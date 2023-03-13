@@ -1,0 +1,129 @@
+/*
+Licensed to LinDB under one or more contributor
+license agreements. See the NOTICE file distributed with
+this work for additional information regarding copyright
+ownership. LinDB licenses this file to you under
+the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+ 
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
+.linsight {
+  height: 100vh;
+
+  .semi-button {
+    border-radius: 0;
+  }
+
+  .semi-input-wrapper {
+    border-radius: 0;
+  }
+
+  .semi-radioGroup-wrapper {
+    border-radius: 0;
+  }
+
+  .semi-select {
+    border-radius: 0;
+  }
+}
+
+.nav-menu-no-icon {
+  .semi-navigation-item-icon-info {
+    // min-width: 0px;
+    margin-right: 4px;
+  }
+
+  .linsight-sider .semi-navigation-item {
+    margin-bottom: 0 !important;
+  }
+
+  .semi-navigation-sub-wrap .semi-navigation-sub-title,
+  .semi-navigation-item {
+    padding: 8px;
+  }
+}
+
+.linsight-sider {
+  .semi-navigation-header-text {
+    font-size: 28px;
+    font-weight: 650;
+  }
+
+  .semi-navigation-item {
+    margin-bottom: 8px !important;
+  }
+
+  .semi-navigation-vertical .semi-navigation-header {
+    display: flex;
+    align-items: center;
+    margin-top: 8px;
+    margin-bottom: 12px;
+    padding: 0;
+  }
+
+  .semi-navigation-header-logo {
+    justify-content: center;
+  }
+
+  .semi-navigation-vertical .semi-navigation-footer {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .semi-navigation-footer {
+    padding: 0;
+  }
+
+  .linsight-nav-footer {
+    width: 100%;
+
+    .user {
+      display: flex;
+      height: 36px;
+      align-items: center;
+      gap: 12px;
+    }
+  }
+
+  .linsight-collapse-btn {
+    color: var(--semi-color-text-3);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--semi-color-primary);
+    }
+  }
+}
+
+.linsight-feature-header {
+  background: var(--semi-color-nav-bg);
+  height: 48px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--semi-color-border);
+}
+
+.linsight-feature {
+  margin: 12px;
+}
+
+.linsight-form {
+  .semi-form-field {
+    padding-bottom: 0;
+  }
+}
+
+.linsight-panel-setting {
+  :first-child {
+    padding-top: 0;
+  }
+}
