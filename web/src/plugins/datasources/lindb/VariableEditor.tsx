@@ -15,10 +15,25 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { Form } from '@douyinfe/semi-ui';
 import React from 'react';
 
 const VariableEditor: React.FC = () => {
-  return <div>variable lin editor</div>;
+  return (
+    <>
+      <Form.Select
+        field="valueType"
+        label="Value type"
+        style={{ width: 300 }}
+        rules={[{ required: true, message: 'Value type is required.' }]}
+        optionList={[
+          { value: 'namespace', label: 'Namespace' },
+          { value: 'metric', label: 'Metric' },
+          { value: 'tagValue', label: 'Tag Value' },
+        ]}
+      />
+    </>
+  );
 };
 
 export default VariableEditor;

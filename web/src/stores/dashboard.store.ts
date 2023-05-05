@@ -20,7 +20,7 @@ import { DefaultColumns, VisualizationAddPanelType } from '@src/constants';
 import { DashboardSrv } from '@src/services';
 import { Dashboard, PanelSetting } from '@src/types';
 import { ApiKit } from '@src/utils';
-import * as _ from 'lodash-es';
+import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
 
 class DashboardStore {
@@ -37,12 +37,12 @@ class DashboardStore {
 
   getPanel(panelId: any): PanelSetting | undefined {
     console.log('xxxxxxxx get panel', panelId, toJS(this.dashboard));
-    const panels = _.get(this.dashboard, 'config.panels', []);
-    return _.find(panels, { id: panelId });
+    const panels = get(this.dashboard, 'config.panels', []);
+    return find(panels, { id: panelId });
   }
 
   clonePanel(panel: PanelSetting) {
-    const newPanel: PanelSetting = _.cloneDeep(panel);
+    const newPanel: PanelSetting = cloneDeep(panel);
     //FIXME: remove other props?
     newPanel.id = `${new Date().getTime()}`;
     if (panel.grid?.x + 2 * panel.grid?.w <= DefaultColumns) {
@@ -54,29 +54,29 @@ class DashboardStore {
   }
 
   addPanel(panel: PanelSetting) {
-    const firstPanelType = _.get(this.dashboard, 'config.panels[0].type', null);
+    const firstPanelType = get(this.dashboard, 'config.panels[0].type', null);
     if (firstPanelType === VisualizationAddPanelType) {
       // first panel is add panel widget, ignore this panel
       return;
     }
-    if (_.has(this.dashboard, 'config.panels')) {
-      _.set(this.dashboard, 'config.panels', _.concat(panel, this.dashboard.config?.panels));
+    if (has(this.dashboard, 'config.panels')) {
+      set(this.dashboard, 'config.panels', concat(panel, this.dashboard.config?.panels));
     } else {
-      _.set(this.dashboard, 'config.panels', [panel]);
+      set(this.dashboard, 'config.panels', [panel]);
     }
     this.sortPanels();
   }
 
   deletePanel(panel: PanelSetting) {
-    const panels = _.get(this.dashboard, 'config.panels', []);
-    const index = _.findIndex(panels, { id: panel.id });
+    const panels = get(this.dashboard, 'config.panels', []);
+    const index = findIndex(panels, { id: panel.id });
     panels.splice(index, 1);
     this.sortPanels();
   }
 
   updatePanel(panel: PanelSetting) {
-    const panels = _.get(this.dashboard, 'config.panels', []);
-    const index = _.findIndex(panels, { id: panel.id });
+    const panels = get(this.dashboard, 'config.panels', []);
+    const index = findIndex(panels, { id: panel.id });
     if (index >= 0) {
       panels[index] = panel;
       console.log('update pp', toJS(panel));
@@ -85,8 +85,8 @@ class DashboardStore {
   }
 
   updatePanelConfig(panel: any, config: any) {
-    _.forIn(config, function (value, key) {
-      _.set(panel, key, value);
+    forIn(config, function (value, key) {
+      set(panel, key, value);
     });
     // const panels = _.get(this.dashboard, 'config.panels', []);
     // const index = _.findIndex(panels, { id: panel.id });
@@ -95,19 +95,31 @@ class DashboardStore {
 
   updateDashboardProps(values: any) {
     console.log(toJS(this.dashboard));
-    this.dashboard = _.merge(this.dashboard, values);
+    this.dashboard = merge(this.dashboard, values);
   }
 
   addVariable(variable: any) {
-    if (_.has(this.dashboard, 'config.variables')) {
-      _.set(this.dashboard, 'config.variables', _.concat(this.dashboard.config?.variables, variable));
+    if (has(this.dashboard, 'config.variables')) {
+      set(this.dashboard, 'config.variables', concat(this.dashboard.config?.variables, variable));
     } else {
-      _.set(this.dashboard, 'config.variables', [variable]);
+      set(this.dashboard, 'config.variables', [variable]);
     }
   }
 
+  updateVariable(index: string, variable: any) {
+    set(this.dashboard, `config.variables[${index}]`, variable);
+  }
+
+  deleteVariable(index: string) {
+    pullAt(get(this.dashboard, 'config.variables', []), parseInt(index));
+  }
+
+  getVariableByIndex(index: string) {
+    return get(this.dashboard, `config.variables[${index}]`, {});
+  }
+
   sortPanels() {
-    const panels = _.get(this.dashboard, 'config.panels', []);
+    const panels = get(this.dashboard, 'config.panels', []);
     panels.sort((a: PanelSetting, b: PanelSetting) => {
       if (a.grid.y === b.grid.y) {
         return a.grid.x - b.grid.x;
@@ -118,14 +130,14 @@ class DashboardStore {
 
   async saveDashboard() {
     try {
-      const panels = _.get(this.dashboard, 'config.panels', []);
+      const panels = get(this.dashboard, 'config.panels', []);
       panels.forEach((panel: PanelSetting) => {
         // only keep x/y/w/h for grid
-        panel.grid = _.pick(panel.grid, ['x', 'y', 'w', 'h']);
+        panel.grid = pick(panel.grid, ['x', 'y', 'w', 'h']);
       });
       this.sortPanels();
       // FIXME: remove unused field
-      if (_.isEmpty(this.dashboard.uid)) {
+      if (isEmpty(this.dashboard.uid)) {
         await DashboardSrv.createDashboard(this.dashboard);
       } else {
         await DashboardSrv.updateDashboard(this.dashboard);
