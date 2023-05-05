@@ -15,30 +15,17 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PanelSetting } from '@src/types';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
+import VariableEditor from './VariableEditor';
+import VariableList from './VariableList';
 
-export interface Dashboard {
-  uid?: string;
-  title?: string;
-  isStarred?: boolean;
-  config?: {
-    panels?: PanelSetting[];
-    variables?: any[];
-  };
-}
+const Variables: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  if (!searchParams.get('edit')) {
+    return <VariableList />;
+  }
+  return <VariableEditor />;
+};
 
-export interface SearchDashboard {
-  title?: string;
-  ownership?: string;
-  tags?: string[];
-}
-
-export interface SearchDashboardResult {
-  total: number;
-  dashboards: Dashboard[];
-}
-export enum VariableHideType {
-  LabelAndValue = 0,
-  OnlyValue = 1,
-  Hide = 2,
-}
+export default Variables;

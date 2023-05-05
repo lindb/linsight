@@ -18,7 +18,7 @@ under the License.
 import React, { useEffect, useRef } from 'react';
 import { Tabs, TabPane, Card, Form } from '@douyinfe/semi-ui';
 import { DashboardStore } from '@src/stores';
-import VariableList from './components/VariableList';
+import Variables from './components/Variables';
 
 const GeneralForm: React.FC = () => {
   const { dashboard } = DashboardStore;
@@ -44,12 +44,12 @@ const GeneralForm: React.FC = () => {
 const Setting: React.FC<{}> = () => {
   return (
     <Card className="linsight-feature dashboard-setting">
-      <Tabs tabPosition="left" defaultActiveKey={'variables'}>
+      <Tabs tabPaneMotion={false} tabPosition="left" defaultActiveKey={'variables'}>
         <TabPane tab="General" itemKey="general">
           <GeneralForm />
         </TabPane>
         <TabPane tab="Variables" itemKey="variables">
-          <VariableList />
+          <Variables />
         </TabPane>
         <TabPane tab="Permissions" itemKey="permissions">
           permissions

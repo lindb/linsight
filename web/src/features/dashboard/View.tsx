@@ -23,8 +23,8 @@ import { Observer } from 'mobx-react-lite';
 import { DashboardStore } from '@src/stores';
 import { toJS } from 'mobx';
 import RGL, { WidthProvider } from 'react-grid-layout';
-import { Form } from '@douyinfe/semi-ui';
 import { DefaultColumns, DefaultRowHeight } from '@src/constants';
+import ViewVariables from './components/ViewVariables';
 
 const ReactGridLayout = WidthProvider(RGL);
 
@@ -51,9 +51,9 @@ const View: React.FC = () => {
 
   return (
     <>
-      <Form style={{ marginLeft: 8 }} className="linsight-form" labelPosition="inset">
-        <Form.Select label="Variable" field="test" optionList={[{ label: 'option1', value: 'option1' }]} />
-      </Form>
+      <div style={{ margin: '6px 6px 0px 6px' }}>
+        <ViewVariables />
+      </div>
       <AutoSizer disableHeight>
         {({ width }) => {
           if (width == 0) {

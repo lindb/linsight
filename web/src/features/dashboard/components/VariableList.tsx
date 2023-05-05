@@ -15,44 +15,95 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardStore } from '@src/stores';
-import * as _ from 'lodash-es';
-import { Button, Table } from '@douyinfe/semi-ui';
-import { IconPlusStroked, IconDeleteStroked, IconCopyStroked } from '@douyinfe/semi-icons';
+import { get, isEmpty, cloneDeep } from 'lodash-es';
+import { Button, Table, Typography } from '@douyinfe/semi-ui';
+import { IconPlusStroked, IconDeleteStroked, IconCopyStroked, IconEyeOpened } from '@douyinfe/semi-icons';
 import { StatusTip } from '@src/components';
 import { observer } from 'mobx-react-lite';
-import VariableEditor from './VariableEditor';
+import { useSearchParams } from 'react-router-dom';
+import ViewVariables from './ViewVariables';
+const { Text } = Typography;
 
 const VariableList: React.FC = () => {
   const { dashboard } = DashboardStore;
-  const variables: any[] = _.get(dashboard, 'config.variables', []);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const variables: any[] = get(dashboard, 'config.variables', []);
+  const [preview, setPreview] = useState(false);
   return (
     <>
-      <VariableEditor />
-      <Button
-        style={{ marginBottom: 12 }}
-        icon={<IconPlusStroked />}
-        onClick={() => DashboardStore.addVariable({ variable: `variable${variables.length}`, name: 'Variable' })}>
-        New
-      </Button>
+      <div style={{ display: 'flex', flexDirection: 'row', gap: 4 }}>
+        <Button
+          icon={<IconPlusStroked />}
+          onClick={() => {
+            const len = variables.length;
+            const variable = `variable${len}`;
+            DashboardStore.addVariable({ name: variable, label: 'Variable' });
+            searchParams.set('edit', `${len}`);
+            setSearchParams(searchParams);
+          }}>
+          New
+        </Button>
+        <Button
+          type="secondary"
+          icon={<IconEyeOpened />}
+          onClick={() => {
+            setPreview(!preview);
+          }}>
+          Preview
+        </Button>
+      </div>
+      {preview && (
+        <div style={{ marginTop: 12 }}>
+          <ViewVariables />
+        </div>
+      )}
       <Table
+        style={{ marginTop: 12 }}
         size="small"
         pagination={false}
         bordered
-        empty={<StatusTip isEmpty={_.isEmpty(variables)} />}
+        empty={<StatusTip isEmpty={isEmpty(variables)} />}
         dataSource={variables}
         columns={[
-          { title: 'Variable', dataIndex: 'variable' },
-          { title: 'Name', dataIndex: 'name' },
+          {
+            title: 'Name',
+            dataIndex: 'name',
+            render: (_text: any, r: any, index: number) => {
+              return (
+                <Text
+                  link
+                  onClick={() => {
+                    searchParams.set('edit', `${index}`);
+                    setSearchParams(searchParams);
+                  }}>
+                  {r.name}
+                </Text>
+              );
+            },
+          },
+          { title: 'Label', dataIndex: 'label' },
           { title: 'Definition' },
           {
             title: 'Operations',
-            render: () => {
+            render: (_text: any, r: any, index: number) => {
               return (
-                <div>
-                  <IconCopyStroked />
-                  <IconDeleteStroked />
+                <div style={{ display: 'flex', flexDirection: 'row', gap: 4 }}>
+                  <Button
+                    type="primary"
+                    icon={<IconCopyStroked size="large" />}
+                    onClick={() => {
+                      const newVariable = cloneDeep(r);
+                      newVariable.name = `copy_of_${newVariable.name}`;
+                      DashboardStore.addVariable(newVariable);
+                    }}
+                  />
+                  <Button
+                    type="danger"
+                    icon={<IconDeleteStroked size="large" />}
+                    onClick={() => DashboardStore.deleteVariable(`${index}`)}
+                  />
                 </div>
               );
             },
