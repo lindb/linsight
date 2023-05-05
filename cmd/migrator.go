@@ -1,0 +1,90 @@
+// Licensed to LinDB under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. LinDB licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+package main
+
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+
+	"github.com/lindb/linsight/accesscontrol"
+	"github.com/lindb/linsight/model"
+	dbpkg "github.com/lindb/linsight/pkg/db"
+	"github.com/lindb/linsight/pkg/util"
+	"github.com/lindb/linsight/pkg/uuid"
+)
+
+func newMigratorCmd() *cobra.Command {
+	migratorCmd := &cobra.Command{
+		Use:   "migrator",
+		Short: "Run as a server",
+	}
+	migratorCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
+		fmt.Sprintf("linsight config file path, default is %s", defaultServerCfgFile))
+
+	migratorCmd.AddCommand(
+		&cobra.Command{
+			Use:   "all",
+			Short: "starts the server",
+			RunE:  runMigration,
+		},
+	)
+	return migratorCmd
+}
+
+func runMigration(_ *cobra.Command, _ []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		panic(err)
+	}
+	db, err := dbpkg.NewDB(cfg.Database)
+	if err != nil {
+		panic(err)
+	}
+	migrator := dbpkg.NewMigrator(db)
+	orgUser := dbpkg.NewMigration(&model.OrgUser{})
+	orgUser.AddInitRecord(
+		&model.OrgUser{OrgID: 1, UserID: 1, Role: accesscontrol.RoleLin},
+		&model.OrgUser{OrgID: 1, UserID: 1},
+	)
+	migrator.AddMigration(orgUser)
+	migrator.AddMigration(dbpkg.NewMigration(&model.UserToken{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Dashboard{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Datasource{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Star{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Preference{}))
+	org := dbpkg.NewMigration(&model.Org{})
+	org.AddInitRecord(
+		&model.Org{Name: "Admin Org", UID: uuid.GenerateShortUUID()},
+		&model.Org{Name: "Admin Org"},
+	)
+	migrator.AddMigration(org)
+
+	user := dbpkg.NewMigration(&model.User{})
+	salt, _ := util.GetRandomString(10)
+	pwd := util.EncodePassword("admin", salt)
+	user.AddInitRecord(
+		&model.User{Name: "admin", Password: pwd, Salt: salt, OrgID: 1, Email: "admin@admin.io"},
+		&model.User{Name: "admin"},
+	)
+	migrator.AddMigration(user)
+	if err = migrator.Run(); err != nil {
+		panic(err)
+	}
+	return nil
+}

@@ -1,0 +1,215 @@
+/*
+Licensed to LinDB under one or more contributor
+license agreements. See the NOTICE file distributed with
+this work for additional information regarding copyright
+ownership. LinDB licenses this file to you under
+the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+ 
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+import { ThemeType, Unit } from '@src/types';
+import { ColorKit, FormatKit, ObjectKit } from '@src/utils';
+import { has, get, set, unset, forIn, cloneDeep, isEmpty, isNull, isNaN } from 'lodash-es';
+
+const OptionsValueMapping = {
+  solid: [],
+  dash: [5, 5],
+  false: false,
+  true: true,
+};
+
+const ConfigItemMapping = {
+  'config.type': 'type',
+};
+
+const OptionsMapping = {
+  'elements.line.borderWidth': 'lineWidth',
+  'elements.line.borderDash': 'lineStyle',
+  'elements.line.cubicInterpolationMode': 'lineInterpolation',
+  'elements.point.radius': 'pointSize',
+  'elements.point.hoverRadius': 'pointSize',
+  spanGaps: 'spanNulls',
+  legend: 'legend',
+  'scales.y.min': 'min',
+  'scales.y.max': 'max',
+};
+
+const CleanOptionsIfNull = {
+  'scales.y.min': 'min',
+  'scales.y.max': 'max',
+};
+
+export const modifyChartConfigs = (chart: any, cfg: object) => {
+  forIn(ConfigItemMapping, (value: string, key: string) => {
+    if (has(cfg, value)) {
+      const val = get(cfg, value);
+      set(chart, key, get(OptionsValueMapping, val, val));
+      // const val = get(cfg, value);
+      // console.log('chart config', key, val, value, isNull(val), isNaN(val));
+      // if (isNull(val) || isNaN(val)) {
+      //   // unset(chart, key);
+      //   console.log('unset...', key, chart, unset(chart, key));
+      // } else {
+      //   set(chart, key, get(OptionsValueMapping, val, val));
+    }
+  });
+  // set fill opacity
+  const fillOpacity = get(cfg, 'fillOpacity', 0);
+  if (fillOpacity <= 0) {
+    (chart.data?.datasets || []).forEach((dataset: any) => {
+      dataset.pointBackgroundColor = dataset.borderColor;
+      dataset.fill = false;
+    });
+  } else {
+    (chart.data?.datasets || []).forEach((dataset: any) => {
+      dataset.pointBackgroundColor = dataset.borderColor;
+      dataset.fill = true;
+      dataset.backgroundColor = ColorKit.toRGBA(dataset.borderColor, fillOpacity / 100);
+    });
+  }
+};
+
+export const modifyChartOptions = (chart: any, options: object) => {
+  forIn(OptionsMapping, (value: string, key: string) => {
+    if (has(options, value)) {
+      const val = get(options, value);
+      set(chart, key, get(OptionsValueMapping, val, val));
+    }
+    // const val = get(options, value);
+    // console.log('chart options', key, val, value, isNull(val), isNaN(val));
+    // if (isNull(val) || isNaN(val)) {
+    //   if (has(CleanOptionsIfNull, key)) {
+    //     // unset(chrrt, key);
+    //   }
+    // } else {
+    //   set(chart, key, get(OptionsValueMapping, val, val));
+    // }
+  });
+};
+
+export const DarkChart = {
+  options: {},
+};
+
+export const LightChart = {
+  options: {
+    scales: {},
+  },
+};
+
+export function getChartThemeConfig(theme: ThemeType, raw: any) {
+  let chartTheme: any = LightChart;
+  if (theme === ThemeType.Dark) {
+    chartTheme = DarkChart;
+  }
+  // NOTE: IMPORTANT: need clone object, because merge return target object.
+  return cloneDeep(ObjectKit.merge(raw, chartTheme));
+}
+
+export const DefaultChartConfig = {
+  type: 'doughnut',
+  data: {},
+  plugins: {
+    message: {},
+  },
+  options: {
+    cutout: '60%',
+    radius: '100%',
+    circumference: 180,
+    rotation: -90,
+    // rotation: 1 * Math.PI /** This is where you need to work out where 89% is */,
+    // circumference: 1 * Math.PI /** put in a much smaller amount  so it does not take up an entire semi circle */,
+    cutoutPercentage: 95, // precent
+    animation: {
+      animateScale: true,
+    },
+    elements: {
+      arc: {
+        angle: 100,
+        borderWidth: 1,
+        circular: true,
+        // borderColor: 'red',
+        borderAlign: 'center',
+      },
+    },
+    plugins: {
+      annotation: {
+        annotations: [],
+      },
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        mode: 'dataset',
+        enabled: false,
+      },
+      title: {
+        display: false,
+      },
+    },
+    legend: {
+      display: false,
+    },
+    tooltips: {
+      enabled: false,
+    },
+  },
+  // options: {
+  //   responsive: true,
+  //   maintainAspectRatio: false,
+  //   animation: false,
+  //   zoom: true,
+  //   legend: {
+  //     asTable: true,
+  //   },
+  //   layout: {
+  //     padding: 0,
+  //   },
+  //   plugins: {
+  //     annotation: {
+  //       annotations: [],
+  //     },
+  //     legend: {
+  //       display: false,
+  //     },
+  //     tooltip: {
+  //       mode: 'dataset',
+  //       enabled: false,
+  //     },
+  //     title: {
+  //       display: false,
+  //     },
+  //   },
+  //   elements: {
+  //     line: {
+  //       tension: false, // disables bezier curve
+  //       borderWidth: 1,
+  //       fillColor: 'rgba(255, 145, 68, 0.2)',
+  //       fill: false,
+  //       cubicInterpolationMode: 'line',
+  //       borderDash: [],
+  //     },
+  //     point: {
+  //       radius: 0,
+  //       borderWidth: 0,
+  //       hoverRadius: 0,
+  //       hoverBorderWidth: 0,
+  //     },
+  //     arc: {
+  //       borderWidth: 0,
+  //     },
+  //   },
+  //   hover: {
+  //     mode: 'index',
+  //     intersect: false,
+  //   },
+  // },
+};

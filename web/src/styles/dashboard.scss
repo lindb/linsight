@@ -1,0 +1,240 @@
+/*
+Licensed to LinDB under one or more contributor
+license agreements. See the NOTICE file distributed with
+this work for additional information regarding copyright
+ownership. LinDB licenses this file to you under
+the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+ 
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+*/
+
+.dashboard-panel {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+
+  .semi-card-header {
+    line-height: 32px;
+    height: 32px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 0 8px;
+  }
+
+  .panel-header {
+    display: flex;
+    width: 100%;
+    align-items: center;
+
+    .title {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .title:hover {
+      cursor: move;
+    }
+
+    .close {
+      cursor: pointer;
+    }
+
+    .btn {
+      visibility: hidden;
+      cursor: pointer;
+    }
+
+    &:hover {
+      .btn {
+        visibility: visible;
+      }
+    }
+  }
+
+  .semi-card-body {
+    padding: 8px;
+    box-sizing: border-box;
+    flex: 1;
+  }
+
+  .add-panel {
+    display: grid;
+    height: 100%;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+
+    button {
+      height: 100%;
+      flex: 50%;
+    }
+  }
+}
+
+.dashboard-panel-static {
+  .panel-header {
+    .title:hover {
+      cursor: default;
+    }
+  }
+}
+
+.add-panel-widget {
+  border: 1.5px solid var(--semi-color-primary);
+
+  .semi-button {
+    .iconfont {
+      font-size: 24px;
+    }
+  }
+}
+
+.edit-panel {
+  .semi-modal-header {
+    margin: 0;
+  }
+
+  .semi-navigation-list-wrapper {
+    padding-top: 0;
+  }
+
+  .semi-navigation-horizontal {
+    height: 36px;
+    border-right: none;
+    border-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .semi-modal-content {
+    padding: 0;
+  }
+
+  .semi-modal-body {
+    background: var(--semi-color-bg-0);
+  }
+}
+
+.react-grid-item {
+  .react-resizable-handle {
+    visibility: hidden;
+  }
+
+  .react-resizable-handle::after {
+    border-right: 2px solid var(--semi-color-primary);
+    border-bottom: 2px solid var(--semi-color-primary);
+  }
+
+  &:hover {
+    .react-resizable-handle {
+      visibility: visible;
+    }
+  }
+}
+
+.react-grid-item.react-grid-placeholder {
+  background: var(--semi-color-primary);
+}
+
+.Resizer {
+  /* background: #000; */
+
+  z-index: 1;
+  box-sizing: border-box;
+  background-clip: padding;
+  background-clip: padding-box;
+}
+
+.Resizer.horizontal {
+  height: 16px;
+  min-height: 16px;
+  position: relative;
+  cursor: row-resize;
+}
+
+.Resizer.horizontal:hover::before {
+  border-color: var(--semi-color-primary);
+}
+
+.Resizer.horizontal:hover::after {
+  background: var(--semi-color-primary);
+}
+
+.Resizer.horizontal::after {
+  width: 200px;
+  height: 4px;
+  background: var(--semi-color-border);
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transition: background 0.2s ease-in-out 0s;
+  transform: translate(-50%, -50%);
+  border-radius: 4px;
+}
+
+.Resizer.horizontal::before {
+  border-bottom: 1px solid transparent;
+  width: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  content: '';
+  position: absolute;
+  transition: border-color 0.2s ease-in-out 0s;
+}
+
+.Resizer.vertical {
+  width: 16px;
+  min-width: 16px;
+  position: relative;
+  cursor: col-resize;
+}
+
+.Resizer.vertical:hover::before {
+  border-color: var(--semi-color-primary);
+}
+
+.Resizer.vertical:hover::after {
+  background: var(--semi-color-primary);
+}
+
+.Resizer.vertical::before {
+  border-right: 1px solid transparent;
+  height: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.Resizer.vertical::before {
+  content: '';
+  position: absolute;
+  transition: border-color 0.2s ease-in-out 0s;
+}
+
+.Resizer.vertical::after {
+  height: 200px;
+  width: 4px;
+}
+
+.Resizer.vertical::after {
+  background: var(--semi-color-border);
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transition: background 0.2s ease-in-out 0s;
+  transform: translate(-50%, -50%);
+  border-radius: 4px;
+}
