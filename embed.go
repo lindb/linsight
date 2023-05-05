@@ -24,3 +24,6 @@ var StaticFS embed.FS
 
 //go:embed web/static/index.html
 var IndexFile string
+
+//go:embed accesscontrol/rbac_model.conf
+var RBACModel string

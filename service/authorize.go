@@ -21,8 +21,10 @@ import (
 	"fmt"
 
 	"github.com/casbin/casbin/v2"
+	"github.com/casbin/casbin/v2/model"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 
+	"github.com/lindb/linsight"
 	"github.com/lindb/linsight/accesscontrol"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 )
@@ -46,8 +48,12 @@ func NewAuthorizeService(db dbpkg.DB) AuthorizeService {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create canbin grom adapter: %v", err))
 	}
+	m, err := model.NewModelFromString(linsight.RBACModel)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create casbin model: %v", err))
+	}
 	// Load model configuration file and policy store adapter
-	enforcer, err := casbin.NewEnforcer("accesscontrol/rbac_model.conf", adapter)
+	enforcer, err := casbin.NewEnforcer(m, adapter)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create casbin enforcer: %v", err))
 	}
