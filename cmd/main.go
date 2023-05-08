@@ -120,6 +120,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AuthenticateSrv: service.NewAuthenticateService(userSrv, db),
 		DatasourceSrv:   service.NewDatasourceService(db),
 		DashboardSrv:    service.NewDashboardService(starSrv, db),
+		ChartSrv:        service.NewChartService(db),
 	}
 }
 

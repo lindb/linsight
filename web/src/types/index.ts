@@ -21,6 +21,7 @@ export * from '@src/types/plugin';
 export * from '@src/types/datasource';
 export * from '@src/types/visualization';
 export * from '@src/types/dashboard';
+export * from '@src/types/chart';
 export * from '@src/types/feature';
 export * from '@src/types/platform';
 export * from '@src/types/format';

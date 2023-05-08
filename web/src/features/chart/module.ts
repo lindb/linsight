@@ -15,12 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ApiPath } from '@src/constants';
-import { DataQuery } from '@src/types';
-import { ApiKit } from '@src/utils';
+import { Feature, FeatureRepositoryInst } from '@src/types';
+import ListChart from '@src/features/chart/index';
 
-const query = (req: DataQuery): Promise<any> => {
-  return ApiKit.PUT<any>(ApiPath.DataQuery, req);
-};
-
-export default { query };
+FeatureRepositoryInst.register(new Feature('/charts', ListChart));

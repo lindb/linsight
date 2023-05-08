@@ -31,6 +31,7 @@ const (
 	Datasource          ResourceType = "datasource"
 	DatasourceDataQuery ResourceType = "datasource_data_query"
 	Dashboard           ResourceType = "dashboard"
+	Chart               ResourceType = "chart"
 )
 
 func (r ResourceType) String() string {
@@ -77,7 +78,9 @@ func BuildPolicyDefinitions() []Policy {
 		AddPolicy(RoleAdmin, Datasource, Write).
 		AddPolicy(RoleViewer, Datasource, Read).
 		AddPolicy(RoleViewer, DatasourceDataQuery, Read).
+		AddPolicy(RoleViewer, Dashboard, Write).
 		AddPolicy(RoleViewer, Dashboard, Read).
-		AddPolicy(RoleViewer, Dashboard, Read).
+		AddPolicy(RoleViewer, Chart, Write).
+		AddPolicy(RoleViewer, Chart, Read).
 		Build()
 }

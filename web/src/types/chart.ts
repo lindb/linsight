@@ -15,12 +15,23 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ApiPath } from '@src/constants';
-import { DataQuery } from '@src/types';
-import { ApiKit } from '@src/utils';
+import { PanelSetting } from '@src/types';
 
-const query = (req: DataQuery): Promise<any> => {
-  return ApiKit.PUT<any>(ApiPath.DataQuery, req);
-};
+export interface Chart {
+  uid?: string;
+  title?: string;
+  isStarred?: boolean;
+  config?: PanelSetting;
+  variables?: any[];
+}
 
-export default { query };
+export interface SearchChart {
+  title?: string;
+  ownership?: string;
+  tags?: string[];
+}
+
+export interface SearchChartResult {
+  total: number;
+  charts: Chart[];
+}

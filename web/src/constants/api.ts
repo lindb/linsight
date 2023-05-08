@@ -25,4 +25,5 @@ export enum ApiPath {
   Datasource = '/datasource',
   Dashboard = '/dashboards',
   DataQuery = '/data/query',
+  Chart = '/charts',
 }

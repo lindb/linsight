@@ -23,11 +23,14 @@ import (
 )
 
 type API struct {
-	Config          *config.Server
+	Config *config.Server
+
 	OrgSrv          service.OrgService
 	UserSrv         service.UserService
+	DatasourceSrv   service.DatasourceService
 	AuthenticateSrv service.AuthenticateService
 	AuthorizeSrv    service.AuthorizeService
-	DashboardSrv    service.DashboardService
-	DatasourceSrv   service.DatasourceService
+
+	DashboardSrv service.DashboardService
+	ChartSrv     service.ChartService
 }

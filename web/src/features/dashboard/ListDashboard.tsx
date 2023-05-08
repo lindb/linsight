@@ -45,7 +45,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardSrv } from '@src/services';
 import { StatusTip } from '@src/components';
-import * as _ from 'lodash-es';
+import { isEmpty } from 'lodash-es';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
 
 const { Text } = Typography;
@@ -70,7 +70,7 @@ const ListDashboard: React.FC = () => {
           defaultValue={title}
           showClear
           onChange={(value: string) => {
-            if (_.isEmpty(value)) {
+            if (isEmpty(value)) {
               searchParams.delete('title');
             } else {
               searchParams.set('title', value);
@@ -131,12 +131,12 @@ const ListDashboard: React.FC = () => {
                   <StatusTip
                     isLoading={isLoading || isFetching}
                     isError={isError}
-                    isEmpty={_.isEmpty(data?.dashboards)}
+                    isEmpty={isEmpty(data?.dashboards)}
                     error={error}
                   />
                 }
                 pagination={
-                  _.isEmpty(data?.dashboards)
+                  isEmpty(data?.dashboards)
                     ? false
                     : { total: data?.total || 0, pageSize: 20, style: { marginLeft: 8 } }
                 }
