@@ -110,6 +110,13 @@ class DashboardStore {
     set(this.dashboard, `config.variables[${index}]`, variable);
   }
 
+  reorderVariables(startIndex: number, endIndex: number) {
+    const result = Array.from(get(this.dashboard, 'config.variables', []));
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+    set(this.dashboard, `config.variables`, result);
+  }
+
   deleteVariable(index: string) {
     pullAt(get(this.dashboard, 'config.variables', []), parseInt(index));
   }

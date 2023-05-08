@@ -20,3 +20,19 @@ under the License.
     padding-right: 8px;
   }
 }
+
+.lin-variables-table {
+  margin-top: 12px;
+
+  .semi-table-body {
+    // fix auto scroll not working
+    // https://github.com/atlassian/react-beautiful-dnd/issues/2028
+    overflow: unset;
+  }
+
+  .row-dragging {
+    display: table;
+    color: var(--semi-color-primary);
+    background: var(--semi-color-primary-light-active);
+  }
+}
