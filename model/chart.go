@@ -17,26 +17,16 @@
 
 package model
 
-import (
-	"gorm.io/datatypes"
-)
+import "gorm.io/datatypes"
 
-type Ownership int
-
-const (
-	Any Ownership = iota
-	Mine
-	Shared
-)
-
-// Dashboard represents dasshboard basic information.
-type Dashboard struct {
+// Chart represents chart basic information.
+type Chart struct {
 	BaseModel
 
-	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
+	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_chart_org_title,unique"`
 
-	UID     string `json:"uid" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
-	Title   string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
+	UID     string `json:"uid" gorm:"column:uid;index:u_idx_chart_uid,unique"`
+	Title   string `json:"title" gorm:"column:title;index:u_idx_chart_org_title,unique"`
 	Desc    string `json:"desc" gorm:"column:desc"`
 	Version int    `json:"version" gorm:"column:version"`
 
@@ -45,8 +35,8 @@ type Dashboard struct {
 	IsStarred bool `json:"isStarred" gorm:"-"`
 }
 
-// SearchDashboardRequest represents search dashboard request params.
-type SearchDashboardRequest struct {
+// SearchChartRequest represents search chart request params.
+type SearchChartRequest struct {
 	PagingParam
 	Title     string    `form:"title" json:"title"`
 	Ownership Ownership `form:"ownership" json:"ownership"`

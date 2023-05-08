@@ -16,11 +16,18 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { DataQuery } from '@src/types';
+import { Chart, SearchChart, SearchChartResult } from '@src/types';
 import { ApiKit } from '@src/utils';
 
-const query = (req: DataQuery): Promise<any> => {
-  return ApiKit.PUT<any>(ApiPath.DataQuery, req);
+const createChart = (chart: Chart): Promise<string> => {
+  return ApiKit.POST<string>(ApiPath.Chart, chart);
 };
 
-export default { query };
+const searchCharts = (req: SearchChart): Promise<SearchChartResult> => {
+  return ApiKit.GET<SearchChartResult>(ApiPath.Chart, req);
+};
+
+export default {
+  createChart,
+  searchCharts,
+};

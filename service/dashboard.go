@@ -108,7 +108,7 @@ func (srv *dashboardService) DeleteDashboardByUID(ctx context.Context, uid strin
 }
 
 // SearchDashboards searches the dashboard by given params.
-func (srv *dashboardService) SearchDashboards(ctx context.Context,
+func (srv *dashboardService) SearchDashboards(ctx context.Context, //nolint:dupl
 	req *model.SearchDashboardRequest,
 ) (rs []model.Dashboard, total int64, err error) {
 	conditions := []string{"org_id=?"}

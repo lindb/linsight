@@ -35,9 +35,11 @@ type Router struct {
 	bootAPI       *api.BootAPI
 	orgAPI        *api.OrgAPI
 	userAPI       *api.UserAPI
-	dashboardAPI  *api.DashboardAPI
 	datasourceAPI *api.DatasourceAPI
 	dataQueryAPI  *api.DataQueryAPI
+
+	dashboardAPI *api.DashboardAPI
+	chartAPI     *api.ChartAPI
 }
 
 func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
@@ -47,9 +49,11 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		loginAPI:      api.NewLoginAPI(deps),
 		bootAPI:       api.NewBootAPI(deps),
 		userAPI:       api.NewUserAPI(deps),
-		dashboardAPI:  api.NewDashboardAPI(deps),
 		datasourceAPI: api.NewDatasourceAPI(deps),
 		dataQueryAPI:  api.NewDataQueryAPI(deps),
+
+		dashboardAPI: api.NewDashboardAPI(deps),
+		chartAPI:     api.NewChartAPI(deps),
 	}
 }
 
@@ -93,20 +97,27 @@ func (r *Router) RegisterRouters() {
 	router.GET("/datasources/:uid",
 		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Read, r.datasourceAPI.GetDatasourceByUID)...)
 
+	// dashboard api
 	router.POST("/dashboards",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.dashboardAPI.CreateDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.CreateDashboard)...)
 	router.PUT("/dashboards",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.dashboardAPI.UpdateDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.UpdateDashboard)...)
 	router.DELETE("/dashboards/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.dashboardAPI.DeleteDashboardByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.DeleteDashboardByUID)...)
 	router.GET("/dashboards",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Read, r.dashboardAPI.SearchDashboards)...)
+		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Read, r.dashboardAPI.SearchDashboards)...)
 	router.GET("/dashboards/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Read, r.dashboardAPI.GetDashboardByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Read, r.dashboardAPI.GetDashboardByUID)...)
 	router.PUT("/dashboards/:uid/star",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.dashboardAPI.StarDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.StarDashboard)...)
 	router.DELETE("/dashboards/:uid/star",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.dashboardAPI.UnstarDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.UnstarDashboard)...)
+
+	// chart repo api
+	router.POST("/charts",
+		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.CreateChart)...)
+	router.GET("/charts",
+		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Read, r.chartAPI.SearchCharts)...)
 
 	router.PUT("/data/query",
 		middleware.Authorize(r.deps, accesscontrol.DatasourceDataQuery, accesscontrol.Read, r.dataQueryAPI.Query)...)

@@ -264,7 +264,7 @@ func TestDashboardAPI_GetDashboardByUID(t *testing.T) {
 	}
 }
 
-func TestDashboardAPI_SearchDashboard(t *testing.T) {
+func TestDashboardAPI_SearchDashboards(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -324,6 +324,7 @@ func TestDashboardAPI_SearchDashboard(t *testing.T) {
 		})
 	}
 }
+
 func TestDashboardAPI_StarDashboard(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
