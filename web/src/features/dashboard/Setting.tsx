@@ -19,8 +19,10 @@ import React, { useEffect, useRef } from 'react';
 import { Tabs, TabPane, Card, Form } from '@douyinfe/semi-ui';
 import { DashboardStore } from '@src/stores';
 import Variables from './components/Variables';
+import { observer } from 'mobx-react-lite';
+import { useSearchParams } from 'react-router-dom';
 
-const GeneralForm: React.FC = () => {
+const GeneralForm: React.FC = observer(() => {
   const { dashboard } = DashboardStore;
   const formApi = useRef<any>();
 
@@ -39,12 +41,21 @@ const GeneralForm: React.FC = () => {
       <Form.Input label="Title" field="title" />
     </Form>
   );
-};
+});
 
 const Setting: React.FC<{}> = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   return (
     <Card className="linsight-feature dashboard-setting">
-      <Tabs tabPaneMotion={false} tabPosition="left" defaultActiveKey={'variables'}>
+      <Tabs
+        tabPaneMotion={false}
+        tabPosition="left"
+        defaultActiveKey={searchParams.get('tab') || 'general'}
+        onChange={(activeKey: string) => {
+          searchParams.set('tab', activeKey);
+          setSearchParams(searchParams);
+        }}>
         <TabPane tab="General" itemKey="general">
           <GeneralForm />
         </TabPane>

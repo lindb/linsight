@@ -145,13 +145,16 @@ class DashboardStore {
       this.sortPanels();
       // FIXME: remove unused field
       if (isEmpty(this.dashboard.uid)) {
-        await DashboardSrv.createDashboard(this.dashboard);
+        const uid = await DashboardSrv.createDashboard(this.dashboard);
+        this.dashboard.uid = uid;
       } else {
         await DashboardSrv.updateDashboard(this.dashboard);
       }
       Notification.success('Save dashboard successfully!');
+      return true;
     } catch (err) {
       Notification.error(ApiKit.getErrorMsg(err));
+      return false;
     }
   }
 }
