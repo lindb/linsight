@@ -77,7 +77,7 @@ const DashboardStar = observer(() => {
 });
 
 const Dashboard: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const dashboardId = searchParams.get('d');
   const { data: dashboard, isLoading } = useQuery(
@@ -127,7 +127,7 @@ const Dashboard: React.FC = () => {
       <Header className="linsight-feature-header dashboard">
         <div className="title">
           <IconGridStroked size="large" />
-          <Title heading={6}>{dashboard.title}</Title>
+          <Title heading={6}>{DashboardStore.dashboard?.title}</Title>
           <DashboardStar />
         </div>
         <div style={{ marginRight: 12, gap: 8, display: 'flex' }}>
@@ -157,12 +157,17 @@ const Dashboard: React.FC = () => {
           <Button
             type="tertiary"
             icon={<IconSaveStroked />}
-            onClick={() => {
+            onClick={async () => {
               if (PanelStore.panel) {
                 // if has edit panel, need update dashboard's panel
                 DashboardStore.updatePanel(PanelStore.panel);
               }
-              DashboardStore.saveDashboard();
+              const success = await DashboardStore.saveDashboard();
+              if (success && !dashboardId) {
+                // if create dashboard successfully, need set uid to url params
+                searchParams.set('d', `${DashboardStore.dashboard.uid}`);
+                setSearchParams(searchParams);
+              }
             }}
           />
           <Button
@@ -190,4 +195,5 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard;
+//TODO: need add dashboard header?
+export default observer(Dashboard);
