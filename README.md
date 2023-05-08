@@ -2,6 +2,8 @@
 
 An open-source, all-in-one observability platform.
 
+[![codecov](https://codecov.io/gh/lindb/linsight/branch/develop/graph/badge.svg)](https://codecov.io/gh/lindb/linsight)
+
 - init db records
 
 ```sh
