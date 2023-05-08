@@ -43,3 +43,5 @@ jobs:
         run: make gomock
       - name: Test
         run: make test-without-lint
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v3
