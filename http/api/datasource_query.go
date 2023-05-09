@@ -18,27 +18,24 @@
 package api
 
 import (
-	"encoding/json"
-
 	"github.com/gin-gonic/gin"
 	httppkg "github.com/lindb/common/pkg/http"
 
 	apideps "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
-	"github.com/lindb/linsight/plugin/datasource"
 )
 
-type DataQueryAPI struct {
+type DatasourceQueryAPI struct {
 	deps *apideps.API
 }
 
-func NewDataQueryAPI(deps *apideps.API) *DataQueryAPI {
-	return &DataQueryAPI{
+func NewDatasourceQueryAPI(deps *apideps.API) *DatasourceQueryAPI {
+	return &DatasourceQueryAPI{
 		deps: deps,
 	}
 }
 
-func (api *DataQueryAPI) Query(c *gin.Context) {
+func (api *DatasourceQueryAPI) DataQuery(c *gin.Context) {
 	req := &model.QueryRequest{}
 	err := c.ShouldBind(&req)
 	if err != nil {
@@ -54,9 +51,12 @@ func (api *DataQueryAPI) Query(c *gin.Context) {
 			httppkg.Error(c, err)
 			return
 		}
-		// FIXME: check datasource plugin if exist
-		dsRequest := datasource.DataSourceHandlers[ds.Type](ds.URL, json.RawMessage(ds.Config))
-		resp, err := dsRequest.DataQuery(query, req.Range)
+		cli, err := api.deps.DatasourceMgr.GetPlugin(ds)
+		if err != nil {
+			httppkg.Error(c, err)
+			return
+		}
+		resp, err := cli.DataQuery(ctx, query, req.Range)
 		if err != nil {
 			httppkg.Error(c, err)
 			return
@@ -64,4 +64,31 @@ func (api *DataQueryAPI) Query(c *gin.Context) {
 		rs[i] = resp
 	}
 	httppkg.OK(c, rs)
+}
+
+func (api *DatasourceQueryAPI) MetadataQuery(c *gin.Context) {
+	req := &model.Query{}
+	err := c.ShouldBind(&req)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+
+	ctx := c.Request.Context()
+	ds, err := api.deps.DatasourceSrv.GetDatasourceByUID(ctx, req.Datasource.UID)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	cli, err := api.deps.DatasourceMgr.GetPlugin(ds)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	resp, err := cli.MetadataQuery(ctx, req)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, resp)
 }

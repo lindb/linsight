@@ -19,14 +19,14 @@ package model
 
 import "encoding/json"
 
-type Range struct {
+type TimeRange struct {
 	From string `json:"from"`
 	To   string `json:"to"`
 }
 
 type QueryRequest struct {
-	Range   Range    `json:"range"`
-	Queries []*Query `json:"queries"`
+	Range   TimeRange `json:"range"`
+	Queries []*Query  `json:"queries"`
 }
 
 type Query struct {

@@ -15,25 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package lindb
 
 import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
+	sq "github.com/Masterminds/squirrel"
 )
 
-type API struct {
-	Config *config.Server
-
-	OrgSrv          service.OrgService
-	UserSrv         service.UserService
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+func buildDataSQL(req *DataQueryRequest) (string, error) {
+	groupBy := req.GroupBy
+	if req.Stats {
+		groupBy = append(groupBy, "time()")
+	}
+	// quoting fields: https://github.com/Masterminds/squirrel/issues/94
+	builder := sq.Select(req.Fields...).
+		From(req.Metric).
+		GroupBy(groupBy...)
+	sql, _, err := builder.ToSql()
+	if err != nil {
+		return "", err
+	}
+	return sql, nil
 }

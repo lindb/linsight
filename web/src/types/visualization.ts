@@ -32,13 +32,13 @@ export enum Unit {
 }
 
 export interface PanelSetting {
-  id: any;
+  id?: any;
   title?: string;
   description?: string;
   type?: string;
   options?: object;
   targets?: Query[];
-  grid: {
+  grid?: {
     x: number;
     y: number;
     w: number;

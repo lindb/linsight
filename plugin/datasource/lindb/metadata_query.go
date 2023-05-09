@@ -15,25 +15,28 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package lindb
 
-import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
-)
+import "fmt"
 
-type API struct {
-	Config *config.Server
+func buildMetadataQuerySQL(req *MetadataQueryRequest) string {
+	switch req.Type {
+	case Namespace:
+		return "show namespaces"
+	case Metric:
+		return "show metrics" + buildMetricNamePrefix(req.Prefix)
+	case Field:
+		return fmt.Sprintf("show fields from '%s'", req.Metric)
+	case TagKey:
+		return fmt.Sprintf("show tag keys from '%s'", req.Metric)
+	case TagValue:
+	}
+	return ""
+}
 
-	OrgSrv          service.OrgService
-	UserSrv         service.UserService
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+func buildMetricNamePrefix(prefix string) string {
+	if prefix != "" {
+		return fmt.Sprintf(" where metric='%s'", prefix)
+	}
+	return ""
 }

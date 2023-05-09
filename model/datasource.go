@@ -19,6 +19,14 @@ package model
 
 import "gorm.io/datatypes"
 
+// DatasourceType represents the type of datasource.
+type DatasourceType = string
+
+// Define all support datasource types.
+var (
+	LinDBDatasource DatasourceType = "lindb"
+)
+
 // Datasource represents datasource information.
 type Datasource struct {
 	BaseModel
@@ -28,7 +36,7 @@ type Datasource struct {
 
 	UID    string         `json:"uid" gorm:"column:uid;index:u_idx_datasource_uid,unique"`
 	Name   string         `json:"name" gorm:"column:name;index:u_idx_datasource_org_name,unique"`
-	Type   string         `json:"type" gorm:"column:type"`
+	Type   DatasourceType `json:"type" gorm:"column:type"`
 	URL    string         `json:"url" gorm:"column:url"`
 	Config datatypes.JSON `json:"config" gorm:"column:config"`
 }

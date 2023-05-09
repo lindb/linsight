@@ -39,6 +39,7 @@ const GeneralForm: React.FC = observer(() => {
       getFormApi={(api: any) => (formApi.current = api)}
       onValueChange={(values: any) => DashboardStore.updateDashboardProps(values)}>
       <Form.Input label="Title" field="title" />
+      <Form.TextArea label="Description" field="desc" />
     </Form>
   );
 });

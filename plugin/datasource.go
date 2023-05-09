@@ -15,25 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package plugin
 
 import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
+	"context"
+	"encoding/json"
+
+	"github.com/lindb/linsight/model"
 )
 
-type API struct {
-	Config *config.Server
+type NewDatasourcePlugin func(url string, cfg json.RawMessage) (DatasourcePlugin, error)
 
-	OrgSrv          service.OrgService
-	UserSrv         service.UserService
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+type DatasourcePlugin interface {
+	DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error)
+	MetadataQuery(ctx context.Context, req *model.Query) (any, error)
 }

@@ -15,22 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package datasource
+package lindb
 
 import (
-	"encoding/json"
-
-	"github.com/lindb/linsight/model"
+	"testing"
 )
 
-type NewHander func(url string, cfg json.RawMessage) Handler
-
-var DataSourceHandlers = make(map[string]NewHander)
-
-func init() {
-	DataSourceHandlers["lindb"] = NewLinDBHandler
-}
-
-type Handler interface {
-	DataQuery(req *model.Query, timeRange model.Range) (any, error)
+func TestDataQuery_buildSQL(t *testing.T) {
+	_, _ = buildDataSQL(&DataQueryRequest{
+		Metric:  "system.host.cpu",
+		Fields:  []string{"load", "usage"},
+		GroupBy: []string{"host", "region"},
+	})
 }

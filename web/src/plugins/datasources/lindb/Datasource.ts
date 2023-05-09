@@ -17,7 +17,7 @@ under the License.
 */
 import { DataQuerySrv } from '@src/services';
 import { DatasourceAPI, DatasourceSetting } from '@src/types';
-import * as _ from 'lodash-es';
+import { isEmpty } from 'lodash-es';
 
 export class LinDBDatasource extends DatasourceAPI {
   constructor(setting: DatasourceSetting) {
@@ -25,38 +25,51 @@ export class LinDBDatasource extends DatasourceAPI {
   }
 
   async fetchMetricNames(prefix?: string): Promise<string[]> {
-    const rs = await DataQuerySrv.query({
-      queries: [{ datasource: { uid: this.setting.uid }, request: { db: '_internal', sql: 'show metrics' } }],
+    const rs = await DataQuerySrv.metadataQuery({
+      datasource: { uid: this.setting.uid },
+      request: { type: 'metric', prefix: prefix },
     });
     if (rs) {
-      return rs[0].values;
+      return rs.values;
     }
     return [];
   }
 
   async getFields(metric: string): Promise<string[]> {
-    if (_.isEmpty(metric)) {
+    if (isEmpty(metric)) {
       return [];
     }
-    const rs = await DataQuerySrv.query({
-      queries: [{ datasource: { uid: this.setting.uid }, request: { sql: `show fields from '${metric}'` } }],
+    const rs = await DataQuerySrv.metadataQuery({
+      datasource: { uid: this.setting.uid },
+      request: { type: 'field', metric: metric },
     });
     if (rs) {
-      return rs[0].values;
+      return rs.values;
     }
     return [];
   }
 
-  getTagKeys() {
-    console.log('get tag keys');
+  async getTagKeys(metric: string): Promise<string[]> {
+    if (isEmpty(metric)) {
+      return [];
+    }
+    const rs = await DataQuerySrv.metadataQuery({
+      datasource: { uid: this.setting.uid },
+      request: { type: 'tagKey', metric: metric },
+    });
+    if (rs) {
+      return rs.values;
+    }
+    return [];
   }
 
   query(req: any) {
-    return DataQuerySrv.query({
+    console.log(req, 'xxxxxx');
+    return DataQuerySrv.dataQuery({
       queries: [
         {
           datasource: { uid: this.setting.uid },
-          request: { sql: `select go_threads from 'lindb.runtime' group by node,time()` },
+          request: req,
         },
       ],
     });

@@ -29,6 +29,7 @@ import (
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
 	dbpkg "github.com/lindb/linsight/pkg/db"
+	"github.com/lindb/linsight/plugin/datasource"
 	"github.com/lindb/linsight/service"
 )
 
@@ -121,6 +122,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DatasourceSrv:   service.NewDatasourceService(db),
 		DashboardSrv:    service.NewDashboardService(starSrv, db),
 		ChartSrv:        service.NewChartService(db),
+
+		DatasourceMgr: datasource.NewDatasourceManager(),
 	}
 }
 
