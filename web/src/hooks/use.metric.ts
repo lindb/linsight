@@ -18,14 +18,16 @@ under the License.
 import { DatasourceStore } from '@src/stores';
 import { Query } from '@src/types';
 import { useQuery } from '@tanstack/react-query';
-import * as _ from 'lodash-es';
+import { isEmpty } from 'lodash-es';
 
 export const useMetric = (queries: Query[]) => {
-  const { isInitialLoading, isLoading, isFetching, isError, data, error } = useQuery(
+  console.log('use metric.......', queries);
+  const { isInitialLoading, isLoading, isFetching, isError, data, refetch, error } = useQuery(
     ['search_metric_data'],
     async () => {
       const requests: any[] = [];
       (queries || []).forEach((query: Query) => {
+        console.log(query, 'query.....');
         const ds = DatasourceStore.getDatasource(query.datasource.uid);
         if (!ds) {
           return;
@@ -37,12 +39,13 @@ export const useMetric = (queries: Query[]) => {
         return res.map((item) => (item.status === 'fulfilled' ? item.value : [])).flat();
       });
     },
-    { enabled: !_.isEmpty(queries) }
+    { enabled: !isEmpty(queries) }
   );
   return {
     isLoading: isInitialLoading || isLoading || isFetching,
     isError,
     data,
     error,
+    refetch,
   };
 };

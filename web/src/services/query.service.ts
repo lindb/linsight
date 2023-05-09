@@ -16,11 +16,18 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { DataQuery } from '@src/types';
+import { DataQuery, Query } from '@src/types';
 import { ApiKit } from '@src/utils';
 
-const query = (req: DataQuery): Promise<any> => {
+const dataQuery = (req: DataQuery): Promise<any> => {
   return ApiKit.PUT<any>(ApiPath.DataQuery, req);
 };
 
-export default { query };
+const metadataQuery = (req: Query): Promise<any> => {
+  return ApiKit.PUT<any>(ApiPath.MetadataQuery, req);
+};
+
+export default {
+  dataQuery,
+  metadataQuery,
+};

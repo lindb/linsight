@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { DatasourcePlugin, DatasourceRepositoryInst } from '@src/types';
-import { LinDBDatasource } from './DataSource';
+import { LinDBDatasource } from './Datasource';
 import LightLogo from './images/logo_light.svg';
 import DarkLogo from './images/logo_dark.svg';
 import QueryEditor from './QueryEditor';

@@ -31,12 +31,12 @@ type Router struct {
 	engine *gin.Engine
 	deps   *depspkg.API
 
-	loginAPI      *api.LoginAPI
-	bootAPI       *api.BootAPI
-	orgAPI        *api.OrgAPI
-	userAPI       *api.UserAPI
-	datasourceAPI *api.DatasourceAPI
-	dataQueryAPI  *api.DataQueryAPI
+	loginAPI           *api.LoginAPI
+	bootAPI            *api.BootAPI
+	orgAPI             *api.OrgAPI
+	userAPI            *api.UserAPI
+	datasourceAPI      *api.DatasourceAPI
+	datasourceQueryAPI *api.DatasourceQueryAPI
 
 	dashboardAPI *api.DashboardAPI
 	chartAPI     *api.ChartAPI
@@ -44,13 +44,13 @@ type Router struct {
 
 func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 	return &Router{
-		engine:        engine,
-		deps:          deps,
-		loginAPI:      api.NewLoginAPI(deps),
-		bootAPI:       api.NewBootAPI(deps),
-		userAPI:       api.NewUserAPI(deps),
-		datasourceAPI: api.NewDatasourceAPI(deps),
-		dataQueryAPI:  api.NewDataQueryAPI(deps),
+		engine:             engine,
+		deps:               deps,
+		loginAPI:           api.NewLoginAPI(deps),
+		bootAPI:            api.NewBootAPI(deps),
+		userAPI:            api.NewUserAPI(deps),
+		datasourceAPI:      api.NewDatasourceAPI(deps),
+		datasourceQueryAPI: api.NewDatasourceQueryAPI(deps),
 
 		dashboardAPI: api.NewDashboardAPI(deps),
 		chartAPI:     api.NewChartAPI(deps),
@@ -120,5 +120,7 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Read, r.chartAPI.SearchCharts)...)
 
 	router.PUT("/data/query",
-		middleware.Authorize(r.deps, accesscontrol.DatasourceDataQuery, accesscontrol.Read, r.dataQueryAPI.Query)...)
+		middleware.Authorize(r.deps, accesscontrol.DatasourceDataQuery, accesscontrol.Read, r.datasourceQueryAPI.DataQuery)...)
+	router.PUT("/metadata/query",
+		middleware.Authorize(r.deps, accesscontrol.DatasourceDataQuery, accesscontrol.Read, r.datasourceQueryAPI.MetadataQuery)...)
 }

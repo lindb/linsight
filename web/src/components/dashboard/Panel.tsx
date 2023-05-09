@@ -118,7 +118,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
   const [options, setOptions] = useState<PanelSetting>();
-  const { isLoading, isError, error, data } = useMetric(panel?.targets || []);
+  const { isLoading, isError, error, data, refetch } = useMetric(panel?.targets || []);
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const [menuVisible, setMenuVisible] = useState(false);
   const handleKeyDown = useCallback(
@@ -160,6 +160,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
         plugin.components.DefaultOptions,
         plugin.getDefaultOptions()
       );
+      refetch();
       setOptions(ObjectKit.merge(plugin.getDefaultOptions(), panel));
     }
   }, [plugin, panel]);

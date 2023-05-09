@@ -20,7 +20,7 @@ import { LinSelect } from '@src/components';
 import { QueryEditorProps } from '@src/types';
 import React, { useEffect, useState } from 'react';
 import { get, clone } from 'lodash-es';
-import { LinDBDatasource } from './DataSource';
+import { LinDBDatasource } from './Datasource';
 
 const { Text } = Typography;
 
@@ -35,15 +35,17 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
 
   useEffect(() => {
     if (onChange) {
+      //TODO: check params if changed.
       onChange(params);
     }
-  }, [onChange, params]);
+  }, [params]);
 
   return (
     <Form
       layout="horizontal"
       onValueChange={(values: any) => {
         // FIXME: clone just triger change state
+        console.log('query request', values);
         setParmas(clone(values));
       }}>
       <LinSelect
@@ -55,8 +57,8 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
         showClear
         filter
         remote
-        loader={async () => {
-          const values = await api.fetchMetricNames();
+        loader={async (prefix?: string) => {
+          const values = await api.fetchMetricNames(prefix);
           const optionList: any[] = [];
           console.log('kslfasjdflkdsj', values, optionList);
           (values || []).map((item: any) => {
@@ -71,6 +73,7 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
         placeholder="Please select fields"
         labelPosition="inset"
         label="Fields"
+        multiple
         showClear
         filter
         remote
@@ -84,11 +87,25 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
           return optionList;
         }}
       />
-      <Form.Select
+      <LinSelect
         field="where"
-        label="Where"
         labelPosition="inset"
+        placeholder="where conditions"
         style={{ width: 270 }}
+        label="Where"
+        showClear
+        filter
+        multiple
+        remote
+        reloadKeys={[metric]}
+        loader={async () => {
+          const values = await api.getTagKeys(metric);
+          const optionList: any[] = [];
+          (values || []).map((item: any) => {
+            optionList.push({ value: item, label: item });
+          });
+          return optionList;
+        }}
         outerBottomSlot={
           <div style={{ margin: 8, minWidth: 280 }}>
             <Divider style={{ marginBottom: 8 }} />
@@ -123,7 +140,25 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
           </div>
         }
       />
-      <Form.Select field="groupBy" label="Group By" labelPosition="inset" />
+      <LinSelect
+        field="groupBy"
+        placeholder="Please select fields"
+        labelPosition="inset"
+        label="Group By"
+        showClear
+        filter
+        multiple
+        remote
+        reloadKeys={[metric]}
+        loader={async () => {
+          const values = await api.getTagKeys(metric);
+          const optionList: any[] = [];
+          (values || []).map((item: any) => {
+            optionList.push({ value: item, label: item });
+          });
+          return optionList;
+        }}
+      />
     </Form>
   );
 };

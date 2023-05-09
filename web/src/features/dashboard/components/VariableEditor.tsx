@@ -23,7 +23,6 @@ import { DatasourceSelect } from '@src/components';
 import { useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import { observer } from 'mobx-react-lite';
-import { toJS } from 'mobx';
 
 const VariableEditor: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -63,7 +62,6 @@ const VariableEditor: React.FC = () => {
       extraTextPosition="middle"
       getFormApi={(api: any) => (formApi.current = api)}
       onSubmit={(values: any) => {
-        console.log('apply submit', values);
         DashboardStore.updateVariable(index, values);
         gotoList();
       }}>
@@ -97,6 +95,10 @@ const VariableEditor: React.FC = () => {
         }}
       />
       <QueryEditor />
+      <Form.CheckboxGroup field="Selection options">
+        <Form.Checkbox label="Multi-value">Multi-value</Form.Checkbox>
+        <Form.Checkbox label="Include all option">Include all option</Form.Checkbox>
+      </Form.CheckboxGroup>
       <Form.Slot>
         <div style={{ gap: 4, display: 'flex', flexDirection: 'row' }}>
           <Button
