@@ -19,8 +19,7 @@ import { Collapse, Form, Select, Typography } from '@douyinfe/semi-ui';
 import { PanelStore } from '@src/stores';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
-import { PanelSetting, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
-import { FormatCategories } from '@src/constants';
+import { FormatRepositoryInst, PanelSetting, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import { ObjectKit } from '@src/utils';
 
 const { Text } = Typography;
@@ -105,7 +104,8 @@ const StandardOptionsForm: React.FC = () => {
         leafOnly
         autoMergeValue={false}
         motion={false}
-        treeData={FormatCategories}
+        treeData={FormatRepositoryInst.tree()}
+        // treeData={FormatCategories}
         onChange={(value) => {
           console.log(value);
         }}

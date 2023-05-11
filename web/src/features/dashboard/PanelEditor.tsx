@@ -19,41 +19,69 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
 import { IconBellStroked } from '@douyinfe/semi-icons';
 import SplitPane from 'react-split-pane';
-import PanelSetting from '@src/features/dashboard/PanelSetting';
-import { DatasourceSelect, Panel } from '@src/components';
-import * as _ from 'lodash-es';
+import { PanelSetting as PanelOptions } from '@src/types';
+import { DatasourceSelect, Notification, Panel } from '@src/components';
+import { get, isEmpty } from 'lodash-es';
 import { observer } from 'mobx-react-lite';
 import { PanelStore, DashboardStore, DatasourceStore } from '@src/stores';
 import { toJS } from 'mobx';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
+import PanelSetting from './PanelSetting';
 
 const Split: any = SplitPane;
 
-const MetricSetting: React.FC = () => {
+const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
+  const { panel } = props;
   const { datasources } = DatasourceStore;
   const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
-    return toJS(_.get(datasources, '[0]'));
+    return toJS(get(datasources, '[0]'));
   });
 
   const QueryEditor = () => {
     if (!datasource) {
-      return null;
+      return <></>;
     }
     const plugin = datasource.plugin;
     const QueryEditor = plugin.components.QueryEditor;
     if (!QueryEditor) {
-      return null;
+      return <></>;
+    }
+    console.log('panel.....', toJS(panel));
+    const targets = get(panel, 'targets', []);
+    if (isEmpty(targets)) {
+      // no targets, init empty query editor
+      return (
+        <QueryEditor
+          datasource={datasource}
+          onChange={(values) => {
+            console.log('query editor change....', values);
+            DashboardStore.updatePanelConfig(PanelStore.panel, {
+              targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
+            });
+          }}
+        />
+      );
     }
     return (
-      <QueryEditor
-        datasource={datasource}
-        onChange={(values) => {
-          DashboardStore.updatePanelConfig(PanelStore.panel, {
-            targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
-          });
-        }}
-      />
+      <>
+        {targets.map((target: any, index: number) => {
+          return (
+            <QueryEditor
+              key={index}
+              datasource={datasource}
+              initParams={target}
+              onChange={(values) => {
+                // FIXME: set target
+                console.log('query editor change....', values);
+                DashboardStore.updatePanelConfig(PanelStore.panel, {
+                  targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
+                });
+              }}
+            />
+          );
+        })}
+      </>
     );
   };
 
@@ -61,7 +89,7 @@ const MetricSetting: React.FC = () => {
     <div>
       <DatasourceSelect
         noLabel
-        value={_.get(datasource, 'setting.uid')}
+        value={get(datasource, 'setting.uid')}
         style={{ width: 200 }}
         onChange={(instance: DatasourceInstance) => {
           setDatasource(instance);
@@ -77,11 +105,18 @@ const DefaultOptionsEditorSize = 350;
 
 const EditPanel: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const panel = DashboardStore.getPanel(searchParams.get('panel'));
   const [size, setSize] = useState<number>(DefaultOptionsEditorSize);
   const initialized = useRef(false);
 
   useEffect(() => {
+    if (!panel) {
+      Notification.error('Panel not found');
+      searchParams.delete('panel');
+      navigate({ pathname: '/dashboard', search: searchParams.toString() });
+      return;
+    }
     PanelStore.setPanel(panel);
     return () => {
       if (PanelStore.panel) {
@@ -94,9 +129,9 @@ const EditPanel: React.FC = () => {
     };
   }, [panel]);
 
-  if (!PanelStore.panel) {
-    // FIXME: add no page
-    return <div>panel not exit</div>;
+  console.log('...... edit panel....', panel, DashboardStore.dashboard);
+  if (!panel) {
+    return null;
   }
 
   return (
@@ -120,7 +155,7 @@ const EditPanel: React.FC = () => {
         maxSize={500}
         style={{ position: 'relative' }}>
         <Split split="horizontal" minSize={260} style={{ overflow: 'auto' }}>
-          <Panel panel={PanelStore.panel} />
+          <Panel panel={panel} />
           <Card bodyStyle={{ padding: '8px 20px 12px 20px' }}>
             <Tabs size="small">
               <TabPane
@@ -129,13 +164,13 @@ const EditPanel: React.FC = () => {
                     <i className="iconfont icondatabase" style={{ marginRight: 8 }} />
                     Query
                     <Avatar size="extra-extra-small" style={{ margin: 4 }} alt="User">
-                      {_.get(PanelStore.panel, 'targets', []).length}
+                      {get(PanelStore.panel, 'targets', []).length}
                     </Avatar>
                   </span>
                 }
                 itemKey="1">
                 <Card bodyStyle={{ padding: 12 }}>
-                  <MemoMetricSetting />
+                  <MemoMetricSetting panel={panel} />
                 </Card>
               </TabPane>
               <TabPane

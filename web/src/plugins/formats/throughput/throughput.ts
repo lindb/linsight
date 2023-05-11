@@ -15,10 +15,19 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-@import '~react-grid-layout/css/styles.css';
-@import '~react-resizable/css/styles.css';
-@import '@src/styles/theme/index';
-@import '@src/styles/layout';
-@import '@src/styles/explore';
-@import '@src/styles/login';
-@import '@src/styles/input';
+import { FormatCate, Formatted, Formatter } from '@src/types';
+
+class CPS extends Formatter {
+  constructor() {
+    super({
+      category: FormatCate.Throughtput,
+      label: 'Counts/sec (cps)',
+      value: 'cps',
+    });
+  }
+  format(input: number | null, decimals?: number | undefined): Formatted {
+    return { value: 'cps' };
+  }
+}
+
+export { CPS };

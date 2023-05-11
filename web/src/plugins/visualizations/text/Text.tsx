@@ -15,10 +15,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-@import '~react-grid-layout/css/styles.css';
-@import '~react-resizable/css/styles.css';
-@import '@src/styles/theme/index';
-@import '@src/styles/layout';
-@import '@src/styles/explore';
-@import '@src/styles/login';
-@import '@src/styles/input';
+import React from 'react';
+
+const Text: React.FC = () => {
+  return <div>text</div>;
+};
+
+export default Text;

@@ -42,7 +42,8 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   const [isLoading, setIsLoading] = useState(true);
   const { data, isError, error } = useQuery(['bootstrap'], async () => {
     // load all features
-    const moduels = import.meta.glob(['../features/*/module.ts', '../plugins/**/module.ts']);
+    const moduels = import.meta.glob(['../formats/**/module.ts', '../features/*/module.ts', '../plugins/**/module.ts']);
+    console.error('module', moduels);
     for (const key in moduels) {
       await moduels[key]();
     }

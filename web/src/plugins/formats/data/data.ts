@@ -15,10 +15,31 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-@import '~react-grid-layout/css/styles.css';
-@import '~react-resizable/css/styles.css';
-@import '@src/styles/theme/index';
-@import '@src/styles/layout';
-@import '@src/styles/explore';
-@import '@src/styles/login';
-@import '@src/styles/input';
+import { FormatCate, Formatted, Formatter } from '@src/types';
+
+class Bytes extends Formatter {
+  constructor() {
+    super({
+      category: FormatCate.Data,
+      label: 'Bytes(IEC)',
+      value: 'bytes',
+    });
+  }
+  format(input: number | null, decimals?: number | undefined): Formatted {
+    return { value: 'bytes' };
+  }
+}
+
+class DescBytes extends Formatter {
+  constructor() {
+    super({
+      category: FormatCate.Data,
+      label: 'Bytes(SI)',
+      value: 'descbytes',
+    });
+  }
+  format(input: number | null, decimals?: number | undefined): Formatted {
+    return { value: 'descbytes' };
+  }
+}
+export { Bytes, DescBytes };

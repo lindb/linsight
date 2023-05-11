@@ -19,15 +19,16 @@ import { DatasourceStore } from '@src/stores';
 import { Query } from '@src/types';
 import { useQuery } from '@tanstack/react-query';
 import { isEmpty } from 'lodash-es';
+import { toJS } from 'mobx';
 
 export const useMetric = (queries: Query[]) => {
-  console.log('use metric.......', queries);
+  console.log('use metric.......', toJS(queries));
   const { isInitialLoading, isLoading, isFetching, isError, data, refetch, error } = useQuery(
-    ['search_metric_data'],
+    ['search_metric_data', queries],
     async () => {
       const requests: any[] = [];
       (queries || []).forEach((query: Query) => {
-        console.log(query, 'query.....');
+        console.log(toJS(query), 'query.....');
         const ds = DatasourceStore.getDatasource(query.datasource.uid);
         if (!ds) {
           return;
