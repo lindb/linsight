@@ -42,11 +42,11 @@ import {
   IconHandle,
 } from '@douyinfe/semi-icons';
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { DashboardSrv } from '@src/services';
 import { StatusTip } from '@src/components';
 import { isEmpty } from 'lodash-es';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useRequest } from '@src/hooks';
 
 const { Text } = Typography;
 
@@ -56,9 +56,13 @@ const ListDashboard: React.FC = () => {
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
 
-  const { data, isLoading, isError, isFetching, error, refetch } = useQuery(
-    ['fetch-dashboards', title, ownership],
-    () => DashboardSrv.searchDashboards({ title: title, ownership: ownership })
+  const {
+    result: data,
+    loading,
+    error,
+    refetch,
+  } = useRequest(['fetch-dashboards', title, ownership], () =>
+    DashboardSrv.searchDashboards({ title: title, ownership: ownership })
   );
 
   return (
@@ -127,14 +131,7 @@ const ListDashboard: React.FC = () => {
                 rowSelection={{ fixed: 'left', width: 48 }}
                 size="small"
                 dataSource={data?.dashboards || []}
-                empty={
-                  <StatusTip
-                    isLoading={isLoading || isFetching}
-                    isError={isError}
-                    isEmpty={isEmpty(data?.dashboards)}
-                    error={error}
-                  />
-                }
+                empty={<StatusTip isLoading={loading} isEmpty={isEmpty(data?.dashboards)} error={error} />}
                 pagination={
                   isEmpty(data?.dashboards)
                     ? false

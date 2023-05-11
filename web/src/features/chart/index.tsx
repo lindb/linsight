@@ -16,7 +16,6 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ChartSrv } from '@src/services';
-import { useQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import {
   Card,
@@ -36,6 +35,7 @@ import { IconPlusStroked, IconSearchStroked, IconStar, IconStarStroked } from '@
 import { useSearchParams } from 'react-router-dom';
 import { StatusTip } from '@src/components';
 import { isEmpty } from 'lodash-es';
+import { useRequest } from '@src/hooks';
 const { Text } = Typography;
 
 const ListChart: React.FC = () => {
@@ -44,7 +44,7 @@ const ListChart: React.FC = () => {
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
 
-  const { data, isLoading, isError, isFetching, error, refetch } = useQuery(['fetch-charts', title, ownership], () =>
+  const { result, loading, error, refetch } = useRequest(['fetch-charts', title, ownership], () =>
     ChartSrv.searchCharts({ title: title, ownership: ownership })
   );
 
@@ -89,17 +89,12 @@ const ListChart: React.FC = () => {
                   showHeader
                   className="linsight"
                   size="small"
-                  dataSource={data?.charts || []}
-                  empty={
-                    <StatusTip
-                      isLoading={isLoading || isFetching}
-                      isError={isError}
-                      isEmpty={isEmpty(data?.charts)}
-                      error={error}
-                    />
-                  }
+                  dataSource={result?.charts || []}
+                  empty={<StatusTip isLoading={loading} isEmpty={isEmpty(result?.charts)} error={error} />}
                   pagination={
-                    isEmpty(data?.charts) ? false : { total: data?.total || 0, pageSize: 20, style: { marginLeft: 8 } }
+                    isEmpty(result?.charts)
+                      ? false
+                      : { total: result?.total || 0, pageSize: 20, style: { marginLeft: 8 } }
                   }
                   columns={[
                     {

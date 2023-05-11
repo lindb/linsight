@@ -42,12 +42,11 @@ const PanelHeader = forwardRef(
       panel: PanelSetting;
       isStatic?: boolean;
       isLoading: boolean;
-      isError: boolean;
       error: any;
     },
     ref
   ) => {
-    const { panel, isLoading, isError, error, isStatic } = props;
+    const { panel, isLoading, error, isStatic } = props;
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [menuVisible, setMenuVisible] = useState(false);
@@ -67,7 +66,7 @@ const PanelHeader = forwardRef(
             </>
           )}
         </div>
-        <SimpleStatusTip isLoading={isLoading} isError={isError} error={error} />
+        <SimpleStatusTip isLoading={isLoading} error={error} />
         <Dropdown
           render={
             <Dropdown.Menu>
@@ -130,7 +129,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const navigate = useNavigate();
   const [options, setOptions] = useState<PanelSetting>();
   console.log('render panel...', toJS(panel));
-  const { isLoading, isError, error, data } = useMetric(panel?.targets || []);
+  const { loading, error, result } = useMetric(panel?.targets || []);
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const header = useRef<any>();
   const handleKeyDown = useCallback(
@@ -215,17 +214,8 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
       <LazyLoad>
         <Card
           className={panelCls}
-          header={
-            <PanelHeader
-              ref={header}
-              panel={panel}
-              isStatic={isStatic}
-              isLoading={isLoading}
-              isError={isError}
-              error={error}
-            />
-          }>
-          {Visualization && <Visualization datasets={data} theme={theme} panel={options as any} />}
+          header={<PanelHeader ref={header} panel={panel} isStatic={isStatic} isLoading={loading} error={error} />}>
+          {Visualization && <Visualization datasets={result} theme={theme} panel={options as any} />}
         </Card>
       </LazyLoad>
     </div>

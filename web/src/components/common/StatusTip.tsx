@@ -25,17 +25,16 @@ const { Text } = Typography;
 
 const StatusTip: React.FC<{
   isLoading?: boolean;
-  isError?: boolean;
   isEmpty?: boolean;
   error?: any;
   style?: CSSProperties;
 }> = (props) => {
-  const { isLoading, isError, isEmpty, error, style } = props;
+  const { isLoading, isEmpty, error, style } = props;
   const render = () => {
     if (isLoading) {
       return <Spin size="large" tip="Loading" />;
     }
-    if (isError) {
+    if (error) {
       if (ApiKit.getErrorCode(error) === 404) {
         return <Empty image={<Icon icon="icon-empty" style={{ fontSize: 48 }} />} description="Empty result" />;
       }
