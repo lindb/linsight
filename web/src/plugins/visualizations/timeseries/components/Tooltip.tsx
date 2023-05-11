@@ -17,14 +17,14 @@ under the License.
 */
 import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import * as _ from 'lodash-es';
+import { get, upperCase, filter } from 'lodash-es';
 import classNames from 'classnames';
 import { Button, Input } from '@douyinfe/semi-ui';
 import { IconSearchStroked } from '@douyinfe/semi-icons';
 import { Icon } from '@src/components';
 import { Chart } from 'chart.js';
-import { CSSKit, FormatKit } from '@src/utils';
-import { MouseEventType, Unit } from '@src/types';
+import { CSSKit } from '@src/utils';
+import { MouseEventType } from '@src/types';
 import {
   getTooltipPositionAndSize,
   handleSeriesClick,
@@ -32,6 +32,7 @@ import {
   TOOLTIP_POSITION,
 } from '@src/plugins/visualizations/timeseries/utils/chart';
 import { useMouseEvent } from '@src/hooks';
+import { format } from './chart.config';
 
 enum SortBy {
   Name = 'name',
@@ -118,11 +119,10 @@ const TooltipToolbar: React.FC<{
 const TooltipItem: React.FC<{
   series: any;
   index: number;
-  unit: Unit;
   chart: Chart | null;
   onClick: (chart: Chart | null, series: any, event: React.MouseEvent) => void;
 }> = (props) => {
-  const { series, index, unit, chart, onClick } = props;
+  const { series, index, chart, onClick } = props;
   const { borderColor, label, hidden } = series;
   const itemCls = classNames('tooltip-content-list-item', {
     selected: !hidden,
@@ -138,7 +138,7 @@ const TooltipItem: React.FC<{
         <i className="tooltip-series-icon" style={{ background: borderColor }} />
         <span className="tooltip-series-label">{label}</span>
       </span>
-      <span className="tooltip-series-value">{FormatKit.format(_.get(series, `data.[${index}]`, 0), unit)}</span>
+      <span className="tooltip-series-value">{format(chart, get(series, `data.[${index}]`, 0))}</span>
     </div>
   );
 };
@@ -146,11 +146,10 @@ const TooltipItem: React.FC<{
 const TooltipContent: React.FC<{
   datasets: any;
   index: number;
-  unit: Unit;
   chart: Chart | null;
   sort: Sort;
 }> = (props) => {
-  const { datasets, index, unit, chart, sort } = props;
+  const { datasets, index, chart, sort } = props;
   const [selected, setSelected] = useState(false);
 
   const sortDatasets = () => {
@@ -172,7 +171,6 @@ const TooltipContent: React.FC<{
           chart={chart}
           series={item}
           index={index}
-          unit={unit}
           onClick={(chart: Chart | null, series: any, event: React.MouseEvent) => {
             handleSeriesClick(chart, series, event);
             setSelected(!selected); // just triger tooltip content render
@@ -297,11 +295,9 @@ const Tooltip: React.FC<{ chart: any }> = (props) => {
 
   useEffect(() => {
     if (search) {
-      setDatasets(
-        _.filter(_.get(chart, 'data.datasets', []), (o) => _.upperCase(o.label).indexOf(_.upperCase(search)) >= 0)
-      );
+      setDatasets(filter(get(chart, 'data.datasets', []), (o) => upperCase(o.label).indexOf(upperCase(search)) >= 0));
     } else {
-      setDatasets(_.get(chart, 'data.datasets', []));
+      setDatasets(get(chart, 'data.datasets', []));
     }
   }, [search, chart, visible]);
 
@@ -312,7 +308,7 @@ const Tooltip: React.FC<{ chart: any }> = (props) => {
     }
     switch (type) {
       case MouseEventType.Move:
-        if (_.get(chartOfMove, 'id', 0) != _.get(chart, 'id', 0)) {
+        if (get(chartOfMove, 'id', 0) != get(chart, 'id', 0)) {
           return;
         }
         setVisible(true);
@@ -339,7 +335,7 @@ const Tooltip: React.FC<{ chart: any }> = (props) => {
       <div ref={kick} className="tooltip-top-kick" />
       <div className="tooltip-title">
         <TooltipToolbar
-          timestamp={_.get(chart, `data.timeLabels[${currentIndex.current}]`, null)}
+          timestamp={get(chart, `data.timeLabels[${currentIndex.current}]`, null)}
           search={search}
           onSearch={setSearch}
           sort={sort}
@@ -347,13 +343,7 @@ const Tooltip: React.FC<{ chart: any }> = (props) => {
         />
       </div>
       <div className="tooltip-content-list">
-        <TooltipContent
-          unit={_.get(chart, 'lin.extend.unit', Unit.Short)}
-          datasets={datasets}
-          index={currentIndex.current || 0}
-          chart={chart}
-          sort={sort}
-        />
+        <TooltipContent datasets={datasets} index={currentIndex.current || 0} chart={chart} sort={sort} />
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import { useQuery } from '@tanstack/react-query';
 import { createSearchParams, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
@@ -32,6 +32,7 @@ import { ApiKit } from '@src/utils';
 import { observer } from 'mobx-react-lite';
 import ViewPanel from './ViewPanel';
 import { toJS } from 'mobx';
+import './dashboard.scss';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -80,10 +81,12 @@ const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const dashboardId = searchParams.get('d');
+  const [loading, setLoading] = useState(true);
   const { data: dashboard, isLoading } = useQuery(
     ['load-dashboard', dashboardId],
     async () => {
       if (_.isEmpty(dashboardId)) {
+        setLoading(true);
         const id = `abc${new Date().getTime()}`;
         return {
           uid: '',
@@ -106,11 +109,15 @@ const Dashboard: React.FC = () => {
   );
 
   useEffect(() => {
-    console.log('init dashboard...', dashboard);
-    DashboardStore.setDashboard(dashboard as any);
-  }, [dashboard]);
+    if (!isLoading) {
+      console.log('init dashboard...', dashboard);
+      DashboardStore.setDashboard(dashboard as any);
+      setLoading(false);
+    }
+  }, [dashboard, isLoading]);
 
-  if (isLoading) {
+  if (loading) {
+    console.log('loading.....');
     return (
       <div style={{ width: '100%', textAlign: 'center', marginTop: 300 }}>
         <Spin size="large" />

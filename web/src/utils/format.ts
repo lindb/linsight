@@ -16,27 +16,6 @@ specific language governing permissions and limitations
 under the License.
 */
 
-import { Formatted } from '@src/types';
-
-const format = (input: any, unit: any): any => {
-  //FIXME: impl it
-  return input;
-};
-
-const transformPercent = (input: number | null, decimals: number = 2): Formatted => {
-  if (!input) {
-    return { value: '' };
-  }
-  return { value: `${input.toFixed(decimals)}`, suffix: '%' };
-};
-
-const transformPercentUnit = (input: number | null, decimals: number = 2): Formatted => {
-  if (!input) {
-    return { value: '' };
-  }
-  return transformPercent(input * 100, decimals);
-};
-
 const toObject = (input: string): any => {
   switch (input) {
     case 'false':
@@ -49,8 +28,5 @@ const toObject = (input: string): any => {
 };
 
 export default {
-  transformPercent,
-  transformPercentUnit,
-  format,
   toObject,
 };

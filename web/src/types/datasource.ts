@@ -46,6 +46,7 @@ export interface DatasourceSetting {
 
 export interface QueryEditorProps {
   datasource: DatasourceInstance;
+  initParams?: any;
   onChange?: (values: object) => void;
 }
 

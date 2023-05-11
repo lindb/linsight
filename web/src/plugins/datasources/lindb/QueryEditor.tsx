@@ -18,35 +18,30 @@ under the License.
 import { Divider, Row, Col, Form, Typography } from '@douyinfe/semi-ui';
 import { LinSelect } from '@src/components';
 import { QueryEditorProps } from '@src/types';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { get, clone } from 'lodash-es';
 import { LinDBDatasource } from './Datasource';
 
 const { Text } = Typography;
 
 const QueryEditor: React.FC<QueryEditorProps> = (props) => {
-  const { datasource, onChange } = props;
-  const [params, setParmas] = useState({});
+  const { datasource, initParams, onChange } = props;
   // convert LinDBDatasource type
   const api = datasource.api as LinDBDatasource;
-
-  const metric = get(params, 'metric', '');
+  const metric = get(initParams, 'metric', '');
   console.log('change metric....', metric);
-
-  useEffect(() => {
-    if (onChange) {
-      //TODO: check params if changed.
-      onChange(params);
-    }
-  }, [params]);
 
   return (
     <Form
       layout="horizontal"
+      initValues={get(initParams, 'request', {})}
       onValueChange={(values: any) => {
-        // FIXME: clone just triger change state
         console.log('query request', values);
-        setParmas(clone(values));
+        if (onChange) {
+          // TODO: check params if changed.
+          // FIXME: clone just triger change state
+          onChange(clone(values));
+        }
       }}>
       <LinSelect
         style={{ width: 240 }}
