@@ -15,9 +15,17 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ThemeType, Unit } from '@src/types';
-import { ColorKit, FormatKit, ObjectKit } from '@src/utils';
-import { has, get, set, unset, forIn, cloneDeep, isEmpty, isNull, isNaN } from 'lodash-es';
+import { ThemeType } from '@src/types';
+import { ColorKit, ObjectKit } from '@src/utils';
+import { has, get, set, forIn, cloneDeep } from 'lodash-es';
+
+export const format = (chart: any, val: number) => {
+  const format: any = get(chart, 'linsight.extend.format');
+  if (format) {
+    return format(val);
+  }
+  return val;
+};
 
 const OptionsValueMapping = {
   solid: [],
@@ -38,11 +46,6 @@ const OptionsMapping = {
   'elements.point.hoverRadius': 'pointSize',
   spanGaps: 'spanNulls',
   legend: 'legend',
-  'scales.y.min': 'min',
-  'scales.y.max': 'max',
-};
-
-const CleanOptionsIfNull = {
   'scales.y.min': 'min',
   'scales.y.max': 'max',
 };
@@ -200,7 +203,7 @@ export const DefaultChartConfig = {
           },
           callback: function (value: any, index: number, _values: any) {
             if (index % 2 == 0) {
-              return FormatKit.format(value, get(this, 'chart.linsight.extend.unit', Unit.Short));
+              return format(get(this, 'chart'), value);
             }
             return null;
           },

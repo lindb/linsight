@@ -24,8 +24,7 @@ import {
   IconMenu,
 } from '@douyinfe/semi-icons';
 import { PanelSetting, VisualizationRepositoryInst } from '@src/types';
-import React, { useCallback, useContext, useEffect, useState } from 'react';
-import * as _ from 'lodash-es';
+import React, { useCallback, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef } from 'react';
 import { Icon, LazyLoad, SimpleStatusTip } from '@src/components';
 import { PlatformContext } from '@src/contexts';
 import { useMetric } from '@src/hooks';
@@ -37,78 +36,90 @@ import { toJS } from 'mobx';
 
 const { Text } = Typography;
 
-const PanelHeader: React.FC<{
-  panel: PanelSetting;
-  isStatic?: boolean;
-  isLoading: boolean;
-  isError: boolean;
-  menuVisible: boolean;
-  error: any;
-}> = (props) => {
-  const { panel, isLoading, menuVisible, isError, error, isStatic } = props;
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  return (
-    <div className="panel-header">
-      <div className="title">
-        {panel.title && (
-          <>
-            <IconLineChartStroked />
-            <Text>{panel.title}</Text>
-          </>
-        )}
-      </div>
-      <SimpleStatusTip isLoading={isLoading} isError={isError} error={error} />
-      <Dropdown
-        render={
-          <Dropdown.Menu>
-            <Dropdown.Item
-              icon={<Icon icon="icon-eye" />}
-              onClick={() => {
-                searchParams.set('panel', panel.id);
-                navigate({ pathname: '/dashboard/panel/view', search: searchParams.toString() });
-              }}>
-              View
-            </Dropdown.Item>
-            {!isStatic && (
+const PanelHeader = forwardRef(
+  (
+    props: {
+      panel: PanelSetting;
+      isStatic?: boolean;
+      isLoading: boolean;
+      isError: boolean;
+      error: any;
+    },
+    ref
+  ) => {
+    const { panel, isLoading, isError, error, isStatic } = props;
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+    const [menuVisible, setMenuVisible] = useState(false);
+    useImperativeHandle(ref, () => ({
+      // panel invoke, reduce panel rerender
+      showMenu(show: boolean) {
+        setMenuVisible(show);
+      },
+    }));
+    return (
+      <div className="panel-header">
+        <div className="title">
+          {panel.title && (
+            <>
+              <IconLineChartStroked />
+              <Text>{panel.title}</Text>
+            </>
+          )}
+        </div>
+        <SimpleStatusTip isLoading={isLoading} isError={isError} error={error} />
+        <Dropdown
+          render={
+            <Dropdown.Menu>
               <Dropdown.Item
-                icon={<IconEdit2Stroked />}
+                icon={<Icon icon="icon-eye" />}
                 onClick={() => {
                   searchParams.set('panel', panel.id);
-                  navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
+                  navigate({ pathname: '/dashboard/panel/view', search: searchParams.toString() });
                 }}>
-                Edit
+                View
               </Dropdown.Item>
-            )}
-            {!isStatic && (
-              <Dropdown.Item icon={<IconCopyStroked />} onClick={() => DashboardStore.clonePanel(panel)}>
-                Clone
-              </Dropdown.Item>
-            )}
-            <Dropdown.Item
-              icon={<Icon icon="icon-explore" />}
-              onClick={() => {
-                // FIXME: add url searhc param
-                navigate({ pathname: '/explore' });
-              }}>
-              Explore
-            </Dropdown.Item>
-            <Dropdown.Divider />
-            {!isStatic && (
+              {!isStatic && (
+                <Dropdown.Item
+                  icon={<IconEdit2Stroked />}
+                  onClick={() => {
+                    searchParams.set('panel', panel.id);
+                    navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
+                  }}>
+                  Edit
+                </Dropdown.Item>
+              )}
+              {!isStatic && (
+                <Dropdown.Item icon={<IconCopyStroked />} onClick={() => DashboardStore.clonePanel(panel)}>
+                  Clone
+                </Dropdown.Item>
+              )}
               <Dropdown.Item
-                icon={<IconDeleteStroked />}
-                type="danger"
-                onClick={() => DashboardStore.deletePanel(panel)}>
-                Remove
+                icon={<Icon icon="icon-explore" />}
+                onClick={() => {
+                  // FIXME: add url searhc param
+                  navigate({ pathname: '/explore' });
+                }}>
+                Explore
               </Dropdown.Item>
-            )}
-          </Dropdown.Menu>
-        }>
-        <IconMenu className="btn" style={{ visibility: menuVisible ? 'visible' : 'hidden' }} />
-      </Dropdown>
-    </div>
-  );
-};
+              <Dropdown.Divider />
+              {!isStatic && (
+                <Dropdown.Item
+                  icon={<IconDeleteStroked />}
+                  type="danger"
+                  onClick={() => DashboardStore.deletePanel(panel)}>
+                  Remove
+                </Dropdown.Item>
+              )}
+            </Dropdown.Menu>
+          }>
+          <IconMenu className="btn" style={{ visibility: menuVisible ? 'visible' : 'hidden' }} />
+        </Dropdown>
+      </div>
+    );
+  }
+);
+PanelHeader.displayName = 'PanelHeader';
 
 const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: boolean; className?: string }> = (
   props
@@ -118,9 +129,10 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
   const [options, setOptions] = useState<PanelSetting>();
-  const { isLoading, isError, error, data, refetch } = useMetric(panel?.targets || []);
+  console.log('render panel...', toJS(panel));
+  const { isLoading, isError, error, data } = useMetric(panel?.targets || []);
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
-  const [menuVisible, setMenuVisible] = useState(false);
+  const header = useRef<any>();
   const handleKeyDown = useCallback(
     (e: any) => {
       console.log('panel keydown', e);
@@ -160,17 +172,22 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
         plugin.components.DefaultOptions,
         plugin.getDefaultOptions()
       );
-      refetch();
       setOptions(ObjectKit.merge(plugin.getDefaultOptions(), panel));
     }
   }, [plugin, panel]);
 
   useEffect(() => {
     return () => {
-      console.log('remove..... keydown even');
+      console.log('remove..... keydown event');
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleKeyDown]);
+
+  const toggleHeaderMenu = (show: boolean) => {
+    if (header.current) {
+      header.current.showMenu(show);
+    }
+  };
 
   if (!plugin) {
     return <div>panel plugin not exist</div>;
@@ -187,22 +204,22 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
         if (shortcutKey) {
           window.addEventListener('keydown', handleKeyDown);
         }
-        setMenuVisible(true);
+        toggleHeaderMenu(true);
       }}
       onMouseLeave={() => {
         if (shortcutKey) {
           window.removeEventListener('keydown', handleKeyDown);
         }
-        setMenuVisible(false);
+        toggleHeaderMenu(false);
       }}>
       <LazyLoad>
         <Card
           className={panelCls}
           header={
             <PanelHeader
+              ref={header}
               panel={panel}
               isStatic={isStatic}
-              menuVisible={menuVisible}
               isLoading={isLoading}
               isError={isError}
               error={error}

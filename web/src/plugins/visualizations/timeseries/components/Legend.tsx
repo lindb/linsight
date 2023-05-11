@@ -17,9 +17,10 @@ under the License.
 */
 import React, { useRef } from 'react';
 import classNames from 'classnames';
-import * as _ from 'lodash-es';
+import { get, upperFirst, find, isEmpty } from 'lodash-es';
 import { Chart } from 'chart.js';
 import { LegendMode, Placement } from '../types';
+import { format } from './chart.config';
 
 const LegendHeader: React.FC<{ values: string[] }> = (props) => {
   const { values } = props;
@@ -38,7 +39,7 @@ const LegendHeader: React.FC<{ values: string[] }> = (props) => {
             className={headerClass}
             // onClick={() => handleSort(key)}
           >
-            <span>{_.upperFirst(key)}</span>
+            <span>{upperFirst(key)}</span>
           </span>
         );
       })}
@@ -52,7 +53,6 @@ const LegendItem: React.FC<{
   chart: Chart | null;
 }> = (props) => {
   const { series, values, chart } = props;
-  // const unit = _.get(chart, 'lin.extend.unit', Unit.Short);
   const seriesDiv = useRef<HTMLDivElement>(null);
   const { borderColor, label, hidden, stats } = series;
   const seriesCls = classNames('legend-series', {
@@ -68,7 +68,7 @@ const LegendItem: React.FC<{
       </span>
       {values.map((key: string) => (
         <span key={key} className="legend-series-value">
-          {_.get(stats, key)}
+          {format(chart, get(stats, key, 0))}
         </span>
       ))}
     </div>
@@ -77,28 +77,28 @@ const LegendItem: React.FC<{
 
 export const Legend: React.FC<{ chart: any }> = (props) => {
   const { chart } = props;
-  const mode = _.get(chart, 'options.legend.mode', LegendMode.List);
+  const mode = get(chart, 'options.legend.mode', LegendMode.List);
   if (!chart || mode === LegendMode.Hidden) {
     // if chart not exist or hidden legend, return
     return null;
   }
-  const placement = _.get(chart, 'options.legend.placement', Placement.Bottom);
+  const placement = get(chart, 'options.legend.placement', Placement.Bottom);
   const asTable = mode === LegendMode.Table;
   const toRight = placement === Placement.Right;
-  const datasets = _.get(chart, 'data.datasets', []);
-  const values = _.get(chart, 'options.legend.values', []);
+  const datasets = get(chart, 'data.datasets', []);
+  const values = get(chart, 'options.legend.values', []);
   const legendCls = classNames('time-series-legend', {
     'as-table': asTable,
     'to-right': toRight,
   });
   const legendContentCls = classNames('legend-content', {
     table: asTable,
-    active: _.find(datasets, { hidden: false }),
+    active: find(datasets, { hidden: false }),
   });
   return (
     <div className={legendCls}>
       <div className={legendContentCls}>
-        {asTable && !_.isEmpty(datasets) && <LegendHeader values={values} />}
+        {asTable && !isEmpty(datasets) && <LegendHeader values={values} />}
         {datasets.map((series: any) => {
           console.log('xxxxx....');
           return <LegendItem chart={chart} series={series} key={series.label} values={values} />;

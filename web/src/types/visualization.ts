@@ -19,18 +19,6 @@ import { ComponentType } from 'react';
 import { Plugin, Query, ThemeType } from '@src/types';
 import { cloneDeep } from 'lodash-es';
 
-export enum Unit {
-  None = 'none',
-  Short = 'short',
-  Bytes = 'bytes',
-  KBytesPerSecond = 'KB/s',
-  Percent = 'percent',
-  Percent2 = 'percent(0-1)',
-  Seconds = 'seconds(s)',
-  Milliseconds = 'milliseconds(ms)',
-  Nanoseconds = 'nanoseconds(ns)',
-}
-
 export interface PanelSetting {
   id?: any;
   title?: string;

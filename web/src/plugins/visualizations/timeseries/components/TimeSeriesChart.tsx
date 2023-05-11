@@ -28,7 +28,7 @@ import {
 import { Chart, registerables } from 'chart.js';
 import { cloneDeep, get, set, find } from 'lodash-es';
 import classNames from 'classnames';
-import { MouseEventType, ThemeType } from '@src/types';
+import { FormatRepositoryInst, formattedToString, MouseEventType, ThemeType } from '@src/types';
 import { PlatformStore } from '@src/stores';
 import { CSSKit } from '@src/utils';
 import annotationPlugin from 'chartjs-plugin-annotation';
@@ -257,6 +257,12 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
       console.log('update chart....', chart, chartType, toJS(config));
       chart.update();
     }
+
+    set(chartInstance.current, 'linsight.extend.format', function (val: number) {
+      const unit = get(config, 'unit');
+      const decimals = get(config, 'decimals');
+      return FormatRepositoryInst.get(unit).formatString(val, decimals);
+    });
 
     const chartDatasets = get(chartInstance.current, 'data.datasets', []);
     const currentSelectedSet = new Set<string>(selectedSeries);
