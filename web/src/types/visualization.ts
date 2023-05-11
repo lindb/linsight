@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ComponentType } from 'react';
-import { Plugin, Query, ThemeType } from '@src/types';
+import { DatasourceCategory, Plugin, Query, ThemeType } from '@src/types';
 import { cloneDeep } from 'lodash-es';
 
 export interface PanelSetting {
@@ -53,6 +53,7 @@ export interface VisualizationPluginComponents {
 class VisualizationPlugin extends Plugin {
   components: VisualizationPluginComponents = {};
   constructor(
+    public category: DatasourceCategory,
     name: string,
     type: string,
     description: string,

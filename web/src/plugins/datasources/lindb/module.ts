@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { DatasourcePlugin, DatasourceRepositoryInst } from '@src/types';
+import { DatasourceCategory, DatasourcePlugin, DatasourceRepositoryInst } from '@src/types';
 import { LinDBDatasource } from './Datasource';
 import LightLogo from './images/logo_light.svg';
 import DarkLogo from './images/logo_dark.svg';
@@ -24,6 +24,7 @@ import { SettingEditor } from './SettingEditor';
 import VariableEditor from './VariableEditor';
 
 const LinDB = new DatasourcePlugin(
+  DatasourceCategory.Metric,
   'LinDB',
   'lindb',
   'An open-source, distributed time-series database',

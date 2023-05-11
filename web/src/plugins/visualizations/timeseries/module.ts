@@ -15,13 +15,14 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import Logo from '@src/plugins/visualizations/timeseries/images/logo.svg';
 import { OptionsEditor } from '@src/plugins/visualizations/timeseries/OptionsEditor';
 import { TimeSeries } from '@src/plugins/visualizations/timeseries/TimeSeries';
 import { LegendMode, Placement } from './types';
 
 const timeseries = new VisualizationPlugin(
+  DatasourceCategory.Metric,
   'Time series',
   'timeseries',
   'Time based line, area and bar charts',

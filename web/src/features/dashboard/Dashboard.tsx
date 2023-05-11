@@ -156,7 +156,7 @@ const Dashboard: React.FC = () => {
               DashboardStore.addPanel({
                 title: 'Add panel',
                 type: VisualizationAddPanelType,
-                grid: { w: 12, h: 7, x: 5, y: 0 },
+                grid: { w: 12, h: 7, x: 0, y: 0 },
                 id: `abc${new Date().getTime()}`,
               });
             }}
