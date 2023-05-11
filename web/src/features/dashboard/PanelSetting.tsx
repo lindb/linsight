@@ -16,14 +16,18 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Collapse, Form, Select, Typography } from '@douyinfe/semi-ui';
-import { PanelStore } from '@src/stores';
+import { DatasourceStore, PanelStore } from '@src/stores';
 import { observer } from 'mobx-react-lite';
 import React from 'react';
 import { FormatRepositoryInst, PanelSetting, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import { ObjectKit } from '@src/utils';
+import { get } from 'lodash-es';
 
 const { Text } = Typography;
 
+/*
+ * Panle basic information
+ */
 const PanelOptionsForm: React.FC = () => {
   const { panel } = PanelStore;
 
@@ -44,9 +48,21 @@ const PanelOptionsForm: React.FC = () => {
   );
 };
 
+/*
+ * Visualization categories select form
+ */
 const VisualizationsForm: React.FC = () => {
   const { panel } = PanelStore;
   const plugins = VisualizationRepositoryInst.getPlugins();
+
+  const getDatasourceCategory = () => {
+    const datasourceUID = get(panel, 'targets[0].datasource.uid');
+    const ds = DatasourceStore.getDatasource(`${datasourceUID}`);
+    return get(ds, 'plugin.category');
+  };
+
+  // get first target datasource category if exist, because all targets need have same datasource category.
+  const datasourceCategory = getDatasourceCategory();
 
   return (
     <>
@@ -67,6 +83,9 @@ const VisualizationsForm: React.FC = () => {
           );
         }}>
         {plugins.map((plugin: VisualizationPlugin) => {
+          if (datasourceCategory && plugin.category != datasourceCategory) {
+            return;
+          }
           return (
             <Select.Option key={plugin.Type} value={plugin.Type} showTick={false}>
               <img src={`${plugin.lightLogo}`} width={32} />

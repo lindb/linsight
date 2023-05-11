@@ -17,7 +17,7 @@ under the License.
 */
 import { makeAutoObservable, toJS } from 'mobx';
 import { DatasourceInstance, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
-import * as _ from 'lodash-es';
+import { find } from 'lodash-es';
 
 class DatasourceStore {
   datasources: DatasourceInstance[] = [];
@@ -32,7 +32,7 @@ class DatasourceStore {
    * @return if find return DatasourceInstance else return null
    */
   getDatasource(uid: string): DatasourceInstance | null {
-    const ds = _.find(this.datasources, (item: DatasourceInstance) => {
+    const ds = find(this.datasources, (item: DatasourceInstance) => {
       return item.setting.uid == uid;
     });
     if (ds) {

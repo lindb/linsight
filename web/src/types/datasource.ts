@@ -18,6 +18,12 @@ under the License.
 import { ComponentType } from 'react';
 import { Plugin } from '@src/types';
 
+export enum DatasourceCategory {
+  Metric = 'metric',
+  Log = 'log',
+  Trace = 'trace',
+}
+
 export interface DataQuery {
   queries: Query[];
   range?: {
@@ -41,6 +47,7 @@ export interface DatasourceSetting {
   uid: string;
   name: string;
   type: string;
+  category: DatasourceCategory;
   url: string;
 }
 
@@ -63,7 +70,13 @@ export interface DatasourceConstructor {
 class DatasourcePlugin extends Plugin {
   components: DatasourcePluginComponents = {};
 
-  constructor(name: string, type: string, description: string, public DSConstructor: DatasourceConstructor) {
+  constructor(
+    public category: DatasourceCategory,
+    name: string,
+    type: string,
+    description: string,
+    public DSConstructor: DatasourceConstructor
+  ) {
     super(name, type, description);
   }
 

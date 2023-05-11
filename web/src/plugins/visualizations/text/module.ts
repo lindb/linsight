@@ -15,11 +15,11 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import OptionsEditor from './OptionsEditor';
 import Logo from './images/logo.svg';
 import Text from './Text';
 
-const text = new VisualizationPlugin('Text', 'text', 'Text stats visualization', Text);
+const text = new VisualizationPlugin(DatasourceCategory.Metric, 'Text', 'text', 'Text stats visualization', Text);
 text.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
 VisualizationRepositoryInst.register(text);

@@ -15,12 +15,18 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import { Gauge } from '@src/plugins/visualizations/gauge/Gauge';
 import { OptionsEditor } from '@src/plugins/visualizations/gauge/OptionsEditor';
 import Logo from '@src/plugins/visualizations/gauge/images/logo2.svg';
 
-const guage = new VisualizationPlugin('Gauge', 'gauge', 'Standard gauge visualization', Gauge);
+const guage = new VisualizationPlugin(
+  DatasourceCategory.Metric,
+  'Gauge',
+  'gauge',
+  'Standard gauge visualization',
+  Gauge
+);
 
 guage.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
 VisualizationRepositoryInst.register(guage);
