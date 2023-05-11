@@ -15,24 +15,22 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PlatformStore } from '@src/stores';
-import { reaction } from 'mobx';
-import { useEffect, useState } from 'react';
-import { MouseEvent } from '@src/types';
+import { useQuery } from '@tanstack/react-query';
+/**
+ * Do http request hook
+ */
+const useRequest = (requestKeys: any[], fn: () => any, options?: object) => {
+  const { isInitialLoading, isLoading, isFetching, data, refetch, error } = useQuery(
+    [...requestKeys],
+    () => fn(),
+    options
+  );
+  return {
+    loading: isInitialLoading || isLoading || isFetching,
+    result: data,
+    error,
+    refetch,
+  };
+};
 
-export function useMouseEvent() {
-  const [mouseEvent, setMouseEvent] = useState<MouseEvent | null>(null);
-
-  useEffect(() => {
-    const disposer = reaction(
-      () => PlatformStore.mouseEvent,
-      () => {
-        setMouseEvent(PlatformStore.mouseEvent);
-      }
-    );
-
-    return () => disposer();
-  }, []);
-
-  return { mouseEvent };
-}
+export { useRequest };

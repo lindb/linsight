@@ -17,11 +17,11 @@ under the License.
 */
 import { Spin } from '@douyinfe/semi-ui';
 import { Notification } from '@src/components';
+import { useRequest } from '@src/hooks';
 import { PlatformSrv, UserSrv } from '@src/services';
 import { DatasourceStore, MenuStore } from '@src/stores';
 import { Bootdata, ThemeType } from '@src/types';
 import { ApiKit } from '@src/utils';
-import { useQuery } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,7 +40,7 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   const [theme, setTheme] = useState<ThemeType>(ThemeType.Default);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
-  const { data, isError, error } = useQuery(['bootstrap'], async () => {
+  const { result, error } = useRequest(['bootstrap'], async () => {
     // load all features
     const moduels = import.meta.glob(['../formats/**/module.ts', '../features/*/module.ts', '../plugins/**/module.ts']);
     console.error('module', moduels);
@@ -51,15 +51,15 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   });
 
   useEffect(() => {
-    if (data) {
-      MenuStore.setMenus(data.navTree);
-      DatasourceStore.setDatasources(data.datasources);
-      setTheme(data.user.preference?.theme || ThemeType.Default);
-      setCollapsed(data.user.preference?.collapsed || true);
-      setBoot(data);
+    if (result) {
+      MenuStore.setMenus(result.navTree);
+      DatasourceStore.setDatasources(result.datasources);
+      setTheme(result.user.preference?.theme || ThemeType.Default);
+      setCollapsed(result.user.preference?.collapsed || true);
+      setBoot(result);
       setIsLoading(false);
     }
-  }, [data, isError]);
+  }, [result, error]);
 
   useEffect(() => {
     if (theme === ThemeType.Dark) {
@@ -93,7 +93,7 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   };
 
   const renderContent = () => {
-    if (isError) {
+    if (error) {
       const httpCode = ApiKit.getErrorCode(error);
       if (httpCode == 403) {
         navigate('/login');

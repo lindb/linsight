@@ -16,15 +16,15 @@ specific language governing permissions and limitations
 under the License.
 */
 import React, { useEffect, useRef, useState } from 'react';
-import * as _ from 'lodash-es';
+import { isEmpty } from 'lodash-es';
 import { Button, Select, Card, Typography, Form, Space, useFormApi } from '@douyinfe/semi-ui';
 import { IconSaveStroked, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
-import { useQuery } from '@tanstack/react-query';
 import { DatasourcePlugin, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Notification } from '@src/components';
 import { ApiKit } from '@src/utils';
+import { useRequest } from '@src/hooks';
 
 const { Text } = Typography;
 
@@ -50,8 +50,8 @@ const EditDataSource: React.FC = () => {
   const uid = searchParams.get('uid');
   const plugins = DatasourceRepositoryInst.getPlugins();
 
-  const { data: datasource, isLoading } = useQuery(['load-datasource'], () => DatasourceSrv.getDatasource(`${uid}`), {
-    enabled: !_.isEmpty(uid),
+  const { result: datasource, loading } = useRequest(['load-datasource'], () => DatasourceSrv.getDatasource(`${uid}`), {
+    enabled: !isEmpty(uid),
   });
 
   useEffect(() => {
@@ -73,7 +73,7 @@ const EditDataSource: React.FC = () => {
   };
 
   return (
-    <Card className="linsight-feature" loading={!_.isEmpty(uid) && isLoading}>
+    <Card className="linsight-feature" loading={!isEmpty(uid) && loading}>
       <Form
         labelPosition="left"
         labelAlign="right"
@@ -99,7 +99,7 @@ const EditDataSource: React.FC = () => {
         <Form.Select
           label="Type"
           field="type"
-          disabled={!_.isEmpty(uid)}
+          disabled={!isEmpty(uid)}
           style={{ width: '100%' }}
           onChange={(value: any): void => setType(value)}
           renderSelectedItem={(n: Record<string, any>) => {

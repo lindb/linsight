@@ -17,7 +17,6 @@ under the License.
 */
 import React, { useEffect, useState } from 'react';
 import { DashboardSrv } from '@src/services';
-import { useQuery } from '@tanstack/react-query';
 import { createSearchParams, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import * as _ from 'lodash-es';
 import { Spin, Layout, Typography, Button } from '@douyinfe/semi-ui';
@@ -33,6 +32,7 @@ import { observer } from 'mobx-react-lite';
 import ViewPanel from './ViewPanel';
 import { toJS } from 'mobx';
 import './dashboard.scss';
+import { useRequest } from '@src/hooks';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -82,7 +82,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const dashboardId = searchParams.get('d');
   const [loading, setLoading] = useState(true);
-  const { data: dashboard, isLoading } = useQuery(
+  const { result: dashboard, loading: isLoading } = useRequest(
     ['load-dashboard', dashboardId],
     async () => {
       if (_.isEmpty(dashboardId)) {

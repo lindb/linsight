@@ -19,19 +19,17 @@ import React from 'react';
 import { Button, Card, Divider, Input, List, Typography } from '@douyinfe/semi-ui';
 import { IconSearchStroked, IconPlusStroked, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
-import { useQuery } from '@tanstack/react-query';
 import { DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { isEmpty } from 'lodash-es';
 import { createSearchParams, useNavigate } from 'react-router-dom';
 import { StatusTip } from '@src/components';
+import { useRequest } from '@src/hooks';
 
 const { Title, Text } = Typography;
 
 const ListDataSource: React.FC = () => {
   const navigate = useNavigate();
-  const { data, isLoading, isFetching, isError, error } = useQuery(['list_datasources'], () =>
-    DatasourceSrv.fetchDatasources()
-  );
+  const { result, loading, error } = useRequest(['list_datasources'], () => DatasourceSrv.fetchDatasources());
   return (
     <Card className="linsight-feature">
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -42,10 +40,8 @@ const ListDataSource: React.FC = () => {
       </div>
       <List
         bordered
-        dataSource={data}
-        emptyContent={
-          <StatusTip isLoading={isLoading || isFetching} isError={isError} isEmpty={isEmpty(data)} error={error} />
-        }
+        dataSource={result}
+        emptyContent={<StatusTip isLoading={loading} isEmpty={isEmpty(result)} error={error} />}
         renderItem={(ds: DatasourceSetting) => {
           const item = DatasourceRepositoryInst.get(ds.type);
           return (
