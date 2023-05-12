@@ -25,6 +25,7 @@ import { toJS } from 'mobx';
 import RGL, { WidthProvider } from 'react-grid-layout';
 import { DefaultColumns, DefaultRowHeight } from '@src/constants';
 import ViewVariables from './components/ViewVariables';
+import { VariableContextProvider } from '@src/contexts';
 
 const ReactGridLayout = WidthProvider(RGL);
 
@@ -48,9 +49,10 @@ const View: React.FC = () => {
     }
     return <Panel panel={panel} shortcutKey />;
   };
+  console.log('rerender dashboard......');
 
   return (
-    <>
+    <VariableContextProvider>
       <div style={{ margin: '6px 6px 0px 6px' }}>
         <ViewVariables />
       </div>
@@ -92,7 +94,7 @@ const View: React.FC = () => {
           );
         }}
       </AutoSizer>
-    </>
+    </VariableContextProvider>
   );
 };
 

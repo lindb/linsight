@@ -15,6 +15,29 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from './PlatformContextProvider';
-export * from './VariableContextProvider';
-export * from './QueryEditContextProvider';
+import React, { createContext, useState } from 'react';
+
+/*
+ * Context for each query editor
+ */
+export const QueryEditContext = createContext({
+  values: {} as object,
+  setValues: (_values: object) => {},
+});
+
+/*
+ * Context provider for each query editor
+ */
+export const QueryEditContextProvider: React.FC<{ initValues?: object; children: React.ReactNode }> = (props) => {
+  const { initValues, children } = props;
+  const [values, setValues] = useState(initValues || {});
+  return (
+    <QueryEditContext.Provider
+      value={{
+        values,
+        setValues,
+      }}>
+      {children}
+    </QueryEditContext.Provider>
+  );
+};

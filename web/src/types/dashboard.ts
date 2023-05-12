@@ -37,8 +37,15 @@ export interface SearchDashboardResult {
   total: number;
   dashboards: Dashboard[];
 }
+
 export enum VariableHideType {
   LabelAndValue = 0,
   OnlyValue = 1,
   Hide = 2,
+}
+
+export enum SearchParamKeys {
+  From = 'from',
+  To = 'to',
+  Refresh = 'refresh',
 }

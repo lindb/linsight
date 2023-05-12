@@ -25,6 +25,9 @@ import { ApiKit } from '@src/utils';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+/*
+ * Global root context
+ */
 export const PlatformContext = React.createContext({
   boot: {} as any,
   theme: ThemeType.Default,
@@ -33,6 +36,9 @@ export const PlatformContext = React.createContext({
   toggleCollapse: () => {},
 });
 
+/*
+ * Global root platform context provider.
+ */
 export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> = (props) => {
   const { children } = props;
   const [boot, setBoot] = useState<Bootdata | any>({});
@@ -43,12 +49,12 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   const { result, error } = useRequest(['bootstrap'], async () => {
     // load all features
     const moduels = import.meta.glob(['../formats/**/module.ts', '../features/*/module.ts', '../plugins/**/module.ts']);
-    console.error('module', moduels);
     for (const key in moduels) {
       await moduels[key]();
     }
     return PlatformSrv.boot();
   });
+  console.log('result boot....', result);
 
   useEffect(() => {
     if (result) {

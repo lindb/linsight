@@ -17,7 +17,7 @@ under the License.
 */
 import React, { useContext, useEffect } from 'react';
 import { Layout, Nav, Dropdown, Divider, Typography } from '@douyinfe/semi-ui';
-import { IconSemiLogo, IconLeftCircleStroked, IconUser, IconMoon, IconSun } from '@douyinfe/semi-icons';
+import { IconLeftCircleStroked, IconUser, IconMoon, IconSun } from '@douyinfe/semi-icons';
 import * as _ from 'lodash-es';
 import { Footer, Icon } from '@src/components';
 import { PlatformContext } from '@src/contexts';
@@ -25,6 +25,8 @@ import { Feature, FeatureRepositoryInst, ThemeType } from '@src/types';
 import { UserSrv } from './services';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MenuStore } from './stores';
+import DarkLogo from '@src/images/logo-dark.svg';
+import Logo from '@src/images/logo.svg';
 
 const { Text } = Typography;
 const { Sider, Content } = Layout;
@@ -126,8 +128,8 @@ const FeatureMenu: React.FC = () => {
           selectedKeys={selectMenus()}
           style={{ maxWidth: 220, height: '100%' }}
           header={{
-            logo: <IconSemiLogo style={{ height: '36px', fontSize: 36 }} />,
-            text: 'Linsight',
+            logo: theme === ThemeType.Dark ? <img src={DarkLogo} /> : <img src={Logo} />,
+            text: 'insight',
           }}
           footer={{
             children: (

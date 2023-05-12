@@ -17,30 +17,62 @@ under the License.
 */
 import { Divider, Row, Col, Form, Typography } from '@douyinfe/semi-ui';
 import { LinSelect } from '@src/components';
-import { QueryEditorProps } from '@src/types';
-import React from 'react';
+import { DatasourceInstance, QueryEditorProps } from '@src/types';
+import React, { useContext } from 'react';
 import { get, clone } from 'lodash-es';
 import { LinDBDatasource } from './Datasource';
+import { QueryEditContext } from '@src/contexts';
+import { useQueryEditor } from '@src/hooks';
 
 const { Text } = Typography;
 
+const FieldEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+  const { datasource } = props;
+  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
+  const { metric } = useQueryEditor(['metric']);
+
+  return (
+    <LinSelect
+      style={{ width: 240 }}
+      field="fields"
+      placeholder="Please select fields"
+      labelPosition="inset"
+      label="Fields"
+      multiple
+      showClear
+      filter
+      remote
+      reloadKeys={[metric]}
+      loader={async () => {
+        const values = await api.getFields(metric);
+        const optionList: any[] = [];
+        (values || []).map((item: any) => {
+          optionList.push({ value: item.name, label: `${item.name}(${item.type})` });
+        });
+        return optionList;
+      }}
+    />
+  );
+};
+
 const QueryEditor: React.FC<QueryEditorProps> = (props) => {
-  const { datasource, initParams, onChange } = props;
-  // convert LinDBDatasource type
-  const api = datasource.api as LinDBDatasource;
-  const metric = get(initParams, 'metric', '');
+  const { datasource, onChange } = props;
+  const { values, setValues } = useContext(QueryEditContext);
+  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
+  const metric = get(values, 'metric');
   console.log('change metric....', metric);
 
   return (
     <Form
       layout="horizontal"
-      initValues={get(initParams, 'request', {})}
-      onValueChange={(values: any) => {
+      initValues={values}
+      onSubmit={(values: any) => {
         console.log('query request', values);
         if (onChange) {
           // TODO: check params if changed.
           // FIXME: clone just triger change state
           onChange(clone(values));
+          setValues(values);
         }
       }}>
       <LinSelect

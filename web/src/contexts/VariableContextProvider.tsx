@@ -15,6 +15,14 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from './PlatformContextProvider';
-export * from './VariableContextProvider';
-export * from './QueryEditContextProvider';
+import React, { createContext } from 'react';
+import { useSearchParams } from 'react-router-dom';
+
+export const VariableContext = createContext({});
+
+export const VariableContextProvider: React.FC<{ children: React.ReactNode }> = (props) => {
+  const { children } = props;
+  const [searchParams] = useSearchParams();
+  console.log('var context....', searchParams.get('from'));
+  return <VariableContext.Provider value={{}}>{children}</VariableContext.Provider>;
+};

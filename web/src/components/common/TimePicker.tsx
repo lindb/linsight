@@ -17,34 +17,34 @@ under the License.
 */
 import { IconChevronDown, IconRefresh, IconTick } from '@douyinfe/semi-icons';
 import { Button, Dropdown, Input, Popover, Form, SplitButtonGroup, Typography, Space } from '@douyinfe/semi-ui';
-import { useParams } from '@src/hooks';
-import { URLStore } from '@src/stores';
-import * as _ from 'lodash-es';
+import { isEmpty, find, filter } from 'lodash-es';
 import React, { useState, useRef, MutableRefObject, useEffect } from 'react';
 import moment from 'moment';
 import { DateTimeFormat } from '@src/constants';
 import { Icon } from '@src/components';
+import { useSearchParams } from 'react-router-dom';
+import { SearchParamKeys } from '@src/types';
 
 const { Title } = Typography;
 type QuickSelectItem = {
   title: string;
   value: string;
 };
-const defaultQuickItem = { title: 'Last 1Hour', value: 'now()-1h' };
+const defaultQuickItem = { title: 'Last 1 hour', value: 'now()-1h' };
 const defaultAutoRefreshItem = { title: 'off', value: '' };
 const quickSelectList: QuickSelectItem[] = [
-  { title: 'Last 15Min', value: 'now()-15m' },
-  { title: 'Last 30Min', value: 'now()-30m' },
+  { title: 'Last 15 minutes', value: 'now()-15m' },
+  { title: 'Last 30 minutes', value: 'now()-30m' },
   defaultQuickItem,
-  { title: 'Last 3Hours', value: 'now()-3h' },
-  { title: 'Last 6Hours', value: 'now()-6h' },
-  { title: 'Last 12Hours', value: 'now()-12h' },
-  { title: 'Last 1Day', value: 'now()-1d' },
-  { title: 'Last 2Days', value: 'now()-2d' },
-  { title: 'Last 3Days', value: 'now()-3d' },
-  { title: 'Last 7Days', value: 'now()-7d' },
-  { title: 'Last 15Days', value: 'now()-15d' },
-  { title: 'Last 30Days', value: 'now()-30d' },
+  { title: 'Last 3 hours', value: 'now()-3h' },
+  { title: 'Last 6 hours', value: 'now()-6h' },
+  { title: 'Last 12 hours', value: 'now()-12h' },
+  { title: 'Last 1 day', value: 'now()-1d' },
+  { title: 'Last 2 days', value: 'now()-2d' },
+  { title: 'Last 3 days', value: 'now()-3d' },
+  { title: 'Last 7 days', value: 'now()-7d' },
+  { title: 'Last 15 days', value: 'now()-15d' },
+  { title: 'Last 30 days', value: 'now()-30d' },
 ];
 const autoRefreshList: QuickSelectItem[] = [
   {
@@ -57,8 +57,12 @@ const autoRefreshList: QuickSelectItem[] = [
   { value: '300', title: `5m` },
 ];
 
-export default function TimePicker() {
-  const { from, to, refresh } = useParams(['from', 'to', 'refresh']);
+const TimePicker: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const from = searchParams.get(SearchParamKeys.From);
+  const to = searchParams.get(SearchParamKeys.To);
+  const refresh = searchParams.get(SearchParamKeys.Refresh);
+
   const formApi = useRef() as MutableRefObject<any>;
   const [quick, setQuick] = useState<QuickSelectItem | undefined>(defaultQuickItem);
   const [quickItems, setQuickItems] = useState<QuickSelectItem[]>(quickSelectList);
@@ -74,22 +78,23 @@ export default function TimePicker() {
 
     if (interval) {
       countDown.current = +setInterval(() => {
-        URLStore.forceChange();
+        // FIXME:
+        //URLStore.forceChange();
       }, 1000 * interval);
     }
   };
 
   useEffect(() => {
-    if (_.isEmpty(from)) {
+    if (isEmpty(from)) {
       setQuick(defaultQuickItem);
     } else {
-      const quickItem = _.find(quickSelectList, { value: `${from}` });
+      const quickItem = find(quickSelectList, { value: `${from}` });
       setQuick(quickItem);
     }
   }, [from]);
 
   useEffect(() => {
-    const refreshItem = _.find(autoRefreshList, { value: `${refresh}` });
+    const refreshItem = find(autoRefreshList, { value: `${refresh}` });
     if (refreshItem && refreshItem.value !== '') {
       buildCountDown(parseInt(refreshItem.value));
     } else {
@@ -106,10 +111,9 @@ export default function TimePicker() {
         active={quick?.value == item.value}
         onClick={() => {
           setVisible(false);
-          URLStore.changeURLParams({
-            params: { from: `${item.value}` },
-            needDelete: ['from', 'to'],
-          });
+          searchParams.delete(SearchParamKeys.To);
+          searchParams.set(SearchParamKeys.From, `${item.value}`);
+          setSearchParams(searchParams);
         }}>
         <IconTick
           style={{
@@ -160,14 +164,10 @@ export default function TimePicker() {
               style={{ marginTop: 12 }}
               onClick={() => {
                 setVisible(false);
-                const from = formApi.current.getValue('from');
-                const to = formApi.current.getValue('to');
-                URLStore.changeURLParams({
-                  params: {
-                    from: from ? moment(from.getTime()).format(DateTimeFormat) : '',
-                    to: to ? moment(to.getTime()).format(DateTimeFormat) : '',
-                  },
-                });
+                const from = formApi.current.getValue(SearchParamKeys.From);
+                const to = formApi.current.getValue(SearchParamKeys.To);
+                searchParams.set(SearchParamKeys.From, from ? moment(from.getTime()).format(DateTimeFormat) : '');
+                searchParams.set(SearchParamKeys.To, to ? moment(to.getTime()).format(DateTimeFormat) : '');
               }}>
               Apply time range
             </Button>
@@ -176,13 +176,13 @@ export default function TimePicker() {
         <div
           style={{
             paddingLeft: 20,
-            borderLeft: '1px solid var(--semi-color-text-3)',
+            borderLeft: '1px solid var(--semi-color-border)',
           }}>
           <Title strong heading={6}>
             <Input
               placeholder="Search quick range"
               onChange={(val: string) => {
-                const rs = _.filter(quickSelectList, (item: QuickSelectItem) => item.title.indexOf(val) >= 0);
+                const rs = filter(quickSelectList, (item: QuickSelectItem) => item.title.indexOf(val) >= 0);
                 setQuickItems(rs);
               }}
             />
@@ -210,7 +210,12 @@ export default function TimePicker() {
         {renderSelectedTime()}
       </Popover>
       <SplitButtonGroup>
-        <Button icon={<IconRefresh />} onClick={() => URLStore.forceChange()} />
+        <Button
+          icon={<IconRefresh />}
+          onClick={() => {
+            //FIXME:
+          }}
+        />
         <Dropdown
           trigger="click"
           showTick
@@ -221,9 +226,8 @@ export default function TimePicker() {
                   key={item.title}
                   active={item.value === autoRefresh.value}
                   onClick={() => {
-                    URLStore.changeURLParams({
-                      params: { refresh: item.value },
-                    });
+                    searchParams.set(SearchParamKeys.Refresh, item.value);
+                    setSearchParams(searchParams);
                   }}>
                   {item.title}
                 </Dropdown.Item>
@@ -241,4 +245,6 @@ export default function TimePicker() {
       </SplitButtonGroup>
     </>
   );
-}
+};
+
+export default TimePicker;
