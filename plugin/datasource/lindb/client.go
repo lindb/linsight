@@ -53,7 +53,7 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 		return nil, err
 	}
 
-	sql, err := buildDataSQL(dataQueryReq, timeRange)
+	sql, err := buildDataQuerySQL(dataQueryReq, timeRange)
 	if err != nil {
 		return nil, err
 	}

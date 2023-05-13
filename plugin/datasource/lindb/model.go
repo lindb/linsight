@@ -17,6 +17,11 @@
 
 package lindb
 
+import (
+	"bytes"
+	"fmt"
+)
+
 // MetadataType represents metadata type for LinDB.
 type MetadataType = string
 
@@ -27,6 +32,16 @@ var (
 	Field                  = "field"
 	TagKey                 = "tagKey"
 	TagValue               = "tagValue"
+)
+
+// Operator represents binary operator.
+type Operator = string
+
+var (
+	Eq   Operator = "="
+	In            = "in"
+	GtEq          = ">="
+	LtEq          = "<="
 )
 
 // DatasourceConfig represents datasource config for LinDB.
@@ -40,6 +55,7 @@ type DataQueryRequest struct {
 	Metric    string   `json:"metric"`
 	Fields    []string `json:"fields"`
 	GroupBy   []string `json:"groupBy"`
+	Where     []Expr   `json:"where"`
 	Stats     bool     `json:"stats"`
 }
 
@@ -49,4 +65,25 @@ type MetadataQueryRequest struct {
 	Prefix    string       `json:"prefix"`
 	Namespace string       `json:"namespace"`
 	Metric    string       `json:"metric"`
+}
+
+// Expr represents where condition express.
+type Expr struct {
+	Key   string   `json:"key"`
+	Op    Operator `json:"operator"`
+	Value any      `json:"value"`
+}
+
+// String returns the string value of expr.
+func (e Expr) String() string {
+	buf := &bytes.Buffer{}
+	buf.WriteString(e.Key)
+	fmt.Fprintf(buf, " %s ", e.Op)
+	switch e.Value.(type) {
+	case string:
+		fmt.Fprintf(buf, "%v", e.Value)
+	default:
+		fmt.Fprintf(buf, "%v", e.Value)
+	}
+	return buf.String()
 }

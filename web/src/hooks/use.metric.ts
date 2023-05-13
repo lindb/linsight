@@ -16,17 +16,28 @@ specific language governing permissions and limitations
 under the License.
 */
 import { DatasourceStore } from '@src/stores';
-import { Query } from '@src/types';
+import { Query, SearchParamKeys, TimeRange } from '@src/types';
 import { isEmpty } from 'lodash-es';
 import { toJS } from 'mobx';
+import { useSearchParams } from 'react-router-dom';
 import { useRequest } from './use.request';
 
 export const useMetric = (queries: Query[]) => {
   console.log('use metric.......', toJS(queries));
+  const [searchParams] = useSearchParams();
+  const from = searchParams.get(SearchParamKeys.From);
+  const to = searchParams.get(SearchParamKeys.To);
   const { result, loading, refetch, error } = useRequest(
-    ['search_metric_data', queries],
+    ['search_metric_data', queries, from, to],
     async () => {
       const requests: any[] = [];
+      const range: TimeRange = {};
+      if (!isEmpty(from)) {
+        range.from = `${from}`;
+      }
+      if (!isEmpty(to)) {
+        range.to = `${to}`;
+      }
       (queries || []).forEach((query: Query) => {
         console.log(toJS(query), 'query.....');
         const ds = DatasourceStore.getDatasource(query.datasource.uid);
@@ -34,7 +45,7 @@ export const useMetric = (queries: Query[]) => {
           return;
         }
         // add query request into batch
-        requests.push(ds.api.query(query.request));
+        requests.push(ds.api.query(query.request, range));
       });
       return Promise.allSettled(requests).then((res) => {
         return res.map((item) => (item.status === 'fulfilled' ? item.value : [])).flat();

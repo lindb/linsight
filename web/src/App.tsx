@@ -25,7 +25,6 @@ import { Feature, FeatureRepositoryInst, ThemeType } from '@src/types';
 import { UserSrv } from './services';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MenuStore } from './stores';
-import DarkLogo from '@src/images/logo-dark.svg';
 import Logo from '@src/images/logo.svg';
 
 const { Text } = Typography;
@@ -128,7 +127,7 @@ const FeatureMenu: React.FC = () => {
           selectedKeys={selectMenus()}
           style={{ maxWidth: 220, height: '100%' }}
           header={{
-            logo: theme === ThemeType.Dark ? <img src={DarkLogo} /> : <img src={Logo} />,
+            logo: <img src={Logo} />,
             text: 'insight',
           }}
           footer={{
