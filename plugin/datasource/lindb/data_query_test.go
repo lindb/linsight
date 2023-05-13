@@ -18,13 +18,17 @@
 package lindb
 
 import (
+	"fmt"
 	"testing"
+
+	"github.com/lindb/linsight/model"
 )
 
 func TestDataQuery_buildSQL(t *testing.T) {
-	_, _ = buildDataSQL(&DataQueryRequest{
+	sql, _ := buildDataSQL(&DataQueryRequest{
 		Metric:  "system.host.cpu",
 		Fields:  []string{"load", "usage"},
 		GroupBy: []string{"host", "region"},
-	})
+	}, model.TimeRange{From: "from"})
+	fmt.Println(sql)
 }

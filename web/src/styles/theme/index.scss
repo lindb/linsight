@@ -33,11 +33,11 @@ body {
   }
 
   &::-webkit-scrollbar-track {
-    background: rgb(0 0 0 / 0%);
+    background: rgba(0, 0, 0, 0%);
   }
 
   &::-webkit-scrollbar-corner {
-    background-color: rgb(0 0 0 / 0%);
+    background-color: rgba(0, 0, 0, 0%);
   }
 
   &::-webkit-scrollbar-thumb {
@@ -68,7 +68,7 @@ body[theme-mode='dark'] {
     border-color: transparent;
 
     .editor-outer .editor-container {
-      background: rgb(255 255 255 / 4%);
+      background: rgba(255, 255, 255, 4%);
     }
   }
 
@@ -93,4 +93,8 @@ body[theme-mode='dark'] {
 
 .semi-select-option-selected {
   background-color: var(--semi-color-primary-light-hover);
+}
+
+.semi-dropdown-item-active {
+  color: var(--semi-color-primary);
 }

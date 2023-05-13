@@ -19,9 +19,11 @@ package lindb
 
 import (
 	sq "github.com/Masterminds/squirrel"
+
+	"github.com/lindb/linsight/model"
 )
 
-func buildDataSQL(req *DataQueryRequest) (string, error) {
+func buildDataSQL(req *DataQueryRequest, timeRange model.TimeRange) (string, error) {
 	groupBy := req.GroupBy
 	if req.Stats {
 		groupBy = append(groupBy, "time()")
@@ -30,6 +32,12 @@ func buildDataSQL(req *DataQueryRequest) (string, error) {
 	builder := sq.Select(req.Fields...).
 		From(req.Metric).
 		GroupBy(groupBy...)
+	if timeRange.From != "" {
+		builder.Where(sq.Eq{"deleted_at2": "test"})
+	}
+	if timeRange.To != "" {
+		builder.Where(sq.LtOrEq{"to": timeRange.To})
+	}
 	sql, _, err := builder.ToSql()
 	if err != nil {
 		return "", err

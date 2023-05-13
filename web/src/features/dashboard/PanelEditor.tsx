@@ -28,6 +28,8 @@ import { toJS } from 'mobx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
 import PanelSetting from './PanelSetting';
+import ViewVariables from './components/ViewVariables';
+import { QueryEditContextProvider } from '@src/contexts';
 
 const Split: any = SplitPane;
 
@@ -67,18 +69,18 @@ const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
       <>
         {targets.map((target: any, index: number) => {
           return (
-            <QueryEditor
-              key={index}
-              datasource={datasource}
-              initParams={target}
-              onChange={(values) => {
-                // FIXME: set target
-                console.log('query editor change....', values);
-                DashboardStore.updatePanelConfig(PanelStore.panel, {
-                  targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
-                });
-              }}
-            />
+            <QueryEditContextProvider key={index} initValues={get(target, 'request', {})}>
+              <QueryEditor
+                datasource={datasource}
+                onChange={(values) => {
+                  // FIXME: set target
+                  console.log('query editor change....', values);
+                  DashboardStore.updatePanelConfig(PanelStore.panel, {
+                    targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
+                  });
+                }}
+              />
+            </QueryEditContextProvider>
           );
         })}
       </>
@@ -154,8 +156,13 @@ const EditPanel: React.FC = () => {
         minSize={250}
         maxSize={500}
         style={{ position: 'relative' }}>
-        <Split split="horizontal" minSize={260} style={{ overflow: 'auto' }}>
-          <Panel panel={panel} />
+        <Split split="horizontal" minSize={340} style={{ overflow: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+            <div style={{ marginBottom: 6 }}>
+              <ViewVariables />
+            </div>
+            <Panel panel={panel} />
+          </div>
           <Card bodyStyle={{ padding: '8px 20px 12px 20px' }}>
             <Tabs size="small">
               <TabPane

@@ -15,6 +15,21 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from './PlatformContextProvider';
-export * from './VariableContextProvider';
-export * from './QueryEditContextProvider';
+import { QueryEditContext } from '@src/contexts';
+import { useContext, useEffect, useState } from 'react';
+import { pick } from 'lodash-es';
+
+export const useQueryEditor = (watch?: string[]) => {
+  const { values } = useContext(QueryEditContext);
+  const [watchValues, setWatchValues] = useState({});
+  useEffect(() => {
+    if (!watch) {
+      setWatchValues(values);
+    } else {
+      setWatchValues(pick(values, watch));
+    }
+  }, [values, watch]);
+  return {
+    ...watchValues,
+  } as any;
+};

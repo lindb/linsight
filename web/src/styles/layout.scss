@@ -54,8 +54,10 @@ under the License.
 
 .linsight-sider {
   .semi-navigation-header-text {
-    font-size: 28px;
-    font-weight: 650;
+    font-size: 36px;
+    font-weight: 800;
+    color: #e85b2d;
+    -webkit-text-stroke: 1px #fff;
   }
 
   .semi-navigation-item {
@@ -64,7 +66,7 @@ under the License.
 
   .semi-navigation-vertical .semi-navigation-header {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     margin-top: 8px;
     margin-bottom: 12px;
     padding: 0;
@@ -72,6 +74,12 @@ under the License.
 
   .semi-navigation-header-logo {
     justify-content: center;
+    margin-right: 0;
+
+    img {
+      height: 40px;
+      width: 40px;
+    }
   }
 
   .semi-navigation-vertical .semi-navigation-footer {
@@ -113,7 +121,7 @@ under the License.
 }
 
 .linsight-feature {
-  margin: 12px;
+  margin: 6px;
 }
 
 .linsight-form {

@@ -16,17 +16,16 @@ specific language governing permissions and limitations
 under the License.
 */
 import { useQuery } from '@tanstack/react-query';
+import { get } from 'lodash-es';
 /**
  * Do http request hook
  */
 const useRequest = (requestKeys: any[], fn: () => any, options?: object) => {
-  const { isInitialLoading, isLoading, isFetching, data, refetch, error } = useQuery(
-    [...requestKeys],
-    () => fn(),
-    options
-  );
+  const enabled = get(options, 'enabled', true);
+  const { isInitialLoading, isLoading, isFetching, data, refetch, error } = useQuery(requestKeys, () => fn(), options);
+
   return {
-    loading: isInitialLoading || isLoading || isFetching,
+    loading: enabled && (isInitialLoading || isLoading || isFetching),
     result: data,
     error,
     refetch,

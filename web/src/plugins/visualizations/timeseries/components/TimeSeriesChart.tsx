@@ -272,6 +272,7 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
       }
     });
     setSelectedSeries(Array.from(currentSelectedSet));
+    console.error('re-render time series chart');
   }, [config, datasets, theme]);
 
   /**

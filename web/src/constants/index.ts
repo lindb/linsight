@@ -17,4 +17,3 @@ under the License.
 */
 export * from '@src/constants/dashboard';
 export * from '@src/constants/api';
-export * from '@src/constants/format';
