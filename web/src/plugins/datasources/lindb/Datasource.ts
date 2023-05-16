@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { DataQuerySrv } from '@src/services';
-import { DatasourceAPI, DatasourceSetting } from '@src/types';
+import { DatasourceAPI, DatasourceSetting, TimeRange } from '@src/types';
 import { isEmpty } from 'lodash-es';
 
 export class LinDBDatasource extends DatasourceAPI {
@@ -63,9 +63,10 @@ export class LinDBDatasource extends DatasourceAPI {
     return [];
   }
 
-  query(req: any) {
+  query(req: any, range?: TimeRange) {
     console.log(req, 'xxxxxx');
     return DataQuerySrv.dataQuery({
+      range: range,
       queries: [
         {
           datasource: { uid: this.setting.uid },

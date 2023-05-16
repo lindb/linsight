@@ -24,12 +24,14 @@ export enum DatasourceCategory {
   Trace = 'trace',
 }
 
+export interface TimeRange {
+  from?: string;
+  to?: string;
+}
+
 export interface DataQuery {
   queries: Query[];
-  range?: {
-    from?: string;
-    to?: string;
-  };
+  range?: TimeRange;
 }
 
 export interface Query {
@@ -101,7 +103,7 @@ abstract class DatasourceAPI {
     this.setting = setting;
   }
 
-  abstract query(req: any): any;
+  abstract query(req: any, range?: TimeRange): any;
 
   abstract test(): any;
 }
