@@ -17,8 +17,8 @@ under the License.
 */
 import React, { useEffect, useState } from 'react';
 import { DashboardSrv } from '@src/services';
-import { createSearchParams, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
-import * as _ from 'lodash-es';
+import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { isEmpty, endsWith } from 'lodash-es';
 import { Spin, Layout, Typography, Button } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
 import { DashboardStore, PanelStore } from '@src/stores';
@@ -30,7 +30,6 @@ import { VisualizationAddPanelType } from '@src/constants';
 import { ApiKit } from '@src/utils';
 import { observer } from 'mobx-react-lite';
 import ViewPanel from './ViewPanel';
-import { toJS } from 'mobx';
 import './dashboard.scss';
 import { useRequest } from '@src/hooks';
 
@@ -80,12 +79,13 @@ const DashboardStar = observer(() => {
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const dashboardId = searchParams.get('d');
   const [loading, setLoading] = useState(true);
   const { result: dashboard, loading: isLoading } = useRequest(
     ['load-dashboard', dashboardId],
     async () => {
-      if (_.isEmpty(dashboardId)) {
+      if (isEmpty(dashboardId)) {
         setLoading(true);
         const id = `abc${new Date().getTime()}`;
         return {
@@ -116,6 +116,10 @@ const Dashboard: React.FC = () => {
     }
   }, [dashboard, isLoading]);
 
+  const isEditDashboard = (): boolean => {
+    return endsWith(location.pathname, '/edit') || endsWith(location.pathname, '/setting');
+  };
+
   if (loading) {
     console.log('loading.....');
     return (
@@ -137,18 +141,19 @@ const Dashboard: React.FC = () => {
           <Title heading={6}>{DashboardStore.dashboard?.title}</Title>
           <DashboardStar />
         </div>
-        <div style={{ marginRight: 12, gap: 8, display: 'flex' }}>
-          <Button
-            type="tertiary"
-            icon={<Icon icon="icon-back2" />}
-            onClick={() => {
-              console.log('xxxx ddd', toJS(dashboard));
-              navigate({
-                pathname: '/dashboard',
-                search: dashboard.uid ? `${createSearchParams({ d: dashboard.uid })}` : '',
-              });
-            }}
-          />
+        <div style={{ marginRight: 12, gap: 4, display: 'flex' }}>
+          {isEditDashboard() && (
+            <Button
+              type="tertiary"
+              icon={<Icon icon="icon-back2" />}
+              onClick={() => {
+                navigate({
+                  pathname: '/dashboard',
+                  search: dashboard.uid ? `${createSearchParams({ d: dashboard.uid })}` : '',
+                });
+              }}
+            />
+          )}
           <Button
             type="tertiary"
             icon={<Icon icon="icon-panel-add" />}

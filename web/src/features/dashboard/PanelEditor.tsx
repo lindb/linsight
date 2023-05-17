@@ -20,7 +20,7 @@ import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
 import { IconBellStroked } from '@douyinfe/semi-icons';
 import SplitPane from 'react-split-pane';
 import { PanelSetting as PanelOptions } from '@src/types';
-import { DatasourceSelect, Notification, Panel } from '@src/components';
+import { DatasourceSelectForm, Notification, Panel } from '@src/components';
 import { get, isEmpty } from 'lodash-es';
 import { observer } from 'mobx-react-lite';
 import { PanelStore, DashboardStore, DatasourceStore } from '@src/stores';
@@ -89,7 +89,7 @@ const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
 
   return (
     <div>
-      <DatasourceSelect
+      <DatasourceSelectForm
         noLabel
         value={get(datasource, 'setting.uid')}
         style={{ width: 200 }}

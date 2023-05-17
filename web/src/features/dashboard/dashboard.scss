@@ -175,15 +175,15 @@ under the License.
   background: var(--semi-color-primary);
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .Resizer {
-  /* background: #000; */
-
   z-index: 1;
   box-sizing: border-box;
   background-clip: padding;
   background-clip: padding-box;
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .Resizer.horizontal {
   height: 16px;
   min-height: 16px;
@@ -191,10 +191,12 @@ under the License.
   cursor: row-resize;
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .Resizer.horizontal:hover::before {
   border-color: var(--semi-color-primary);
 }
 
+/* stylelint-disable-next-line selector-class-pattern */
 .Resizer.horizontal:hover::after {
   background: var(--semi-color-primary);
 }

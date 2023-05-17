@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import classNames from 'classnames';
 import { get, upperFirst, find, isEmpty } from 'lodash-es';
 import { Chart } from 'chart.js';
@@ -58,8 +58,6 @@ const LegendItem: React.FC<{
   const seriesCls = classNames('legend-series', {
     fade: hidden,
   });
-  console.log('legend values...', values, series);
-
   return (
     <div className={seriesCls}>
       <span className="legend-series-key">
@@ -82,10 +80,10 @@ export const Legend: React.FC<{ chart: any }> = (props) => {
     // if chart not exist or hidden legend, return
     return null;
   }
+  const datasets = get(chart, 'data.datasets', []);
   const placement = get(chart, 'options.legend.placement', Placement.Bottom);
   const asTable = mode === LegendMode.Table;
   const toRight = placement === Placement.Right;
-  const datasets = get(chart, 'data.datasets', []);
   const values = get(chart, 'options.legend.values', []);
   const legendCls = classNames('time-series-legend', {
     'as-table': asTable,
@@ -95,12 +93,12 @@ export const Legend: React.FC<{ chart: any }> = (props) => {
     table: asTable,
     active: find(datasets, { hidden: false }),
   });
+
   return (
     <div className={legendCls}>
       <div className={legendContentCls}>
         {asTable && !isEmpty(datasets) && <LegendHeader values={values} />}
         {datasets.map((series: any) => {
-          console.log('xxxxx....');
           return <LegendItem chart={chart} series={series} key={series.label} values={values} />;
         })}
       </div>

@@ -186,7 +186,13 @@ export const DefaultChartConfig = {
           callback: function (_value: any, index: number, _values: any) {
             const times = get(this, 'chart.config.data.times', []);
             const labels = get(this, 'chart.config.data.labels', []);
-            if (times[index] % (5 * 60 * 1000) == 0) {
+            const interval = get(this, 'chart.config.data.interval', 0);
+            if (interval <= 0) {
+              return labels[index];
+            }
+            const time = times[index];
+            // TODO: opt?
+            if ((time - (time % interval)) % (5 * 60 * 1000) == 0) {
               return labels[index];
             }
             return null;

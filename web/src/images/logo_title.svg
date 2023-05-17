@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" width="860px" height="304px" viewBox="0 4.956 1015 360" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <path style="stroke: rgb(0, 0, 0); stroke-width: 0px; fill: rgb(232, 91, 45);" d="M 0.033 30.046 L 91.711 30.046 L 41.277 303.066 L 0.033 303.066"/>
+  <path style="stroke: rgb(0, 0, 0); stroke-width: 0px; fill: rgb(232, 91, 45);" d="M 64.124 222.767 L 128.212 222.766 L 168.261 5.955 L 104.173 5.956 L 64.124 222.767 Z" transform="matrix(1, 0.000026, -0.000026, 1, 0.002973, -0.003021)" bx:origin="0.499995 0.5"/>
+  <path style="stroke-width: 0px; stroke: rgb(232, 91, 45); paint-order: stroke; fill: rgb(232, 91, 45);" d="M 171.825 30.046 L 288.429 30.046 L 288.429 303.066 L 224.341 303.066 L 224.341 222.766 L 136.22 222.766 L 171.825 30.046 Z"/>
+  <path style="stroke: rgb(0, 0, 0); stroke-width: 0px; fill: rgb(232, 91, 45);" d="M 62.64 230.796 L 50.772 295.036 L 216.33 295.036 L 216.33 230.796 L 62.64 230.796 Z"/>
+  <text style="fill: rgb(232, 91, 45); font-family: &quot;Apple Braille&quot;; font-size: 41.8px; font-weight: 700; white-space: pre;" transform="matrix(5.36346, 0, 0, 6.889523, -1434.781128, -984.640686)" x="323.848" y="186.938">insight</text>
+</svg>

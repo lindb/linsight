@@ -18,7 +18,7 @@ under the License.
 import { Notification } from '@src/components';
 import { DefaultColumns, VisualizationAddPanelType } from '@src/constants';
 import { DashboardSrv } from '@src/services';
-import { Dashboard, PanelSetting } from '@src/types';
+import { Dashboard, PanelSetting, Variable } from '@src/types';
 import { ApiKit } from '@src/utils';
 import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
@@ -121,17 +121,17 @@ class DashboardStore {
     pullAt(get(this.dashboard, 'config.variables', []), parseInt(index));
   }
 
-  getVariableByIndex(index: string) {
-    return get(this.dashboard, `config.variables[${index}]`, {});
+  getVariableByIndex(index: string): Variable {
+    return get(this.dashboard, `config.variables[${index}]`, {} as Variable);
   }
 
   sortPanels() {
     const panels = get(this.dashboard, 'config.panels', []);
     panels.sort((a: PanelSetting, b: PanelSetting) => {
-      if (a.grid.y === b.grid.y) {
-        return a.grid.x - b.grid.x;
+      if (a.grid?.y === b.grid?.y) {
+        return a.grid?.x - b.grid?.x;
       }
-      return a.grid.y - b.grid.y;
+      return a.grid?.y - b.grid?.y;
     });
   }
 

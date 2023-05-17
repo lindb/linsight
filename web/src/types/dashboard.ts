@@ -15,7 +15,16 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PanelSetting } from '@src/types';
+import { PanelSetting, Query } from '@src/types';
+
+export interface Variable {
+  type: VariableType;
+  name: string;
+  label?: string;
+  hide: VariableHideType;
+  optionType: OptionType;
+  query?: Query;
+}
 
 export interface Dashboard {
   uid?: string;
@@ -23,7 +32,7 @@ export interface Dashboard {
   isStarred?: boolean;
   config?: {
     panels?: PanelSetting[];
-    variables?: any[];
+    variables?: Variable[];
   };
 }
 
@@ -42,6 +51,16 @@ export enum VariableHideType {
   LabelAndValue = 0,
   OnlyValue = 1,
   Hide = 2,
+}
+
+export enum VariableType {
+  Constant = 'constant',
+  Query = 'query',
+}
+
+export enum OptionType {
+  Multi = 'multi',
+  All = 'all',
 }
 
 export enum SearchParamKeys {

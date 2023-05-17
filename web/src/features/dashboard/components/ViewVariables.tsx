@@ -20,14 +20,15 @@ import { DashboardStore } from '@src/stores';
 import React, { useEffect } from 'react';
 import { get, isEmpty, map } from 'lodash-es';
 import { observer } from 'mobx-react-lite';
-import { VariableHideType } from '@src/types';
+import { Variable, VariableHideType, VariableType } from '@src/types';
 import './variables.scss';
 import { useSearchParams } from 'react-router-dom';
+import { useVariable } from '@src/hooks';
 
 /*
- * View variable based on setting.
+ * Constant variable based on setting.
  */
-const ViewVariable: React.FC<{ variable: any }> = (props) => {
+const ConstantVariable: React.FC<{ variable: Variable }> = (props) => {
   const { variable } = props;
   const [searchParams] = useSearchParams();
   const formApi = useFormApi();
@@ -58,18 +59,52 @@ const ViewVariable: React.FC<{ variable: any }> = (props) => {
 };
 
 /*
+ * Query variable based on setting.
+ */
+const QueryVariable: React.FC<{ variable: Variable }> = (props) => {
+  const { variable } = props;
+  const { result, loading } = useVariable(variable, '');
+  const [searchParams] = useSearchParams();
+  const formApi = useFormApi();
+
+  useEffect(() => {
+    const name = variable.name;
+    const value = searchParams.get(name);
+    formApi.setValue(name, value);
+  }, [searchParams, variable, formApi]);
+
+  if (variable.hide === VariableHideType.Hide) {
+    return null;
+  }
+
+  return (
+    <Form.Select
+      showClear
+      key={variable.name}
+      noLabel={variable.hide === VariableHideType.OnlyValue}
+      label={variable.label}
+      field={variable.name}
+      loading={loading}
+      optionList={map(result, (r: string) => {
+        return { value: r, label: r };
+      })}
+    />
+  );
+};
+
+/*
  * View the list of variables
  */
 const ViewVariables: React.FC<{ className?: string }> = (props) => {
   const { className } = props;
   const { dashboard } = DashboardStore;
   const [searchParams, setSearchParams] = useSearchParams();
-  const variables: any[] = get(dashboard, 'config.variables', []);
+  const variables: Variable[] = get(dashboard, 'config.variables', []);
   if (isEmpty(variables)) {
     return null;
   }
   // get all variables' name
-  const names = map(variables, (item: any) => item.name);
+  const names = map(variables, (item: Variable) => item.name);
 
   return (
     <Card className={className} bodyStyle={{ padding: 8 }}>
@@ -92,9 +127,12 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
           });
           setSearchParams(searchParams);
         }}>
-        {variables.map((item: any, index: number) => (
-          <ViewVariable variable={item} key={index} />
-        ))}
+        {variables.map((item: Variable, index: number) => {
+          if (item.type === VariableType.Query) {
+            return <QueryVariable variable={item} key={index} />;
+          }
+          return <ConstantVariable variable={item} key={index} />;
+        })}
       </Form>
     </Card>
   );

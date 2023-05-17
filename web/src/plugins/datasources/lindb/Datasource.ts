@@ -63,6 +63,17 @@ export class LinDBDatasource extends DatasourceAPI {
     return [];
   }
 
+  async metaQuery(req: any, prefix?: string): Promise<string[]> {
+    const rs = await DataQuerySrv.metadataQuery({
+      datasource: { uid: this.setting.uid },
+      request: { type: 'metric', prefix: prefix },
+    });
+    if (rs) {
+      return rs.values;
+    }
+    return [];
+  }
+
   query(req: any, range?: TimeRange) {
     console.log(req, 'xxxxxx');
     return DataQuerySrv.dataQuery({

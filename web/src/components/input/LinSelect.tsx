@@ -56,7 +56,7 @@ const LinSelect: React.FC<{
     label,
     placeholder,
     style,
-    labelPosition,
+    labelPosition = 'inset',
     visible,
     loader,
     reloadKeys,
@@ -77,12 +77,12 @@ const LinSelect: React.FC<{
 
   const isEnable = (): boolean => {
     console.log('xxxxkkkkkkk.............');
-    return false;
+    return true;
   };
   const { result, loading, error, refetch } = useRequest(
     [field, loader],
     () => {
-      parseInt('abc');
+      console.log('reload.....', previousValue);
       return loader ? loader(searchInput.current || '') : [];
     },
     {
@@ -92,6 +92,9 @@ const LinSelect: React.FC<{
       },
     }
   );
+  useEffect(() => {
+    previousValue.current = result;
+  }, [result]);
 
   useEffect(() => {
     if (show) {
@@ -130,7 +133,6 @@ const LinSelect: React.FC<{
 
   // lazy remote search when user input.
   const search = debounce(refetch, 200);
-  console.log('rrrrrrr.......', result);
 
   return (
     <>
@@ -158,7 +160,7 @@ const LinSelect: React.FC<{
         onDropdownVisibleChange={(val) => {
           dropdownVisible.current = val;
           if (!val) {
-            formApi.submitForm();
+            // formApi.submitForm();
           }
         }}
         // onFocus={() => {

@@ -17,6 +17,7 @@ under the License.
 */
 import { DatasourceSetting } from './datasource';
 import { Preference, User } from './user';
+import { Chart } from 'chart.js';
 
 export interface Bootdata {
   user: User;
@@ -34,4 +35,6 @@ export enum MouseEventType {
 export interface MouseEvent {
   type: MouseEventType;
   native: any;
+  index?: any;
+  chart?: Chart;
 }

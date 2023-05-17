@@ -105,7 +105,7 @@ const TooltipToolbar: React.FC<{
       </div>
       {(searchVisible || search) && (
         <Input
-          className="tooltip-toolbar__search-input"
+          className="search-input"
           size="small"
           value={search}
           onChange={(v) => onSearch(v)}
