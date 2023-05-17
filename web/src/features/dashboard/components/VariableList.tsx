@@ -35,6 +35,7 @@ import {
 } from 'react-beautiful-dnd';
 import classNames from 'classnames';
 import './variables.scss';
+import { Variable } from '@src/types';
 const { Text } = Typography;
 
 // https://github.com/atlassian/react-beautiful-dnd/blob/master/docs/guides/drop-animation.md#skipping-the-drop-animation
@@ -66,7 +67,6 @@ const TableRow = (props: any) => {
   return (
     <Draggable key={index} draggableId={`${index}`} index={index}>
       {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => {
-        props.record.snapshot = snapshot;
         return (
           <tr
             ref={provided.innerRef}
@@ -106,7 +106,7 @@ const TableCell = (props: any) => {
 const VariableList: React.FC = () => {
   const { dashboard } = DashboardStore;
   const [searchParams, setSearchParams] = useSearchParams();
-  const variables: any[] = get(dashboard, 'config.variables', []);
+  const variables: Variable[] = get(dashboard, 'config.variables', []);
   const [preview, setPreview] = useState(false);
 
   const components = useMemo(() => {
@@ -181,9 +181,10 @@ const VariableList: React.FC = () => {
             {
               title: 'Name',
               dataIndex: 'name',
-              render: (_text: any, r: any, index: number) => {
+              render: (_text: any, r: Variable, index: number) => {
                 return (
                   <Text
+                    style={{ padding: '12px 0 12px 0' }}
                     link
                     onClick={() => {
                       searchParams.set('edit', `${index}`);
@@ -199,7 +200,7 @@ const VariableList: React.FC = () => {
             {
               title: 'Operations',
               width: 120,
-              render: (_text: any, r: any, index: number) => {
+              render: (_text: any, r: Variable, index: number) => {
                 return (
                   <div style={{ display: 'flex', flexDirection: 'row', gap: 4 }}>
                     <Button

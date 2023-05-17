@@ -21,3 +21,4 @@ export * from '@src/hooks/use.metric';
 export * from '@src/hooks/use.request';
 export * from '@src/hooks/use.event';
 export * from '@src/hooks/use.query.edit';
+export * from '@src/hooks/use.variable';

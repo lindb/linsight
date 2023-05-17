@@ -18,7 +18,7 @@ under the License.
 import React, { useContext, useEffect } from 'react';
 import { Layout, Nav, Dropdown, Divider, Typography } from '@douyinfe/semi-ui';
 import { IconLeftCircleStroked, IconUser, IconMoon, IconSun } from '@douyinfe/semi-icons';
-import * as _ from 'lodash-es';
+import { find, get, upperFirst } from 'lodash-es';
 import { Footer, Icon } from '@src/components';
 import { PlatformContext } from '@src/contexts';
 import { Feature, FeatureRepositoryInst, ThemeType } from '@src/types';
@@ -26,6 +26,7 @@ import { UserSrv } from './services';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MenuStore } from './stores';
 import Logo from '@src/images/logo.svg';
+import LogoTitle from '@src/images/logo_title.svg';
 
 const { Text } = Typography;
 const { Sider, Content } = Layout;
@@ -43,7 +44,7 @@ const FeatureMenu: React.FC = () => {
     let menu: string[] = [];
     (boot.navTree || []).forEach((item: any) => {
       if (item.children) {
-        const subItem = _.find(item.children, { path: location.pathname });
+        const subItem = find(item.children, { path: location.pathname });
         if (subItem) {
           menu.push(subItem.path || subItem.text);
           return;
@@ -57,7 +58,6 @@ const FeatureMenu: React.FC = () => {
   };
 
   const renderMenus = (menus: any) => {
-    console.log('xxxxxxx render menu', boot, menus);
     return (menus || []).map((item: any) => {
       if (item.children) {
         return (
@@ -147,12 +147,12 @@ const FeatureMenu: React.FC = () => {
                   render={
                     <Dropdown.Menu className="linsight-user">
                       <Dropdown.Item disabled>
-                        {_.get(boot, 'user.name')}@{_.get(boot, 'user.org.name')}
+                        {get(boot, 'user.name')}@{get(boot, 'user.org.name')}
                       </Dropdown.Item>
                       <Dropdown.Divider />
                       <Dropdown.Item onClick={() => navigate('/setting/user/edit')}>Personal Settings</Dropdown.Item>
                       <Dropdown.Item icon={theme !== ThemeType.Dark ? <IconMoon /> : <IconSun />} onClick={toggleTheme}>
-                        {_.upperFirst(theme)}
+                        {upperFirst(theme)}
                       </Dropdown.Item>
                       <Dropdown.Divider />
                       <Dropdown.Item
@@ -172,7 +172,7 @@ const FeatureMenu: React.FC = () => {
                     <IconUser size="large" />
                     {!collapsed && (
                       <Text ellipsis style={{ width: 160 }}>
-                        {_.get(boot, 'user.name')}
+                        {get(boot, 'user.name')}
                       </Text>
                     )}
                   </div>
@@ -189,7 +189,6 @@ const FeatureMenu: React.FC = () => {
 
 const App: React.FC = () => {
   const features = FeatureRepositoryInst.getFeatures();
-  console.log('app features', features);
   return (
     <Layout className="linsight">
       <FeatureMenu />
@@ -201,6 +200,9 @@ const App: React.FC = () => {
               return <Route key={feature.Route} path={feature.Route} element={<Component />} />;
             })}
           </Routes>
+          <div style={{ border: 1, borderColor: 'red' }}>
+            <img src={LogoTitle} height={72} />
+          </div>
         </Content>
         <Footer />
       </Layout>

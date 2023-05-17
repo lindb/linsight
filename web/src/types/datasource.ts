@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ComponentType } from 'react';
-import { Plugin } from '@src/types';
+import { Plugin, Variable } from '@src/types';
 
 export enum DatasourceCategory {
   Metric = 'metric',
@@ -58,10 +58,15 @@ export interface QueryEditorProps {
   onChange?: (values: object) => void;
 }
 
+export interface VariableEditorProps {
+  variable: Variable;
+  datasource: DatasourceInstance;
+}
+
 export interface DatasourcePluginComponents {
   SettingEditor?: ComponentType<any>;
   QueryEditor?: ComponentType<QueryEditorProps>;
-  VariableEditor?: ComponentType<any>;
+  VariableEditor?: ComponentType<VariableEditorProps>;
 }
 
 export interface DatasourceConstructor {
@@ -104,6 +109,8 @@ abstract class DatasourceAPI {
   }
 
   abstract query(req: any, range?: TimeRange): any;
+
+  abstract metaQuery(req: any, prefix?: string): Promise<string[]>;
 
   abstract test(): any;
 }

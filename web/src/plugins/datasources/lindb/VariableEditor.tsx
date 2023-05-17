@@ -15,14 +15,18 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Form } from '@douyinfe/semi-ui';
 import React from 'react';
+import { Form } from '@douyinfe/semi-ui';
+import { VariableEditorProps } from '@src/types';
+import MetricNameSelect from './components/MetricNameSelect';
 
-const VariableEditor: React.FC = () => {
+const VariableEditor: React.FC<VariableEditorProps> = (props) => {
+  const { variable, datasource } = props;
+  console.log('variable editor', variable);
   return (
     <>
       <Form.Select
-        field="valueType"
+        field="query.request.valueType"
         label="Value type"
         style={{ width: 300 }}
         rules={[{ required: true, message: 'Value type is required.' }]}
@@ -32,6 +36,11 @@ const VariableEditor: React.FC = () => {
           { value: 'tagValue', label: 'Tag Value' },
         ]}
       />
+      {variable.query?.request.valueType === 'tagValue' && (
+        <>
+          <MetricNameSelect labelPosition="top" key="tag_value_metric" datasource={datasource} style={{ width: 300 }} />
+        </>
+      )}
     </>
   );
 };

@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
+import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
 import { Legend } from '@src/plugins/visualizations/timeseries/components/Legend';
 import Tooltip from '@src/plugins/visualizations/timeseries/components/Tooltip';
 import Menu from './Menu';
@@ -26,14 +26,17 @@ import {
   modifyChartConfigs,
 } from '@src/plugins/visualizations/timeseries/components/chart.config';
 import { Chart, registerables } from 'chart.js';
-import { cloneDeep, get, set, find } from 'lodash-es';
+import { cloneDeep, get, set, find, isEmpty } from 'lodash-es';
 import classNames from 'classnames';
-import { FormatRepositoryInst, formattedToString, MouseEventType, ThemeType } from '@src/types';
+import { FormatRepositoryInst, MouseEventType, SearchParamKeys, ThemeType } from '@src/types';
 import { PlatformStore } from '@src/stores';
 import { CSSKit } from '@src/utils';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { toJS } from 'mobx';
 import { Placement } from '../types';
+import moment from 'moment';
+import { DateTimeFormat } from '@src/constants';
+import { useSearchParams } from 'react-router-dom';
 
 Chart.register(annotationPlugin);
 Chart.register(...registerables);
@@ -48,6 +51,7 @@ const Zoom = {
 
 export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config: any }> = (props) => {
   const { theme, config, datasets } = props;
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
   const canvasRef = useRef() as MutableRefObject<HTMLCanvasElement | null>;
@@ -172,6 +176,43 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
       });
     }
   };
+
+  const handleMouseDown = (e: MouseEvent) => {
+    if (!chartInstance.current) {
+      return;
+    }
+    const chart = chartInstance.current;
+    const datasets = get(chart, 'data', {}) as any;
+    if (!isEmpty(datasets) && isZoom(chart)) {
+      zoomRef.current.isMouseDown = true;
+      const points: any = chart.getElementsAtEventForMode(e, 'index', { intersect: false }, false);
+      if (points && points.length > 0) {
+        zoomRef.current.selectedStart = datasets.times[points[0].index];
+      }
+      zoomRef.current.x = e.offsetX;
+      const chartArea = chart.chartArea;
+      const height = chartArea.height;
+      CSSKit.setStyle(zoomDivRef.current, {
+        display: 'block',
+        height: `${height}px`,
+        transform: `translate(${zoomRef.current.x}px, ${chartArea.top}px)`,
+      });
+    }
+  };
+
+  const handleMouseUp = (_e: MouseEvent) => {
+    if (zoomRef.current.drag) {
+      const start = Math.min(zoomRef.current.selectedStart, zoomRef.current.selectedEnd);
+      const end = Math.max(zoomRef.current.selectedStart, zoomRef.current.selectedEnd);
+      const from = moment(start).format(DateTimeFormat);
+      const to = moment(end).format(DateTimeFormat);
+      searchParams.set(SearchParamKeys.From, from);
+      searchParams.set(SearchParamKeys.To, to);
+      setSearchParams(searchParams);
+    }
+    resetZoomRange();
+  };
+
   const handleKeyDown = (e: any) => {
     if (!e.ctrlKey || (e.keyCode !== 76 && e.keyCode !== 85)) {
       return;
@@ -241,8 +282,8 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
       canvas.addEventListener('mousemove', handleMouseMove);
       canvas.addEventListener('mouseout', handleMouseOut);
       canvas.addEventListener('click', handleMouseClick);
-      // canvas.addEventListener('mousedown', handleMouseDown);
-      // canvas.addEventListener('mouseup', handleMouseUp);
+      canvas.addEventListener('mousedown', handleMouseDown);
+      canvas.addEventListener('mouseup', handleMouseUp);
     } else {
       const chart = chartInstance.current;
       chart.data = datasets || [];
@@ -286,8 +327,8 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
         canvas.removeEventListener('mousemove', handleMouseMove);
         canvas.removeEventListener('mouseout', handleMouseOut);
         canvas.removeEventListener('click', handleMouseClick);
-        // canvas.removeEventListener('mousedown', handleMouseDown);
-        // canvas.removeEventListener('mouseup', handleMouseUp);
+        canvas.removeEventListener('mousedown', handleMouseDown);
+        canvas.removeEventListener('mouseup', handleMouseUp);
         chartInstance.current.destroy();
         chartInstance.current = null;
       }
@@ -302,21 +343,12 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
   return (
     <div className={timeseriesChartCls}>
       <div className="time-series-canvas">
-        <canvas
-          ref={canvasRef}
-          // onMouseEnter={() => {
-          //   window.addEventListener('keydown', handleKeyDown);
-          // }}
-          // onMouseLeave={() => {
-          //   window.removeEventListener('keydown', handleKeyDown);
-          // }}
-        />
+        <canvas ref={canvasRef} />
         <div ref={crosshairRef} className="crosshair" />
         <div ref={zoomDivRef} className="zoom" />
       </div>
       <Legend chart={chartInstance.current} />
       <Tooltip chart={chartInstance.current} />
-      <Menu chart={chartInstance.current} />
     </div>
   );
 };

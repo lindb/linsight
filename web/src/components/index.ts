@@ -28,6 +28,7 @@ export { default as Footer } from '@src/components/layout/Footer';
 
 // form components
 export { default as DatasourceSelect } from '@src/components/input/DatasourceSelect';
+export { default as DatasourceSelectForm } from '@src/components/input/DatasourceSelectForm';
 export { default as SliderInput } from '@src/components/input/SliderInput';
 export { default as LinSelect } from '@src/components/input/LinSelect';
 

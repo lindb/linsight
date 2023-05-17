@@ -82,6 +82,7 @@ func (api *DatasourceAPI) GetDatasourceByUID(c *gin.Context) {
 	uid := c.Param(constant.UID)
 	ds, err := api.deps.DatasourceSrv.GetDatasourceByUID(c.Request.Context(), uid)
 	if err != nil {
+		//TODO: check not found???
 		httppkg.Error(c, err)
 		return
 	}

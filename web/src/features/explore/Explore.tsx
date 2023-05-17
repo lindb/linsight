@@ -15,9 +15,9 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Layout, TimePicker } from '@douyinfe/semi-ui';
+import { Layout } from '@douyinfe/semi-ui';
 import React, { useEffect, useState } from 'react';
-import { AddToDashboard, DatasourceSelect, Icon, MetricExplore } from '@src/components';
+import { AddToDashboard, DatasourceSelectForm, Icon, MetricExplore, TimePicker } from '@src/components';
 import { DatasourceInstance } from '@src/types';
 import { useSearchParams } from 'react-router-dom';
 import { DatasourceStore } from '@src/stores';
@@ -45,7 +45,7 @@ const Explore: React.FC = () => {
       <Header className="linsight-feature-header">
         <div style={{ flex: 1, marginLeft: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Icon icon="icon-explore" style={{ fontSize: 20 }} />
-          <DatasourceSelect
+          <DatasourceSelectForm
             noLabel
             value={ds || get(datasources, '[0].setting.uid')}
             style={{ width: 200 }}
@@ -54,7 +54,7 @@ const Explore: React.FC = () => {
             }}
           />
         </div>
-        <div>
+        <div style={{ display: 'flex', gap: 4 }}>
           <AddToDashboard btnType="tertiary" btnTheme="light" />
           <TimePicker />
         </div>

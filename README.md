@@ -1,8 +1,16 @@
-## Linsight
+<p align="center">
+  <img src="./web/src/images/logo_title.svg" alt="linsight-logo" height="72" />
 
-An open-source, all-in-one observability platform.
+  <p align="center">
+	An open-source, comprehensive observability platform for monitoring your applications and troubleshooting issues, similar to DataDog, New Relic, and others.
+  </p>
+</p>
+
+<div align="center">
 
 [![codecov](https://codecov.io/gh/lindb/linsight/branch/develop/graph/badge.svg)](https://codecov.io/gh/lindb/linsight)
+
+</div>
 
 - init db records
 
