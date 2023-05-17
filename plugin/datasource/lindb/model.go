@@ -65,6 +65,7 @@ type MetadataQueryRequest struct {
 	Prefix    string       `json:"prefix"`
 	Namespace string       `json:"namespace"`
 	Metric    string       `json:"metric"`
+	TagKey    string       `json:"tagKey"`
 }
 
 // Expr represents where condition express.

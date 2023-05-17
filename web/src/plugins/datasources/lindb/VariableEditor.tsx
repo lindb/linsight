@@ -19,6 +19,7 @@ import React from 'react';
 import { Form } from '@douyinfe/semi-ui';
 import { VariableEditorProps } from '@src/types';
 import MetricNameSelect from './components/MetricNameSelect';
+import TagKeySelect from './components/TagKeySelect';
 
 const VariableEditor: React.FC<VariableEditorProps> = (props) => {
   const { variable, datasource } = props;
@@ -26,7 +27,7 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
   return (
     <>
       <Form.Select
-        field="query.request.valueType"
+        field="query.request.type"
         label="Value type"
         style={{ width: 300 }}
         rules={[{ required: true, message: 'Value type is required.' }]}
@@ -38,7 +39,21 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
       />
       {variable.query?.request.valueType === 'tagValue' && (
         <>
-          <MetricNameSelect labelPosition="top" key="tag_value_metric" datasource={datasource} style={{ width: 300 }} />
+          <MetricNameSelect
+            labelPosition="top"
+            label="Metric"
+            field="query.request.metric"
+            datasource={datasource}
+            style={{ width: 300 }}
+          />
+          <TagKeySelect
+            labelPosition="top"
+            label="Tag key"
+            field="query.request.tagKey"
+            metricField="query.request.metric"
+            datasource={datasource}
+            style={{ width: 300 }}
+          />
         </>
       )}
     </>

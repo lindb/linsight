@@ -30,6 +30,7 @@ func buildMetadataQuerySQL(req *MetadataQueryRequest) string {
 	case TagKey:
 		return fmt.Sprintf("show tag keys from '%s'", req.Metric)
 	case TagValue:
+		return fmt.Sprintf("show tag values from '%s' with key='%s'", req.Metric, req.TagKey)
 	}
 	return ""
 }
