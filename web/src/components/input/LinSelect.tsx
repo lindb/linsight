@@ -15,12 +15,14 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { MutableRefObject, useCallback, useEffect, useRef } from 'react';
-import { Form, useFieldState, useFormApi } from '@douyinfe/semi-ui';
-import { isEmpty, isEqual, upperFirst, concat, debounce } from 'lodash-es';
+import React, { MutableRefObject, useEffect, useRef } from 'react';
+import { Form, useFormApi, useFormState } from '@douyinfe/semi-ui';
+import { isEmpty, isEqual, upperFirst, debounce, pick } from 'lodash-es';
 import { useRequest } from '@src/hooks';
 import { ApiKit } from '@src/utils';
 import { Notification } from '@src/components';
+
+const RELOAD_TIME = 5 * 60 * 1000;
 
 /**
  * LinSelect implements remote load select component.
@@ -49,40 +51,36 @@ const LinSelect: React.FC<{
     field,
     cascade,
     multiple,
-    showClear,
-    filter,
-    remote,
+    showClear = true,
+    filter = true,
+    remote = true,
     prefix,
     label,
     placeholder,
     style,
     labelPosition = 'inset',
-    visible,
     loader,
     reloadKeys,
     rules,
-    clearKeys,
     outerBottomSlot,
     onChange,
   } = props;
+  const formState = useFormState();
   const formApi = useFormApi();
-  const { value } = useFieldState(field);
-  const show = visible ? visible() : true;
+  const formValues = formState.values;
 
   const searchInput = useRef('') as MutableRefObject<string>;
   const dropdownVisible = useRef() as MutableRefObject<boolean>;
-  const previousValue = useRef() as MutableRefObject<any>;
-  const previousCascade = useRef({}) as MutableRefObject<any>;
-  const valueTriggerURL = useRef() as MutableRefObject<boolean>; // mark value trigger url modify
+  const previousValuesOfReloadKeys = useRef(pick(formValues, reloadKeys || [])) as MutableRefObject<any>;
+  const lastLoad = useRef(new Date().getTime()) as MutableRefObject<number>;
 
   const isEnable = (): boolean => {
-    console.log('xxxxkkkkkkk.............');
     return true;
   };
   const { result, loading, error, refetch } = useRequest(
     [field, loader],
     () => {
-      console.log('reload.....', previousValue);
+      lastLoad.current = new Date().getTime();
       return loader ? loader(searchInput.current || '') : [];
     },
     {
@@ -92,44 +90,17 @@ const LinSelect: React.FC<{
       },
     }
   );
-  useEffect(() => {
-    previousValue.current = result;
-  }, [result]);
 
   useEffect(() => {
-    if (show) {
-      if (!isEmpty(reloadKeys)) {
-        console.log('reload key.....', reloadKeys);
+    if (!isEmpty(reloadKeys)) {
+      const valuesOfReloadKeys = pick(formValues, reloadKeys || []);
+      if (!isEqual(previousValuesOfReloadKeys.current, valuesOfReloadKeys)) {
+        previousValuesOfReloadKeys.current = valuesOfReloadKeys;
+        formApi.setValue(field, '');
         refetch();
-        // if (!isEqual(previousKeys.current, values)) {
-        //   refetch();
-        //   previousKeys.current = values;
-        // }
       }
     }
-  }, [refetch, reloadKeys, show]);
-
-  useEffect(() => {
-    if (valueTriggerURL.current) {
-      valueTriggerURL.current = false;
-      return;
-    }
-    if (show) {
-      // const value = get(params, field);
-      if (!isEqual(value, previousValue.current)) {
-        let finalVal = undefined;
-        if (!isEmpty(value)) {
-          finalVal = multiple ? concat([], value) : value;
-        }
-        formApi.setValue(field, finalVal);
-        previousValue.current = finalVal;
-      }
-    }
-  }, [show, field, multiple, formApi]);
-
-  if (!show) {
-    return null;
-  }
+  }, [refetch, reloadKeys, formValues, field, formApi]);
 
   // lazy remote search when user input.
   const search = debounce(refetch, 200);
@@ -159,16 +130,19 @@ const LinSelect: React.FC<{
         }}
         onDropdownVisibleChange={(val) => {
           dropdownVisible.current = val;
-          if (!val) {
-            // formApi.submitForm();
+          // TODO: need add change form submit logic
+          // if (!val && onChange) {
+          //   onChange(val);
+          //   // formApi.submitForm();
+          // }
+        }}
+        onFocus={() => {
+          if (error || new Date().getTime() - lastLoad.current >= RELOAD_TIME) {
+            // 1. if previous fetch failure, retry when focus
+            // 2. last fetch time > RELOAD_TIME
+            refetch();
           }
         }}
-        // onFocus={() => {
-        //   if (error) {
-        //     // if previous fetch failure, retry when focus
-        //     refetch();
-        //   }
-        // }}
       />
     </>
   );

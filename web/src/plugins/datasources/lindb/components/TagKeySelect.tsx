@@ -15,32 +15,34 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import React, { CSSProperties } from 'react';
 import { LinSelect } from '@src/components';
 import { DatasourceInstance } from '@src/types';
-import React, { CSSProperties } from 'react';
 import { LinDBDatasource } from '../Datasource';
+import { useFieldState } from '@douyinfe/semi-ui';
 
-const MetricNameSelect: React.FC<{
+const TagKeySelect: React.FC<{
   datasource: DatasourceInstance;
-  label?: string;
   field?: string;
+  label?: string;
   style?: CSSProperties;
+  metricField?: string;
   labelPosition?: 'top' | 'left' | 'inset';
 }> = (props) => {
-  const { datasource, label, style, field = 'metric', labelPosition } = props;
+  const { datasource, label, style, field = 'tagKey', metricField = 'metric', labelPosition } = props;
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
+  const { value: metricName } = useFieldState(metricField);
   return (
     <LinSelect
       style={style}
-      label={label}
       field={field}
-      placeholder="Please select metric"
+      label={label}
+      placeholder="Please select tag key"
       labelPosition={labelPosition}
-      loader={async (prefix?: string) => {
-        console.log('load metric name......');
-        const values = await api.fetchMetricNames(prefix);
+      reloadKeys={[metricField]}
+      loader={async (_prefix?: string) => {
+        const values = await api.getTagKeys(metricName);
         const optionList: any[] = [];
-        console.log('kslfasjdflkdsj', values, optionList);
         (values || []).map((item: any) => {
           optionList.push({ value: item, label: item });
         });
@@ -50,4 +52,4 @@ const MetricNameSelect: React.FC<{
   );
 };
 
-export default MetricNameSelect;
+export default TagKeySelect;

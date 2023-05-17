@@ -18,6 +18,7 @@ under the License.
 import { DataQuerySrv } from '@src/services';
 import { DatasourceAPI, DatasourceSetting, TimeRange } from '@src/types';
 import { isEmpty } from 'lodash-es';
+import { toJS } from 'mobx';
 
 export class LinDBDatasource extends DatasourceAPI {
   constructor(setting: DatasourceSetting) {
@@ -64,9 +65,10 @@ export class LinDBDatasource extends DatasourceAPI {
   }
 
   async metaQuery(req: any, prefix?: string): Promise<string[]> {
+    console.log('req metadata', toJS(req));
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'metric', prefix: prefix },
+      request: req,
     });
     if (rs) {
       return rs.values;

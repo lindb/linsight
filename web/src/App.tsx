@@ -200,9 +200,6 @@ const App: React.FC = () => {
               return <Route key={feature.Route} path={feature.Route} element={<Component />} />;
             })}
           </Routes>
-          <div style={{ border: 1, borderColor: 'red' }}>
-            <img src={LogoTitle} height={72} />
-          </div>
         </Content>
         <Footer />
       </Layout>
