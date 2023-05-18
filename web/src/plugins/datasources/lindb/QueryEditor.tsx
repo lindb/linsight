@@ -23,6 +23,10 @@ import { get, clone } from 'lodash-es';
 import { LinDBDatasource } from './Datasource';
 import { QueryEditContext } from '@src/contexts';
 import { useQueryEditor } from '@src/hooks';
+import MetricNameSelect from './components/MetricNameSelect';
+import TagKeySelect from './components/TagKeySelect';
+import FieldSelect from './components/FieldSelect';
+import WhereConditonSelect from './components/WhereEditor';
 
 const { Text } = Typography;
 
@@ -75,116 +79,15 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
           setValues(values);
         }
       }}>
-      <LinSelect
-        style={{ width: 240 }}
-        field="metric"
-        placeholder="Please select metric"
-        labelPosition="inset"
-        label="Metric"
-        showClear
-        filter
-        remote
-        loader={async (prefix?: string) => {
-          const values = await api.fetchMetricNames(prefix);
-          const optionList: any[] = [];
-          console.log('kslfasjdflkdsj', values, optionList);
-          (values || []).map((item: any) => {
-            optionList.push({ value: item, label: item });
-          });
-          return optionList;
-        }}
-      />
-      <LinSelect
-        style={{ width: 240 }}
-        field="fields"
-        placeholder="Please select fields"
-        labelPosition="inset"
-        label="Fields"
-        multiple
-        showClear
-        filter
-        remote
-        reloadKeys={[metric]}
-        loader={async () => {
-          const values = await api.getFields(metric);
-          const optionList: any[] = [];
-          (values || []).map((item: any) => {
-            optionList.push({ value: item.name, label: `${item.name}(${item.type})` });
-          });
-          return optionList;
-        }}
-      />
-      <LinSelect
-        field="where"
-        labelPosition="inset"
-        placeholder="where conditions"
-        style={{ width: 270 }}
-        label="Where"
-        showClear
-        filter
-        multiple
-        remote
-        reloadKeys={[metric]}
-        loader={async () => {
-          const values = await api.getTagKeys(metric);
-          const optionList: any[] = [];
-          (values || []).map((item: any) => {
-            optionList.push({ value: item, label: item });
-          });
-          return optionList;
-        }}
-        outerBottomSlot={
-          <div style={{ margin: 8, minWidth: 280 }}>
-            <Divider style={{ marginBottom: 8 }} />
-            <Row>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  wildcard:
-                </Text>
-                <Text size="small">host:inst*</Text>
-              </Col>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  exclusion:
-                </Text>
-                <Text size="small">not host:a</Text>
-              </Col>
-            </Row>
-            <Row>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  in:
-                </Text>
-                <Text size="small">host in (a,b)</Text>
-              </Col>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  union:
-                </Text>
-                <Text size="small">host:a OR host:b</Text>
-              </Col>
-            </Row>
-          </div>
-        }
-      />
-      <LinSelect
+      <MetricNameSelect datasource={datasource} style={{ width: 240 }} />
+      <FieldSelect datasource={datasource} style={{ width: 240 }} />
+      <WhereConditonSelect datasource={datasource} />
+      <TagKeySelect
         field="groupBy"
-        placeholder="Please select fields"
-        labelPosition="inset"
-        label="Group By"
-        showClear
-        filter
+        placeholder="Please select group by tag key"
         multiple
-        remote
-        reloadKeys={[metric]}
-        loader={async () => {
-          const values = await api.getTagKeys(metric);
-          const optionList: any[] = [];
-          (values || []).map((item: any) => {
-            optionList.push({ value: item, label: item });
-          });
-          return optionList;
-        }}
+        label="Group By"
+        datasource={datasource}
       />
     </Form>
   );

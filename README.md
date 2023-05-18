@@ -26,7 +26,7 @@
 ### Docker
 
 ```sh
-docker run  --name=linsight -p 8080:8080 lindata/linsight
+docker run --name=linsight -p 8080:8080 lindata/linsight
 ```
 
 Open your browser and navigate to [http://localhost:8080](http://localhost:8080) to access the Linsight web interface.

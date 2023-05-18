@@ -73,6 +73,7 @@ type Expr struct {
 	Key   string   `json:"key"`
 	Op    Operator `json:"operator"`
 	Value any      `json:"value"`
+	raw   bool
 }
 
 // String returns the string value of expr.
@@ -80,11 +81,17 @@ func (e Expr) String() string {
 	buf := &bytes.Buffer{}
 	buf.WriteString(e.Key)
 	fmt.Fprintf(buf, " %s ", e.Op)
-	switch e.Value.(type) {
+	var value string
+	switch v := e.Value.(type) {
 	case string:
-		fmt.Fprintf(buf, "%v", e.Value)
+		value = v
 	default:
-		fmt.Fprintf(buf, "%v", e.Value)
+		value = fmt.Sprintf("'%v'", v)
+	}
+	if e.raw {
+		fmt.Fprintf(buf, "%s", value)
+	} else {
+		fmt.Fprintf(buf, "'%s'", value)
 	}
 	return buf.String()
 }

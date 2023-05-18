@@ -17,7 +17,7 @@ under the License.
 */
 import React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import * as _ from 'lodash-es';
+import { get, findIndex } from 'lodash-es';
 import { AddPanelWidget, Panel } from '@src/components';
 import { Observer } from 'mobx-react-lite';
 import { DashboardStore } from '@src/stores';
@@ -26,10 +26,14 @@ import RGL, { WidthProvider } from 'react-grid-layout';
 import { DefaultColumns, DefaultRowHeight } from '@src/constants';
 import ViewVariables from './components/ViewVariables';
 import { VariableContextProvider } from '@src/contexts';
+import { Variable } from '@src/types';
 
 const ReactGridLayout = WidthProvider(RGL);
 
 const View: React.FC = () => {
+  const { dashboard } = DashboardStore;
+  const variables: Variable[] = get(dashboard, 'config.variables', []);
+
   const buildLayout = (panels: any) => {
     const layout: any[] = [];
     toJS(panels || []).map((item: any, _index: number) => {
@@ -52,7 +56,7 @@ const View: React.FC = () => {
   console.log('rerender dashboard......');
 
   return (
-    <VariableContextProvider>
+    <VariableContextProvider variables={variables}>
       <div style={{ margin: '6px 6px 0px 6px' }}>
         <ViewVariables />
       </div>
@@ -71,8 +75,8 @@ const View: React.FC = () => {
                     useCSSTransforms={false}
                     onLayoutChange={(layout: any) => {
                       (layout || []).forEach((item: any) => {
-                        const panels = _.get(DashboardStore.dashboard, 'config.panels', []);
-                        const index = _.findIndex(panels, { id: item.i });
+                        const panels = get(DashboardStore.dashboard, 'config.panels', []);
+                        const index = findIndex(panels, { id: item.i });
                         DashboardStore.updatePanelConfig(panels[index], { grid: item });
                       });
                     }}

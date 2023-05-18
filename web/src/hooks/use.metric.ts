@@ -15,10 +15,13 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { VariableContext } from '@src/contexts';
 import { DatasourceStore } from '@src/stores';
 import { Query, SearchParamKeys, TimeRange } from '@src/types';
-import { isEmpty } from 'lodash-es';
+import { TemplateKit } from '@src/utils';
+import { isEmpty, cloneDeep } from 'lodash-es';
 import { toJS } from 'mobx';
+import { useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useRequest } from './use.request';
 
@@ -27,8 +30,10 @@ export const useMetric = (queries: Query[]) => {
   const [searchParams] = useSearchParams();
   const from = searchParams.get(SearchParamKeys.From);
   const to = searchParams.get(SearchParamKeys.To);
+  const { values } = useContext(VariableContext);
+  console.log('use metric, variable values', values);
   const { result, loading, refetch, error } = useRequest(
-    ['search_metric_data', queries, from, to],
+    ['search_metric_data', queries, from, to, values],
     async () => {
       const requests: any[] = [];
       const range: TimeRange = {};
@@ -38,8 +43,16 @@ export const useMetric = (queries: Query[]) => {
       if (!isEmpty(to)) {
         range.to = `${to}`;
       }
-      (queries || []).forEach((query: Query) => {
+      (queries || []).forEach((q: Query) => {
+        const query = cloneDeep(q);
         console.log(toJS(query), 'query.....');
+        if (!isEmpty(query.request.where)) {
+          query.request.where = query.request.where.map((w: any) => {
+            w.value = TemplateKit.template(w.value, values);
+            console.log('template', TemplateKit.template(w.value), w.value, values || { node: '1231231' });
+            return w;
+          });
+        }
         const ds = DatasourceStore.getDatasource(query.datasource.uid);
         if (!ds) {
           return;

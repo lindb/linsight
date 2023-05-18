@@ -15,31 +15,15 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { toJS } from 'mobx';
-import React, { createContext, useState } from 'react';
+export enum Operator {
+  Eq = '=',
+  In = 'in',
+  GtEq = '>=',
+  LtEq = '<=',
+}
 
-/*
- * Context for each query editor
- */
-export const QueryEditContext = createContext({
-  values: {} as object,
-  setValues: (_values: object) => {},
-});
-
-/*
- * Context provider for each query editor
- */
-export const QueryEditContextProvider: React.FC<{ initValues?: object; children: React.ReactNode }> = (props) => {
-  const { initValues, children } = props;
-  const [values, setValues] = useState(initValues || {});
-  console.log('query editor context', toJS(initValues));
-  return (
-    <QueryEditContext.Provider
-      value={{
-        values,
-        setValues,
-      }}>
-      {children}
-    </QueryEditContext.Provider>
-  );
-};
+export interface ConditionExpr {
+  key: string;
+  operator: Operator;
+  value: string;
+}

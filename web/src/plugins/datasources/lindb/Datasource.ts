@@ -64,6 +64,20 @@ export class LinDBDatasource extends DatasourceAPI {
     return [];
   }
 
+  async getTagValues(metric: string, tagKey: string, prefix?: string): Promise<string[]> {
+    if (isEmpty(metric) || isEmpty(tagKey)) {
+      return [];
+    }
+    const rs = await DataQuerySrv.metadataQuery({
+      datasource: { uid: this.setting.uid },
+      request: { type: 'tagValue', metric: metric, tagKey: tagKey, prefix: prefix },
+    });
+    if (rs) {
+      return rs.values;
+    }
+    return [];
+  }
+
   async metaQuery(req: any, prefix?: string): Promise<string[]> {
     console.log('req metadata', toJS(req));
     const rs = await DataQuerySrv.metadataQuery({
