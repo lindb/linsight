@@ -15,10 +15,42 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { FormatRepositoryInst, VisualizationProps } from '@src/types';
+import { get } from 'lodash-es';
+import { DataSetKit } from '@src/utils';
+import { Typography, List as UIList } from '@douyinfe/semi-ui';
 
-const List: React.FC = () => {
-  return <div>list</div>;
+/**
+ * List is a visualization component for list stats.
+ */
+const List: React.FC<VisualizationProps> = (props) => {
+  const { panel, datasets } = props;
+  const [data, setData] = useState();
+
+  useEffect(() => {
+    const ds = DataSetKit.createStatsDatasets(datasets);
+    const unit = get(panel.options, 'unit');
+    const decimals = get(panel.options, 'decimals');
+    const newData = (ds?.labels || []).map((label: string, index: number) => {
+      return {
+        key: label,
+        value: (
+          <Typography.Text type="success">
+            {FormatRepositoryInst.formatString(unit, ds.datasets[index], decimals)}
+          </Typography.Text>
+        ),
+      };
+    });
+    setData(newData);
+  }, [datasets, panel]);
+  return (
+    <UIList
+      size="small"
+      dataSource={data}
+      renderItem={(item: any) => <UIList.Item main={item.key} extra={item.value} />}
+    />
+  );
 };
 
 export default List;

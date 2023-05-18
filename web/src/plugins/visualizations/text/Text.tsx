@@ -24,7 +24,6 @@ import { get } from 'lodash-es';
 /**
  * Text is a visualization component for text stats.
  */
-
 const Text: React.FC<VisualizationProps> = (props) => {
   const { panel, datasets } = props;
   const [data, setData] = useState();
@@ -38,7 +37,7 @@ const Text: React.FC<VisualizationProps> = (props) => {
         key: label,
         value: (
           <Typography.Text type="success">
-            {FormatRepositoryInst.formatString(unit, ds.datasets[index], decimals)}{' '}
+            {FormatRepositoryInst.formatString(unit, ds.datasets[index], decimals)}
           </Typography.Text>
         ),
       };
