@@ -18,7 +18,7 @@ under the License.
 import React from 'react';
 
 const OptionsEditor: React.FC = () => {
-  return <div>text options editor</div>;
+  return <div>text options editor impl</div>;
 };
 
 export default OptionsEditor;

@@ -38,7 +38,6 @@ const createStatsDatasets = (resultSet: any): any => {
   const datasets: any[] = [];
   let colorIdx = 0;
   const labels: string[] = [];
-  const data: number[] = [];
   (resultSet || []).forEach((rs: any) => {
     if (!rs) {
       return;
@@ -67,24 +66,16 @@ const createStatsDatasets = (resultSet: any): any => {
         const points: { [timestamp: string]: number } = fields![key];
         const timestamps = keys(points);
         if (isEmpty(timestamps)) {
-          data.push(0);
+          datasets.push(0);
         } else {
           const value = points[`${timestamps[0]}`];
           const v = value ? Math.floor(value * 1000) / 1000 : 0;
-          data.push(v);
+          datasets.push(v);
         }
 
         labels.push(label);
       }
     });
-  });
-  datasets.push({
-    data,
-    // meta: {
-    //   metricName,
-    //   tags,
-    //   field: key,
-    // },
   });
   if (isEmpty(datasets)) {
     // no data in response

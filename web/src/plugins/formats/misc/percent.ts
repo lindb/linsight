@@ -19,10 +19,7 @@ under the License.
 import { FormatCate, Formatted, Formatter, toFixed } from '@src/types';
 
 const transformPercent = (input: number | null, decimals: number = 2): Formatted => {
-  if (!input) {
-    return { value: '' };
-  }
-  const value = toFixed(input, decimals);
+  const value = toFixed(input || 0, decimals);
   return { value: value, suffix: '%' };
 };
 
@@ -48,10 +45,7 @@ class PercentUnit extends Formatter {
     });
   }
   format(input: number | null, decimals?: number | undefined): Formatted {
-    if (!input) {
-      return { value: '' };
-    }
-    return transformPercent(input * 100, decimals);
+    return transformPercent((input || 0) * 100, decimals);
   }
 }
 

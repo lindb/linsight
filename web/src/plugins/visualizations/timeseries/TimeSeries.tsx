@@ -17,9 +17,8 @@ under the License.
 */
 import React, { useEffect, useState } from 'react';
 import { VisualizationProps } from '@src/types';
-import { TimeSeriesChart } from '@src/plugins/visualizations/timeseries/components/TimeSeriesChart';
+import { TimeSeriesChart } from './components/TimeSeriesChart';
 import { DataSetKit } from '@src/utils';
-import { toJS } from 'mobx';
 
 /**
  * TimeSeries is a visualization component for time series chart.
@@ -31,7 +30,6 @@ export const TimeSeries: React.FC<VisualizationProps> = (props) => {
   useEffect(() => {
     setDS(DataSetKit.createTimeSeriesDatasets(datasets));
   }, [datasets]);
-  console.log('time series.....', toJS(panel));
 
   return <TimeSeriesChart theme={theme} datasets={ds} config={panel.options} />;
 };
