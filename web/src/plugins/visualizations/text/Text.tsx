@@ -15,10 +15,37 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
+import { Descriptions, Typography } from '@douyinfe/semi-ui';
+import { FormatRepositoryInst, VisualizationProps } from '@src/types';
+import { DataSetKit } from '@src/utils';
+import React, { useEffect, useState } from 'react';
+import { get } from 'lodash-es';
 
-const Text: React.FC = () => {
-  return <div>text</div>;
+/**
+ * Text is a visualization component for text stats.
+ */
+
+const Text: React.FC<VisualizationProps> = (props) => {
+  const { panel, datasets } = props;
+  const [data, setData] = useState();
+
+  useEffect(() => {
+    const ds = DataSetKit.createStatsDatasets(datasets);
+    const unit = get(panel.options, 'unit');
+    const decimals = get(panel.options, 'decimals');
+    const newData = (ds?.labels || []).map((label: string, index: number) => {
+      return {
+        key: label,
+        value: (
+          <Typography.Text type="success">
+            {FormatRepositoryInst.formatString(unit, ds.datasets[index], decimals)}{' '}
+          </Typography.Text>
+        ),
+      };
+    });
+    setData(newData);
+  }, [datasets, panel]);
+  return <Descriptions align="center" data={data} />;
 };
 
 export default Text;
