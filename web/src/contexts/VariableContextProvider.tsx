@@ -15,14 +15,31 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { createContext } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Variable } from '@src/types';
+import { isEmpty, set } from 'lodash-es';
 
-export const VariableContext = createContext({});
+export const VariableContext = createContext({
+  values: {},
+});
 
-export const VariableContextProvider: React.FC<{ children: React.ReactNode }> = (props) => {
-  const { children } = props;
+export const VariableContextProvider: React.FC<{ variables: Variable[]; children: React.ReactNode }> = (props) => {
+  const { children, variables } = props;
+  const [valuesOfVariable, setValuesOfVariable] = useState({});
   const [searchParams] = useSearchParams();
-  console.log('var context....', searchParams.get('from'));
-  return <VariableContext.Provider value={{}}>{children}</VariableContext.Provider>;
+  useEffect(() => {
+    if (isEmpty(variables)) {
+      return;
+    }
+    const newValues = {};
+    variables.forEach((variable: Variable) => {
+      if (searchParams.has(variable.name)) {
+        // TODO: add multi/all logic
+        set(newValues, variable.name, searchParams.get(variable.name));
+      }
+    });
+    setValuesOfVariable(newValues);
+  }, [searchParams, variables]);
+  return <VariableContext.Provider value={{ values: valuesOfVariable }}>{children}</VariableContext.Provider>;
 };

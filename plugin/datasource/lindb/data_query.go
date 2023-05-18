@@ -34,6 +34,7 @@ func buildDataQuerySQL(req *DataQueryRequest, timeRange model.TimeRange) (string
 	}
 	builder := New().Select(req.Fields...).
 		Metric(req.Metric).
+		Where(req.Where...).
 		GroupBy(groupBy...)
 
 	builder.TimeRange(timeRange)
@@ -41,6 +42,7 @@ func buildDataQuerySQL(req *DataQueryRequest, timeRange model.TimeRange) (string
 	if err != nil {
 		return "", err
 	}
+	fmt.Println(sql)
 	return sql, nil
 }
 
@@ -145,9 +147,9 @@ func (b *DataQueryBuilder) isTimestamp(timestamp string) bool {
 func (b *DataQueryBuilder) setTimeCondition(timestamp string, op Operator) {
 	if timestamp != "" {
 		if b.isTimestamp(timestamp) {
-			b.Where(Expr{Key: "time", Op: op, Value: fmt.Sprintf("'%s'", timestamp)})
-		} else {
 			b.Where(Expr{Key: "time", Op: op, Value: timestamp})
+		} else {
+			b.Where(Expr{Key: "time", Op: op, Value: timestamp, raw: true})
 		}
 	}
 }

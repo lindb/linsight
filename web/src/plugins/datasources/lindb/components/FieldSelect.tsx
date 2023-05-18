@@ -15,32 +15,21 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { CSSProperties } from 'react';
+import { useFieldState } from '@douyinfe/semi-ui';
 import { LinSelect } from '@src/components';
 import { DatasourceInstance } from '@src/types';
+import React, { CSSProperties } from 'react';
 import { LinDBDatasource } from '../Datasource';
-import { useFieldState } from '@douyinfe/semi-ui';
 
-const TagKeySelect: React.FC<{
+const FieldSelect: React.FC<{
   datasource: DatasourceInstance;
   field?: string;
   label?: string;
   style?: CSSProperties;
-  multiple?: boolean;
   metricField?: string;
-  placeholder?: string;
   labelPosition?: 'top' | 'left' | 'inset';
 }> = (props) => {
-  const {
-    datasource,
-    multiple,
-    label,
-    style,
-    placeholder = 'Please select tag key',
-    field = 'tagKey',
-    metricField = 'metric',
-    labelPosition,
-  } = props;
+  const { datasource, label, style, field = 'fields', metricField = 'metric', labelPosition } = props;
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
   const { value: metricName } = useFieldState(metricField);
   return (
@@ -48,15 +37,15 @@ const TagKeySelect: React.FC<{
       style={style}
       field={field}
       label={label}
-      multiple={multiple}
-      placeholder={placeholder}
+      multiple
+      placeholder="Please select fields"
       labelPosition={labelPosition}
       reloadKeys={[metricField]}
       loader={async (_prefix?: string) => {
-        const values = await api.getTagKeys(metricName);
+        const values = await api.getFields(metricName);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
-          optionList.push({ value: item, label: item });
+          optionList.push({ value: item.name, label: `${item.name}(${item.type})` });
         });
         return optionList;
       }}
@@ -64,4 +53,4 @@ const TagKeySelect: React.FC<{
   );
 };
 
-export default TagKeySelect;
+export default FieldSelect;
