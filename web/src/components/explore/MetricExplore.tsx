@@ -32,21 +32,21 @@ const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) 
   const { values } = useContext(QueryEditContext);
   const QueryEditor = plugin.components.QueryEditor;
   const [searchParams, setSearchParams] = useSearchParams();
+
   useEffect(() => {
-    console.log('xxx..........jjjjj');
     searchParams.set('left', JSON.stringify({ datasource: { uid: datasource.setting.uid }, request: values }));
     setSearchParams(searchParams);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, datasource.setting.uid]);
 
   if (!QueryEditor) {
     return null;
   }
-  console.log('xxxxx....', values);
   return <QueryEditor datasource={datasource} />;
 };
 
-const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
-  const { datasource } = props;
+const MetricExplore: React.FC<{ datasource: DatasourceInstance; onValueChange: (options: any) => void }> = (props) => {
+  const { datasource, onValueChange } = props;
   const [searchParams] = useSearchParams();
   const getTargets = (key: string) => {
     const targets = searchParams.get(key);
@@ -68,6 +68,12 @@ const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
     setLeft(getTargets('left'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+  useEffect(() => {
+    onValueChange({
+      type: 'timeseries',
+      targets: [left],
+    });
+  }, [left, onValueChange]);
 
   return (
     <>

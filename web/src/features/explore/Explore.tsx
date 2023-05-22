@@ -16,8 +16,8 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Layout } from '@douyinfe/semi-ui';
-import React, { useEffect, useState } from 'react';
-import { AddToDashboard, DatasourceSelectForm, Icon, MetricExplore, TimePicker } from '@src/components';
+import React, { useEffect, useRef, useState } from 'react';
+import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, MetricExplore, TimePicker } from '@src/components';
 import { DatasourceInstance } from '@src/types';
 import { useSearchParams } from 'react-router-dom';
 import { DatasourceStore } from '@src/stores';
@@ -33,6 +33,7 @@ const Explore: React.FC = () => {
     return toJS(get(datasources, '[0]'));
   });
   const [searchParams, setSearchParams] = useSearchParams();
+  const options = useRef<any>({});
   const ds = searchParams.get('ds');
 
   useEffect(() => {
@@ -56,11 +57,14 @@ const Explore: React.FC = () => {
           />
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
+          <AddToCharts panel={options.current} />
           <AddToDashboard btnType="tertiary" btnTheme="light" />
           <TimePicker />
         </div>
       </Header>
-      {datasource && <MetricExplore datasource={datasource} />}
+      {datasource && (
+        <MetricExplore datasource={datasource} onValueChange={(values: any) => (options.current = values)} />
+      )}
     </Layout>
   );
 };

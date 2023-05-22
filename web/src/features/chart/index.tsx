@@ -32,7 +32,7 @@ import {
   Typography,
 } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconSearchStroked, IconStar, IconStarStroked } from '@douyinfe/semi-icons';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { StatusTip } from '@src/components';
 import { isEmpty } from 'lodash-es';
 import { useRequest } from '@src/hooks';
@@ -41,6 +41,7 @@ const { Text } = Typography;
 const ListChart: React.FC = () => {
   const [metric, setMetric] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
 
@@ -53,7 +54,9 @@ const ListChart: React.FC = () => {
       <Card className="linsight-feature" bodyStyle={{ padding: 0 }}>
         <div style={{ margin: 16, display: 'flex', gap: 8 }}>
           <TagInput prefix={<IconSearchStroked />} placeholder="Filter charts" defaultValue={['team:monitor']} />
-          <Button icon={<IconPlusStroked />}>New</Button>
+          <Button icon={<IconPlusStroked />} onClick={() => navigate('/explore')}>
+            New
+          </Button>
         </div>
         <Row>
           <Col span={4}>
