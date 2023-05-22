@@ -19,38 +19,37 @@ import {
   Divider,
   Row,
   Col,
-  Typography,
   useFieldState,
-  Transfer,
   Dropdown,
   Form,
   Input,
   List,
   Tag,
   useFormApi,
+  Typography,
 } from '@douyinfe/semi-ui';
-import { IconSearchStroked, IconPlusStroked, IconPlusCircleStroked } from '@douyinfe/semi-icons';
-import { LinSelect } from '@src/components';
+import { IconSearchStroked } from '@douyinfe/semi-icons';
+import { StatusTip } from '@src/components';
 import { useRequest } from '@src/hooks';
-import { DatasourceInstance } from '@src/types';
-import { isEmpty } from 'lodash-es';
-import React, { CSSProperties, useEffect, useState } from 'react';
+import { isEmpty, has, get, set, pick, transform, isArray, indexOf, join } from 'lodash-es';
+import React, { CSSProperties, useCallback, useEffect, useState } from 'react';
 import { LinDBDatasource } from '../Datasource';
 import { ConditionExpr, Operator } from '../types';
+import classNames from 'classnames';
 
 const { Text } = Typography;
 
 const TagValueSelect: React.FC<{
   datasource: LinDBDatasource;
   metric: string;
-  tagKey: string | undefined;
+  tagKey: string;
+  where: object;
 }> = (props) => {
-  const { datasource, metric, tagKey } = props;
+  const { datasource, metric, tagKey, where } = props;
   const {
     result: tagValues,
     error,
     loading,
-    refetch,
   } = useRequest(
     ['load_tag_values_for_where', metric, tagKey],
     async () => {
@@ -58,13 +57,58 @@ const TagValueSelect: React.FC<{
     },
     { enabled: !isEmpty(metric) && !isEmpty(tagKey) }
   );
-  console.log('tag values load', tagValues);
+
+  const getSelectedValue = useCallback(() => {
+    const selectedValues = get(where, `${tagKey}.value`);
+    if (isArray(selectedValues)) {
+      return selectedValues;
+    }
+    return [selectedValues];
+  }, [tagKey, where]);
+
+  const [selected, setSelected] = useState(() => {
+    return getSelectedValue();
+  });
+
+  useEffect(() => {
+    setSelected(getSelectedValue());
+  }, [getSelectedValue]);
+
   return (
     <List
-      dataSource={tagValues}
-      header={<Input prefix={<IconSearchStroked />} />}
-      renderItem={(item) => <List.Item>{item}</List.Item>}
       size="small"
+      dataSource={tagValues}
+      emptyContent={<StatusTip isLoading={loading} error={error} />}
+      header={<Input prefix={<IconSearchStroked />} />}
+      renderItem={(item) => (
+        <List.Item
+          className={classNames('tag-item', {
+            active: indexOf(selected, item) >= 0,
+          })}
+          onClick={() => {
+            if (indexOf(selected, item) >= 0) {
+              // tag value selcted.
+              return;
+            }
+            const newSelected = [...selected];
+            newSelected.push(item);
+            setSelected(newSelected);
+
+            if (!has(where, tagKey)) {
+              set(where, tagKey, { key: tagKey, operator: Operator.Eq, value: item });
+            } else {
+              // FIXME: add other op
+              const value: any = get(where, `${tagKey}.value`);
+              if (isArray(value)) {
+                value.push(item);
+              } else {
+                set(where, tagKey, { key: tagKey, operator: Operator.In, value: [value, item] });
+              }
+            }
+          }}>
+          {item}
+        </List.Item>
+      )}
     />
   );
 };
@@ -72,14 +116,14 @@ const TagValueSelect: React.FC<{
 const TagKeySelect: React.FC<{
   datasource: LinDBDatasource;
   metric: string;
+  currentTagKey: string;
   onChangeTagKey: (tagKey: string) => void;
 }> = (props) => {
-  const { datasource, metric, onChangeTagKey } = props;
+  const { datasource, metric, currentTagKey, onChangeTagKey } = props;
   const {
     result: tagKeys,
     error,
     loading,
-    refetch,
   } = useRequest(
     ['load_tag_keys_for_where', metric],
     async () => {
@@ -89,22 +133,17 @@ const TagKeySelect: React.FC<{
   );
   return (
     <List
+      size="small"
       dataSource={tagKeys}
       header={<Input prefix={<IconSearchStroked />} />}
+      emptyContent={<StatusTip isLoading={loading} error={error} />}
       renderItem={(item) => (
         <List.Item
-          main={<span onClick={() => onChangeTagKey(item)}>{item}</span>}
-          extra={
-            <IconPlusCircleStroked
-              style={{ cursor: 'pointer', color: 'var(--semi-color-success)' }}
-              onClick={() => {
-                console.log('xxxxxxxxxxxx');
-              }}
-            />
-          }
-        />
+          className={classNames('tag-item', { active: currentTagKey === item })}
+          onClick={() => onChangeTagKey(item)}>
+          {item}
+        </List.Item>
       )}
-      size="small"
     />
   );
 };
@@ -118,17 +157,61 @@ const WhereConditonSelect: React.FC<{
   const [visible, setVisible] = useState(false);
   const [currentTagKey, setCurrentTagKey] = useState('');
   const { value: metricName } = useFieldState(metricField);
-  const where: ConditionExpr[] = [{ key: 'node', operator: Operator.Eq, value: '${node}' }];
   const formApi = useFormApi();
-  useEffect(() => {
-    // FIXME: mock need remove
-  }, []);
-  useEffect(() => {
-    if (visible) {
-      formApi.setValue('where', where);
-      formApi.submitForm();
+  const [where, setWhere] = useState<Record<string, ConditionExpr>>(() => {
+    const result = {};
+    const initWhere = formApi.getValue('where');
+    if (isEmpty(initWhere)) {
+      return result;
     }
+    initWhere.forEach((item: ConditionExpr) => set(result, item.key, item));
+    return result;
+  });
+
+  const setWhereConditions = () => {
+    const conditions: ConditionExpr[] = [];
+    transform(
+      where,
+      (_result, value: ConditionExpr, _key) => {
+        conditions.push(value);
+      },
+      {}
+    );
+    formApi.setValue('where', conditions);
+    formApi.submitForm();
+  };
+  useEffect(() => {
+    setWhereConditions();
   }, [visible]);
+
+  const pickWhereConditions = (values: string[]) => {
+    const finalWhere = pick(where, values);
+    setWhere(finalWhere);
+    setWhereConditions();
+  };
+
+  const conditionToString = (condition: ConditionExpr): string => {
+    if (condition.operator === Operator.In) {
+      return `${condition.key} ${condition.operator} (${join(condition.value, ',')})`;
+    }
+    return `${condition.key} ${condition.operator} ${condition.value}`;
+  };
+
+  const renderCurrentCondition = () => {
+    if (isEmpty(currentTagKey)) {
+      return null;
+    }
+    const condition = get(where, currentTagKey, {}) as ConditionExpr;
+    return (
+      <>
+        <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
+          Current:
+        </Text>
+        <Text size="small">{conditionToString(condition)}</Text>
+        <Divider style={{ marginBottom: 8, marginTop: 8 }} />
+      </>
+    );
+  };
 
   return (
     <Dropdown
@@ -137,19 +220,58 @@ const WhereConditonSelect: React.FC<{
       onEscKeyDown={() => setVisible(false)}
       onClickOutSide={() => setVisible(false)}
       render={
-        <div>
-          <Row>
-            <Col span={12}>
+        <div style={{ padding: 8 }}>
+          {renderCurrentCondition()}
+          <Row gutter={8}>
+            <Col
+              span={12}
+              style={{
+                borderRight: '1px solid var(--semi-color-border)',
+              }}>
               <TagKeySelect
+                currentTagKey={currentTagKey}
                 datasource={datasource}
                 metric={metricName}
-                onChangeTagKey={(tagKey: string) => setCurrentTagKey(tagKey)}
+                onChangeTagKey={(tagKey: string) => {
+                  setCurrentTagKey(tagKey);
+                }}
               />
             </Col>
             <Col span={12}>
-              <TagValueSelect datasource={datasource} metric={metricName} tagKey={currentTagKey} />
+              <TagValueSelect datasource={datasource} metric={metricName} tagKey={currentTagKey} where={where} />
             </Col>
           </Row>
+          <div style={{ margin: 8, minWidth: 280 }}>
+            <Divider style={{ marginBottom: 8 }} />
+            <Row>
+              <Col span={12}>
+                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
+                  wildcard:
+                </Text>
+                <Text size="small">host:inst*</Text>
+              </Col>
+              <Col span={12}>
+                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
+                  exclusion:
+                </Text>
+                <Text size="small">not host:a</Text>
+              </Col>
+            </Row>
+            <Row>
+              <Col span={12}>
+                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
+                  in:
+                </Text>
+                <Text size="small">host in (a,b)</Text>
+              </Col>
+              <Col span={12}>
+                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
+                  union:
+                </Text>
+                <Text size="small">host:a OR host:b</Text>
+              </Col>
+            </Row>
+          </div>
         </div>
       }>
       <Form.TagInput
@@ -159,28 +281,19 @@ const WhereConditonSelect: React.FC<{
         style={style}
         onFocus={() => setVisible(true)}
         showClear
-        onChange={(values: any) => {
-          console.log('change......', values);
+        onChange={(values: string[]) => {
+          pickWhereConditions(values);
         }}
-        onRemove={(removedValue: string, idx: number) => {
-          // formApi.setValue('where', null);
-          console.log('on remove xxxx..........', formApi.getValues());
+        renderTagItem={(value: any, index: number, onClose) => {
+          if (isEmpty(value.key) || isEmpty(value.operator) || isEmpty(value.value)) {
+            return null;
+          }
+          return (
+            <Tag key={index} closable color="white" size="large" onClose={onClose}>
+              {conditionToString(value)}
+            </Tag>
+          );
         }}
-        renderTagItem={(value: any, index: number) => (
-          <Tag
-            key={index}
-            closable
-            color="white"
-            size="large"
-            onClose={() => {
-              console.log('xxxx...........');
-              // formApi.setValue('where', null);
-              console.log('xxxx..........', formApi.getValues());
-              // formApi.submitForm();
-            }}>
-            {value.key + value.operator + value.value}
-          </Tag>
-        )}
       />
     </Dropdown>
   );

@@ -19,7 +19,7 @@ import { VariableContext } from '@src/contexts';
 import { DatasourceStore } from '@src/stores';
 import { Query, SearchParamKeys, TimeRange } from '@src/types';
 import { TemplateKit } from '@src/utils';
-import { isEmpty, cloneDeep } from 'lodash-es';
+import { isEmpty, cloneDeep, isString } from 'lodash-es';
 import { toJS } from 'mobx';
 import { useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -48,8 +48,9 @@ export const useMetric = (queries: Query[]) => {
         console.log(toJS(query), 'query.....');
         if (!isEmpty(query.request.where)) {
           query.request.where = query.request.where.map((w: any) => {
-            w.value = TemplateKit.template(w.value, values);
-            console.log('template', TemplateKit.template(w.value), w.value, values || { node: '1231231' });
+            if (isString(w.value)) {
+              w.value = TemplateKit.template(w.value, values);
+            }
             return w;
           });
         }

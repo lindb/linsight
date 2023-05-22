@@ -16,7 +16,21 @@ specific language governing permissions and limitations
 under the License.
 */
 .lindb-query-editor {
+  gap: 4px;
+
   .semi-form-field {
-    padding-right: 4px;
+    padding-right: 0;
+  }
+}
+
+.tag-item {
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--semi-color-fill-0);
+  }
+
+  &.active {
+    background-color: var(--semi-color-primary-light-default);
   }
 }

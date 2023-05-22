@@ -20,6 +20,7 @@ package lindb
 import (
 	"bytes"
 	"fmt"
+	"strings"
 )
 
 // MetadataType represents metadata type for LinDB.
@@ -85,10 +86,18 @@ func (e Expr) String() string {
 	switch v := e.Value.(type) {
 	case string:
 		value = v
+	case []any:
+		var values []string
+		for _, val := range v {
+			values = append(values, fmt.Sprintf("'%s'", val))
+		}
+		value = strings.Join(values, ",")
 	default:
 		value = fmt.Sprintf("'%v'", v)
 	}
-	if e.raw {
+	if e.Op == In {
+		fmt.Fprintf(buf, "( %s )", value)
+	} else if e.raw {
 		fmt.Fprintf(buf, "%s", value)
 	} else {
 		fmt.Fprintf(buf, "'%s'", value)
