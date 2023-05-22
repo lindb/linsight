@@ -20,10 +20,11 @@ import { Form } from '@douyinfe/semi-ui';
 import { VariableEditorProps } from '@src/types';
 import MetricNameSelect from './components/MetricNameSelect';
 import TagKeySelect from './components/TagKeySelect';
+import { LinDBDatasource } from './Datasource';
 
 const VariableEditor: React.FC<VariableEditorProps> = (props) => {
   const { variable, datasource } = props;
-  console.log('variable editor', variable);
+  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
   return (
     <>
       <Form.Select
@@ -43,7 +44,7 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
             labelPosition="top"
             label="Metric"
             field="query.request.metric"
-            datasource={datasource}
+            datasource={api}
             style={{ width: 300 }}
           />
           <TagKeySelect
@@ -51,7 +52,7 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
             label="Tag key"
             field="query.request.tagKey"
             metricField="query.request.metric"
-            datasource={datasource}
+            datasource={api}
             style={{ width: 300 }}
           />
         </>

@@ -26,7 +26,6 @@ import { UserSrv } from './services';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MenuStore } from './stores';
 import Logo from '@src/images/logo.svg';
-import LogoTitle from '@src/images/logo_title.svg';
 
 const { Text } = Typography;
 const { Sider, Content } = Layout;

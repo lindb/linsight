@@ -45,7 +45,7 @@ const LinSelect: React.FC<{
   rules?: any[];
   clearKeys?: string[];
   outerBottomSlot?: React.ReactNode;
-  onChange?: (value: string | number | any[] | Record<string, any>) => void;
+  onFinished?: () => void;
 }> = (props) => {
   const {
     field,
@@ -63,14 +63,13 @@ const LinSelect: React.FC<{
     reloadKeys,
     rules,
     outerBottomSlot,
-    onChange,
+    onFinished,
   } = props;
   const formState = useFormState();
   const formApi = useFormApi();
   const formValues = formState.values;
-
+  const dropdownVisible = useRef(false) as MutableRefObject<boolean>;
   const searchInput = useRef('') as MutableRefObject<string>;
-  const dropdownVisible = useRef() as MutableRefObject<boolean>;
   const previousValuesOfReloadKeys = useRef(pick(formValues, reloadKeys || [])) as MutableRefObject<any>;
   const lastLoad = useRef(new Date().getTime()) as MutableRefObject<number>;
 
@@ -128,13 +127,21 @@ const LinSelect: React.FC<{
             search();
           }
         }}
+        onClear={() => onFinished && onFinished()}
+        onChange={() => {
+          if (onFinished) {
+            if (!multiple || !dropdownVisible.current) {
+              // 1. signle select, if value change need trigger
+              // 2. multiple select, if value change by result delete btn need trigger
+              onFinished();
+            }
+          }
+        }}
         onDropdownVisibleChange={(val) => {
           dropdownVisible.current = val;
-          // TODO: need add change form submit logic
-          // if (!val && onChange) {
-          //   onChange(val);
-          //   // formApi.submitForm();
-          // }
+          if (!val && onFinished) {
+            onFinished();
+          }
         }}
         onFocus={() => {
           if (error || new Date().getTime() - lastLoad.current >= RELOAD_TIME) {

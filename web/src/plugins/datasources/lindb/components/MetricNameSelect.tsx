@@ -15,20 +15,23 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { useFormApi } from '@douyinfe/semi-ui';
 import { LinSelect } from '@src/components';
-import { DatasourceInstance } from '@src/types';
 import React, { CSSProperties } from 'react';
 import { LinDBDatasource } from '../Datasource';
 
+/*
+ * Metric name select for query/variable editor.
+ */
 const MetricNameSelect: React.FC<{
-  datasource: DatasourceInstance;
+  datasource: LinDBDatasource;
   label?: string;
   field?: string;
   style?: CSSProperties;
   labelPosition?: 'top' | 'left' | 'inset';
 }> = (props) => {
   const { datasource, label, style, field = 'metric', labelPosition } = props;
-  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
+  const formApi = useFormApi();
   return (
     <LinSelect
       style={style}
@@ -37,15 +40,14 @@ const MetricNameSelect: React.FC<{
       placeholder="Please select metric"
       labelPosition={labelPosition}
       loader={async (prefix?: string) => {
-        console.log('load metric name......');
-        const values = await api.fetchMetricNames(prefix);
+        const values = await datasource.fetchMetricNames(prefix);
         const optionList: any[] = [];
-        console.log('kslfasjdflkdsj', values, optionList);
         (values || []).map((item: any) => {
-          optionList.push({ value: item, label: item });
+          optionList.push({ value: item, label: item, showTick: false });
         });
         return optionList;
       }}
+      onFinished={() => formApi.submitForm()}
     />
   );
 };

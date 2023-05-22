@@ -16,23 +16,8 @@ specific language governing permissions and limitations
 under the License.
 */
 import { get, trim } from 'lodash-es';
-import Handlebars from 'handlebars';
-Handlebars.registerHelper('openExp', function () {
-  return '${';
-});
-Handlebars.registerHelper('closeExp', function () {
-  return '}';
-});
 
 const template = (tmpl: string, params?: object): string => {
-  // const compiled = Handlebars.compile('${node}');
-  // const rs = compiled(params);
-  // console.log('template....', tmpl, params, rs);
-  // const regex = /\$\{[^}]+\}/;
-  // if (regex.test(rs)) {
-  //   return '';
-  // }
-  // return rs;
   return tmpl.replace(/\$\{\s*(\w+)\s*\}/g, (_, key) => get(params, trim(key), ''));
 };
 

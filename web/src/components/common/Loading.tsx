@@ -15,8 +15,18 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-.linsight-explore {
-  .semi-collapse-header {
-    background-color: var(--semi-color-fill-0);
-  }
-}
+import React from 'react';
+import './loading.scss';
+
+const Loading: React.FC = () => {
+  return (
+    <div className="loading">
+      <div className="loading-bar"></div>
+      <div className="loading-bar"></div>
+      <div className="loading-bar"></div>
+      <div className="loading-bar"></div>
+    </div>
+  );
+};
+
+export default Loading;

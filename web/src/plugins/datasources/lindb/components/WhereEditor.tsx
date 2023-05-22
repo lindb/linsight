@@ -34,18 +34,18 @@ import { LinSelect } from '@src/components';
 import { useRequest } from '@src/hooks';
 import { DatasourceInstance } from '@src/types';
 import { isEmpty } from 'lodash-es';
-import React, { useEffect, useState } from 'react';
+import React, { CSSProperties, useEffect, useState } from 'react';
 import { LinDBDatasource } from '../Datasource';
 import { ConditionExpr, Operator } from '../types';
 
 const { Text } = Typography;
 
 const TagValueSelect: React.FC<{
-  api: LinDBDatasource;
+  datasource: LinDBDatasource;
   metric: string;
   tagKey: string | undefined;
 }> = (props) => {
-  const { api, metric, tagKey } = props;
+  const { datasource, metric, tagKey } = props;
   const {
     result: tagValues,
     error,
@@ -54,7 +54,7 @@ const TagValueSelect: React.FC<{
   } = useRequest(
     ['load_tag_values_for_where', metric, tagKey],
     async () => {
-      return await api.getTagValues(metric, `${tagKey}`);
+      return await datasource.getTagValues(metric, `${tagKey}`);
     },
     { enabled: !isEmpty(metric) && !isEmpty(tagKey) }
   );
@@ -70,11 +70,11 @@ const TagValueSelect: React.FC<{
 };
 
 const TagKeySelect: React.FC<{
-  api: LinDBDatasource;
+  datasource: LinDBDatasource;
   metric: string;
   onChangeTagKey: (tagKey: string) => void;
 }> = (props) => {
-  const { api, metric, onChangeTagKey } = props;
+  const { datasource, metric, onChangeTagKey } = props;
   const {
     result: tagKeys,
     error,
@@ -83,7 +83,7 @@ const TagKeySelect: React.FC<{
   } = useRequest(
     ['load_tag_keys_for_where', metric],
     async () => {
-      return await api.getTagKeys(metric);
+      return await datasource.getTagKeys(metric);
     },
     { enabled: !isEmpty(metric) }
   );
@@ -110,13 +110,13 @@ const TagKeySelect: React.FC<{
 };
 
 const WhereConditonSelect: React.FC<{
-  datasource: DatasourceInstance;
+  datasource: LinDBDatasource;
   metricField?: string;
+  style?: CSSProperties;
 }> = (props) => {
-  const { datasource, metricField = 'metric' } = props;
+  const { datasource, metricField = 'metric', style } = props;
   const [visible, setVisible] = useState(false);
   const [currentTagKey, setCurrentTagKey] = useState('');
-  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
   const { value: metricName } = useFieldState(metricField);
   const where: ConditionExpr[] = [{ key: 'node', operator: Operator.Eq, value: '${node}' }];
   const formApi = useFormApi();
@@ -141,13 +141,13 @@ const WhereConditonSelect: React.FC<{
           <Row>
             <Col span={12}>
               <TagKeySelect
-                api={api}
+                datasource={datasource}
                 metric={metricName}
                 onChangeTagKey={(tagKey: string) => setCurrentTagKey(tagKey)}
               />
             </Col>
             <Col span={12}>
-              <TagValueSelect api={api} metric={metricName} tagKey={currentTagKey} />
+              <TagValueSelect datasource={datasource} metric={metricName} tagKey={currentTagKey} />
             </Col>
           </Row>
         </div>
@@ -155,9 +155,31 @@ const WhereConditonSelect: React.FC<{
       <Form.TagInput
         field="where"
         labelPosition="inset"
+        placeholder="Input where conditions"
+        style={style}
         onFocus={() => setVisible(true)}
-        renderTagItem={(value: ConditionExpr, index) => (
-          <Tag key={index}>{value.key + value.operator + value.value}</Tag>
+        showClear
+        onChange={(values: any) => {
+          console.log('change......', values);
+        }}
+        onRemove={(removedValue: string, idx: number) => {
+          // formApi.setValue('where', null);
+          console.log('on remove xxxx..........', formApi.getValues());
+        }}
+        renderTagItem={(value: any, index: number) => (
+          <Tag
+            key={index}
+            closable
+            color="white"
+            size="large"
+            onClose={() => {
+              console.log('xxxx...........');
+              // formApi.setValue('where', null);
+              console.log('xxxx..........', formApi.getValues());
+              // formApi.submitForm();
+            }}>
+            {value.key + value.operator + value.value}
+          </Tag>
         )}
       />
     </Dropdown>

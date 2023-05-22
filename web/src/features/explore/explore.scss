@@ -15,21 +15,17 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { QueryEditContext } from '@src/contexts';
-import { useContext, useEffect, useState } from 'react';
-import { pick } from 'lodash-es';
+.linsight-explore {
+  .explore-header {
+    display: flex;
+    align-items: center;
+    gap: 8;
+    margin-left: 12px;
+    flex: 1;
 
-export const useQueryEditor = (watch?: string[]) => {
-  const { values } = useContext(QueryEditContext);
-  const [watchValues, setWatchValues] = useState({});
-  useEffect(() => {
-    if (!watch) {
-      setWatchValues(values);
-    } else {
-      setWatchValues(pick(values, watch));
+    & > i {
+      font-size: 20px;
+      margin-right: 12px;
     }
-  }, [values, watch]);
-  return {
-    ...watchValues,
-  } as any;
-};
+  }
+}

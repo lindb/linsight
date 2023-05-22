@@ -19,10 +19,10 @@ import React, { useEffect, useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { isEmpty, endsWith } from 'lodash-es';
-import { Spin, Layout, Typography, Button } from '@douyinfe/semi-ui';
+import { Layout, Typography, Button } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
 import { DashboardStore, PanelStore } from '@src/stores';
-import { Icon, Notification, TimePicker } from '@src/components';
+import { Icon, Loading, Notification, TimePicker } from '@src/components';
 import Setting from './Setting';
 import PanelEditor from './PanelEditor';
 import View from './View';
@@ -123,8 +123,8 @@ const Dashboard: React.FC = () => {
   if (loading) {
     console.log('loading.....');
     return (
-      <div style={{ width: '100%', textAlign: 'center', marginTop: 300 }}>
-        <Spin size="large" />
+      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Loading />
       </div>
     );
   }
@@ -207,5 +207,4 @@ const Dashboard: React.FC = () => {
   );
 };
 
-//TODO: need add dashboard header?
 export default observer(Dashboard);

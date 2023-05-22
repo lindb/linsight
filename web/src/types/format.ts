@@ -39,11 +39,12 @@ export interface FormatCategory {
 const cateToString = (cate: FormatCate): string => {
   return toLower(cate).replaceAll(' ', '');
 };
+
 const categoryToString = (category: FormatCategory): string => {
   return [cateToString(category.category), category.value].join('_');
 };
+
 const formattedToString = (formatted: Formatted): string => {
-  console.log('xxxxxxx', formatted);
   return `${formatted.prefix ?? ''}${formatted.value}${formatted.suffix ?? ''}`;
 };
 
@@ -89,12 +90,12 @@ class FormatRepository {
 
   public get(category: any): Formatter {
     const format = this.formatters.get(join(category, '_'));
-    console.log('find......', format);
     if (format) {
       return format;
     }
     return defaultFormatter;
   }
+
   public formatString(category: any, input: number | null, decimals = 2): string {
     return this.get(category).formatString(input, decimals);
   }

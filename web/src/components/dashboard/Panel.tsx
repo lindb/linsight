@@ -32,7 +32,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import { ObjectKit } from '@src/utils';
 import classNames from 'classnames';
-import { toJS } from 'mobx';
+import { get } from 'lodash-es';
 
 const { Text } = Typography;
 
@@ -56,6 +56,7 @@ const PanelHeader = forwardRef(
         setMenuVisible(show);
       },
     }));
+
     return (
       <div className="panel-header">
         <div className="title">
@@ -96,8 +97,9 @@ const PanelHeader = forwardRef(
               <Dropdown.Item
                 icon={<Icon icon="icon-explore" />}
                 onClick={() => {
-                  // FIXME: add url searhc param
-                  navigate({ pathname: '/explore' });
+                  searchParams.set('left', JSON.stringify(get(panel, 'targets[0]', {})));
+                  searchParams.delete('d');
+                  navigate({ pathname: '/explore', search: searchParams.toString() });
                 }}>
                 Explore
               </Dropdown.Item>
@@ -112,7 +114,7 @@ const PanelHeader = forwardRef(
               )}
             </Dropdown.Menu>
           }>
-          <IconMenu className="btn" style={{ visibility: menuVisible ? 'visible' : 'hidden' }} />
+          <IconMenu className="btn" style={{ display: menuVisible ? 'block' : 'none' }} />
         </Dropdown>
       </div>
     );
@@ -128,13 +130,11 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
   const [options, setOptions] = useState<PanelSetting>();
-  console.log('render panel...', toJS(panel));
   const { loading, error, result } = useMetric(panel?.targets || []);
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const header = useRef<any>();
   const handleKeyDown = useCallback(
     (e: any) => {
-      console.log('panel keydown', e);
       if (!e.ctrlKey) {
         return;
       }
@@ -165,19 +165,12 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
 
   useEffect(() => {
     if (plugin) {
-      console.log(
-        'update options..........',
-        toJS(panel),
-        plugin.components.DefaultOptions,
-        plugin.getDefaultOptions()
-      );
       setOptions(ObjectKit.merge(plugin.getDefaultOptions(), panel));
     }
   }, [plugin, panel]);
 
   useEffect(() => {
     return () => {
-      console.log('remove..... keydown event');
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleKeyDown]);

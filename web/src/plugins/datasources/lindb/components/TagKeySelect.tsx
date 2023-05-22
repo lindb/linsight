@@ -17,12 +17,11 @@ under the License.
 */
 import React, { CSSProperties } from 'react';
 import { LinSelect } from '@src/components';
-import { DatasourceInstance } from '@src/types';
 import { LinDBDatasource } from '../Datasource';
 import { useFieldState } from '@douyinfe/semi-ui';
 
 const TagKeySelect: React.FC<{
-  datasource: DatasourceInstance;
+  datasource: LinDBDatasource;
   field?: string;
   label?: string;
   style?: CSSProperties;
@@ -30,6 +29,7 @@ const TagKeySelect: React.FC<{
   metricField?: string;
   placeholder?: string;
   labelPosition?: 'top' | 'left' | 'inset';
+  onFinished?: () => void;
 }> = (props) => {
   const {
     datasource,
@@ -40,8 +40,8 @@ const TagKeySelect: React.FC<{
     field = 'tagKey',
     metricField = 'metric',
     labelPosition,
+    onFinished,
   } = props;
-  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
   const { value: metricName } = useFieldState(metricField);
   return (
     <LinSelect
@@ -53,13 +53,14 @@ const TagKeySelect: React.FC<{
       labelPosition={labelPosition}
       reloadKeys={[metricField]}
       loader={async (_prefix?: string) => {
-        const values = await api.getTagKeys(metricName);
+        const values = await datasource.getTagKeys(metricName);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
-          optionList.push({ value: item, label: item });
+          optionList.push({ value: item, label: item, showTick: false });
         });
         return optionList;
       }}
+      onFinished={onFinished}
     />
   );
 };

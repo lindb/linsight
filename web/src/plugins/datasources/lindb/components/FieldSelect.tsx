@@ -15,14 +15,16 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { useFieldState } from '@douyinfe/semi-ui';
+import { useFieldState, useFormApi } from '@douyinfe/semi-ui';
 import { LinSelect } from '@src/components';
-import { DatasourceInstance } from '@src/types';
 import React, { CSSProperties } from 'react';
 import { LinDBDatasource } from '../Datasource';
 
+/*
+ * Field select for query/variable editor.
+ */
 const FieldSelect: React.FC<{
-  datasource: DatasourceInstance;
+  datasource: LinDBDatasource;
   field?: string;
   label?: string;
   style?: CSSProperties;
@@ -30,8 +32,8 @@ const FieldSelect: React.FC<{
   labelPosition?: 'top' | 'left' | 'inset';
 }> = (props) => {
   const { datasource, label, style, field = 'fields', metricField = 'metric', labelPosition } = props;
-  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
   const { value: metricName } = useFieldState(metricField);
+  const formApi = useFormApi();
   return (
     <LinSelect
       style={style}
@@ -42,13 +44,14 @@ const FieldSelect: React.FC<{
       labelPosition={labelPosition}
       reloadKeys={[metricField]}
       loader={async (_prefix?: string) => {
-        const values = await api.getFields(metricName);
+        const values = await datasource.getFields(metricName);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
-          optionList.push({ value: item.name, label: `${item.name}(${item.type})` });
+          optionList.push({ value: item.name, label: `${item.name}(${item.type})`, showTick: false });
         });
         return optionList;
       }}
+      onFinished={() => formApi.submitForm()}
     />
   );
 };
