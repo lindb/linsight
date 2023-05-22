@@ -33,6 +33,7 @@ import { DashboardStore } from '@src/stores';
 import { ObjectKit } from '@src/utils';
 import classNames from 'classnames';
 import { get } from 'lodash-es';
+import { toJS } from 'mobx';
 
 const { Text } = Typography;
 
@@ -129,7 +130,6 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const [searchParams] = useSearchParams();
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
-  const [options, setOptions] = useState<PanelSetting>();
   const { loading, error, result } = useMetric(panel?.targets || []);
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const header = useRef<any>();
@@ -162,12 +162,6 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
     },
     [panel, searchParams, navigate]
   );
-
-  useEffect(() => {
-    if (plugin) {
-      setOptions(ObjectKit.merge(plugin.getDefaultOptions(), panel));
-    }
-  }, [plugin, panel]);
 
   useEffect(() => {
     return () => {
@@ -208,7 +202,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
         <Card
           className={panelCls}
           header={<PanelHeader ref={header} panel={panel} isStatic={isStatic} isLoading={loading} error={error} />}>
-          {Visualization && <Visualization datasets={result} theme={theme} panel={options as any} />}
+          {Visualization && <Visualization datasets={result} theme={theme} panel={panel} />}
         </Card>
       </LazyLoad>
     </div>

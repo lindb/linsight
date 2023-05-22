@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
 import { IconBellStroked } from '@douyinfe/semi-icons';
 import SplitPane from 'react-split-pane';
@@ -29,9 +29,26 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
 import PanelSetting from './PanelSetting';
 import ViewVariables from './components/ViewVariables';
-import { QueryEditContextProvider } from '@src/contexts';
+import { QueryEditContext, QueryEditContextProvider } from '@src/contexts';
 
 const Split: any = SplitPane;
+
+const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+  const { datasource } = props;
+  const plugin = datasource.plugin;
+  const { values } = useContext(QueryEditContext);
+  const QueryEditor = plugin.components.QueryEditor;
+  useEffect(() => {
+    DashboardStore.updatePanelConfig(PanelStore.panel, {
+      targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
+    });
+  }, [values, datasource.setting.uid]);
+
+  if (!QueryEditor) {
+    return null;
+  }
+  return <QueryEditor datasource={datasource} />;
+};
 
 const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
   const { panel } = props;
@@ -54,15 +71,9 @@ const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
     if (isEmpty(targets)) {
       // no targets, init empty query editor
       return (
-        <QueryEditor
-          datasource={datasource}
-          onChange={(values) => {
-            console.log('query editor change....', values);
-            DashboardStore.updatePanelConfig(PanelStore.panel, {
-              targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
-            });
-          }}
-        />
+        <QueryEditContextProvider>
+          <MetricQueryEditor datasource={datasource} />
+        </QueryEditContextProvider>
       );
     }
     return (
@@ -70,16 +81,7 @@ const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
         {targets.map((target: any, index: number) => {
           return (
             <QueryEditContextProvider key={index} initValues={get(target, 'request', {})}>
-              <QueryEditor
-                datasource={datasource}
-                onChange={(values) => {
-                  // FIXME: set target
-                  console.log('query editor change....', values);
-                  DashboardStore.updatePanelConfig(PanelStore.panel, {
-                    targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
-                  });
-                }}
-              />
+              <MetricQueryEditor datasource={datasource} />
             </QueryEditContextProvider>
           );
         })}
@@ -131,7 +133,6 @@ const EditPanel: React.FC = () => {
     };
   }, [panel]);
 
-  console.log('...... edit panel....', panel, DashboardStore.dashboard);
   if (!panel) {
     return null;
   }

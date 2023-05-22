@@ -19,6 +19,7 @@ import { PanelSetting } from '@src/types';
 import { makeAutoObservable } from 'mobx';
 import { cloneDeep } from 'lodash-es';
 import { ObjectKit } from '@src/utils';
+import { DashboardStore } from '.';
 
 /**
  * Store current edit panel
@@ -48,6 +49,11 @@ class PanelStore {
    */
   public update(values: any): void {
     this.panel = cloneDeep(ObjectKit.merge(this.panel || {}, values));
+    if (this.panel) {
+      // NOTE: need modify dashboard's panel to trigger panel options modify event
+      // because clone create new object, modify dashboard panel ref
+      DashboardStore.updatePanel(this.panel);
+    }
   }
 }
 
