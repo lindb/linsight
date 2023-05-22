@@ -15,26 +15,64 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { DatasourceInstance } from '@src/types';
-import {} from 'lodash-es';
+import { isEmpty, get } from 'lodash-es';
 import { Card, Collapse, Typography } from '@douyinfe/semi-ui';
 import { IconCopy } from '@douyinfe/semi-icons';
 import Panel from '../dashboard/Panel';
+import './metric-explore.scss';
+import { QueryEditContext, QueryEditContextProvider } from '@src/contexts';
+import { useSearchParams } from 'react-router-dom';
 const { Text } = Typography;
 
-const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   const { datasource } = props;
-  const [query, setQuery] = useState<any>(null);
   const plugin = datasource.plugin;
+  const { values } = useContext(QueryEditContext);
   const QueryEditor = plugin.components.QueryEditor;
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    console.log('xxx..........jjjjj');
+    searchParams.set('left', JSON.stringify({ datasource: { uid: datasource.setting.uid }, request: values }));
+    setSearchParams(searchParams);
+  }, [values, datasource.setting.uid]);
+
   if (!QueryEditor) {
     return null;
   }
+  console.log('xxxxx....', values);
+  return <QueryEditor datasource={datasource} />;
+};
+
+const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+  const { datasource } = props;
+  const [searchParams] = useSearchParams();
+  const getTargets = (key: string) => {
+    const targets = searchParams.get(key);
+    if (isEmpty(targets)) {
+      return {};
+    }
+    try {
+      return JSON.parse(`${targets}`);
+    } catch (err) {
+      console.log('parse metric explore error', err);
+    }
+  };
+
+  const [left, setLeft] = useState(() => {
+    return getTargets('left');
+  });
+
+  useEffect(() => {
+    setLeft(getTargets('left'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   return (
     <>
       <Card className="linsight-feature">
-        <div className="linsight-explore">
+        <div className="metric-explore">
           <Collapse activeKey={['A']} expandIconPosition="left">
             <Collapse.Panel
               header={
@@ -48,7 +86,9 @@ const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
                 </div>
               }
               itemKey="A">
-              <QueryEditor datasource={datasource} onChange={(values: object) => setQuery(values)} />
+              <QueryEditContextProvider initValues={get(left, 'request', {})}>
+                <MetricQueryEditor datasource={datasource} />
+              </QueryEditContextProvider>
             </Collapse.Panel>
           </Collapse>
         </div>
@@ -57,7 +97,7 @@ const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
         <Panel
           panel={{
             type: 'timeseries',
-            targets: [{ datasource: { uid: datasource.setting.uid }, request: query }],
+            targets: [left],
           }}
         />
       </div>

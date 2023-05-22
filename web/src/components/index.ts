@@ -22,6 +22,7 @@ export { default as SimpleStatusTip } from '@src/components/common/SimpleStatusT
 export { default as LazyLoad } from '@src/components/common/LazyLoad';
 export { default as Notification } from '@src/components/common/Notification';
 export { default as TimePicker } from '@src/components/common/TimePicker';
+export { default as Loading } from '@src/components/common/Loading';
 
 // layout components
 export { default as Footer } from '@src/components/layout/Footer';

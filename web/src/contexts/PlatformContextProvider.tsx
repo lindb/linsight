@@ -15,8 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Spin } from '@douyinfe/semi-ui';
-import { Notification } from '@src/components';
+import { Avatar, Layout, Skeleton, Spin } from '@douyinfe/semi-ui';
+import { Footer, Loading, Notification } from '@src/components';
 import { useRequest } from '@src/hooks';
 import { PlatformSrv, UserSrv } from '@src/services';
 import { DatasourceStore, MenuStore } from '@src/stores';
@@ -110,8 +110,9 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
     }
     if (isLoading) {
       return (
-        <div style={{ width: '100%', textAlign: 'center', marginTop: 300 }}>
-          <Spin size="large" />
+        <div
+          style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Loading />
         </div>
       );
     }

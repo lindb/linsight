@@ -15,9 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from '@src/hooks/use.ui';
-export * from '@src/hooks/use.url';
-export * from '@src/hooks/use.metric';
-export * from '@src/hooks/use.request';
-export * from '@src/hooks/use.event';
-export * from '@src/hooks/use.variable';
+.metric-explore {
+  .semi-collapse-header {
+    background-color: var(--semi-color-fill-0);
+  }
+}

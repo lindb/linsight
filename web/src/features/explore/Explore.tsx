@@ -23,6 +23,7 @@ import { useSearchParams } from 'react-router-dom';
 import { DatasourceStore } from '@src/stores';
 import { get } from 'lodash-es';
 import { toJS } from 'mobx';
+import './explore.scss';
 
 const { Header } = Layout;
 
@@ -41,10 +42,10 @@ const Explore: React.FC = () => {
   }, [ds]);
 
   return (
-    <Layout>
+    <Layout className="linsight-explore">
       <Header className="linsight-feature-header">
-        <div style={{ flex: 1, marginLeft: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon icon="icon-explore" style={{ fontSize: 20 }} />
+        <div className="explore-header">
+          <Icon icon="icon-explore" />
           <DatasourceSelectForm
             noLabel
             value={ds || get(datasources, '[0].setting.uid')}

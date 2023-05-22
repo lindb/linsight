@@ -16,13 +16,11 @@ specific language governing permissions and limitations
 under the License.
 */
 import { IconAlertTriangle } from '@douyinfe/semi-icons';
-import { Empty, Spin, List, Tooltip, Typography } from '@douyinfe/semi-ui';
+import { Empty, Spin, List, Tooltip } from '@douyinfe/semi-ui';
 import { ApiKit } from '@src/utils';
 import React, { CSSProperties } from 'react';
 import { Icon } from '@src/components';
 import { isArray } from 'lodash-es';
-
-const { Text } = Typography;
 
 const getErrMsg = (error: any) => {
   if (isArray(error)) {
@@ -52,11 +50,9 @@ const SimpleStatusTip: React.FC<{
       return <Empty image={<Icon icon="iconempty" style={{ fontSize: 16 }} />} />;
     }
     return (
-      <Text type="danger">
-        <Tooltip content={getErrMsg(error)}>
-          <IconAlertTriangle size="large" />
-        </Tooltip>
-      </Text>
+      <Tooltip content={getErrMsg(error)}>
+        <IconAlertTriangle size="large" style={{ color: 'var(--semi-color-danger)' }} />
+      </Tooltip>
     );
   }
   return null;

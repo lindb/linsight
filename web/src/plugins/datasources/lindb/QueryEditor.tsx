@@ -15,80 +15,51 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Divider, Row, Col, Form, Typography } from '@douyinfe/semi-ui';
-import { LinSelect } from '@src/components';
-import { DatasourceInstance, QueryEditorProps } from '@src/types';
+import { Form } from '@douyinfe/semi-ui';
+import { QueryEditorProps } from '@src/types';
 import React, { useContext } from 'react';
-import { get, clone } from 'lodash-es';
+import { isEmpty } from 'lodash-es';
 import { LinDBDatasource } from './Datasource';
 import { QueryEditContext } from '@src/contexts';
-import { useQueryEditor } from '@src/hooks';
 import MetricNameSelect from './components/MetricNameSelect';
 import TagKeySelect from './components/TagKeySelect';
 import FieldSelect from './components/FieldSelect';
 import WhereConditonSelect from './components/WhereEditor';
-
-const { Text } = Typography;
-
-const FieldEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
-  const { datasource } = props;
-  const api = datasource.api as LinDBDatasource; // covert LinDB datasource
-  const { metric } = useQueryEditor(['metric']);
-
-  return (
-    <LinSelect
-      style={{ width: 240 }}
-      field="fields"
-      placeholder="Please select fields"
-      labelPosition="inset"
-      label="Fields"
-      multiple
-      showClear
-      filter
-      remote
-      reloadKeys={[metric]}
-      loader={async () => {
-        const values = await api.getFields(metric);
-        const optionList: any[] = [];
-        (values || []).map((item: any) => {
-          optionList.push({ value: item.name, label: `${item.name}(${item.type})` });
-        });
-        return optionList;
-      }}
-    />
-  );
-};
+import './query-edit.scss';
+import { ObjectKit } from '@src/utils';
 
 const QueryEditor: React.FC<QueryEditorProps> = (props) => {
-  const { datasource, onChange } = props;
+  const { datasource } = props;
   const { values, setValues } = useContext(QueryEditContext);
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
-  const metric = get(values, 'metric');
-  console.log('change metric....', metric);
 
   return (
     <Form
+      className="lindb-query-editor"
       layout="horizontal"
       initValues={values}
       onSubmit={(values: any) => {
-        console.log('query request', values);
-        if (onChange) {
-          // TODO: check params if changed.
-          // FIXME: clone just triger change state
-          onChange(clone(values));
-          setValues(values);
+        const newValues = ObjectKit.cleanEmptyProperties(values);
+        if (!isEmpty(newValues)) {
+          // change query edit context's values
+          setValues(newValues);
         }
       }}>
-      <MetricNameSelect datasource={datasource} style={{ width: 240 }} />
-      <FieldSelect datasource={datasource} style={{ width: 240 }} />
-      <WhereConditonSelect datasource={datasource} />
-      <TagKeySelect
-        field="groupBy"
-        placeholder="Please select group by tag key"
-        multiple
-        label="Group By"
-        datasource={datasource}
-      />
+      {({ formApi }) => (
+        <>
+          <MetricNameSelect datasource={api} style={{ minWidth: 240 }} />
+          <FieldSelect datasource={api} style={{ minWidth: 240 }} />
+          <WhereConditonSelect datasource={api} style={{ minWidth: 270 }} />
+          <TagKeySelect
+            field="groupBy"
+            placeholder="Please select group by tag key"
+            multiple
+            label="Group By"
+            datasource={api}
+            onFinished={() => formApi.submitForm()}
+          />
+        </>
+      )}
     </Form>
   );
 };
