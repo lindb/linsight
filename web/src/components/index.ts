@@ -34,6 +34,7 @@ export { default as SliderInput } from '@src/components/input/SliderInput';
 export { default as LinSelect } from '@src/components/input/LinSelect';
 
 export { default as MetricExplore } from '@src/components/explore/MetricExplore';
+export { default as AddToCharts } from '@src/components/explore/AddToCharts';
 export { default as AddPanelWidget } from '@src/components/dashboard/AddPanelWidget';
 export { default as Panel } from '@src/components/dashboard/Panel';
 
