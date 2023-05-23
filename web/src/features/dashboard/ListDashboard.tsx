@@ -82,7 +82,7 @@ const ListDashboard: React.FC = () => {
             setSearchParams(searchParams);
           }}
         />
-        <Button icon={<IconPlusStroked />} onClick={() => navigate('/dashboard/edit')}>
+        <Button icon={<IconPlusStroked />} onClick={() => navigate('/dashboard')}>
           New
         </Button>
       </div>

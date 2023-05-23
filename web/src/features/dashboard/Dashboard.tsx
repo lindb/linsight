@@ -19,7 +19,7 @@ import React, { useEffect, useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { isEmpty, endsWith } from 'lodash-es';
-import { Layout, Typography, Button } from '@douyinfe/semi-ui';
+import { Layout, Typography, Button, SideSheet, Form, Space } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
 import { DashboardStore, PanelStore } from '@src/stores';
 import { Icon, Loading, Notification, TimePicker } from '@src/components';
@@ -35,6 +35,7 @@ import { useRequest } from '@src/hooks';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
+
 const DashboardStar = observer(() => {
   const { dashboard } = DashboardStore;
 
@@ -76,8 +77,84 @@ const DashboardStar = observer(() => {
   );
 });
 
-const Dashboard: React.FC = () => {
+const SaveDashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const dashboardId = searchParams.get('d');
+  const [visible, setVisible] = useState(false);
+  const saveDashboard = async (values: any) => {
+    if (PanelStore.panel) {
+      // if has edit panel, need update dashboard's panel
+      DashboardStore.updatePanel(PanelStore.panel);
+    }
+    DashboardStore.updateDashboardProps({ title: values.title });
+    if (values.saveVariable) {
+      console.log('save variable');
+    }
+    const success = await DashboardStore.saveDashboard();
+    if (success && !dashboardId) {
+      // if create dashboard successfully, need set uid to url params
+      searchParams.set('d', `${DashboardStore.dashboard.uid}`);
+      setSearchParams(searchParams);
+    }
+  };
+  return (
+    <>
+      <Button
+        type="tertiary"
+        icon={<IconSaveStroked />}
+        onClick={async () => {
+          setVisible(true);
+        }}
+      />
+      <SideSheet
+        size="medium"
+        motion={false}
+        closeOnEsc
+        visible={visible}
+        onCancel={() => setVisible(false)}
+        headerStyle={{ borderBottom: '1px solid var(--semi-color-border)' }}
+        bodyStyle={{ borderBottom: '1px solid var(--semi-color-border)' }}
+        title={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <IconGridStroked size="extra-large" />
+            <Typography.Title heading={4}>Save dashboard</Typography.Title>
+          </div>
+        }>
+        <Form
+          className="linsight-form"
+          initValues={DashboardStore.dashboard}
+          onSubmit={(values: any) => saveDashboard(values)}>
+          {({ formApi }) => (
+            <>
+              {isEmpty(dashboardId) && (
+                <Form.Input
+                  field="title"
+                  label="Dashboard title"
+                  rules={[{ required: true, message: 'Dashboard title is required' }]}
+                />
+              )}
+              <Form.Checkbox field="saveVariable" noLabel>
+                Save current variable values
+              </Form.Checkbox>
+              <Form.TextArea field="comment" placeholder="Add a comment to describe your changes" noLabel />
+              <Space style={{ marginTop: 12 }}>
+                <Button type="tertiary" onClick={() => setVisible(false)}>
+                  Cancel
+                </Button>
+                <Button icon={<IconSaveStroked />} onClick={() => formApi.submitForm()}>
+                  Save
+                </Button>
+              </Space>
+            </>
+          )}
+        </Form>
+      </SideSheet>
+    </>
+  );
+};
+
+const Dashboard: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const dashboardId = searchParams.get('d');
@@ -121,7 +198,6 @@ const Dashboard: React.FC = () => {
   };
 
   if (loading) {
-    console.log('loading.....');
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Loading />
@@ -166,22 +242,7 @@ const Dashboard: React.FC = () => {
               });
             }}
           />
-          <Button
-            type="tertiary"
-            icon={<IconSaveStroked />}
-            onClick={async () => {
-              if (PanelStore.panel) {
-                // if has edit panel, need update dashboard's panel
-                DashboardStore.updatePanel(PanelStore.panel);
-              }
-              const success = await DashboardStore.saveDashboard();
-              if (success && !dashboardId) {
-                // if create dashboard successfully, need set uid to url params
-                searchParams.set('d', `${DashboardStore.dashboard.uid}`);
-                setSearchParams(searchParams);
-              }
-            }}
-          />
+          <SaveDashboard />
           <Button
             type="tertiary"
             icon={<IconSettingStroked />}

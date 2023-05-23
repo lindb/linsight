@@ -33,7 +33,7 @@ const Explore: React.FC = () => {
     return toJS(get(datasources, '[0]'));
   });
   const [searchParams, setSearchParams] = useSearchParams();
-  const options = useRef<any>({});
+  const addToChartBtn = useRef<any>();
   const ds = searchParams.get('ds');
 
   useEffect(() => {
@@ -57,13 +57,20 @@ const Explore: React.FC = () => {
           />
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
-          <AddToCharts panel={options.current} />
+          <AddToCharts ref={addToChartBtn} />
           <AddToDashboard btnType="tertiary" btnTheme="light" />
           <TimePicker />
         </div>
       </Header>
       {datasource && (
-        <MetricExplore datasource={datasource} onValueChange={(values: any) => (options.current = values)} />
+        <MetricExplore
+          datasource={datasource}
+          onValueChange={(values: any) => {
+            if (addToChartBtn.current) {
+              addToChartBtn.current.setOptions(values);
+            }
+          }}
+        />
       )}
     </Layout>
   );

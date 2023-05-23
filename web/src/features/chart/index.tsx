@@ -30,20 +30,41 @@ import {
   Button,
   Table,
   Typography,
+  SideSheet,
 } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconSearchStroked, IconStar, IconStarStroked } from '@douyinfe/semi-icons';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { StatusTip } from '@src/components';
-import { isEmpty } from 'lodash-es';
+import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Icon, Panel, StatusTip } from '@src/components';
+import { isEmpty, get } from 'lodash-es';
 import { useRequest } from '@src/hooks';
+import { Chart, PanelSetting } from '@src/types';
 const { Text } = Typography;
 
+const ChartDetail: React.FC<{ chart: Chart; visible: boolean; setVisible: (visible: boolean) => void }> = (props) => {
+  const { visible, setVisible, chart } = props;
+  const navigate = useNavigate();
+  return (
+    <SideSheet size="large" closeOnEsc motion={false} visible={visible} onCancel={() => setVisible(false)}>
+      <Button
+        icon={<Icon icon="icon-explore" />}
+        onClick={() => {
+          const params = createSearchParams({ left: JSON.stringify(get(chart, 'config.targets[0]', null)) });
+          navigate({ pathname: '/explore', search: params.toString() });
+        }}>
+        Explore
+      </Button>
+      <Panel panel={chart.config || {}} />
+    </SideSheet>
+  );
+};
+
 const ListChart: React.FC = () => {
-  const [metric, setMetric] = useState(null);
+  const [chart, setChart] = useState<PanelSetting>({});
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
+  const [visible, setVisible] = useState(false);
 
   const { result, loading, error, refetch } = useRequest(['fetch-charts', title, ownership], () =>
     ChartSrv.searchCharts({ title: title, ownership: ownership })
@@ -125,8 +146,8 @@ const ListChart: React.FC = () => {
                             <Text
                               link
                               onClick={() => {
-                                setMetric(r);
-                                // setVisible(true);
+                                setChart(r);
+                                setVisible(true);
                               }}>
                               {r.title}
                             </Text>
@@ -139,18 +160,6 @@ const ListChart: React.FC = () => {
                       key: 'desc',
                       align: 'left',
                       dataIndex: 'desc',
-                      render: (text: any, r: any) => {
-                        return (
-                          <Text
-                            link
-                            onClick={() => {
-                              setMetric(r);
-                              // setVisible(true);
-                            }}>
-                            {text}
-                          </Text>
-                        );
-                      },
                     },
                   ]}
                 />
@@ -159,6 +168,7 @@ const ListChart: React.FC = () => {
           </Col>
         </Row>
       </Card>
+      <ChartDetail visible={visible} setVisible={setVisible} chart={chart} />
     </>
   );
 };
