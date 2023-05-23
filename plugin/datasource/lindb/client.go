@@ -74,7 +74,10 @@ func (cli *client) MetadataQuery(ctx context.Context, req *model.Query) (any, er
 	}
 
 	fmt.Println(dataQueryReq)
-	sql := buildMetadataQuerySQL(dataQueryReq)
+	sql, err := buildMetadataQuerySQL(dataQueryReq)
+	if err != nil {
+		return nil, err
+	}
 	fmt.Println(sql)
 	query := cli.client.DataQuery()
 	rs, err := query.MetadataQuery(ctx, cli.cfg.Database, sql)

@@ -27,6 +27,7 @@ import FieldSelect from './components/FieldSelect';
 import WhereConditonSelect from './components/WhereEditor';
 import './query-edit.scss';
 import { ObjectKit } from '@src/utils';
+import NamespaceSelect from './components/NamespaceSelect';
 
 const QueryEditor: React.FC<QueryEditorProps> = (props) => {
   const { datasource } = props;
@@ -47,6 +48,7 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
       }}>
       {({ formApi }) => (
         <>
+          <NamespaceSelect datasource={api} style={{ minWidth: 240 }} />
           <MetricNameSelect datasource={api} style={{ minWidth: 240 }} />
           <FieldSelect datasource={api} style={{ minWidth: 240 }} />
           <WhereConditonSelect datasource={api} style={{ minWidth: 270 }} />

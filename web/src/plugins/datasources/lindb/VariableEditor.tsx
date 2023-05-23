@@ -21,6 +21,7 @@ import { VariableEditorProps } from '@src/types';
 import MetricNameSelect from './components/MetricNameSelect';
 import TagKeySelect from './components/TagKeySelect';
 import { LinDBDatasource } from './Datasource';
+import { get } from 'lodash-es';
 
 const VariableEditor: React.FC<VariableEditorProps> = (props) => {
   const { variable, datasource } = props;
@@ -38,7 +39,7 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
           { value: 'tagValue', label: 'Tag Value' },
         ]}
       />
-      {variable.query?.request.valueType === 'tagValue' && (
+      {get(variable, 'query.request.type') === 'tagValue' && (
         <>
           <MetricNameSelect
             labelPosition="top"

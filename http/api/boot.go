@@ -49,6 +49,7 @@ func (api *BootAPI) Boot(c *gin.Context) {
 	signedUser := util.GetUser(c.Request.Context())
 	// FIXME: need modify nav item data based on use setting
 	httppkg.OK(c, &model.BootData{
+		Home:        "/dashboards",
 		User:        *signedUser,
 		Datasources: datasources,
 		NavTree: []model.NavItem{

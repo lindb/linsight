@@ -41,19 +41,20 @@ const { Text } = Typography;
 
 const TagValueSelect: React.FC<{
   datasource: LinDBDatasource;
+  namespace: string;
   metric: string;
   tagKey: string;
   where: object;
 }> = (props) => {
-  const { datasource, metric, tagKey, where } = props;
+  const { datasource, namespace, metric, tagKey, where } = props;
   const {
     result: tagValues,
     error,
     loading,
   } = useRequest(
-    ['load_tag_values_for_where', metric, tagKey],
+    ['load_tag_values_for_where', namespace, metric, tagKey],
     async () => {
-      return await datasource.getTagValues(metric, `${tagKey}`);
+      return await datasource.getTagValues(namespace, metric, `${tagKey}`);
     },
     { enabled: !isEmpty(metric) && !isEmpty(tagKey) }
   );
@@ -115,19 +116,20 @@ const TagValueSelect: React.FC<{
 
 const TagKeySelect: React.FC<{
   datasource: LinDBDatasource;
+  namespace: string;
   metric: string;
   currentTagKey: string;
   onChangeTagKey: (tagKey: string) => void;
 }> = (props) => {
-  const { datasource, metric, currentTagKey, onChangeTagKey } = props;
+  const { datasource, namespace, metric, currentTagKey, onChangeTagKey } = props;
   const {
     result: tagKeys,
     error,
     loading,
   } = useRequest(
-    ['load_tag_keys_for_where', metric],
+    ['load_tag_keys_for_where', namespace, metric],
     async () => {
-      return await datasource.getTagKeys(metric);
+      return await datasource.getTagKeys(namespace, metric);
     },
     { enabled: !isEmpty(metric) }
   );
@@ -151,12 +153,14 @@ const TagKeySelect: React.FC<{
 const WhereConditonSelect: React.FC<{
   datasource: LinDBDatasource;
   metricField?: string;
+  namespaceField?: string;
   style?: CSSProperties;
 }> = (props) => {
-  const { datasource, metricField = 'metric', style } = props;
+  const { datasource, metricField = 'metric', namespaceField = 'namespace', style } = props;
   const [visible, setVisible] = useState(false);
   const [currentTagKey, setCurrentTagKey] = useState('');
   const { value: metricName } = useFieldState(metricField);
+  const { value: namespace } = useFieldState(namespaceField);
   const formApi = useFormApi();
   const [where, setWhere] = useState<Record<string, ConditionExpr>>(() => {
     const result = {};
@@ -231,6 +235,7 @@ const WhereConditonSelect: React.FC<{
               <TagKeySelect
                 currentTagKey={currentTagKey}
                 datasource={datasource}
+                namespace={namespace}
                 metric={metricName}
                 onChangeTagKey={(tagKey: string) => {
                   setCurrentTagKey(tagKey);
@@ -238,7 +243,13 @@ const WhereConditonSelect: React.FC<{
               />
             </Col>
             <Col span={12}>
-              <TagValueSelect datasource={datasource} metric={metricName} tagKey={currentTagKey} where={where} />
+              <TagValueSelect
+                datasource={datasource}
+                namespace={namespace}
+                metric={metricName}
+                tagKey={currentTagKey}
+                where={where}
+              />
             </Col>
           </Row>
           <div style={{ margin: 8, minWidth: 280 }}>
