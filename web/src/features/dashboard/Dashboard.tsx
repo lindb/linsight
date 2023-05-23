@@ -18,7 +18,7 @@ under the License.
 import React, { useEffect, useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { isEmpty, endsWith } from 'lodash-es';
+import { isEmpty, endsWith, get } from 'lodash-es';
 import { Layout, Typography, Button, SideSheet, Form, Space } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
 import { DashboardStore, PanelStore } from '@src/stores';
@@ -27,7 +27,7 @@ import Setting from './Setting';
 import PanelEditor from './PanelEditor';
 import View from './View';
 import { VisualizationAddPanelType } from '@src/constants';
-import { ApiKit } from '@src/utils';
+import { ApiKit, VariableKit } from '@src/utils';
 import { observer } from 'mobx-react-lite';
 import ViewPanel from './ViewPanel';
 import './dashboard.scss';
@@ -88,7 +88,8 @@ const SaveDashboard: React.FC = () => {
     }
     DashboardStore.updateDashboardProps({ title: values.title });
     if (values.saveVariable) {
-      console.log('save variable');
+      // save current variable selected values
+      VariableKit.setVariableValues(searchParams, get(DashboardStore.dashboard, 'config.variables', []));
     }
     const success = await DashboardStore.saveDashboard();
     if (success && !dashboardId) {
