@@ -30,10 +30,8 @@ import { PlatformContext } from '@src/contexts';
 import { useMetric } from '@src/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
-import { ObjectKit } from '@src/utils';
 import classNames from 'classnames';
 import { get } from 'lodash-es';
-import { toJS } from 'mobx';
 
 const { Text } = Typography;
 

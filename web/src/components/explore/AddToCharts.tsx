@@ -15,27 +15,34 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useRef, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { Button, Form, Modal } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { PanelSetting } from '@src/types';
-import { ApiKit, ObjectKit } from '@src/utils';
+import { ApiKit } from '@src/utils';
 import { ChartSrv } from '@src/services';
 import { Icon, Notification } from '@src/components';
 
 /*
  * Add metric explore to chart repository.
  */
-const AddToCharts: React.FC<{ panel: PanelSetting }> = (props) => {
-  const { panel } = props;
+const AddToCharts = forwardRef((_props: {}, ref) => {
   const [visible, setVisible] = useState(false);
+  const chartOptions = useRef<PanelSetting>();
   const formApi = useRef<any>();
   const [submitting, setSubmitting] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    setOptions(options: PanelSetting) {
+      chartOptions.current = options;
+    },
+  }));
+
   const saveChart = async (values: any) => {
     setSubmitting(true);
     try {
-      const chart = ObjectKit.merge(values, panel);
-      await ChartSrv.createChart(chart);
+      values.config = chartOptions.current;
+      await ChartSrv.createChart(values);
       Notification.success('Save chart successfully');
       setVisible(false);
     } catch (err) {
@@ -87,6 +94,8 @@ const AddToCharts: React.FC<{ panel: PanelSetting }> = (props) => {
       </Modal>
     </>
   );
-};
+});
+
+AddToCharts.displayName = 'AddToCharts';
 
 export default AddToCharts;

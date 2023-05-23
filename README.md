@@ -8,6 +8,10 @@
 
 <div align="center">
 
+[![LICENSE](https://img.shields.io/github/license/lindb/linsight)](https://github.com/lindb/linsight/blob/develop/LICENSE)
+[![go](https://img.shields.io/github/go-mod/go-version/lindb/linsight)](https://github.com/lindb/linsight/blob/develop/go.mod)
+<img src="https://img.shields.io/badge/react%20-%2320232a.svg?logo=react&logoColor=%2361DAFB"/>
+<img src="https://img.shields.io/badge/typescript%20-%23007ACC.svg?logo=typescript&logoColor=white"/>
 [![codecov](https://codecov.io/gh/lindb/linsight/branch/develop/graph/badge.svg)](https://codecov.io/gh/lindb/linsight)
 
 </div>

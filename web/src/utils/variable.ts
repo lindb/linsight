@@ -15,11 +15,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export { default as TemplateKit } from '@src/utils/template';
-export { default as FormatKit } from '@src/utils/format';
-export { default as ColorKit } from '@src/utils/color';
-export { default as ApiKit } from '@src/utils/api';
-export { default as DataSetKit } from '@src/utils/dataset';
-export { default as CSSKit } from '@src/utils/css';
-export { default as ObjectKit } from '@src/utils/object';
-export { default as VariableKit } from '@src/utils/variable';
+import { Variable } from '@src/types';
+
+const setVariableValues = (searchParams: URLSearchParams, variables: Variable[]) => {};
+
+export default {
+  setVariableValues,
+};

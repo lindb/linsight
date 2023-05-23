@@ -68,6 +68,7 @@ const MetricExplore: React.FC<{ datasource: DatasourceInstance; onValueChange: (
     setLeft(getTargets('left'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
   useEffect(() => {
     onValueChange({
       type: 'timeseries',
