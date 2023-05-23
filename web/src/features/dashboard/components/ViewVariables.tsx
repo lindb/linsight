@@ -17,31 +17,21 @@ under the License.
 */
 import { Card, Form, useFormApi } from '@douyinfe/semi-ui';
 import { DashboardStore } from '@src/stores';
-import React, { useEffect } from 'react';
-import { get, isEmpty, map } from 'lodash-es';
+import React, { MutableRefObject, useEffect, useRef } from 'react';
+import { get, set, isEmpty, map, isArray } from 'lodash-es';
 import { observer } from 'mobx-react-lite';
 import { Variable, VariableHideType, VariableType } from '@src/types';
 import './variables.scss';
 import { useSearchParams } from 'react-router-dom';
 import { useVariable } from '@src/hooks';
+import { VariableKit } from '@src/utils';
+import { toJS } from 'mobx';
 
 /*
  * Constant variable based on setting.
  */
 const ConstantVariable: React.FC<{ variable: Variable }> = (props) => {
   const { variable } = props;
-  const [searchParams] = useSearchParams();
-  const formApi = useFormApi();
-
-  useEffect(() => {
-    const name = variable.name;
-    const value = searchParams.get(name);
-    formApi.setValue(name, value);
-  }, [searchParams, variable, formApi]);
-
-  if (variable.hide === VariableHideType.Hide) {
-    return null;
-  }
 
   return (
     <Form.Select
@@ -64,27 +54,31 @@ const ConstantVariable: React.FC<{ variable: Variable }> = (props) => {
 const QueryVariable: React.FC<{ variable: Variable }> = (props) => {
   const { variable } = props;
   const { result, loading } = useVariable(variable, '');
-  const [searchParams] = useSearchParams();
   const formApi = useFormApi();
-
-  useEffect(() => {
-    const name = variable.name;
-    const value = searchParams.get(name);
-    formApi.setValue(name, value);
-  }, [searchParams, variable, formApi]);
-
-  if (variable.hide === VariableHideType.Hide) {
-    return null;
-  }
+  const isMulti = VariableKit.isMulti(variable);
+  const dropdownVisible = useRef(false) as MutableRefObject<boolean>;
 
   return (
     <Form.Select
       showClear
       key={variable.name}
       noLabel={variable.hide === VariableHideType.OnlyValue}
+      multiple={isMulti}
       label={variable.label}
       field={variable.name}
       loading={loading}
+      onClear={() => formApi.submitForm()}
+      onChange={(_value) => {
+        if (!isMulti || !dropdownVisible.current) {
+          formApi.submitForm();
+        }
+      }}
+      onDropdownVisibleChange={(val) => {
+        dropdownVisible.current = val;
+        if (!val && isMulti) {
+          formApi.submitForm();
+        }
+      }}
       optionList={map(result, (r: string) => {
         return { value: r, label: r, showTick: false };
       })}
@@ -100,11 +94,26 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
   const { dashboard } = DashboardStore;
   const [searchParams, setSearchParams] = useSearchParams();
   const variables: Variable[] = get(dashboard, 'config.variables', []);
+  const formApi = useRef<any>();
+  useEffect(() => {
+    if (isEmpty(variables) || !formApi.current) {
+      return;
+    }
+    const values = {};
+    toJS(variables).forEach((variable: Variable) => {
+      const val = get(variable, 'current.value');
+      if (!isEmpty(val)) {
+        set(values, variable.name, val);
+      }
+    });
+    if (!isEmpty(values)) {
+      formApi.current.setValues(values);
+    }
+  }, [variables, formApi]);
+
   if (isEmpty(variables)) {
     return null;
   }
-  // get all variables' name
-  const names = map(variables, (item: Variable) => item.name);
 
   return (
     <Card className={className} bodyStyle={{ padding: 8 }}>
@@ -112,22 +121,29 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
         labelPosition="inset"
         layout="horizontal"
         className="lin-variables"
-        onValueChange={(values: any) => {
-          if (isEmpty(names)) {
-            return;
-          }
+        getFormApi={(api: any) => (formApi.current = api)}
+        onSubmit={(values: any) => {
           // set variables to url params
-          names.forEach((name: string) => {
+          variables.forEach((variable: Variable) => {
+            const name = variable.name;
             const val = get(values, name);
-            if (isEmpty(val)) {
-              searchParams.delete(name);
-            } else {
-              searchParams.set(name, val);
+            // first deleve old value
+            searchParams.delete(name);
+            if (!isEmpty(val)) {
+              // if has selected, set new value
+              if (VariableKit.isMulti(variable) && isArray(val)) {
+                val.forEach((v: string) => searchParams.append(name, v));
+              } else {
+                searchParams.set(name, val);
+              }
             }
           });
           setSearchParams(searchParams);
         }}>
         {variables.map((item: Variable, index: number) => {
+          if (item.hide === VariableHideType.Hide) {
+            return null;
+          }
           if (item.type === VariableType.Query) {
             return <QueryVariable variable={item} key={index} />;
           }

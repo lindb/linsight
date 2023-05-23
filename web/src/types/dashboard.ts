@@ -22,7 +22,10 @@ export interface Variable {
   name: string;
   label?: string;
   hide: VariableHideType;
-  optionType: OptionType;
+  optionType: OptionType[];
+  current?: {
+    value?: any;
+  };
   query?: Query;
 }
 
