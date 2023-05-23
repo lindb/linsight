@@ -23,12 +23,12 @@ import { Footer, Icon } from '@src/components';
 import { PlatformContext } from '@src/contexts';
 import { Feature, FeatureRepositoryInst, ThemeType } from '@src/types';
 import { UserSrv } from './services';
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { MenuStore } from './stores';
 import Logo from '@src/images/logo.svg';
 
 const { Text } = Typography;
-const { Sider, Content } = Layout;
+const { Sider } = Layout;
 
 const FeatureMenu: React.FC = () => {
   const { boot, collapsed, toggleCollapse, toggleTheme, theme } = useContext(PlatformContext);
@@ -126,7 +126,7 @@ const FeatureMenu: React.FC = () => {
           selectedKeys={selectMenus()}
           style={{ maxWidth: 220, height: '100%' }}
           header={{
-            logo: <img src={Logo} />,
+            logo: <img src={Logo} onClick={() => navigate('/')} />,
             text: 'insight',
           }}
           footer={{
@@ -186,20 +186,28 @@ const FeatureMenu: React.FC = () => {
   );
 };
 
-const App: React.FC = () => {
+const Content: React.FC = () => {
   const features = FeatureRepositoryInst.getFeatures();
+  const { boot } = useContext(PlatformContext);
+  return (
+    <Routes>
+      {features.map((feature: Feature) => {
+        const Component = feature.Component;
+        return <Route key={feature.Route} path={feature.Route} element={<Component />} />;
+      })}
+      <Route path="*" element={<Navigate to={boot.home || '/explore'} />} />
+    </Routes>
+  );
+};
+
+const App: React.FC = () => {
   return (
     <Layout className="linsight">
       <FeatureMenu />
       <Layout>
-        <Content>
-          <Routes>
-            {features.map((feature: Feature) => {
-              const Component = feature.Component;
-              return <Route key={feature.Route} path={feature.Route} element={<Component />} />;
-            })}
-          </Routes>
-        </Content>
+        <Layout.Content>
+          <Content />
+        </Layout.Content>
         <Footer />
       </Layout>
     </Layout>

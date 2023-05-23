@@ -28,11 +28,21 @@ const FieldSelect: React.FC<{
   field?: string;
   label?: string;
   style?: CSSProperties;
+  namespaceField?: string;
   metricField?: string;
   labelPosition?: 'top' | 'left' | 'inset';
 }> = (props) => {
-  const { datasource, label, style, field = 'fields', metricField = 'metric', labelPosition } = props;
+  const {
+    datasource,
+    label,
+    style,
+    field = 'fields',
+    namespaceField = 'namespace',
+    metricField = 'metric',
+    labelPosition,
+  } = props;
   const { value: metricName } = useFieldState(metricField);
+  const { value: namespace } = useFieldState(namespaceField);
   const formApi = useFormApi();
   return (
     <LinSelect
@@ -42,9 +52,9 @@ const FieldSelect: React.FC<{
       multiple
       placeholder="Please select fields"
       labelPosition={labelPosition}
-      reloadKeys={[metricField]}
+      reloadKeys={[metricField, namespaceField]}
       loader={async (_prefix?: string) => {
-        const values = await datasource.getFields(metricName);
+        const values = await datasource.getFields(namespace, metricName);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
           optionList.push({ value: item.name, label: `${item.name}(${item.type})`, showTick: false });

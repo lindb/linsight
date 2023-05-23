@@ -51,7 +51,7 @@ const ConstantVariable: React.FC<{ variable: Variable }> = (props) => {
       label={variable.label}
       field={variable.name}
       optionList={[
-        { value: 'value1', label: 'value1' },
+        { value: 'value1', label: 'value1' }, //FIXME: impl it
         { value: 'value2', label: 'value2' },
       ]}
     />
@@ -86,7 +86,7 @@ const QueryVariable: React.FC<{ variable: Variable }> = (props) => {
       field={variable.name}
       loading={loading}
       optionList={map(result, (r: string) => {
-        return { value: r, label: r };
+        return { value: r, label: r, showTick: false };
       })}
     />
   );

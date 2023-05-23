@@ -20,6 +20,7 @@ import { Preference, User } from './user';
 import { Chart } from 'chart.js';
 
 export interface Bootdata {
+  home?: string; // home page
   user: User;
   navTree: any;
   datasources: DatasourceSetting[];

@@ -15,25 +15,23 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { useFieldState, useFormApi } from '@douyinfe/semi-ui';
+import { useFormApi } from '@douyinfe/semi-ui';
 import { LinSelect } from '@src/components';
 import React, { CSSProperties } from 'react';
 import { LinDBDatasource } from '../Datasource';
 
 /*
- * Metric name select for query/variable editor.
+ * Namespace select for query/variable editor.
  */
-const MetricNameSelect: React.FC<{
+const NamespaceSelect: React.FC<{
   datasource: LinDBDatasource;
   label?: string;
   field?: string;
   style?: CSSProperties;
-  namespaceField?: string;
   labelPosition?: 'top' | 'left' | 'inset';
 }> = (props) => {
-  const { datasource, label, style, field = 'metric', namespaceField = 'namespace', labelPosition } = props;
+  const { datasource, label, style, field = 'namespace', labelPosition } = props;
   const formApi = useFormApi();
-  const { value: namespace } = useFieldState(namespaceField);
   return (
     <LinSelect
       style={style}
@@ -41,9 +39,8 @@ const MetricNameSelect: React.FC<{
       field={field}
       placeholder="Please select metric"
       labelPosition={labelPosition}
-      reloadKeys={[namespaceField]}
       loader={async (prefix?: string) => {
-        const values = await datasource.fetchMetricNames(namespace, prefix);
+        const values = await datasource.fetchNamespaces(prefix);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
           optionList.push({ value: item, label: item, showTick: false });
@@ -55,4 +52,4 @@ const MetricNameSelect: React.FC<{
   );
 };
 
-export default MetricNameSelect;
+export default NamespaceSelect;

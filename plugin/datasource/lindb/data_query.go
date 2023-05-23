@@ -34,6 +34,7 @@ func buildDataQuerySQL(req *DataQueryRequest, timeRange model.TimeRange) (string
 	}
 	builder := New().Select(req.Fields...).
 		Metric(req.Metric).
+		Namespace(req.Namespace).
 		Where(req.Where...).
 		GroupBy(groupBy...)
 
@@ -48,10 +49,11 @@ func buildDataQuerySQL(req *DataQueryRequest, timeRange model.TimeRange) (string
 
 // DataQueryBuilder represents LinDB query language builder.
 type DataQueryBuilder struct {
-	fields  []string
-	metric  string
-	groupBy []string
-	where   []Expr
+	fields    []string
+	metric    string
+	namespace string
+	groupBy   []string
+	where     []Expr
 }
 
 // New creates a builder.
@@ -68,6 +70,12 @@ func (b *DataQueryBuilder) Select(fields ...string) *DataQueryBuilder {
 // Metric sets metric name.
 func (b *DataQueryBuilder) Metric(metric string) *DataQueryBuilder {
 	b.metric = metric
+	return b
+}
+
+// Namespace sets namespace.
+func (b *DataQueryBuilder) Namespace(namespace string) *DataQueryBuilder {
+	b.namespace = namespace
 	return b
 }
 
@@ -108,6 +116,11 @@ func (b *DataQueryBuilder) ToSQL() (sql string, err error) {
 	sqlBuf.WriteString(" FROM ")
 	fmt.Fprintf(sqlBuf, "'%s'", b.metric)
 
+	if len(b.namespace) > 0 {
+		sqlBuf.WriteString(" ON ")
+		fmt.Fprintf(sqlBuf, "'%s'", b.namespace)
+	}
+
 	if len(b.where) > 0 {
 		sqlBuf.WriteString(" WHERE ")
 		sqlBuf.WriteString(b.joinWhere(" AND "))
@@ -118,8 +131,7 @@ func (b *DataQueryBuilder) ToSQL() (sql string, err error) {
 		sqlBuf.WriteString(strings.Join(b.groupBy, ","))
 	}
 
-	sql = sqlBuf.String()
-	return
+	return sqlBuf.String(), nil
 }
 
 // joinWhere builds where conditions.

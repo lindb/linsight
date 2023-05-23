@@ -18,6 +18,7 @@
 package model
 
 type BootData struct {
+	Home        string       `json:"home,omitempty"`
 	User        SignedUser   `json:"user"`
 	NavTree     []NavItem    `json:"navTree"`
 	Datasources []Datasource `json:"datasources"`

@@ -26,6 +26,7 @@ const TagKeySelect: React.FC<{
   label?: string;
   style?: CSSProperties;
   multiple?: boolean;
+  namespaceField?: string;
   metricField?: string;
   placeholder?: string;
   labelPosition?: 'top' | 'left' | 'inset';
@@ -38,11 +39,13 @@ const TagKeySelect: React.FC<{
     style,
     placeholder = 'Please select tag key',
     field = 'tagKey',
+    namespaceField = 'namespace',
     metricField = 'metric',
     labelPosition,
     onFinished,
   } = props;
   const { value: metricName } = useFieldState(metricField);
+  const { value: namespace } = useFieldState(namespaceField);
   return (
     <LinSelect
       style={style}
@@ -51,9 +54,9 @@ const TagKeySelect: React.FC<{
       multiple={multiple}
       placeholder={placeholder}
       labelPosition={labelPosition}
-      reloadKeys={[metricField]}
+      reloadKeys={[metricField, namespaceField]}
       loader={async (_prefix?: string) => {
-        const values = await datasource.getTagKeys(metricName);
+        const values = await datasource.getTagKeys(namespace, metricName);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
           optionList.push({ value: item, label: item, showTick: false });

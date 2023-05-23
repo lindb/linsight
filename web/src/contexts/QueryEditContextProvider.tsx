@@ -15,7 +15,6 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { toJS } from 'mobx';
 import React, { createContext, useState } from 'react';
 
 /*
@@ -32,7 +31,6 @@ export const QueryEditContext = createContext({
 export const QueryEditContextProvider: React.FC<{ initValues?: object; children: React.ReactNode }> = (props) => {
   const { initValues, children } = props;
   const [values, setValues] = useState(initValues || {});
-  console.log('query editor context', toJS(initValues));
   return (
     <QueryEditContext.Provider
       value={{

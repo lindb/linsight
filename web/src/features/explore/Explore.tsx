@@ -52,7 +52,7 @@ const Explore: React.FC = () => {
             value={ds || get(datasources, '[0].setting.uid')}
             style={{ width: 200 }}
             onChange={(instance: DatasourceInstance) => {
-              setSearchParams({ q: JSON.stringify({ datasouce: { uid: instance.setting.uid } }) });
+              // setSearchParams({ q: JSON.stringify({ datasouce: { uid: instance.setting.uid } }) });
             }}
           />
         </div>

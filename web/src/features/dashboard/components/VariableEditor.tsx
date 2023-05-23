@@ -39,7 +39,8 @@ const VariableEditor: React.FC = () => {
    */
   const QueryEditor = (props: { formState: any }) => {
     const { formState } = props;
-    const datasource = DatasourceStore.getDatasource(get(formState, 'values.datasource.uid', ''));
+    const datasource = DatasourceStore.getDatasource(get(formState, 'values.query.datasource.uid', ''));
+    console.log('xxxx....', datasource, formState);
     if (!datasource) {
       return null;
     }

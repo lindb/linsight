@@ -25,10 +25,10 @@ export class LinDBDatasource extends DatasourceAPI {
     super(setting);
   }
 
-  async fetchMetricNames(prefix?: string): Promise<string[]> {
+  async fetchMetricNames(namespace: string, prefix?: string): Promise<string[]> {
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'metric', prefix: prefix },
+      request: { type: 'metric', prefix: prefix, namespace: namespace },
     });
     if (rs) {
       return rs.values;
@@ -36,13 +36,24 @@ export class LinDBDatasource extends DatasourceAPI {
     return [];
   }
 
-  async getFields(metric: string): Promise<string[]> {
+  async fetchNamespaces(prefix?: string): Promise<string[]> {
+    const rs = await DataQuerySrv.metadataQuery({
+      datasource: { uid: this.setting.uid },
+      request: { type: 'namespace', prefix: prefix },
+    });
+    if (rs) {
+      return rs.values;
+    }
+    return [];
+  }
+
+  async getFields(namespace: string, metric: string): Promise<string[]> {
     if (isEmpty(metric)) {
       return [];
     }
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'field', metric: metric },
+      request: { type: 'field', metric: metric, namespace: namespace },
     });
     if (rs) {
       return rs.values;
@@ -50,13 +61,13 @@ export class LinDBDatasource extends DatasourceAPI {
     return [];
   }
 
-  async getTagKeys(metric: string): Promise<string[]> {
+  async getTagKeys(namespace: string, metric: string): Promise<string[]> {
     if (isEmpty(metric)) {
       return [];
     }
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'tagKey', metric: metric },
+      request: { type: 'tagKey', metric: metric, namespace: namespace },
     });
     if (rs) {
       return rs.values;
@@ -64,13 +75,13 @@ export class LinDBDatasource extends DatasourceAPI {
     return [];
   }
 
-  async getTagValues(metric: string, tagKey: string, prefix?: string): Promise<string[]> {
+  async getTagValues(namespace: string, metric: string, tagKey: string, prefix?: string): Promise<string[]> {
     if (isEmpty(metric) || isEmpty(tagKey)) {
       return [];
     }
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'tagValue', metric: metric, tagKey: tagKey, prefix: prefix },
+      request: { type: 'tagValue', namespace: namespace, metric: metric, tagKey: tagKey, prefix: prefix },
     });
     if (rs) {
       return rs.values;
