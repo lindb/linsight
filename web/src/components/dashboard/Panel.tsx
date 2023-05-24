@@ -57,7 +57,7 @@ const PanelHeader = forwardRef(
     }));
 
     return (
-      <div className="panel-header">
+      <div className="panel-header grid-drag-handle">
         <div className="title">
           {panel.title && (
             <>

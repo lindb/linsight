@@ -17,6 +17,7 @@ under the License.
 */
 export const DefaultVisualizationType = 'timeseries';
 export const VisualizationAddPanelType = 'addPanel';
+export const RowPanelType = 'row';
 export const DateTimeFormat = 'YYYY-MM-DD HH:mm:ss';
 export const DefaultColumns = 24;
 export const DefaultRowHeight = 30;

@@ -23,10 +23,11 @@ import { Observer } from 'mobx-react-lite';
 import { DashboardStore } from '@src/stores';
 import { toJS } from 'mobx';
 import RGL, { WidthProvider } from 'react-grid-layout';
-import { DefaultColumns, DefaultRowHeight } from '@src/constants';
+import { DefaultColumns, DefaultRowHeight, RowPanelType, VisualizationAddPanelType } from '@src/constants';
 import ViewVariables from './components/ViewVariables';
 import { VariableContextProvider } from '@src/contexts';
 import { Variable } from '@src/types';
+import RowPanel from './components/RowPanel';
 
 const ReactGridLayout = WidthProvider(RGL);
 
@@ -37,29 +38,42 @@ const View: React.FC = () => {
   const buildLayout = (panels: any) => {
     const layout: any[] = [];
     toJS(panels || []).map((item: any, _index: number) => {
-      if (!item) {
+      if (!item || get(item, '_hidden', false)) {
         return;
+      }
+      if (item.type === RowPanelType) {
+        item.grid.isResizable = false;
       }
       item.grid.i = item.id;
       layout.push(item.grid);
     });
-    console.log('layout.......', toJS(panels), layout);
     return layout;
   };
 
   const renderPanel = (panel: any) => {
-    if (panel.type === 'addPanel') {
-      return <AddPanelWidget panel={panel} />;
+    switch (panel.type) {
+      case VisualizationAddPanelType:
+        return <AddPanelWidget panel={panel} />;
+      case RowPanelType:
+        return <RowPanel panel={panel} />;
+      default:
+        return <Panel panel={panel} shortcutKey />;
     }
-    return <Panel panel={panel} shortcutKey />;
   };
-  console.log('rerender dashboard......');
+
+  const renderPanels = () => {
+    const panels = DashboardStore.getPanels();
+    return panels.map((item: any, index: number) => {
+      if (!item || get(item, '_hidden', false)) {
+        return null;
+      }
+      return <div key={item.id ? `${item.id}` : `${index}`}>{renderPanel(item)}</div>;
+    });
+  };
 
   return (
     <VariableContextProvider variables={variables}>
-      <div style={{ margin: '6px 6px 0px 6px' }}>
-        <ViewVariables />
-      </div>
+      <ViewVariables className="variables" />
       <AutoSizer disableHeight>
         {({ width }) => {
           if (width == 0) {
@@ -71,26 +85,22 @@ const View: React.FC = () => {
                 {() => (
                   <ReactGridLayout
                     className="layout"
-                    layout={buildLayout(DashboardStore.dashboard.config?.panels)}
+                    layout={buildLayout(DashboardStore.getPanels())}
                     useCSSTransforms={false}
                     onLayoutChange={(layout: any) => {
                       (layout || []).forEach((item: any) => {
                         const panels = get(DashboardStore.dashboard, 'config.panels', []);
                         const index = findIndex(panels, { id: item.i });
                         DashboardStore.updatePanelConfig(panels[index], { grid: item });
+                        DashboardStore.sortPanels();
                       });
                     }}
                     margin={[6, 6]}
                     cols={DefaultColumns}
                     rowHeight={DefaultRowHeight}
                     width={width}
-                    draggableHandle=".semi-card-header">
-                    {DashboardStore.dashboard.config?.panels?.map((item: any, index: number) => {
-                      if (!item) {
-                        return null;
-                      }
-                      return <div key={item.id ? `${item.id}` : `${index}`}>{renderPanel(item)}</div>;
-                    })}
+                    draggableHandle=".grid-drag-handle">
+                    {renderPanels()}
                   </ReactGridLayout>
                 )}
               </Observer>

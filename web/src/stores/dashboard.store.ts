@@ -16,10 +16,10 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Notification } from '@src/components';
-import { DefaultColumns, VisualizationAddPanelType } from '@src/constants';
+import { DefaultColumns, RowPanelType, VisualizationAddPanelType } from '@src/constants';
 import { DashboardSrv } from '@src/services';
 import { Dashboard, PanelSetting, Variable } from '@src/types';
-import { ApiKit } from '@src/utils';
+import { ApiKit, ObjectKit } from '@src/utils';
 import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
 
@@ -35,10 +35,37 @@ class DashboardStore {
     this.dashboard = dashboard;
   }
 
+  getPanels(): PanelSetting[] {
+    return get(this.dashboard, 'config.panels', []);
+  }
+
   getPanel(panelId: any): PanelSetting | undefined {
     console.log('xxxxxxxx get panel', panelId, toJS(this.dashboard));
-    const panels = get(this.dashboard, 'config.panels', []);
+    const panels = this.getPanels();
     return find(panels, { id: panelId });
+  }
+
+  getPanelsOfRow(rowPanelId: any): PanelSetting[] {
+    const panels = this.getPanels();
+    const result: PanelSetting[] = [];
+    const index = findIndex(panels, { id: rowPanelId });
+    if (index < 0) {
+      return result;
+    }
+    for (let i = index + 1; i < panels.length; i++) {
+      const panel = panels[i];
+      if (panel.type === RowPanelType) {
+        break;
+      }
+      result.push(panel);
+    }
+    return result;
+  }
+
+  collapseRow(row: PanelSetting, collapsed: boolean) {
+    this.updatePanelConfig(row, { collapsed: collapsed });
+    const children = this.getPanelsOfRow(row.id);
+    (children || []).forEach((child: PanelSetting) => set(child, '_hidden', collapsed));
   }
 
   clonePanel(panel: PanelSetting) {
@@ -67,15 +94,21 @@ class DashboardStore {
     this.sortPanels();
   }
 
+  deleteRowAndChildren(row: PanelSetting) {
+    const children = this.getPanelsOfRow(row.id);
+    (children || []).forEach((child: PanelSetting) => this.deletePanel(child));
+    this.deletePanel(row);
+  }
+
   deletePanel(panel: PanelSetting) {
-    const panels = get(this.dashboard, 'config.panels', []);
+    const panels = this.getPanels();
     const index = findIndex(panels, { id: panel.id });
     panels.splice(index, 1);
     this.sortPanels();
   }
 
   updatePanel(panel: PanelSetting) {
-    const panels = get(this.dashboard, 'config.panels', []);
+    const panels = this.getPanels();
     const index = findIndex(panels, { id: panel.id });
     if (index >= 0) {
       panels[index] = panel;
@@ -88,9 +121,6 @@ class DashboardStore {
     forIn(config, function (value, key) {
       set(panel, key, value);
     });
-    // const panels = _.get(this.dashboard, 'config.panels', []);
-    // const index = _.findIndex(panels, { id: panel.id });
-    // _.set(this.dashboard, `config.panels[${index}]`, panel);
   }
 
   updateDashboardProps(values: any) {
@@ -126,7 +156,7 @@ class DashboardStore {
   }
 
   sortPanels() {
-    const panels = get(this.dashboard, 'config.panels', []);
+    const panels = this.getPanels();
     panels.sort((a: PanelSetting, b: PanelSetting) => {
       if (a.grid?.y === b.grid?.y) {
         return a.grid?.x - b.grid?.x;
@@ -137,22 +167,25 @@ class DashboardStore {
 
   async saveDashboard() {
     try {
-      const panels = get(this.dashboard, 'config.panels', []);
+      const panels = this.getPanels();
       panels.forEach((panel: PanelSetting) => {
         // only keep x/y/w/h for grid
         panel.grid = pick(panel.grid, ['x', 'y', 'w', 'h']);
       });
       this.sortPanels();
+      const dashboard = ObjectKit.removeUnderscoreProperties(toJS(this.dashboard));
+      console.log('ssss....', toJS(dashboard));
       // FIXME: remove unused field
       if (isEmpty(this.dashboard.uid)) {
-        const uid = await DashboardSrv.createDashboard(this.dashboard);
+        const uid = await DashboardSrv.createDashboard(dashboard);
         this.dashboard.uid = uid;
       } else {
-        await DashboardSrv.updateDashboard(this.dashboard);
+        await DashboardSrv.updateDashboard(dashboard);
       }
       Notification.success('Save dashboard successfully!');
       return true;
     } catch (err) {
+      console.log(err);
       Notification.error(ApiKit.getErrorMsg(err));
       return false;
     }
