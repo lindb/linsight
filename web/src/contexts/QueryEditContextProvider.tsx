@@ -15,8 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { createContext, useState } from 'react';
-
+import React, { createContext, useRef, useState } from 'react';
+import { isEqual, cloneDeep } from 'lodash-es';
 /*
  * Context for each query editor
  */
@@ -28,14 +28,31 @@ export const QueryEditContext = createContext({
 /*
  * Context provider for each query editor
  */
-export const QueryEditContextProvider: React.FC<{ initValues?: object; children: React.ReactNode }> = (props) => {
-  const { initValues, children } = props;
-  const [values, setValues] = useState(initValues || {});
+export const QueryEditContextProvider: React.FC<{
+  initValues?: object;
+  onValuesChange?: (value: object) => void;
+  children: React.ReactNode;
+}> = (props) => {
+  const { initValues = {}, children, onValuesChange } = props;
+  const [values, setValues] = useState(initValues);
+  const previous = useRef(cloneDeep(initValues));
+
+  const modifyValues = (newValues: object) => {
+    if (!isEqual(newValues, previous.current)) {
+      previous.current = newValues;
+      setValues(cloneDeep(newValues));
+
+      if (onValuesChange) {
+        onValuesChange(newValues);
+      }
+    }
+  };
+
   return (
     <QueryEditContext.Provider
       value={{
         values,
-        setValues,
+        setValues: modifyValues,
       }}>
       {children}
     </QueryEditContext.Provider>

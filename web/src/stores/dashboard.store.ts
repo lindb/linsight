@@ -204,7 +204,25 @@ class DashboardStore {
     });
   }
 
+  private initDashboard(dashboard: Dashboard) {
+    this.dashboard = dashboard;
+    const panels = this.getPanels();
+    const maxPanel = maxBy(panels, (panel: PanelSetting) => {
+      if (!panel.id || panel.id < 0) {
+        panel.id = this.assignPanelId();
+      }
+      // NOTE: set grid i here
+      this.setPanelGridId(panel);
+      return panel.id;
+    });
+    if (maxPanel) {
+      this.panelSeq = maxPanel.id || 0;
+    }
+  }
+
   async loadDashbaord(dashboardId: string | null) {
+    // reset panel seq when load dashboard
+    this.panelSeq = 0;
     if (isEmpty(dashboardId)) {
       const panelId = this.assignPanelId();
       this.dashboard = {
@@ -224,19 +242,7 @@ class DashboardStore {
     }
     try {
       const dashboard = await DashboardSrv.getDashboard(`${dashboardId}`);
-      this.dashboard = dashboard;
-      const panels = this.getPanels();
-      const maxPanel = maxBy(panels, (panel: PanelSetting) => {
-        if (!panel.id || panel.id < 0) {
-          panel.id = this.assignPanelId();
-        }
-        // NOTE: set grid i here
-        this.setPanelGridId(panel);
-        return panel.id;
-      });
-      if (maxPanel) {
-        this.panelSeq = maxPanel.id || 0;
-      }
+      this.initDashboard(dashboard);
     } catch (err) {
       console.warn('load dashobard error', err);
       Notification.error(ApiKit.getErrorMsg(err));

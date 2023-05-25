@@ -16,12 +16,12 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Collapse, Form, Select, Typography } from '@douyinfe/semi-ui';
-import { DatasourceStore, PanelStore } from '@src/stores';
-import { observer } from 'mobx-react-lite';
-import React from 'react';
+import { DatasourceStore } from '@src/stores';
+import React, { useContext } from 'react';
 import { FormatRepositoryInst, PanelSetting, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import { ObjectKit } from '@src/utils';
 import { get } from 'lodash-es';
+import { PanelEditContext } from '@src/contexts';
 
 const { Text } = Typography;
 
@@ -29,7 +29,7 @@ const { Text } = Typography;
  * Panle basic information
  */
 const PanelOptionsForm: React.FC = () => {
-  const { panel } = PanelStore;
+  const { panel, modifyPanel } = useContext(PanelEditContext);
 
   return (
     <>
@@ -38,8 +38,7 @@ const PanelOptionsForm: React.FC = () => {
         layout="vertical"
         initValues={panel}
         onValueChange={(values: object) => {
-          PanelStore.update(values);
-          console.log(values, 'basic');
+          modifyPanel(values);
         }}>
         <Form.Input field="title" label="Title" />
         <Form.TextArea field="description" label="Description" rows={2} />
@@ -52,7 +51,7 @@ const PanelOptionsForm: React.FC = () => {
  * Visualization categories select form
  */
 const VisualizationsForm: React.FC = () => {
-  const { panel } = PanelStore;
+  const { panel, modifyPanel } = useContext(PanelEditContext);
   const plugins = VisualizationRepositoryInst.getPlugins();
 
   const getDatasourceCategory = () => {
@@ -69,7 +68,7 @@ const VisualizationsForm: React.FC = () => {
       <Select
         defaultValue={panel?.type}
         style={{ width: '100%' }}
-        onChange={(v) => PanelStore.update({ type: v })}
+        onChange={(v) => modifyPanel({ type: v } as object)}
         renderSelectedItem={(n: Record<string, any>) => {
           const plugin = VisualizationRepositoryInst.get(`${n.value}`);
           if (!plugin) {
@@ -104,14 +103,14 @@ const VisualizationsForm: React.FC = () => {
 };
 
 const StandardOptionsForm: React.FC = () => {
-  const { panel } = PanelStore;
+  const { panel, modifyPanel } = useContext(PanelEditContext);
   return (
     <Form
       className="linsight-form linsight-panel-setting"
       layout="vertical"
       initValues={panel?.options}
       onValueChange={(values: object) => {
-        PanelStore.update({ options: values });
+        modifyPanel({ options: values });
       }}>
       <Form.Cascader
         field="unit"
@@ -135,7 +134,7 @@ const StandardOptionsForm: React.FC = () => {
 };
 
 const PanelSetting: React.FC = () => {
-  const { panel } = PanelStore;
+  const { panel, modifyPanel } = useContext(PanelEditContext);
   const plugin = VisualizationRepositoryInst.get(`${panel?.type}`);
   if (!plugin || !panel) {
     return null;
@@ -154,7 +153,8 @@ const PanelSetting: React.FC = () => {
           <OptionsEditor
             panel={ObjectKit.merge(plugin.getDefaultOptions(), panel)}
             onOptionsChange={(options: {}) => {
-              PanelStore.update({ options: options });
+              console.error('option ccc', options);
+              modifyPanel({ options: options });
             }}
           />
         )}
@@ -166,4 +166,4 @@ const PanelSetting: React.FC = () => {
   );
 };
 
-export default observer(PanelSetting);
+export default PanelSetting;

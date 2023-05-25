@@ -18,3 +18,4 @@ under the License.
 export * from './PlatformContextProvider';
 export * from './VariableContextProvider';
 export * from './QueryEditContextProvider';
+export * from './PanelEditContextProvider';

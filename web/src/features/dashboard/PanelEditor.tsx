@@ -21,28 +21,23 @@ import { IconBellStroked } from '@douyinfe/semi-icons';
 import SplitPane from 'react-split-pane';
 import { PanelSetting as PanelOptions } from '@src/types';
 import { DatasourceSelectForm, Notification, Panel } from '@src/components';
-import { get, isEmpty } from 'lodash-es';
-import { observer } from 'mobx-react-lite';
-import { PanelStore, DashboardStore, DatasourceStore } from '@src/stores';
+import { get, cloneDeep } from 'lodash-es';
+import { DashboardStore, DatasourceStore } from '@src/stores';
 import { toJS } from 'mobx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
-import PanelSetting from './PanelSetting';
 import ViewVariables from './components/ViewVariables';
-import { QueryEditContext, QueryEditContextProvider } from '@src/contexts';
+import { PanelEditContext, PanelEditContextProvider, QueryEditContextProvider } from '@src/contexts';
+import PanelSetting from './PanelSetting';
+import { DefaultVisualizationType, VisualizationAddPanelType } from '@src/constants';
 
 const Split: any = SplitPane;
+const DefaultOptionsEditorSize = 350;
 
 const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   const { datasource } = props;
   const plugin = datasource.plugin;
-  const { values } = useContext(QueryEditContext);
   const QueryEditor = plugin.components.QueryEditor;
-  useEffect(() => {
-    DashboardStore.updatePanelConfig(PanelStore.panel, {
-      targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
-    });
-  }, [values, datasource.setting.uid]);
 
   if (!QueryEditor) {
     return null;
@@ -50,8 +45,8 @@ const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) 
   return <QueryEditor datasource={datasource} />;
 };
 
-const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
-  const { panel } = props;
+const MetricSetting: React.FC = () => {
+  const { panel, modifyPanel } = useContext(PanelEditContext);
   const { datasources } = DatasourceStore;
   const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
     return toJS(get(datasources, '[0]'));
@@ -66,21 +61,20 @@ const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
     if (!QueryEditor) {
       return <></>;
     }
-    console.log('panel.....', toJS(panel));
-    const targets = get(panel, 'targets', []);
-    if (isEmpty(targets)) {
-      // no targets, init empty query editor
-      return (
-        <QueryEditContextProvider>
-          <MetricQueryEditor datasource={datasource} />
-        </QueryEditContextProvider>
-      );
-    }
+    // NOTE: init target if empty
+    const targets = get(panel, 'targets', [{}]);
     return (
       <>
         {targets.map((target: any, index: number) => {
           return (
-            <QueryEditContextProvider key={index} initValues={get(target, 'request', {})}>
+            <QueryEditContextProvider
+              key={index}
+              initValues={get(target, 'request', {})}
+              onValuesChange={(values: object) => {
+                modifyPanel({
+                  targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
+                });
+              }}>
               <MetricQueryEditor datasource={datasource} />
             </QueryEditContextProvider>
           );
@@ -105,33 +99,88 @@ const MetricSetting: React.FC<{ panel?: PanelOptions }> = (props) => {
 };
 
 const MemoMetricSetting = React.memo(MetricSetting);
-const DefaultOptionsEditorSize = 350;
+
+const Editor: React.FC<{ initSize: number }> = (props) => {
+  const { initSize } = props;
+  const { panel } = useContext(PanelEditContext);
+  const [size, setSize] = useState<number>(initSize);
+  return (
+    <Split
+      onDragFinished={(size: number) => {
+        setSize(size);
+      }}
+      split="vertical"
+      size={size}
+      primary="second"
+      minSize={250}
+      maxSize={500}
+      style={{ position: 'relative' }}>
+      <Split split="horizontal" minSize={340} style={{ overflow: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+          <div style={{ marginBottom: 6 }}>
+            <ViewVariables />
+          </div>
+          <Panel panel={panel} />
+        </div>
+        <Card bodyStyle={{ padding: '8px 20px 12px 20px' }}>
+          <Tabs size="small">
+            <TabPane
+              tab={
+                <span>
+                  <i className="iconfont icondatabase" style={{ marginRight: 8 }} />
+                  Query
+                  <Avatar size="extra-extra-small" style={{ margin: 4 }} alt="User">
+                    {get(panel, 'targets', []).length}
+                  </Avatar>
+                </span>
+              }
+              itemKey="1">
+              <Card bodyStyle={{ padding: 12 }}>
+                <MemoMetricSetting />
+              </Card>
+            </TabPane>
+            <TabPane
+              tab={
+                <span>
+                  <IconBellStroked />
+                  Alert
+                </span>
+              }
+              itemKey="2"></TabPane>
+          </Tabs>
+        </Card>
+      </Split>
+      <div style={{ height: '100%', overflow: 'auto' }}>
+        <Card bodyStyle={{ padding: 0 }}>
+          <PanelSetting />
+        </Card>
+      </div>
+    </Split>
+  );
+};
 
 const EditPanel: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const panel = DashboardStore.getPanel(parseInt(`${searchParams.get('panel')}`));
   const [size, setSize] = useState<number>(DefaultOptionsEditorSize);
+  const [panel, setPanel] = useState<PanelOptions>();
   const initialized = useRef(false);
 
   useEffect(() => {
+    const panel = DashboardStore.getPanel(parseInt(`${searchParams.get('panel')}`));
     if (!panel) {
+      // if panel not exist, forward to dashboard page.
       Notification.error('Panel not found');
       searchParams.delete('panel');
       navigate({ pathname: '/dashboard', search: searchParams.toString() });
       return;
     }
-    PanelStore.setPanel(panel);
-    return () => {
-      if (PanelStore.panel) {
-        // need update panel of dashboard when destory panel editor,
-        // because panel of PanelStore is a copy from dashboard.
-        DashboardStore.updatePanel(PanelStore.panel);
-        // reset current edit panel
-        PanelStore.setPanel(undefined);
-      }
-    };
-  }, [panel]);
+    if (panel.type == VisualizationAddPanelType) {
+      // if panel is init add widget panel, set init panel title and type
+      DashboardStore.updatePanelConfig(panel, { title: 'Panel title', type: DefaultVisualizationType });
+    }
+    setPanel(panel);
+  }, [navigate, searchParams]);
 
   if (!panel) {
     return null;
@@ -145,61 +194,12 @@ const EditPanel: React.FC = () => {
           setSize(DefaultOptionsEditorSize);
         }
       }}
-      className="linsight-feature"
-      style={{ display: 'flex', height: '100vh' }}>
-      <Split
-        onDragFinished={(size: number) => {
-          setSize(size);
-        }}
-        split="vertical"
-        size={size}
-        primary="second"
-        minSize={250}
-        maxSize={500}
-        style={{ position: 'relative' }}>
-        <Split split="horizontal" minSize={340} style={{ overflow: 'auto' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
-            <div style={{ marginBottom: 6 }}>
-              <ViewVariables />
-            </div>
-            <Panel panel={panel} />
-          </div>
-          <Card bodyStyle={{ padding: '8px 20px 12px 20px' }}>
-            <Tabs size="small">
-              <TabPane
-                tab={
-                  <span>
-                    <i className="iconfont icondatabase" style={{ marginRight: 8 }} />
-                    Query
-                    <Avatar size="extra-extra-small" style={{ margin: 4 }} alt="User">
-                      {get(PanelStore.panel, 'targets', []).length}
-                    </Avatar>
-                  </span>
-                }
-                itemKey="1">
-                <Card bodyStyle={{ padding: 12 }}>
-                  <MemoMetricSetting panel={panel} />
-                </Card>
-              </TabPane>
-              <TabPane
-                tab={
-                  <span>
-                    <IconBellStroked />
-                    Alert
-                  </span>
-                }
-                itemKey="2"></TabPane>
-            </Tabs>
-          </Card>
-        </Split>
-        <div style={{ height: '100%', overflow: 'auto' }}>
-          <Card bodyStyle={{ padding: 0 }}>
-            <PanelSetting />
-          </Card>
-        </div>
-      </Split>
+      className="linsight-feature panel-editor">
+      <PanelEditContextProvider initPanel={panel}>
+        <Editor initSize={size} />
+      </PanelEditContextProvider>
     </div>
   );
 };
 
-export default observer(EditPanel);
+export default EditPanel;

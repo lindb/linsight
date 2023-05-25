@@ -166,6 +166,11 @@ under the License.
   }
 }
 
+.panel-editor {
+  display: flex;
+  height: 100vh;
+}
+
 .edit-panel {
   .semi-modal-header {
     margin: 0;
