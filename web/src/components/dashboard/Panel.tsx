@@ -73,7 +73,7 @@ const PanelHeader = forwardRef(
               <Dropdown.Item
                 icon={<Icon icon="icon-eye" />}
                 onClick={() => {
-                  searchParams.set('panel', panel.id);
+                  searchParams.set('panel', `${panel.id}`);
                   navigate({ pathname: '/dashboard/panel/view', search: searchParams.toString() });
                 }}>
                 View
@@ -82,7 +82,7 @@ const PanelHeader = forwardRef(
                 <Dropdown.Item
                   icon={<IconEdit2Stroked />}
                   onClick={() => {
-                    searchParams.set('panel', panel.id);
+                    searchParams.set('panel', `${panel.id}`);
                     navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
                   }}>
                   Edit
@@ -138,11 +138,11 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
       }
       switch (e.keyCode) {
         case 86: // ctrl+v
-          searchParams.set('panel', panel.id);
+          searchParams.set('panel', `${panel.id}`);
           navigate({ pathname: '/dashboard/panel/view', search: searchParams.toString() });
           return;
         case 69: // ctrl+e
-          searchParams.set('panel', panel.id);
+          searchParams.set('panel', `${panel.id}`);
           navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
           return;
         case 67: // ctrl+c

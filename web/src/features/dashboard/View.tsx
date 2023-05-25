@@ -17,7 +17,7 @@ under the License.
 */
 import React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { get, findIndex } from 'lodash-es';
+import { get } from 'lodash-es';
 import { AddPanelWidget, Panel } from '@src/components';
 import { Observer } from 'mobx-react-lite';
 import { DashboardStore } from '@src/stores';
@@ -44,7 +44,6 @@ const View: React.FC = () => {
       if (item.type === RowPanelType) {
         item.grid.isResizable = false;
       }
-      item.grid.i = item.id;
       layout.push(item.grid);
     });
     return layout;
@@ -63,11 +62,11 @@ const View: React.FC = () => {
 
   const renderPanels = () => {
     const panels = DashboardStore.getPanels();
-    return panels.map((item: any, index: number) => {
+    return panels.map((item: any, _index: number) => {
       if (!item || get(item, '_hidden', false)) {
         return null;
       }
-      return <div key={item.id ? `${item.id}` : `${index}`}>{renderPanel(item)}</div>;
+      return <div key={item.id}>{renderPanel(item)}</div>;
     });
   };
 
@@ -89,10 +88,11 @@ const View: React.FC = () => {
                     useCSSTransforms={false}
                     onLayoutChange={(layout: any) => {
                       (layout || []).forEach((item: any) => {
-                        const panels = get(DashboardStore.dashboard, 'config.panels', []);
-                        const index = findIndex(panels, { id: item.i });
-                        DashboardStore.updatePanelConfig(panels[index], { grid: item });
-                        DashboardStore.sortPanels();
+                        const panel = DashboardStore.getPanel(parseInt(item.i));
+                        if (panel) {
+                          DashboardStore.updatePanelConfig(panel, { grid: item });
+                          DashboardStore.sortPanels();
+                        }
                       });
                     }}
                     margin={[6, 6]}

@@ -20,32 +20,47 @@ import { DefaultColumns, RowPanelType, VisualizationAddPanelType } from '@src/co
 import { DashboardSrv } from '@src/services';
 import { Dashboard, PanelSetting, Variable } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
-import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
+import {
+  set,
+  get,
+  find,
+  cloneDeep,
+  has,
+  concat,
+  findIndex,
+  forIn,
+  merge,
+  pick,
+  isEmpty,
+  pullAt,
+  maxBy,
+} from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
 
 class DashboardStore {
   public dashboard: Dashboard = {};
+  private panelSeq = 0;
 
   constructor() {
     makeAutoObservable(this);
   }
 
-  setDashboard(dashboard: Dashboard) {
-    console.log('set dashboard.........', dashboard);
-    this.dashboard = dashboard;
+  private assignPanelId(): number {
+    this.panelSeq++;
+    return this.panelSeq;
   }
 
   getPanels(): PanelSetting[] {
     return get(this.dashboard, 'config.panels', []);
   }
 
-  getPanel(panelId: any): PanelSetting | undefined {
+  getPanel(panelId: number | undefined): PanelSetting | undefined {
     console.log('xxxxxxxx get panel', panelId, toJS(this.dashboard));
     const panels = this.getPanels();
     return find(panels, { id: panelId });
   }
 
-  getPanelsOfRow(rowPanelId: any): PanelSetting[] {
+  getPanelsOfRow(rowPanelId: number | undefined): PanelSetting[] {
     const panels = this.getPanels();
     const result: PanelSetting[] = [];
     const index = findIndex(panels, { id: rowPanelId });
@@ -71,7 +86,7 @@ class DashboardStore {
   clonePanel(panel: PanelSetting) {
     const newPanel: PanelSetting = cloneDeep(panel);
     //FIXME: remove other props?
-    newPanel.id = `${new Date().getTime()}`;
+    newPanel.id = this.assignPanelId();
     if (panel.grid?.x + 2 * panel.grid?.w <= DefaultColumns) {
       newPanel.grid.x += panel.grid.w;
     } else {
@@ -80,7 +95,20 @@ class DashboardStore {
     this.addPanel(newPanel);
   }
 
+  createPanelConfig(newID: boolean = true): PanelSetting {
+    const cfg: PanelSetting = {
+      title: 'Add panel',
+      type: VisualizationAddPanelType,
+      grid: { w: 12, h: 7, x: 0, y: 0 },
+    };
+    if (newID) {
+      cfg.id = this.assignPanelId();
+    }
+    return cfg;
+  }
+
   addPanel(panel: PanelSetting) {
+    this.setPanelGridId(panel);
     const firstPanelType = get(this.dashboard, 'config.panels[0].type', null);
     if (firstPanelType === VisualizationAddPanelType) {
       // first panel is add panel widget, ignore this panel
@@ -103,8 +131,10 @@ class DashboardStore {
   deletePanel(panel: PanelSetting) {
     const panels = this.getPanels();
     const index = findIndex(panels, { id: panel.id });
-    panels.splice(index, 1);
-    this.sortPanels();
+    if (index >= 0) {
+      pullAt(panels, index);
+      this.sortPanels();
+    }
   }
 
   updatePanel(panel: PanelSetting) {
@@ -112,7 +142,6 @@ class DashboardStore {
     const index = findIndex(panels, { id: panel.id });
     if (index >= 0) {
       panels[index] = panel;
-      console.log('update pp', toJS(panel));
       this.sortPanels();
     }
   }
@@ -121,11 +150,21 @@ class DashboardStore {
     forIn(config, function (value, key) {
       set(panel, key, value);
     });
+    this.setPanelGridId(panel);
+  }
+
+  private setPanelGridId(panel: any) {
+    // NOTE: make sure set grid i
+    set(panel, 'grid.i', `${panel.id}`);
   }
 
   updateDashboardProps(values: any) {
     console.log(toJS(this.dashboard));
     this.dashboard = merge(this.dashboard, values);
+  }
+
+  getVariables(): Variable[] {
+    return get(this.dashboard, 'config.variables', []);
   }
 
   addVariable(variable: any) {
@@ -148,7 +187,7 @@ class DashboardStore {
   }
 
   deleteVariable(index: string) {
-    pullAt(get(this.dashboard, 'config.variables', []), parseInt(index));
+    pullAt(this.getVariables(), parseInt(index));
   }
 
   getVariableByIndex(index: string): Variable {
@@ -165,16 +204,55 @@ class DashboardStore {
     });
   }
 
+  async loadDashbaord(dashboardId: string | null) {
+    if (isEmpty(dashboardId)) {
+      const panelId = this.assignPanelId();
+      this.dashboard = {
+        title: 'New Dashboard',
+        config: {
+          panels: [
+            {
+              title: 'Add panel',
+              type: VisualizationAddPanelType,
+              grid: { w: 12, h: 7, x: 0, y: 0, i: `${panelId}` }, // NOTE: must set i value(string)
+              id: panelId,
+            },
+          ],
+        },
+      };
+      return this.dashboard;
+    }
+    try {
+      const dashboard = await DashboardSrv.getDashboard(`${dashboardId}`);
+      this.dashboard = dashboard;
+      const panels = this.getPanels();
+      const maxPanel = maxBy(panels, (panel: PanelSetting) => {
+        if (!panel.id || panel.id < 0) {
+          panel.id = this.assignPanelId();
+        }
+        // NOTE: set grid i here
+        this.setPanelGridId(panel);
+        return panel.id;
+      });
+      if (maxPanel) {
+        this.panelSeq = maxPanel.id || 0;
+      }
+    } catch (err) {
+      console.warn('load dashobard error', err);
+      Notification.error(ApiKit.getErrorMsg(err));
+    }
+    return this.dashboard;
+  }
+
   async saveDashboard() {
     try {
-      const panels = this.getPanels();
+      const dashboard = ObjectKit.removeUnderscoreProperties(toJS(this.dashboard));
+      const panels = get(dashboard, 'config.panels', []);
       panels.forEach((panel: PanelSetting) => {
         // only keep x/y/w/h for grid
-        panel.grid = pick(panel.grid, ['x', 'y', 'w', 'h']);
+        panel.grid = pick(panel.grid, ['x', 'y', 'w', 'h']) as any;
       });
       this.sortPanels();
-      const dashboard = ObjectKit.removeUnderscoreProperties(toJS(this.dashboard));
-      console.log('ssss....', toJS(dashboard));
       // FIXME: remove unused field
       if (isEmpty(this.dashboard.uid)) {
         const uid = await DashboardSrv.createDashboard(dashboard);
@@ -185,7 +263,7 @@ class DashboardStore {
       Notification.success('Save dashboard successfully!');
       return true;
     } catch (err) {
-      console.log(err);
+      console.warn('save dashobard error', err);
       Notification.error(ApiKit.getErrorMsg(err));
       return false;
     }
