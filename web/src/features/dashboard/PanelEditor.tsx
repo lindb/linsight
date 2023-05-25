@@ -110,7 +110,7 @@ const DefaultOptionsEditorSize = 350;
 const EditPanel: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const panel = DashboardStore.getPanel(searchParams.get('panel'));
+  const panel = DashboardStore.getPanel(parseInt(`${searchParams.get('panel')}`));
   const [size, setSize] = useState<number>(DefaultOptionsEditorSize);
   const initialized = useRef(false);
 

@@ -26,6 +26,9 @@ import { PanelSetting } from '@src/types';
 
 const { Text } = Typography;
 
+/*
+ * Add panel widget in dashboard.
+ */
 const AddPanelWidget: React.FC<{
   panel: PanelSetting;
 }> = (props) => {
@@ -43,7 +46,7 @@ const AddPanelWidget: React.FC<{
               <Icon icon="icon-panel-add" />
               <Text>{panel.title}</Text>
             </div>
-            <IconClose className="close" />
+            <IconClose className="close" onClick={() => DashboardStore.deletePanel(panel)} />
           </div>
         }>
         <div className="add-panel">
@@ -51,7 +54,7 @@ const AddPanelWidget: React.FC<{
             onClick={() => {
               panel.title = 'Panel title';
               panel.type = DefaultVisualizationType;
-              searchParams.set('panel', panel.id);
+              searchParams.set('panel', `${panel.id}`);
 
               navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
             }}>

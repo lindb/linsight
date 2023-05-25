@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { isEmpty, endsWith, get } from 'lodash-es';
@@ -26,7 +26,6 @@ import { Icon, Loading, Notification, TimePicker } from '@src/components';
 import Setting from './Setting';
 import PanelEditor from './PanelEditor';
 import View from './View';
-import { VisualizationAddPanelType } from '@src/constants';
 import { ApiKit, VariableKit } from '@src/utils';
 import { observer } from 'mobx-react-lite';
 import ViewPanel from './ViewPanel';
@@ -166,43 +165,21 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dashboardId = searchParams.get('d');
-  const [loading, setLoading] = useState(true);
-  const { result: dashboard, loading: isLoading } = useRequest(
+  const dashboard = DashboardStore.dashboard;
+  const { loading } = useRequest(
     ['load-dashboard', dashboardId],
     async () => {
-      if (isEmpty(dashboardId)) {
-        setLoading(true);
-        const id = `abc${new Date().getTime()}`;
-        return {
-          uid: '',
-          title: 'New Dashboard',
-          config: {
-            panels: [
-              {
-                title: 'Add panel',
-                type: 'addPanel',
-                grid: { w: 12, h: 7, x: 0, y: 0, i: id },
-                id: id,
-              },
-            ],
-          },
-        };
-      }
-      return DashboardSrv.getDashboard(`${dashboardId}`);
+      return DashboardStore.loadDashbaord(dashboardId);
     },
     {}
   );
 
-  useEffect(() => {
-    if (!isLoading) {
-      console.log('init dashboard...', dashboard);
-      DashboardStore.setDashboard(dashboard as any);
-      setLoading(false);
-    }
-  }, [dashboard, isLoading]);
-
   const isEditDashboard = (): boolean => {
-    return endsWith(location.pathname, '/edit') || endsWith(location.pathname, '/setting');
+    return (
+      endsWith(location.pathname, '/edit') ||
+      endsWith(location.pathname, '/setting') ||
+      endsWith(location.pathname, '/panel/view')
+    );
   };
 
   if (loading) {
@@ -212,6 +189,7 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
+
   if (!dashboard) {
     // FIXME: use error page
     return <div>Dashboard not exit</div>;
@@ -242,12 +220,7 @@ const Dashboard: React.FC = () => {
             type="tertiary"
             icon={<Icon icon="icon-panel-add" />}
             onClick={() => {
-              DashboardStore.addPanel({
-                title: 'Add panel',
-                type: VisualizationAddPanelType,
-                grid: { w: 12, h: 7, x: 0, y: 0 },
-                id: `abc${new Date().getTime()}`,
-              });
+              DashboardStore.addPanel(DashboardStore.createPanelConfig());
             }}
           />
           <SaveDashboard />

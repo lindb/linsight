@@ -116,7 +116,7 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
   }
 
   return (
-    <Card className={className} bodyStyle={{ padding: 8 }}>
+    <Card className={className} bodyStyle={{ padding: 6 }}>
       <Form
         labelPosition="inset"
         layout="horizontal"

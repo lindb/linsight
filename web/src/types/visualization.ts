@@ -20,7 +20,7 @@ import { DatasourceCategory, Plugin, Query, ThemeType } from '@src/types';
 import { cloneDeep } from 'lodash-es';
 
 export interface PanelSetting {
-  id?: any;
+  id?: number;
   title?: string;
   description?: string;
   type?: string;
@@ -31,6 +31,7 @@ export interface PanelSetting {
     y: number;
     w: number;
     h: number;
+    i?: string;
   };
 }
 

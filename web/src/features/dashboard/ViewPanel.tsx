@@ -15,18 +15,29 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
-import { Panel } from '@src/components';
+import { Panel, Notification } from '@src/components';
 import { observer } from 'mobx-react-lite';
 
 const ViewPanel: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const panel = DashboardStore.getPanel(searchParams.get('panel'));
+  const panel = DashboardStore.getPanel(parseInt(`${searchParams.get('panel')}`));
+  const navigte = useNavigate();
+
+  useEffect(() => {
+    if (!panel) {
+      Notification.error('Panel not found');
+      searchParams.delete('panel');
+      navigte({ pathname: '/dashboard', search: searchParams.toString() });
+      return;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel]);
 
   if (!panel) {
-    return <div>panel not exit</div>;
+    return null;
   }
   return (
     <div className="linsight-feature" style={{ height: '90vh' }}>
