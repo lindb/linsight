@@ -81,21 +81,28 @@ const SaveDashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const dashboardId = searchParams.get('d');
   const [visible, setVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const saveDashboard = async (values: any) => {
-    if (PanelStore.panel) {
-      // if has edit panel, need update dashboard's panel
-      DashboardStore.updatePanel(PanelStore.panel);
-    }
-    DashboardStore.updateDashboardProps({ title: values.title });
-    if (values.saveVariable) {
-      // save current variable selected values
-      VariableKit.setVariableValues(searchParams, get(DashboardStore.dashboard, 'config.variables', []));
-    }
-    const success = await DashboardStore.saveDashboard();
-    if (success && !dashboardId) {
-      // if create dashboard successfully, need set uid to url params
-      searchParams.set('d', `${DashboardStore.dashboard.uid}`);
-      setSearchParams(searchParams);
+    try {
+      setSubmitting(true);
+      if (PanelStore.panel) {
+        // if has edit panel, need update dashboard's panel
+        DashboardStore.updatePanel(PanelStore.panel);
+      }
+      DashboardStore.updateDashboardProps({ title: values.title });
+      if (values.saveVariable) {
+        // save current variable selected values
+        VariableKit.setVariableValues(searchParams, get(DashboardStore.dashboard, 'config.variables', []));
+      }
+      const success = await DashboardStore.saveDashboard();
+      if (success && !dashboardId) {
+        // if create dashboard successfully, need set uid to url params
+        searchParams.set('d', `${DashboardStore.dashboard.uid}`);
+        setSearchParams(searchParams);
+      }
+      setVisible(false);
+    } finally {
+      setSubmitting(false);
     }
   };
   return (
@@ -142,7 +149,7 @@ const SaveDashboard: React.FC = () => {
                 <Button type="tertiary" onClick={() => setVisible(false)}>
                   Cancel
                 </Button>
-                <Button icon={<IconSaveStroked />} onClick={() => formApi.submitForm()}>
+                <Button icon={<IconSaveStroked />} loading={submitting} onClick={() => formApi.submitForm()}>
                   Save
                 </Button>
               </Space>

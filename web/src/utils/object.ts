@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { mergeWith, isArray, transform, isObject, pickBy, isEmpty } from 'lodash-es';
+import { mergeWith, isArray, isString, transform, isObject, pickBy, isEmpty } from 'lodash-es';
 
 const merge = (dest: object, src: object): any => {
   return mergeWith(dest, src, (objValue: any, srcValue: any) => {
@@ -28,8 +28,12 @@ const merge = (dest: object, src: object): any => {
 
 const removeUnderscoreProperties = (obj: Record<string, any>): Record<string, any> => {
   return transform(obj, (result, value, key) => {
-    if (!key.startsWith('_')) {
-      result[key] = isObject(value) && !isArray(value) ? removeUnderscoreProperties(value) : value;
+    let val = value;
+    if (isObject(value) || isArray(value)) {
+      val = removeUnderscoreProperties(value);
+    }
+    if (!isString(key) || !key.startsWith('_') || !isEmpty(val)) {
+      result[key] = val;
     }
   });
 };
