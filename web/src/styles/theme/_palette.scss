@@ -27,6 +27,8 @@ body[theme-mode='dark'] {
   --semi-color-primary-light-active: rgba(var(--semi-orange-5), 0.4);
   --semi-color-focus-border: rgba(var(--semi-orange-5), 1);
   --semi-border-radius-large: 0;
+  --semi-border-radius-medium: 0;
+  --semi-border-radius-small: 0;
 }
 
 // light theme primary color
@@ -41,4 +43,6 @@ body {
   --semi-color-focus-border: rgba(var(--semi-orange-5), 1);
   --semi-color-bg-0: rgba(244, 245, 245, 100%);
   --semi-border-radius-large: 0;
+  --semi-border-radius-medium: 0;
+  --semi-border-radius-small: 0;
 }

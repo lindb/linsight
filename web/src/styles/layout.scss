@@ -27,6 +27,7 @@ under the License.
     border-radius: 0;
   }
 
+  /* stylelint-disable-next-line selector-class-pattern */
   .semi-radioGroup-wrapper {
     border-radius: 0;
   }
@@ -36,9 +37,29 @@ under the License.
   }
 }
 
+.sider-collapse-btn {
+  position: absolute;
+  color: var(--semi-color-text-2) !important;
+  top: 50px;
+  z-index: 999;
+  border-radius: 50% !important;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--semi-color-border);
+  background-color: var(--semi-color-nav-bg);
+
+  .semi-icon-default {
+    font-size: 18px;
+  }
+
+  &:hover {
+    background-color: var(--semi-color-nav-bg) !important;
+    box-shadow: 0 0 6px var(--semi-color-fill-2);
+  }
+}
+
 .nav-menu-no-icon {
   .semi-navigation-item-icon-info {
-    // min-width: 0px;
     margin-right: 4px;
   }
 
@@ -47,15 +68,52 @@ under the License.
   }
 }
 
+.semi-navigation-item-sub {
+  padding: 0 !important;
+}
+
+.semi-navigation-sub-wrap {
+  .semi-navigation-sub-title {
+    padding: 8px 10px;
+  }
+}
+
 .linsight-sider {
   .semi-navigation-header-text {
-    font-size: 36px;
+    font-size: 38px;
     font-weight: 800;
     color: #e85b2d;
+    margin-right: 1px;
   }
 
-  .semi-navigation-item {
-    margin-bottom: 8px !important;
+  .semi-navigation {
+    transition: none;
+
+    .semi-navigation-item {
+      padding: 8px 10px;
+    }
+  }
+
+  .semi-navigation-header-list-outer-collapsed {
+    width: 40px;
+
+    .semi-navigation-item {
+      margin-bottom: 8px !important;
+      padding: 0 !important;
+
+      .semi-navigation-sub-title {
+        padding: 8px 10px;
+      }
+
+      .semi-navigation-item-inner {
+        justify-content: center;
+        width: 20px;
+
+        .semi-navigation-item-icon-info {
+          margin-right: 0;
+        }
+      }
+    }
   }
 
   .semi-navigation-vertical .semi-navigation-header {
@@ -72,22 +130,24 @@ under the License.
 
     img {
       cursor: pointer;
-      height: 40px;
+      height: 40px !important;
+      width: 40px !important;
+    }
+  }
+
+  .semi-navigation-vertical {
+    .semi-navigation-footer {
+      padding: 0;
+    }
+
+    .semi-navigation-footer-collapsed {
       width: 40px;
     }
   }
 
-  .semi-navigation-vertical .semi-navigation-footer {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
-  .semi-navigation-footer {
-    padding: 0;
-  }
-
   .linsight-nav-footer {
     width: 100%;
+    cursor: pointer;
 
     .user {
       display: flex;
@@ -95,14 +155,9 @@ under the License.
       align-items: center;
       gap: 12px;
     }
-  }
-
-  .linsight-collapse-btn {
-    color: var(--semi-color-text-3);
-    cursor: pointer;
 
     &:hover {
-      color: var(--semi-color-primary);
+      background-color: var(--semi-color-fill-0);
     }
   }
 }

@@ -16,8 +16,8 @@ specific language governing permissions and limitations
 under the License.
 */
 import React, { useContext, useEffect } from 'react';
-import { Layout, Nav, Dropdown, Divider, Typography } from '@douyinfe/semi-ui';
-import { IconLeftCircleStroked, IconUser, IconMoon, IconSun } from '@douyinfe/semi-icons';
+import { Layout, Nav, Dropdown, Typography, Button } from '@douyinfe/semi-ui';
+import { IconChevronRightStroked, IconUser, IconMoon, IconSun } from '@douyinfe/semi-icons';
 import { find, get, upperFirst } from 'lodash-es';
 import { Footer, Icon } from '@src/components';
 import { PlatformContext } from '@src/contexts';
@@ -115,6 +115,17 @@ const FeatureMenu: React.FC = () => {
   return (
     <>
       <div className="nav-menu-no-icon"></div>
+      <Button
+        style={{
+          left: collapsed ? 48 : 208,
+        }}
+        className="sider-collapse-btn"
+        type="tertiary"
+        size="small"
+        onClick={toggleCollapse}
+        icon={<IconChevronRightStroked rotate={collapsed ? 0 : 180} />}
+      />
+
       <Sider className="linsight-sider">
         <Nav
           subNavMotion={false}
@@ -132,14 +143,6 @@ const FeatureMenu: React.FC = () => {
           footer={{
             children: (
               <div className="linsight-nav-footer">
-                <Divider>
-                  <IconLeftCircleStroked
-                    className="linsight-collapse-btn"
-                    onClick={toggleCollapse}
-                    rotate={collapsed ? 180 : 0}
-                    size="large"
-                  />
-                </Divider>
                 <Dropdown
                   spacing={8}
                   position="right"
@@ -167,7 +170,7 @@ const FeatureMenu: React.FC = () => {
                   }>
                   <div
                     className="user"
-                    style={collapsed ? { justifyContent: 'center' } : { justifyContent: 'start', paddingLeft: 12 }}>
+                    style={collapsed ? { justifyContent: 'center' } : { justifyContent: 'start', paddingLeft: 10 }}>
                     <IconUser size="large" />
                     {!collapsed && (
                       <Text ellipsis style={{ width: 160 }}>
@@ -186,7 +189,7 @@ const FeatureMenu: React.FC = () => {
   );
 };
 
-const Content: React.FC = () => {
+const Content: React.FC = React.memo(() => {
   const features = FeatureRepositoryInst.getFeatures();
   const { boot } = useContext(PlatformContext);
   return (
@@ -198,7 +201,8 @@ const Content: React.FC = () => {
       <Route path="*" element={<Navigate to={boot.home || '/explore'} />} />
     </Routes>
   );
-};
+});
+Content.displayName = 'Content';
 
 const App: React.FC = () => {
   return (
