@@ -17,8 +17,8 @@ under the License.
 */
 import { Form } from '@douyinfe/semi-ui';
 import { QueryEditorProps } from '@src/types';
-import React, { useContext } from 'react';
-import { isEmpty } from 'lodash-es';
+import React, { useContext, useRef } from 'react';
+import { isEqual, cloneDeep } from 'lodash-es';
 import { LinDBDatasource } from './Datasource';
 import { QueryEditContext } from '@src/contexts';
 import MetricNameSelect from './components/MetricNameSelect';
@@ -31,17 +31,19 @@ import NamespaceSelect from './components/NamespaceSelect';
 
 const QueryEditor: React.FC<QueryEditorProps> = (props) => {
   const { datasource } = props;
-  const { values, setValues } = useContext(QueryEditContext);
+  const { values: initValues, setValues } = useContext(QueryEditContext);
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
+  const previous = useRef(cloneDeep(initValues));
 
   return (
     <Form
       className="lindb-query-editor"
       layout="horizontal"
-      initValues={values}
+      initValues={initValues}
       onSubmit={(values: any) => {
         const newValues = ObjectKit.cleanEmptyProperties(values);
-        if (!isEmpty(newValues)) {
+        if (!isEqual(previous.current, newValues)) {
+          previous.current = cloneDeep(newValues);
           // change query edit context's values
           setValues(newValues);
         }

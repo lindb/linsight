@@ -21,7 +21,7 @@ import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchP
 import { isEmpty, endsWith, get } from 'lodash-es';
 import { Layout, Typography, Button, SideSheet, Form, Space } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
-import { DashboardStore, PanelStore } from '@src/stores';
+import { DashboardStore } from '@src/stores';
 import { Icon, Loading, Notification, TimePicker } from '@src/components';
 import Setting from './Setting';
 import PanelEditor from './PanelEditor';
@@ -84,10 +84,6 @@ const SaveDashboard: React.FC = () => {
   const saveDashboard = async (values: any) => {
     try {
       setSubmitting(true);
-      if (PanelStore.panel) {
-        // if has edit panel, need update dashboard's panel
-        DashboardStore.updatePanel(PanelStore.panel);
-      }
       DashboardStore.updateDashboardProps({ title: values.title });
       if (values.saveVariable) {
         // save current variable selected values

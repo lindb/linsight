@@ -172,7 +172,7 @@ const WhereConditonSelect: React.FC<{
     return result;
   });
 
-  const setWhereConditions = () => {
+  const setWhereConditions = useCallback(() => {
     const conditions: ConditionExpr[] = [];
     transform(
       where,
@@ -183,10 +183,11 @@ const WhereConditonSelect: React.FC<{
     );
     formApi.setValue('where', conditions);
     formApi.submitForm();
-  };
+  }, [formApi, where]);
+
   useEffect(() => {
     setWhereConditions();
-  }, [visible]);
+  }, [visible, setWhereConditions]);
 
   const pickWhereConditions = (values: string[]) => {
     const finalWhere = pick(where, values);

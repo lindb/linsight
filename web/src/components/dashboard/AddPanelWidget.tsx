@@ -21,7 +21,6 @@ import { DashboardStore } from '@src/stores';
 import React from 'react';
 import { Icon } from '@src/components';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { DefaultVisualizationType } from '@src/constants';
 import { PanelSetting } from '@src/types';
 
 const { Text } = Typography;
@@ -52,10 +51,7 @@ const AddPanelWidget: React.FC<{
         <div className="add-panel">
           <Button
             onClick={() => {
-              panel.title = 'Panel title';
-              panel.type = DefaultVisualizationType;
               searchParams.set('panel', `${panel.id}`);
-
               navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
             }}>
             <div>
