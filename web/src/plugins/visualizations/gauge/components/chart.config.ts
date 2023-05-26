@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ThemeType, Unit } from '@src/types';
+import { ThemeType } from '@src/types';
 import { ColorKit, FormatKit, ObjectKit } from '@src/utils';
 import { has, get, set, unset, forIn, cloneDeep, isEmpty, isNull, isNaN } from 'lodash-es';
 
@@ -117,99 +117,123 @@ export function getChartThemeConfig(theme: ThemeType, raw: any) {
 export const DefaultChartConfig = {
   type: 'doughnut',
   data: {},
-  plugins: {
-    message: {},
-  },
+  // plugins: {
+  //   message: {},
+  // },
   options: {
-    cutout: '60%',
-    radius: '100%',
-    circumference: 180,
-    rotation: -90,
-    // rotation: 1 * Math.PI /** This is where you need to work out where 89% is */,
-    // circumference: 1 * Math.PI /** put in a much smaller amount  so it does not take up an entire semi circle */,
-    cutoutPercentage: 95, // precent
-    animation: {
-      animateScale: true,
-    },
-    elements: {
-      arc: {
-        angle: 100,
-        borderWidth: 1,
-        circular: true,
-        // borderColor: 'red',
-        borderAlign: 'center',
-      },
-    },
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
     plugins: {
-      annotation: {
-        annotations: [],
-      },
       legend: {
         display: false,
-      },
-      tooltip: {
-        mode: 'dataset',
-        enabled: false,
+        position: 'top',
       },
       title: {
         display: false,
       },
+      tooltip: {
+        enabled: false,
+      },
     },
-    legend: {
-      display: false,
+    // cutout: '60%',
+    radius: '100%',
+    circumference: 220,
+    rotation: -110,
+    datasets: {
+      doughnut: {
+        borderWidth: 0,
+        borderAlign: 'inner',
+      },
     },
-    tooltips: {
-      enabled: false,
-    },
+
+    // rotation: 1 * Math.PI /** This is where you need to work out where 89% is */,
+    // circumference: 1 * Math.PI /** put in a much smaller amount  so it does not take up an entire semi circle */,
+    // offset: 30,
+    // spacing: 1,
+    cutout: '60%', // percent
+    // animation: {
+    //   animateScale: true,
+    // },
+    //   elements: {
+    //     arc: {
+    //       angle: 100,
+    //       borderWidth: 1,
+    //       circular: true,
+    //       // borderColor: 'red',
+    //       borderAlign: 'center',
+    //     },
+    //   },
+    //   plugins: {
+    //     annotation: {
+    //       annotations: [],
+    //     },
+    //     legend: {
+    //       display: false,
+    //     },
+    //     tooltip: {
+    //       mode: 'dataset',
+    //       enabled: false,
+    //     },
+    //     title: {
+    //       display: false,
+    //     },
+    //   },
+    //   legend: {
+    //     display: false,
+    //   },
+    //   tooltips: {
+    //     enabled: false,
+    //   },
+    // },
+    // options: {
+    //   responsive: true,
+    //   maintainAspectRatio: false,
+    //   animation: false,
+    //   zoom: true,
+    //   legend: {
+    //     asTable: true,
+    //   },
+    //   layout: {
+    //     padding: 0,
+    //   },
+    //   plugins: {
+    //     annotation: {
+    //       annotations: [],
+    //     },
+    //     legend: {
+    //       display: false,
+    //     },
+    //     tooltip: {
+    //       mode: 'dataset',
+    //       enabled: false,
+    //     },
+    //     title: {
+    //       display: false,
+    //     },
+    //   },
+    //   elements: {
+    //     line: {
+    //       tension: false, // disables bezier curve
+    //       borderWidth: 1,
+    //       fillColor: 'rgba(255, 145, 68, 0.2)',
+    //       fill: false,
+    //       cubicInterpolationMode: 'line',
+    //       borderDash: [],
+    //     },
+    //     point: {
+    //       radius: 0,
+    //       borderWidth: 0,
+    //       hoverRadius: 0,
+    //       hoverBorderWidth: 0,
+    //     },
+    //     arc: {
+    //       borderWidth: 0,
+    //     },
+    //   },
+    //   hover: {
+    //     mode: 'index',
+    //     intersect: false,
+    //   },
   },
-  // options: {
-  //   responsive: true,
-  //   maintainAspectRatio: false,
-  //   animation: false,
-  //   zoom: true,
-  //   legend: {
-  //     asTable: true,
-  //   },
-  //   layout: {
-  //     padding: 0,
-  //   },
-  //   plugins: {
-  //     annotation: {
-  //       annotations: [],
-  //     },
-  //     legend: {
-  //       display: false,
-  //     },
-  //     tooltip: {
-  //       mode: 'dataset',
-  //       enabled: false,
-  //     },
-  //     title: {
-  //       display: false,
-  //     },
-  //   },
-  //   elements: {
-  //     line: {
-  //       tension: false, // disables bezier curve
-  //       borderWidth: 1,
-  //       fillColor: 'rgba(255, 145, 68, 0.2)',
-  //       fill: false,
-  //       cubicInterpolationMode: 'line',
-  //       borderDash: [],
-  //     },
-  //     point: {
-  //       radius: 0,
-  //       borderWidth: 0,
-  //       hoverRadius: 0,
-  //       hoverBorderWidth: 0,
-  //     },
-  //     arc: {
-  //       borderWidth: 0,
-  //     },
-  //   },
-  //   hover: {
-  //     mode: 'index',
-  //     intersect: false,
-  //   },
-  // },
 };

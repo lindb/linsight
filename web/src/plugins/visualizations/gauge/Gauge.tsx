@@ -15,17 +15,28 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PanelSetting, VisualizationProps } from '@src/types';
+import { VisualizationProps } from '@src/types';
 import { DataSetKit } from '@src/utils';
 import React, { useEffect, useState } from 'react';
 import { GaugeChart } from './components/GaugeChart';
+import './components/gauge.scss';
 
+/*
+ * https://www.chartle.com/
+ */
 export const Gauge: React.FC<VisualizationProps> = (props) => {
   const { panel, theme, datasets } = props;
-  const [ds, setDS] = useState();
+  const [ds, setDS] = useState<any>();
 
   useEffect(() => {
-    setDS(DataSetKit.createStatsDatasets(datasets));
+    const datasetsOfGauge = DataSetKit.createStatsDatasets(datasets);
+    setDS({
+      labels: ['10%', '100%'],
+      datasets: [
+        { label: 'a', data: [70, 20, 10], backgroundColor: ['green', 'orange', 'red'] },
+        { label: 'b', data: [34.34, 90], borderWidth: 1, backgroundColor: ['green', 'rgba(46,50,56, .1)'], weight: 10 },
+      ],
+    });
   }, [datasets]);
-  return <GaugeChart theme={theme} datasets={ds} config={panel.options} />;
+  return <GaugeChart theme={theme} datasets={ds} options={panel.options || {}} panel={panel} />;
 };

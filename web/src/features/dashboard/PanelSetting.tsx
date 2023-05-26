@@ -15,13 +15,23 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Collapse, Form, Select, Typography } from '@douyinfe/semi-ui';
+import React, { useContext, useEffect, useRef } from 'react';
+import { ArrayField, Avatar, Button, Collapse, Form, Radio, Select, Typography } from '@douyinfe/semi-ui';
+import { IconPlusStroked, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { DatasourceStore } from '@src/stores';
-import React, { useContext } from 'react';
-import { FormatRepositoryInst, PanelSetting, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
-import { ObjectKit } from '@src/utils';
-import { get } from 'lodash-es';
+import {
+  FieldConfig,
+  FormatRepositoryInst,
+  PanelSetting,
+  Thresholds,
+  ThresholdStep,
+  VisualizationPlugin,
+  VisualizationRepositoryInst,
+} from '@src/types';
+import { ColorKit, ObjectKit } from '@src/utils';
+import { get, set, isEmpty, size, isNil, orderBy, maxBy, has } from 'lodash-es';
 import { PanelEditContext } from '@src/contexts';
+import { toJS } from 'mobx';
 
 const { Text } = Typography;
 
@@ -36,6 +46,7 @@ const PanelOptionsForm: React.FC = () => {
       <Form
         className="linsight-form linsight-panel-setting"
         layout="vertical"
+        allowEmpty
         initValues={panel}
         onValueChange={(values: object) => {
           modifyPanel(values);
@@ -116,7 +127,6 @@ const StandardOptionsForm: React.FC = () => {
         field="unit"
         label="Unit"
         placeholder="choose"
-        style={{ width: '100%' }}
         filterTreeNode
         showClear
         leafOnly
@@ -133,6 +143,116 @@ const StandardOptionsForm: React.FC = () => {
   );
 };
 
+const ThresholdsFieldConfigForm: React.FC = () => {
+  const { panel, modifyPanel } = useContext(PanelEditContext);
+  const formApi = useRef<any>();
+  const maxStepValue = useRef<number>(0);
+  const currentStep = useRef<string>('');
+  const STEP = 10;
+  const thresholds: Thresholds = get(panel, 'fieldConfig.defaults.thresholds', {});
+
+  useEffect(() => {
+    let i = 0;
+    maxStepValue.current =
+      get(
+        maxBy(thresholds.steps, (o) => {
+          i++;
+          if (!has(o, '_key')) {
+            set(o, '_key', `${i}`);
+          }
+          return o.value;
+        }),
+        'value',
+        0
+      ) || 0;
+    if (formApi.current) {
+      thresholds.steps = orderBy(thresholds.steps, [(obj) => isNil(obj.value), 'value'], ['asc', 'desc']);
+      formApi.current.setValues(thresholds, { isOverride: true });
+    }
+  }, [formApi, thresholds]);
+
+  return (
+    <Form
+      allowEmpty
+      className="linsight-form linsight-panel-setting"
+      getFormApi={(api: any) => (formApi.current = api)}
+      extraTextPosition="middle"
+      onValueChange={(values: Thresholds) => {
+        modifyPanel({
+          fieldConfig: {
+            defaults: {
+              thresholds: values,
+            },
+          },
+        });
+      }}>
+      <ArrayField field="steps">
+        {({ arrayFields, addWithInitValue }) => {
+          return (
+            <>
+              <Button
+                icon={<IconPlusStroked />}
+                onClick={() =>
+                  addWithInitValue({
+                    value: maxStepValue.current + STEP,
+                    color: ColorKit.getColor(size(thresholds.steps)),
+                  })
+                }>
+                Add threshold
+              </Button>
+              {arrayFields.map(({ field, key, remove }, i) => {
+                const step: ThresholdStep = get(thresholds, `steps.[${i}]`, {});
+                if (isEmpty(step)) {
+                  return null;
+                }
+                const fieldName = `${field}[value]`;
+                return (
+                  <Form.InputNumber
+                    field={fieldName}
+                    key={get(step, '_key', key)} // use step._key keep current field focus after sort
+                    disabled={!step.value}
+                    placeholder="Base"
+                    noLabel
+                    autofocus={currentStep.current == key}
+                    hideButtons={!step.value}
+                    suffix={step.value && <IconDeleteStroked style={{ cursor: 'pointer' }} onClick={remove} />}
+                    prefix={
+                      <>
+                        <Avatar
+                          size="extra-extra-small"
+                          style={{
+                            margin: 8,
+                            marginRight: 8,
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            backgroundColor: `${step.color}`,
+                          }}
+                        />
+                        {thresholds.mode === 'percentage' && (
+                          <span style={{ marginRight: 6, fontSize: 12, color: 'var(--semi-color-text-2)' }}>%</span>
+                        )}
+                      </>
+                    }
+                  />
+                );
+              })}
+            </>
+          );
+        }}
+      </ArrayField>
+      <Form.RadioGroup
+        label="Thresholds mode"
+        field="mode"
+        type="button"
+        extraText="Percentage means thresholds relative to min & max">
+        <Radio value="absolute">Absolute</Radio>
+        <Radio value="percentage">Percentage</Radio>
+      </Form.RadioGroup>
+    </Form>
+  );
+};
+
 const PanelSetting: React.FC = () => {
   const { panel, modifyPanel } = useContext(PanelEditContext);
   const plugin = VisualizationRepositoryInst.get(`${panel?.type}`);
@@ -142,7 +262,9 @@ const PanelSetting: React.FC = () => {
   const OptionsEditor = plugin.components.OptionsEditor;
   return (
     <>
-      <Collapse expandIconPosition="left" defaultActiveKey={['panelOptions', 'visualizations', 'standardOptions']}>
+      <Collapse
+        expandIconPosition="left"
+        defaultActiveKey={['panelOptions', 'visualizations', 'standardOptions', 'thresholds']}>
         <Collapse.Panel header="Panel options" itemKey="panelOptions">
           <PanelOptionsForm />
         </Collapse.Panel>
@@ -160,6 +282,9 @@ const PanelSetting: React.FC = () => {
         )}
         <Collapse.Panel header="Standard options" itemKey="standardOptions">
           <StandardOptionsForm />
+        </Collapse.Panel>
+        <Collapse.Panel header="Thresholds" itemKey="thresholds">
+          <ThresholdsFieldConfigForm />
         </Collapse.Panel>
       </Collapse>
     </>

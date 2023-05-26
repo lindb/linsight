@@ -15,44 +15,66 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ThemeType } from '@src/types';
+import { PanelSetting, ThemeType, Thresholds, ThresholdStep } from '@src/types';
 import React, { MutableRefObject, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
-import { get, set, cloneDeep } from 'lodash-es';
+import { get, cloneDeep, orderBy, isNil } from 'lodash-es';
 import { toJS } from 'mobx';
-import { DefaultChartConfig, getChartThemeConfig, modifyChartConfigs, modifyChartOptions } from './chart.config';
-import { Placement } from '../../timeseries/types';
-import classNames from 'classnames';
+import { DefaultChartConfig, getChartThemeConfig } from './chart.config';
+import { GaugeOptions } from '../types';
 
 Chart.register(...registerables);
 
-export const GaugeChart: React.FC<{ datasets: any; theme: ThemeType; config: any }> = (props) => {
-  const { theme, config, datasets } = props;
+export const GaugeChart: React.FC<{ datasets: any; theme: ThemeType; options: GaugeOptions; panel: PanelSetting }> = (
+  props
+) => {
+  const { theme, options, datasets, panel } = props;
   const canvasRef = useRef() as MutableRefObject<HTMLCanvasElement | null>;
   const chartInstance = useRef() as MutableRefObject<Chart | null>;
+  const thresholds: Thresholds = get(panel, 'fieldConfig.defaults.thresholds', {});
+
+  const showThresholdMarkers = (): boolean => {
+    return options.showThresholdMarkers || false;
+  };
 
   useEffect(() => {
     if (!canvasRef.current) {
       // if canvas is null, return it.
       return;
     }
-    const chartType = get(config, 'type', 'doughnut');
+    const chartType = get(options, 'type', 'doughnut');
     const chartCfg: any = getChartThemeConfig(theme, cloneDeep(DefaultChartConfig));
+    const dd = [];
+    if (showThresholdMarkers()) {
+      const thresholdSteps = orderBy(thresholds.steps || [], [(obj) => isNil(obj.value), 'value'], ['asc', 'asc']);
+      const data: any[] = [];
+      const backgroundColor: any[] = [];
+      thresholdSteps.forEach((step: ThresholdStep) => {
+        data.push(step.value);
+        backgroundColor.push(step.color);
+      });
+
+      dd.push({ data: data, backgroundColor: backgroundColor });
+    }
+    dd.push({
+      data: [90],
+      borderWidth: 1,
+      backgroundColor: ['green', 'rgba(46,50,56, .1)'],
+      weight: 10,
+    });
+    const datasets = {
+      labels: ['10%', '100%'],
+      datasets: dd,
+    };
     if (!chartInstance.current) {
       chartCfg.data = datasets || [];
-      chartCfg.type = chartType;
-      modifyChartConfigs(chartCfg, config);
-      modifyChartOptions(chartCfg.options, config);
-      console.log('create new chart', chartInstance, chartCfg, config);
+      chartCfg.type = 'doughnut';
+      // modifyChartConfigs(chartCfg, config);
+      // modifyChartOptions(chartCfg.options, config);
+      console.log('create new chart', chartInstance, chartCfg, options);
       const canvas = canvasRef.current;
       const chart = new Chart(canvas, chartCfg);
       chartInstance.current = chart;
-      // add mouse event handles, after chart created
-      // canvas.addEventListener('mousemove', handleMouseMove);
-      // canvas.addEventListener('mouseout', handleMouseOut);
-      // canvas.addEventListener('click', handleMouseClick);
-      // canvas.addEventListener('mousedown', handleMouseDown);
-      // canvas.addEventListener('mouseup', handleMouseUp);
     } else {
       const chart = chartInstance.current;
       chart.data = datasets || [];
@@ -61,32 +83,19 @@ export const GaugeChart: React.FC<{ datasets: any; theme: ThemeType; config: any
         options: get(chart, 'options', {}),
       }).options;
 
-      modifyChartConfigs(chart, config);
-      modifyChartOptions(chart.config.options, config);
+      // modifyChartConfigs(chart, config);
+      // modifyChartOptions(chart.config.options, config);
       // update chart after dataset or config changed
-      console.log('update chart....', chart, chartType, toJS(config));
+      console.log('update chart....', chart, datasets, chartType, toJS(options));
       chart.update();
     }
-  }, [config, datasets, theme]);
-
-  const timeseriesChartCls = classNames('time-series-container', {
-    'chart-cursor-pointer': true,
-    'legend-to-right': get(config, 'legend.placement', Placement.Bottom) === Placement.Right,
-  });
+  }, [options, datasets, theme]);
 
   return (
-    <div className={timeseriesChartCls}>
-      <div className="time-series-canvas">
-        <canvas
-          ref={canvasRef}
-          // onMouseEnter={() => {
-          //   window.addEventListener('keydown', handleKeyDown);
-          // }}
-          // onMouseLeave={() => {
-          //   window.removeEventListener('keydown', handleKeyDown);
-          // }}
-        />
-        <p className="percent">89%</p>
+    <div className="gauge-container">
+      <div className="gauge-canvas">
+        <div className="percent">34.55%</div>
+        <canvas ref={canvasRef} />
       </div>
     </div>
   );

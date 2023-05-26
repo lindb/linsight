@@ -26,13 +26,22 @@ const merge = (dest: object, src: object): any => {
   });
 };
 
+/**
+ * Remove all underscore props
+ */
 const removeUnderscoreProperties = (obj: Record<string, any>): Record<string, any> => {
   return transform(obj, (result, value, key) => {
     let val = value;
     if (isObject(value) || isArray(value)) {
       val = removeUnderscoreProperties(value);
     }
-    if (!isString(key) || !key.startsWith('_') || !isEmpty(val)) {
+    if (isString(key)) {
+      // handle object
+      if (!key.startsWith('_')) {
+        result[key] = val;
+      }
+    } else {
+      // handle array
       result[key] = val;
     }
   });

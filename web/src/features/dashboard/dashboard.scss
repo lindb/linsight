@@ -164,6 +164,19 @@ under the License.
   .semi-form-field:first-of-type {
     padding-top: 0;
   }
+
+  .semi-input-number {
+    width: 100%;
+  }
+
+  .semi-cascader {
+    width: 100%;
+  }
+
+  .semi-button {
+    width: 100%;
+    margin-bottom: 12px;
+  }
 }
 
 .panel-editor {
