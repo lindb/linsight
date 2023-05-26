@@ -91,9 +91,8 @@ const QueryVariable: React.FC<{ variable: Variable }> = (props) => {
  */
 const ViewVariables: React.FC<{ className?: string }> = (props) => {
   const { className } = props;
-  const { dashboard } = DashboardStore;
   const [searchParams, setSearchParams] = useSearchParams();
-  const variables: Variable[] = get(dashboard, 'config.variables', []);
+  const variables: Variable[] = DashboardStore.getVariables();
   const formApi = useRef<any>();
   useEffect(() => {
     if (isEmpty(variables) || !formApi.current) {

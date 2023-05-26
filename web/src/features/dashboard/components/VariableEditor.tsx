@@ -112,14 +112,14 @@ const VariableEditor: React.FC = () => {
             ]}
           />
           <QueryVaribleEditor formState={formState} />
-          <Form.CheckboxGroup field="optionType" label="Selection options">
-            <Form.Checkbox value={OptionType.Multi} label="Multi-value">
+          <Form.Slot label="Selection options">
+            <Form.Checkbox field="multi" value={OptionType.Multi} noLabel>
               Multi-value
             </Form.Checkbox>
-            <Form.Checkbox value={OptionType.All} label="Include all option">
+            <Form.Checkbox field="includeAll" value={OptionType.All} noLabel>
               Include all option
             </Form.Checkbox>
-          </Form.CheckboxGroup>
+          </Form.Slot>
           <Form.Slot>
             <div style={{ gap: 4, display: 'flex', flexDirection: 'row' }}>
               <Button

@@ -26,8 +26,8 @@ export interface PanelSetting {
   type?: string;
   options?: object;
   targets?: Query[];
-  fieldConfig: Record<string, FieldConfig>;
-  grid?: {
+  fieldConfig?: Record<string, FieldConfig>;
+  gridPos?: {
     x: number;
     y: number;
     w: number;

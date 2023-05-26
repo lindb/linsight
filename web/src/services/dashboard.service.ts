@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { Dashboard, SearchDashboard, SearchDashboardResult } from '@src/types';
+import { Dashboard, DashboardDetail, SearchDashboard, SearchDashboardResult } from '@src/types';
 import { ApiKit } from '@src/utils';
 
 const createDashboard = (dashboard: Dashboard): Promise<string> => {
@@ -27,8 +27,8 @@ const updateDashboard = (dashboard: Dashboard): Promise<string> => {
   return ApiKit.PUT<string>(ApiPath.Dashboard, dashboard);
 };
 
-const getDashboard = (uid: string): Promise<Dashboard> => {
-  return ApiKit.GET<Dashboard>(`${ApiPath.Dashboard}/${uid}`);
+const getDashboard = (uid: string): Promise<DashboardDetail> => {
+  return ApiKit.GET<DashboardDetail>(`${ApiPath.Dashboard}/${uid}`);
 };
 
 const deleteDashboard = (uid: string): Promise<string> => {
@@ -45,6 +45,7 @@ const searchDashboards = (req: SearchDashboard): Promise<SearchDashboardResult> 
   return ApiKit.GET<SearchDashboardResult>(ApiPath.Dashboard, req);
 };
 
+// FIXME: remove it
 function getDashboardList() {
   return [
     { id: 1, favorite: false, type: 'kubernetes', name: 'Kubernetes workload overview', modified: 'Oct 14 00:00' },

@@ -29,6 +29,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/datatypes"
 
 	"github.com/lindb/common/pkg/encoding"
 
@@ -51,7 +52,7 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 		DashboardSrv: dashboardSrv,
 	})
 	r.POST("/dashboard", api.CreateDashboard)
-	body := encoding.JSONMarshal(&model.Dashboard{})
+	body := encoding.JSONMarshal(&model.Dashboard{Title: "test"})
 
 	cases := []struct {
 		name    string
@@ -78,7 +79,7 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 		},
 		{
 			name: "create dashboard successfully",
-			body: bytes.NewBuffer(body),
+			body: bytes.NewBuffer(encoding.JSONMarshal(&model.Dashboard{Config: body})),
 			prepare: func() {
 				dashboardSrv.EXPECT().CreateDashboard(gomock.Any(), gomock.Any()).Return("1234", nil)
 			},
@@ -242,7 +243,11 @@ func TestDashboardAPI_GetDashboardByUID(t *testing.T) {
 		{
 			name: "get dashboard successfully",
 			prepare: func() {
-				dashboardSrv.EXPECT().GetDashboardByUID(gomock.Any(), "1234").Return(nil, nil)
+				var dashboard datatypes.JSON
+				_ = encoding.JSONUnmarshal([]byte("{}"), &dashboard)
+				dashboardSrv.EXPECT().GetDashboardByUID(gomock.Any(), "1234").Return(&model.Dashboard{
+					Config: dashboard,
+				}, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)

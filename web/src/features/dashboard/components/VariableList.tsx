@@ -35,7 +35,7 @@ import {
 } from 'react-beautiful-dnd';
 import classNames from 'classnames';
 import './variables.scss';
-import { Variable } from '@src/types';
+import { Variable, VariableHideType } from '@src/types';
 const { Text } = Typography;
 
 // https://github.com/atlassian/react-beautiful-dnd/blob/master/docs/guides/drop-animation.md#skipping-the-drop-animation
@@ -104,9 +104,8 @@ const TableCell = (props: any) => {
 };
 
 const VariableList: React.FC = () => {
-  const { dashboard } = DashboardStore;
   const [searchParams, setSearchParams] = useSearchParams();
-  const variables: Variable[] = get(dashboard, 'config.variables', []);
+  const variables: Variable[] = DashboardStore.getVariables();
   const [preview, setPreview] = useState(false);
 
   const components = useMemo(() => {
@@ -131,7 +130,7 @@ const VariableList: React.FC = () => {
           onClick={() => {
             const len = variables.length;
             const variable = `variable${len}`;
-            DashboardStore.addVariable({ name: variable, label: 'Variable' });
+            DashboardStore.addVariable({ name: variable, label: 'Variable', hide: VariableHideType.LabelAndValue });
             searchParams.set('edit', `${len}`);
             setSearchParams(searchParams);
           }}>

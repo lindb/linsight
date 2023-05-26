@@ -18,8 +18,12 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
+	"fmt"
 
+	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
+
+	"github.com/lindb/common/pkg/encoding"
 	httppkg "github.com/lindb/common/pkg/http"
 
 	"github.com/lindb/linsight/constant"
@@ -41,13 +45,20 @@ func NewDashboardAPI(deps *depspkg.API) *DashboardAPI {
 
 // CreateDashboard creates a new dashboard.
 func (api *DashboardAPI) CreateDashboard(c *gin.Context) {
-	var dashboard model.Dashboard
-	if err := c.ShouldBind(&dashboard); err != nil {
+	var dashboardJSON datatypes.JSON
+	if err := c.ShouldBind(&dashboardJSON); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	dashboard := &model.Dashboard{
+		Config: dashboardJSON,
+	}
+	if err := dashboard.ReadMeta(); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	ctx := c.Request.Context()
-	uid, err := api.deps.DashboardSrv.CreateDashboard(ctx, &dashboard)
+	uid, err := api.deps.DashboardSrv.CreateDashboard(ctx, dashboard)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
@@ -57,13 +68,20 @@ func (api *DashboardAPI) CreateDashboard(c *gin.Context) {
 
 // UpdateDashboard updates an existing dashboard.
 func (api *DashboardAPI) UpdateDashboard(c *gin.Context) {
-	var dashboard model.Dashboard
-	if err := c.ShouldBind(&dashboard); err != nil {
+	var dashboardJSON datatypes.JSON
+	if err := c.ShouldBind(&dashboardJSON); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	dashboard := &model.Dashboard{
+		Config: dashboardJSON,
+	}
+	if err := dashboard.ReadMeta(); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	ctx := c.Request.Context()
-	if err := api.deps.DashboardSrv.UpdateDashboard(ctx, &dashboard); err != nil {
+	if err := api.deps.DashboardSrv.UpdateDashboard(ctx, dashboard); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
@@ -88,7 +106,17 @@ func (api *DashboardAPI) GetDashboardByUID(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
-	httppkg.OK(c, dashboard)
+	var dashboardMap map[string]any
+	if err := encoding.JSONUnmarshal(dashboard.Config, &dashboardMap); err != nil {
+		fmt.Println(dashboard.Config)
+		fmt.Println(err)
+		httppkg.Error(c, err)
+		return
+	}
+	dashboardMap[constant.UID] = uid
+	httppkg.OK(c, gin.H{
+		"dashboard": dashboardMap,
+	})
 }
 
 // StarDashboard stars the dashboard by given uid.

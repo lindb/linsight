@@ -51,11 +51,10 @@ class DashboardStore {
   }
 
   getPanels(): PanelSetting[] {
-    return get(this.dashboard, 'config.panels', []);
+    return get(this.dashboard, 'panels', []);
   }
 
   getPanel(panelId: number | undefined): PanelSetting | undefined {
-    console.log('xxxxxxxx get panel', panelId, toJS(this.dashboard));
     const panels = this.getPanels();
     return find(panels, { id: panelId });
   }
@@ -87,10 +86,10 @@ class DashboardStore {
     const newPanel: PanelSetting = cloneDeep(panel);
     //FIXME: remove other props?
     newPanel.id = this.assignPanelId();
-    if (panel.grid?.x + 2 * panel.grid?.w <= DefaultColumns) {
-      newPanel.grid.x += panel.grid.w;
+    if (panel.gridPos?.x + 2 * panel.gridPos?.w <= DefaultColumns) {
+      newPanel.gridPos.x += panel.gridPos.w;
     } else {
-      newPanel.grid.y += panel.grid.y;
+      newPanel.gridPos.y += panel.gridPos.y;
     }
     this.addPanel(newPanel);
   }
@@ -99,7 +98,7 @@ class DashboardStore {
     const cfg: PanelSetting = {
       title: 'Add panel',
       type: VisualizationAddPanelType,
-      grid: { w: 12, h: 7, x: 0, y: 0 },
+      gridPos: { w: 12, h: 7, x: 0, y: 0 },
     };
     if (newID) {
       cfg.id = this.assignPanelId();
@@ -109,15 +108,15 @@ class DashboardStore {
 
   addPanel(panel: PanelSetting) {
     this.setPanelGridId(panel);
-    const firstPanelType = get(this.dashboard, 'config.panels[0].type', null);
+    const firstPanelType = get(this.dashboard, 'panels[0].type', null);
     if (firstPanelType === VisualizationAddPanelType) {
       // first panel is add panel widget, ignore this panel
       return;
     }
-    if (has(this.dashboard, 'config.panels')) {
-      set(this.dashboard, 'config.panels', concat(panel, this.dashboard.config?.panels));
+    if (has(this.dashboard, 'panels')) {
+      set(this.dashboard, 'panels', concat(panel, this.dashboard.panels));
     } else {
-      set(this.dashboard, 'config.panels', [panel]);
+      set(this.dashboard, 'panels', [panel]);
     }
     this.sortPanels();
   }
@@ -155,7 +154,7 @@ class DashboardStore {
 
   private setPanelGridId(panel: any) {
     // NOTE: make sure set grid i
-    set(panel, 'grid.i', `${panel.id}`);
+    set(panel, 'gridPos.i', `${panel.id}`);
   }
 
   updateDashboardProps(values: any) {
@@ -164,26 +163,27 @@ class DashboardStore {
   }
 
   getVariables(): Variable[] {
-    return get(this.dashboard, 'config.variables', []);
+    return get(this.dashboard, 'templating.list', []) as Variable[];
   }
 
   addVariable(variable: any) {
-    if (has(this.dashboard, 'config.variables')) {
-      set(this.dashboard, 'config.variables', concat(this.dashboard.config?.variables, variable));
+    const variables = get(this);
+    if (has(this.dashboard, 'templating.list')) {
+      set(this.dashboard, 'templating.list', concat(this.dashboard.config?.variables, variable));
     } else {
-      set(this.dashboard, 'config.variables', [variable]);
+      set(this.dashboard, 'templating.list', [variable]);
     }
   }
 
   updateVariable(index: string, variable: any) {
-    set(this.dashboard, `config.variables[${index}]`, variable);
+    set(this.dashboard, `templating.list[${index}]`, variable);
   }
 
   reorderVariables(startIndex: number, endIndex: number) {
-    const result = Array.from(get(this.dashboard, 'config.variables', []));
+    const result = Array.from(get(this.dashboard, 'templating.list', []));
     const [removed] = result.splice(startIndex, 1);
     result.splice(endIndex, 0, removed);
-    set(this.dashboard, `config.variables`, result);
+    set(this.dashboard, `templating.list`, result);
   }
 
   deleteVariable(index: string) {
@@ -191,16 +191,16 @@ class DashboardStore {
   }
 
   getVariableByIndex(index: string): Variable {
-    return get(this.dashboard, `config.variables[${index}]`, {} as Variable);
+    return get(this.dashboard, `templating.list[${index}]`, {} as Variable);
   }
 
   sortPanels() {
     const panels = this.getPanels();
     panels.sort((a: PanelSetting, b: PanelSetting) => {
-      if (a.grid?.y === b.grid?.y) {
-        return a.grid?.x - b.grid?.x;
+      if (a.gridPos?.y === b.gridPos?.y) {
+        return a.gridPos?.x - b.gridPos?.x;
       }
-      return a.grid?.y - b.grid?.y;
+      return a.gridPos?.y - b.gridPos?.y;
     });
   }
 
@@ -227,22 +227,20 @@ class DashboardStore {
       const panelId = this.assignPanelId();
       this.dashboard = {
         title: 'New Dashboard',
-        config: {
-          panels: [
-            {
-              title: 'Add panel',
-              type: VisualizationAddPanelType,
-              grid: { w: 12, h: 7, x: 0, y: 0, i: `${panelId}` }, // NOTE: must set i value(string)
-              id: panelId,
-            },
-          ],
-        },
+        panels: [
+          {
+            title: 'Add panel',
+            type: VisualizationAddPanelType,
+            gridPos: { w: 12, h: 7, x: 0, y: 0, i: `${panelId}` }, // NOTE: must set i value(string)
+            id: panelId,
+          },
+        ],
       };
       return this.dashboard;
     }
     try {
       const dashboard = await DashboardSrv.getDashboard(`${dashboardId}`);
-      this.initDashboard(dashboard);
+      this.initDashboard(dashboard.dashboard);
     } catch (err) {
       console.warn('load dashobard error', err);
       Notification.error(ApiKit.getErrorMsg(err));
@@ -253,10 +251,10 @@ class DashboardStore {
   async saveDashboard() {
     try {
       const dashboard = ObjectKit.removeUnderscoreProperties(toJS(this.dashboard));
-      const panels = get(dashboard, 'config.panels', []);
+      const panels = get(dashboard, 'panels', []);
       panels.forEach((panel: PanelSetting) => {
         // only keep x/y/w/h for grid
-        panel.grid = pick(panel.grid, ['x', 'y', 'w', 'h']) as any;
+        panel.gridPos = pick(panel.gridPos, ['x', 'y', 'w', 'h']) as any;
       });
       this.sortPanels();
       // FIXME: remove unused field
