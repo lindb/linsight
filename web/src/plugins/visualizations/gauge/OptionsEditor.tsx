@@ -15,11 +15,36 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PanelSetting } from '@src/types';
 import React from 'react';
+import { Collapse, Form } from '@douyinfe/semi-ui';
+import { OptionsEditorProps } from '@src/types';
 
-export const OptionsEditor: React.FC<{ panel: PanelSetting }> = (props) => {
-  const { panel } = props;
-  console.log('gauge options', panel);
-  return <div>guage options editor</div>;
+/**
+ * Gauge options editor
+ *
+ * options type: @typedef {GaugeOptions}
+ */
+export const OptionsEditor: React.FC<OptionsEditorProps> = (props) => {
+  const { panel, onOptionsChange } = props;
+  return (
+    <Collapse expandIconPosition="left" defaultActiveKey="gauge">
+      <Collapse.Panel header="Gauge" itemKey="gauge">
+        <Form
+          extraTextPosition="middle"
+          className="linsight-form linsight-panel-setting"
+          initValues={panel.options}
+          onValueChange={(values: object) => {
+            if (onOptionsChange) {
+              onOptionsChange(values);
+            }
+          }}>
+          <Form.Switch
+            field="showThresholdMarkers"
+            label="Show threshold markers"
+            extraText="Redners the thresholds as an outer bar"
+          />
+        </Form>
+      </Collapse.Panel>
+    </Collapse>
+  );
 };

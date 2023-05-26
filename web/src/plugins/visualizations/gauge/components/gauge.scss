@@ -15,22 +15,32 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect, useState } from 'react';
-import { VisualizationProps } from '@src/types';
-import { TimeSeriesChart } from './components/TimeSeriesChart';
-import { DataSetKit } from '@src/utils';
-import './components/timeseries.scss';
+.gauge-container {
+  height: 100%;
+  display: flex;
+  justify-content: center;
 
-/**
- * TimeSeries is a visualization component for time series chart.
- */
-export const TimeSeries: React.FC<VisualizationProps> = (props) => {
-  const { panel, theme, datasets } = props;
-  const [ds, setDS] = useState();
+  .gauge-canvas {
+    flex: 1 0;
+    position: relative;
+    max-width: 100%;
 
-  useEffect(() => {
-    setDS(DataSetKit.createTimeSeriesDatasets(datasets));
-  }, [datasets]);
+    .percent {
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      height: 100%;
+      width: 100%;
+      position: absolute;
+      font-size: 24px;
+      color: green;
+      font-weight: 700;
+    }
 
-  return <TimeSeriesChart theme={theme} datasets={ds} config={panel.options} />;
-};
+    canvas {
+      cursor: default;
+      position: absolute;
+      inset: 0;
+    }
+  }
+}

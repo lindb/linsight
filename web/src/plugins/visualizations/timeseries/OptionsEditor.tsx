@@ -19,7 +19,7 @@ import { Collapse, Form, Radio } from '@douyinfe/semi-ui';
 import { OptionsEditorProps } from '@src/types';
 import React from 'react';
 import { get, cloneDeep, has, set } from 'lodash-es';
-import '@src/plugins/visualizations/timeseries/components/timeseries.scss';
+import './components/timeseries.scss';
 import { SliderInput } from '@src/components';
 import Smooth from '@src/plugins/visualizations/timeseries/images/smooth.svg';
 import Line from '@src/plugins/visualizations/timeseries/images/line.svg';
@@ -35,7 +35,6 @@ const LegendForm: React.FC<OptionsEditorProps> = (props) => {
       layout="vertical"
       initValues={get(panel, 'options.legend', {})}
       onValueChange={(values: object) => {
-        console.log('change values', values);
         if (onOptionsChange) {
           onOptionsChange({ legend: values });
         }

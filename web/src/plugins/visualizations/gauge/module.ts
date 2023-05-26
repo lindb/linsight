@@ -28,5 +28,30 @@ const guage = new VisualizationPlugin(
   Gauge
 );
 
-guage.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
+guage
+  .setOptionsEditor(OptionsEditor)
+  .setDefaultOptions({
+    fieldConfig: {
+      defaults: {
+        thresholds: {
+          mode: 'percentage',
+          steps: [
+            {
+              value: null,
+              color: 'green',
+            },
+            {
+              value: 80,
+              color: 'red',
+            },
+          ],
+        },
+      },
+    },
+    options: {
+      type: 'doughnut',
+    },
+  })
+  .setDarkLogo(Logo)
+  .setLightLogo(Logo);
 VisualizationRepositoryInst.register(guage);

@@ -18,7 +18,6 @@ under the License.
 import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
 import { Legend } from '@src/plugins/visualizations/timeseries/components/Legend';
 import Tooltip from '@src/plugins/visualizations/timeseries/components/Tooltip';
-import Menu from './Menu';
 import {
   DefaultChartConfig,
   getChartThemeConfig,

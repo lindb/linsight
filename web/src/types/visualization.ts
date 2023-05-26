@@ -26,6 +26,7 @@ export interface PanelSetting {
   type?: string;
   options?: object;
   targets?: Query[];
+  fieldConfig: Record<string, FieldConfig>;
   grid?: {
     x: number;
     y: number;
@@ -33,6 +34,20 @@ export interface PanelSetting {
     h: number;
     i?: string;
   };
+}
+
+export interface FieldConfig {
+  thresholds?: Thresholds;
+}
+
+export interface Thresholds {
+  mode?: 'absolute' | 'percentage';
+  steps?: ThresholdStep[];
+}
+
+export interface ThresholdStep {
+  color?: string;
+  value?: number | null;
 }
 
 export interface OptionsEditorProps {
