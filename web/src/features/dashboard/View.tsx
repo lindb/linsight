@@ -42,9 +42,9 @@ const View: React.FC = () => {
         return;
       }
       if (item.type === RowPanelType) {
-        item.grid.isResizable = false;
+        item.gridPos.isResizable = false;
       }
-      layout.push(item.grid);
+      layout.push(item.gridPos);
     });
     return layout;
   };
@@ -90,7 +90,7 @@ const View: React.FC = () => {
                       (layout || []).forEach((item: any) => {
                         const panel = DashboardStore.getPanel(parseInt(item.i));
                         if (panel) {
-                          DashboardStore.updatePanelConfig(panel, { grid: item });
+                          DashboardStore.updatePanelConfig(panel, { gridPos: item });
                           DashboardStore.sortPanels();
                         }
                       });

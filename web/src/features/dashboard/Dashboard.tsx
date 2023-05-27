@@ -87,7 +87,7 @@ const SaveDashboard: React.FC = () => {
       DashboardStore.updateDashboardProps({ title: values.title });
       if (values.saveVariable) {
         // save current variable selected values
-        VariableKit.setVariableValues(searchParams, get(DashboardStore.dashboard, 'config.variables', []));
+        VariableKit.setVariableValues(searchParams, DashboardStore.getVariables());
       }
       const success = await DashboardStore.saveDashboard();
       if (success && !dashboardId) {

@@ -18,10 +18,17 @@
 package model
 
 import (
+	"errors"
+	"fmt"
+
+	"github.com/lindb/common/pkg/encoding"
 	"gorm.io/datatypes"
+
+	"github.com/lindb/linsight/constant"
 )
 
 type Ownership int
+type JSONType datatypes.JSON
 
 const (
 	Any Ownership = iota
@@ -33,16 +40,35 @@ const (
 type Dashboard struct {
 	BaseModel
 
-	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
+	OrgID int64 `gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
 
-	UID     string `json:"uid" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
+	UID     string `gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
 	Title   string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
-	Desc    string `json:"desc" gorm:"column:desc"`
-	Version int    `json:"version" gorm:"column:version"`
+	Desc    string `gorm:"column:desc"`
+	Version int    `gorm:"column:version"`
 
-	Config datatypes.JSON `json:"config" gorm:"column:config"`
+	Config datatypes.JSON `gorm:"column:config"`
 
+	// FIXME: need remove
 	IsStarred bool `json:"isStarred" gorm:"-"`
+}
+
+// ReadMeta reads dashboard metadata from json data.
+func (d *Dashboard) ReadMeta() error {
+	var dashboardMap map[string]any
+	if err := encoding.JSONUnmarshal(d.Config, &dashboardMap); err != nil {
+		return err
+	}
+	title, ok := dashboardMap["title"]
+	if !ok {
+		return errors.New("title is required")
+	}
+	d.Title = fmt.Sprintf("%v", title)
+	uid, ok := dashboardMap[constant.UID]
+	if ok {
+		d.UID = fmt.Sprintf("%v", uid)
+	}
+	return nil
 }
 
 // SearchDashboardRequest represents search dashboard request params.

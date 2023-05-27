@@ -17,26 +17,30 @@ under the License.
 */
 import { PanelSetting, Query } from '@src/types';
 
+export interface DashboardDetail {
+  dashboard: Dashboard;
+}
+
 export interface Variable {
-  type: VariableType;
-  name: string;
-  label?: string;
-  hide: VariableHideType;
-  optionType: OptionType[];
   current?: {
     value?: any;
   };
+  hide: VariableHideType;
+  includeAll?: boolean;
+  label?: string;
+  multi?: boolean;
+  name: string;
   query?: Query;
+  type: VariableType;
 }
 
 export interface Dashboard {
   uid?: string;
   title?: string;
+  description?: string;
   isStarred?: boolean;
-  config?: {
-    panels?: PanelSetting[];
-    variables?: Variable[];
-  };
+  panels?: PanelSetting[];
+  templating?: Record<string, Variable>;
 }
 
 export interface SearchDashboard {
