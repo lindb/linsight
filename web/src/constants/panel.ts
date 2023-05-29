@@ -15,6 +15,12 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from '@src/constants/dashboard';
-export * from '@src/constants/api';
-export * from '@src/constants/panel';
+import { ThresholdMode, Thresholds } from '@src/types';
+
+export const DEFAULT_THRESHOLDS: Thresholds = {
+  mode: ThresholdMode.Absolute,
+  steps: [
+    { value: -Infinity, color: 'green' },
+    { value: 80, color: 'red' },
+  ],
+};

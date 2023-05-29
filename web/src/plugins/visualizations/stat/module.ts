@@ -15,6 +15,11 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from '@src/constants/dashboard';
-export * from '@src/constants/api';
-export * from '@src/constants/panel';
+import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import { OptionsEditor } from '@src/plugins/visualizations/pie/OptionsEditor';
+import Logo from '@src/plugins/visualizations/pie/images/logo2.svg';
+import Stat from './Stat';
+
+const pie = new VisualizationPlugin(DatasourceCategory.Metric, 'Stat', 'stat', 'Standard stat visualization', Stat);
+pie.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
+VisualizationRepositoryInst.register(pie);

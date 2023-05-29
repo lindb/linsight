@@ -24,6 +24,7 @@ export interface PanelSetting {
   title?: string;
   description?: string;
   type?: string;
+  collapsed?: boolean;
   options?: object;
   targets?: Query[];
   fieldConfig?: Record<string, FieldConfig>;
@@ -40,16 +41,24 @@ export interface FieldConfig {
   thresholds?: Thresholds;
   unit?: string;
   decimals?: number;
+  min?: number;
+  max?: number;
+}
+
+export enum ThresholdMode {
+  Absolute = 'absolute',
+  Percenttag = 'percentage',
 }
 
 export interface Thresholds {
-  mode?: 'absolute' | 'percentage';
-  steps?: ThresholdStep[];
+  mode?: ThresholdMode;
+  steps?: Threshold[];
 }
 
-export interface ThresholdStep {
+export interface Threshold {
   color?: string;
   value?: number | null;
+  _percent?: number | null;
 }
 
 export interface OptionsEditorProps {
