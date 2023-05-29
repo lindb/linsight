@@ -15,12 +15,11 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Avatar, Layout, Skeleton, Spin } from '@douyinfe/semi-ui';
-import { Footer, Loading, Notification } from '@src/components';
+import { Loading, Notification } from '@src/components';
 import { useRequest } from '@src/hooks';
 import { PlatformSrv, UserSrv } from '@src/services';
 import { DatasourceStore, MenuStore } from '@src/stores';
-import { Bootdata, ThemeType } from '@src/types';
+import { Bootdata, FormatRepositoryInst, ThemeType } from '@src/types';
 import { ApiKit } from '@src/utils';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -48,13 +47,14 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   const [isLoading, setIsLoading] = useState(true);
   const { result, error } = useRequest(['bootstrap'], async () => {
     // load all features
-    const moduels = import.meta.glob(['../formats/**/module.ts', '../features/*/module.ts', '../plugins/**/module.ts']);
+    const moduels = import.meta.glob(['../features/*/module.ts', '../plugins/**/module.ts']);
     for (const key in moduels) {
       await moduels[key]();
     }
+    // after load plugins moduels build format tree datasources
+    FormatRepositoryInst.buildTree();
     return PlatformSrv.boot();
   });
-  console.log('result boot....', result);
 
   useEffect(() => {
     if (result) {

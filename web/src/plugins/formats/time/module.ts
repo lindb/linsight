@@ -16,6 +16,16 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatRepositoryInst } from '@src/types';
-import { MS } from './time';
+import { Time } from './time';
 
-FormatRepositoryInst.register(new MS());
+FormatRepositoryInst.register(new Time('nanoseconds (ns)', 'ns'))
+  .register(new Time('microseconds (µs)', 'µs'))
+  .register(new Time('milliseconds (ms)', 'ms'))
+  .register(new Time('seconds (s)', 's'))
+  .register(new Time('minutes (m)', 'm'))
+  .register(new Time('hours (h)', 'h'))
+  .register(new Time('days (d)', 'd'))
+  .register(new Time('duration (ms)', 'dtdurationms'))
+  .register(new Time('duration (s)', 'dtdurations'))
+  .register(new Time('duration (hh:mm:ss)', 'dthms'))
+  .register(new Time('duration (d hh:mm:ss)', 'dtdhms'));

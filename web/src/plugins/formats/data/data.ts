@@ -16,30 +16,32 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatCate, Formatted, Formatter } from '@src/types';
+import { FormatKit } from '@src/utils';
+import { map, slice } from 'lodash-es';
 
-class Bytes extends Formatter {
-  constructor() {
+const BIN = ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi', 'Yi'];
+const SI = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
+
+class Binary extends Formatter {
+  private units: string[];
+  private k: number;
+  constructor(label: string, value: string, units: string[], unit: string, k: number, offset = 0) {
     super({
       category: FormatCate.Data,
-      label: 'Bytes(IEC)',
-      value: 'bytes',
+      label: label,
+      value: value,
     });
+    this.k = k;
+    this.units = slice(
+      map(units, (item) => {
+        return `${item}${unit}`;
+      }),
+      offset
+    );
   }
   format(input: number | null, decimals?: number | undefined): Formatted {
-    return { value: 'bytes' };
+    return FormatKit.formatUnit(input, this.units, this.k, decimals);
   }
 }
 
-class DescBytes extends Formatter {
-  constructor() {
-    super({
-      category: FormatCate.Data,
-      label: 'Bytes(SI)',
-      value: 'descbytes',
-    });
-  }
-  format(input: number | null, decimals?: number | undefined): Formatted {
-    return { value: 'descbytes' };
-  }
-}
-export { Bytes, DescBytes };
+export { Binary, BIN, SI };

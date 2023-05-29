@@ -40,15 +40,15 @@ export const PanelEditContextProvider: React.FC<{ initPanel: PanelSetting; child
    * Modify panel options
    */
   const modifyPanel = (cfg: PanelSetting) => {
-    const newPanel = cloneDeep(ObjectKit.merge(panel || {}, cfg));
+    const newPanel = cloneDeep(ObjectKit.merge(panel || {}, ObjectKit.removeUnderscoreProperties(cfg)));
     if (!isEqual(previous.current, newPanel)) {
-      previous.current = newPanel;
+      console.error('change panel data.......');
+      // NOTE: must clone it, because if not clonet panel=previous
+      previous.current = cloneDeep(newPanel);
       // NOTE: need modify dashboard's panel to trigger panel options modify event
       // because clone create new object, modify dashboard panel ref
       DashboardStore.updatePanel(newPanel);
-
-      // NOTE: must clone it, because if not clonet panel=previous
-      setPanel(cloneDeep(newPanel));
+      setPanel(newPanel);
     }
   };
 

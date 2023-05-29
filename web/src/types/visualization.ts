@@ -38,6 +38,8 @@ export interface PanelSetting {
 
 export interface FieldConfig {
   thresholds?: Thresholds;
+  unit?: string;
+  decimals?: number;
 }
 
 export interface Thresholds {
@@ -106,6 +108,14 @@ class VisualizationRepository {
       rs.push(visualization);
     }
     return rs;
+  }
+
+  public getDefaultOptions(type: string): object {
+    const plugin = this.get(type);
+    if (!plugin) {
+      return {};
+    }
+    return plugin.getDefaultOptions();
   }
 
   public get(type: string): VisualizationPlugin | undefined {

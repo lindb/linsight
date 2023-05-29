@@ -49,7 +49,7 @@ guage
       },
     },
     options: {
-      type: 'doughnut',
+      showThresholdMarkers: true,
     },
   })
   .setDarkLogo(Logo)

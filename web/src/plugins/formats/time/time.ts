@@ -17,12 +17,12 @@ under the License.
 */
 import { FormatCate, Formatted, Formatter } from '@src/types';
 
-class MS extends Formatter {
-  constructor() {
+class Time extends Formatter {
+  constructor(label: string, value: string) {
     super({
       category: FormatCate.Time,
-      label: 'Milliseconds (ms)',
-      value: 'ms',
+      label: label,
+      value: value,
     });
   }
   format(input: number | null, decimals?: number | undefined): Formatted {
@@ -30,4 +30,4 @@ class MS extends Formatter {
   }
 }
 
-export { MS };
+export { Time };
