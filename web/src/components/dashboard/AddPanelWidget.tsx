@@ -65,7 +65,7 @@ const AddPanelWidget: React.FC<{
               DashboardStore.updatePanelConfig(panel, {
                 title: 'Row title',
                 type: 'row',
-                grid: { w: 24, h: 1, y: 0, x: 0 },
+                gridPos: { w: 24, h: 1, y: 0, x: 0 },
               });
             }}>
             <div>

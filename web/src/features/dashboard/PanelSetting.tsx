@@ -29,7 +29,7 @@ import {
   VisualizationRepositoryInst,
 } from '@src/types';
 import { ColorKit, ObjectKit } from '@src/utils';
-import { get, set, isEmpty, size, isNil, orderBy, maxBy, has } from 'lodash-es';
+import { get, set, isEmpty, size, isNil, orderBy, maxBy, has, cloneDeep } from 'lodash-es';
 import { PanelEditContext } from '@src/contexts';
 import { toJS } from 'mobx';
 
@@ -79,7 +79,11 @@ const VisualizationsForm: React.FC = () => {
       <Select
         defaultValue={panel?.type}
         style={{ width: '100%' }}
-        onChange={(v) => modifyPanel({ type: v } as object)}
+        onChange={(v: any) => {
+          const newCfg = ObjectKit.merge(VisualizationRepositoryInst.getDefaultOptions(v), panel);
+          newCfg.type = v;
+          modifyPanel(newCfg);
+        }}
         renderSelectedItem={(n: Record<string, any>) => {
           const plugin = VisualizationRepositoryInst.get(`${n.value}`);
           if (!plugin) {
@@ -115,16 +119,31 @@ const VisualizationsForm: React.FC = () => {
 
 const StandardOptionsForm: React.FC = () => {
   const { panel, modifyPanel } = useContext(PanelEditContext);
+  const fieldConfig: FieldConfig = cloneDeep(get(panel, 'fieldConfig.defaults', {}));
+  const formApi = useRef<any>();
+  useEffect(() => {
+    if (formApi.current) {
+      const unit = get(fieldConfig, 'unit', '');
+      const formatter = FormatRepositoryInst.get(unit);
+      set(fieldConfig, '_unit', [formatter.Category.category, formatter.Category.value]);
+      formApi.current.setValues(fieldConfig, { isOverride: true });
+    }
+  }, [formApi, fieldConfig]);
   return (
     <Form
       className="linsight-form linsight-panel-setting"
       layout="vertical"
-      initValues={panel?.options}
+      getFormApi={(api: any) => (formApi.current = api)}
       onValueChange={(values: object) => {
-        modifyPanel({ options: values });
+        set(values, 'unit', get(values, '_unit[1]', ''));
+        modifyPanel({
+          fieldConfig: {
+            defaults: set(values, 'unit', get(values, '_unit[1]', '')),
+          },
+        });
       }}>
       <Form.Cascader
-        field="unit"
+        field="_unit"
         label="Unit"
         placeholder="choose"
         filterTreeNode
@@ -133,10 +152,6 @@ const StandardOptionsForm: React.FC = () => {
         autoMergeValue={false}
         motion={false}
         treeData={FormatRepositoryInst.tree()}
-        // treeData={FormatCategories}
-        onChange={(value) => {
-          console.log(value);
-        }}
       />
       <Form.InputNumber field="decimals" label="Decimals" />
     </Form>
@@ -147,7 +162,6 @@ const ThresholdsFieldConfigForm: React.FC = () => {
   const { panel, modifyPanel } = useContext(PanelEditContext);
   const formApi = useRef<any>();
   const maxStepValue = useRef<number>(0);
-  const currentStep = useRef<string>('');
   const STEP = 10;
   const thresholds: Thresholds = get(panel, 'fieldConfig.defaults.thresholds', {});
 
@@ -166,7 +180,9 @@ const ThresholdsFieldConfigForm: React.FC = () => {
         0
       ) || 0;
     if (formApi.current) {
-      thresholds.steps = orderBy(thresholds.steps, [(obj) => isNil(obj.value), 'value'], ['asc', 'desc']);
+      if (thresholds.steps) {
+        thresholds.steps = orderBy(thresholds.steps, [(obj) => isNil(obj.value), 'value'], ['asc', 'desc']);
+      }
       formApi.current.setValues(thresholds, { isOverride: true });
     }
   }, [formApi, thresholds]);
@@ -181,7 +197,7 @@ const ThresholdsFieldConfigForm: React.FC = () => {
         modifyPanel({
           fieldConfig: {
             defaults: {
-              thresholds: values,
+              thresholds: ObjectKit.removeUnderscoreProperties(values),
             },
           },
         });
@@ -213,7 +229,6 @@ const ThresholdsFieldConfigForm: React.FC = () => {
                     disabled={!step.value}
                     placeholder="Base"
                     noLabel
-                    autofocus={currentStep.current == key}
                     hideButtons={!step.value}
                     suffix={step.value && <IconDeleteStroked style={{ cursor: 'pointer' }} onClick={remove} />}
                     prefix={
@@ -260,6 +275,7 @@ const PanelSetting: React.FC = () => {
     return null;
   }
   const OptionsEditor = plugin.components.OptionsEditor;
+  console.log('xxxxxx.........', toJS(panel));
   return (
     <>
       <Collapse
@@ -273,7 +289,7 @@ const PanelSetting: React.FC = () => {
         </Collapse.Panel>
         {OptionsEditor && (
           <OptionsEditor
-            panel={ObjectKit.merge(plugin.getDefaultOptions(), panel)}
+            panel={ObjectKit.merge(VisualizationRepositoryInst.getDefaultOptions(`${panel.type}`), panel)}
             onOptionsChange={(options: {}) => {
               console.error('option ccc', options);
               modifyPanel({ options: options });

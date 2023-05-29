@@ -20,9 +20,9 @@ import { ColorKit, ObjectKit } from '@src/utils';
 import { has, get, set, forIn, cloneDeep } from 'lodash-es';
 
 export const format = (chart: any, val: number) => {
-  const format: any = get(chart, 'linsight.extend.format');
-  if (format) {
-    return format(val);
+  const formatFn: any = get(chart, 'linsight.extend.format');
+  if (formatFn) {
+    return formatFn(val);
   }
   return val;
 };

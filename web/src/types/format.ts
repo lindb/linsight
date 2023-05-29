@@ -15,7 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { toLower, sortBy, join } from 'lodash-es';
+import { find } from 'lodash-es';
+
 export enum FormatCate {
   Misc = 'Misc',
   Data = 'Data',
@@ -35,14 +36,6 @@ export interface FormatCategory {
   value: string;
   label: string;
 }
-
-const cateToString = (cate: FormatCate): string => {
-  return toLower(cate).replaceAll(' ', '');
-};
-
-const categoryToString = (category: FormatCategory): string => {
-  return [cateToString(category.category), category.value].join('_');
-};
 
 const formattedToString = (formatted: Formatted): string => {
   return `${formatted.prefix ?? ''}${formatted.value}${formatted.suffix ?? ''}`;
@@ -82,51 +75,52 @@ const defaultFormatter = new DefaultFormatter();
 
 class FormatRepository {
   private formatters: Map<string, Formatter> = new Map<string, Formatter>();
+  private treeData: any[] = [];
 
   public register(formatter: Formatter): FormatRepository {
-    this.formatters.set(categoryToString(formatter.Category), formatter);
+    this.formatters.set(formatter.Category.value, formatter);
     return this;
   }
 
-  public get(category: any): Formatter {
-    const format = this.formatters.get(join(category, '_'));
+  public get(unit: string): Formatter {
+    const format = this.formatters.get(unit);
     if (format) {
       return format;
     }
     return defaultFormatter;
   }
 
-  public formatString(category: any, input: number | null, decimals = 2): string {
-    return this.get(category).formatString(input, decimals);
+  public formatString(unit: any, input: number | null, decimals = 2): string {
+    return this.get(unit).formatString(input, decimals);
   }
 
   public tree(): any {
-    const keys = sortBy(Array.from(this.formatters.keys()));
+    return this.treeData;
+  }
+
+  public buildTree() {
     const result: any[] = [];
-    let cate: FormatCate;
-    let children: any[];
-    keys.forEach((key: string) => {
-      const formatter = this.formatters.get(key);
-      if (formatter) {
-        if (formatter.Category.category !== cate) {
-          cate = formatter.Category.category;
-          children = [];
-          const cateStr = cateToString(cate);
-          result.push({
-            label: cate,
-            value: cateStr,
-            key: cateStr,
-            children: children,
-          });
-        }
-        children.push({
-          key: formatter.Category.label,
-          label: formatter.Category.label,
-          value: formatter.Category.value,
+    this.formatters.forEach((formatter: Formatter) => {
+      const cate = formatter.Category.category;
+      const category = find(result, { value: cate });
+      const unit = {
+        key: formatter.Category.value,
+        label: formatter.Category.label,
+        value: formatter.Category.value,
+      };
+
+      if (category) {
+        category.children.push(unit);
+      } else {
+        result.push({
+          label: cate,
+          value: cate,
+          key: cate,
+          children: [unit],
         });
       }
     });
-    return result;
+    this.treeData = result;
   }
 }
 

@@ -27,7 +27,7 @@ import {
 import { Chart, registerables } from 'chart.js';
 import { cloneDeep, get, set, find, isEmpty } from 'lodash-es';
 import classNames from 'classnames';
-import { FormatRepositoryInst, MouseEventType, SearchParamKeys, ThemeType } from '@src/types';
+import { FormatRepositoryInst, MouseEventType, PanelSetting, SearchParamKeys, ThemeType } from '@src/types';
 import { PlatformStore } from '@src/stores';
 import { CSSKit } from '@src/utils';
 import annotationPlugin from 'chartjs-plugin-annotation';
@@ -48,8 +48,10 @@ const Zoom = {
   x: 0,
 };
 
-export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config: any }> = (props) => {
-  const { theme, config, datasets } = props;
+export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel: PanelSetting; options: any }> = (
+  props
+) => {
+  const { theme, options, panel, datasets } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
@@ -266,13 +268,13 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
       // if canvas is null, return it.
       return;
     }
-    const chartType = get(config, 'type', 'line');
+    const chartType = get(options, 'type', 'line');
     const chartCfg: any = getChartThemeConfig(theme, cloneDeep(DefaultChartConfig));
     if (!chartInstance.current) {
       chartCfg.data = datasets || [];
-      modifyChartConfigs(chartCfg, config);
-      modifyChartOptions(chartCfg.options, config);
-      console.log('create new chart', chartInstance, chartCfg, config);
+      modifyChartConfigs(chartCfg, options);
+      modifyChartOptions(chartCfg.options, options);
+      console.log('create new chart', chartInstance, chartCfg, options);
       const canvas = canvasRef.current;
       const chart = new Chart(canvas, chartCfg);
       set(chart, 'linsight.extend.crosshair', crosshairRef.current);
@@ -291,16 +293,16 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
         options: get(chart, 'options', {}),
       }).options;
 
-      modifyChartConfigs(chart, config);
-      modifyChartOptions(chart.config.options, config);
+      modifyChartConfigs(chart, options);
+      modifyChartOptions(chart.config.options, options);
       // update chart after dataset or config changed
-      console.log('update chart....', chart, chartType, toJS(config));
+      console.log('update chart....', chart, chartType, toJS(options));
       chart.update();
     }
 
     set(chartInstance.current, 'linsight.extend.format', function (val: number) {
-      const unit = get(config, 'unit');
-      const decimals = get(config, 'decimals');
+      const unit = get(panel, 'fieldConfig.defaults.unit', '');
+      const decimals = get(options, 'decimals');
       return FormatRepositoryInst.get(unit).formatString(val, decimals);
     });
 
@@ -313,7 +315,7 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
     });
     setSelectedSeries(Array.from(currentSelectedSet));
     console.error('re-render time series chart');
-  }, [config, datasets, theme]);
+  }, [options, datasets, theme, panel]);
 
   /**
    * destroy resource
@@ -336,7 +338,7 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; config
 
   const timeseriesChartCls = classNames('time-series-container', {
     'chart-cursor-pointer': true,
-    'legend-to-right': get(config, 'legend.placement', Placement.Bottom) === Placement.Right,
+    'legend-to-right': get(options, 'legend.placement', Placement.Bottom) === Placement.Right,
   });
 
   return (

@@ -18,7 +18,7 @@ under the License.
 import { Notification } from '@src/components';
 import { DefaultColumns, RowPanelType, VisualizationAddPanelType } from '@src/constants';
 import { DashboardSrv } from '@src/services';
-import { Dashboard, PanelSetting, Variable } from '@src/types';
+import { Dashboard, PanelSetting, Variable, VisualizationRepositoryInst } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
 import {
   set,
@@ -207,16 +207,21 @@ class DashboardStore {
   private initDashboard(dashboard: Dashboard) {
     this.dashboard = dashboard;
     const panels = this.getPanels();
-    const maxPanel = maxBy(panels, (panel: PanelSetting) => {
+    let maxPanel = 0;
+    (panels || []).forEach((panel: PanelSetting) => {
       if (!panel.id || panel.id < 0) {
         panel.id = this.assignPanelId();
       }
       // NOTE: set grid i here
       this.setPanelGridId(panel);
+      // calc max panel id
+      if (maxPanel < panel.id) {
+        maxPanel = panel.id;
+      }
       return panel.id;
     });
     if (maxPanel) {
-      this.panelSeq = maxPanel.id || 0;
+      this.panelSeq = maxPanel || 0;
     }
   }
 

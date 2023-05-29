@@ -25,3 +25,5 @@ export enum Placement {
   Bottom = 'bottom',
   Right = 'right',
 }
+
+export interface TimeSeriesOptions {}

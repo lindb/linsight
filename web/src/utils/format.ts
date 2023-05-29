@@ -15,6 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { Formatted } from '@src/types';
+import { round, divide, get } from 'lodash-es';
 
 const toObject = (input: string): any => {
   switch (input) {
@@ -27,6 +29,23 @@ const toObject = (input: string): any => {
   }
 };
 
+const formatUnit = (value: number | null, units: string[], k = 1000, decimals = 2): Formatted => {
+  if (!value || value === 0) {
+    return {
+      value: '0',
+      suffix: get(units, `[0]`, ''),
+    };
+  }
+  const i = Math.min(Math.floor(Math.log(value) / Math.log(k)), units.length - 1);
+  const result = round(divide(value, Math.pow(k, i)), decimals);
+  const unit = units[i];
+  return {
+    value: `${result}`,
+    suffix: unit,
+  };
+};
+
 export default {
+  formatUnit,
   toObject,
 };
