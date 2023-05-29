@@ -18,7 +18,7 @@ under the License.
 import React from 'react';
 
 const Stat: React.FC = () => {
-  return <div>stat</div>;
+  return <div>N/A</div>;
 };
 
 export default Stat;
