@@ -47,10 +47,7 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   const [isLoading, setIsLoading] = useState(true);
   const { result, error } = useRequest(['bootstrap'], async () => {
     // load all features
-    const moduels = import.meta.glob(['../features/*/module.ts', '../plugins/**/module.ts']);
-    for (const key in moduels) {
-      await moduels[key]();
-    }
+    import.meta.glob(['../features/*/module.ts', '../plugins/**/module.ts'], { eager: true });
     // after load plugins moduels build format tree datasources
     FormatRepositoryInst.buildTree();
     return PlatformSrv.boot();
