@@ -19,6 +19,7 @@ import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } 
 import { Gauge } from '@src/plugins/visualizations/gauge/Gauge';
 import { OptionsEditor } from '@src/plugins/visualizations/gauge/OptionsEditor';
 import Logo from '@src/plugins/visualizations/gauge/images/logo2.svg';
+import { DEFAULT_THRESHOLDS } from '@src/constants';
 
 const guage = new VisualizationPlugin(
   DatasourceCategory.Metric,
@@ -33,19 +34,7 @@ guage
   .setDefaultOptions({
     fieldConfig: {
       defaults: {
-        thresholds: {
-          mode: 'percentage',
-          steps: [
-            {
-              value: null,
-              color: 'green',
-            },
-            {
-              value: 80,
-              color: 'red',
-            },
-          ],
-        },
+        thresholds: DEFAULT_THRESHOLDS,
       },
     },
     options: {

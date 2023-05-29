@@ -173,10 +173,13 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
     }
   };
 
-  if (!plugin) {
-    return <div>panel plugin not exist</div>;
-  }
-  const Visualization = plugin.Visualization;
+  const renderContent = () => {
+    if (!plugin) {
+      return <div>not support</div>;
+    }
+    const Visualization = plugin.Visualization;
+    return <Visualization datasets={result} theme={theme} panel={panel} />;
+  };
   const panelCls = classNames('dashboard-panel', className, {
     'dashboard-panel-static': isStatic,
   });
@@ -200,7 +203,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
         <Card
           className={panelCls}
           header={<PanelHeader ref={header} panel={panel} isStatic={isStatic} isLoading={loading} error={error} />}>
-          {Visualization && <Visualization datasets={result} theme={theme} panel={panel} />}
+          {renderContent()}
         </Card>
       </LazyLoad>
     </div>

@@ -23,3 +23,4 @@ export { default as DataSetKit } from '@src/utils/dataset';
 export { default as CSSKit } from '@src/utils/css';
 export { default as ObjectKit } from '@src/utils/object';
 export { default as VariableKit } from '@src/utils/variable';
+export { default as FieldKit } from '@src/utils/panel/field';

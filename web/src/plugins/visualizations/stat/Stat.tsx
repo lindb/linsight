@@ -15,6 +15,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from '@src/constants/dashboard';
-export * from '@src/constants/api';
-export * from '@src/constants/panel';
+import React from 'react';
+
+const Stat: React.FC = () => {
+  return <div>stat</div>;
+};
+
+export default Stat;

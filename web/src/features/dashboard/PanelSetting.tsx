@@ -24,7 +24,7 @@ import {
   FormatRepositoryInst,
   PanelSetting,
   Thresholds,
-  ThresholdStep,
+  Threshold,
   VisualizationPlugin,
   VisualizationRepositoryInst,
 } from '@src/types';
@@ -153,6 +153,8 @@ const StandardOptionsForm: React.FC = () => {
         motion={false}
         treeData={FormatRepositoryInst.tree()}
       />
+      <Form.InputNumber field="min" label="Min" />
+      <Form.InputNumber field="max" label="Max" />
       <Form.InputNumber field="decimals" label="Decimals" />
     </Form>
   );
@@ -217,7 +219,7 @@ const ThresholdsFieldConfigForm: React.FC = () => {
                 Add threshold
               </Button>
               {arrayFields.map(({ field, key, remove }, i) => {
-                const step: ThresholdStep = get(thresholds, `steps.[${i}]`, {});
+                const step: Threshold = get(thresholds, `steps.[${i}]`, {});
                 if (isEmpty(step)) {
                   return null;
                 }

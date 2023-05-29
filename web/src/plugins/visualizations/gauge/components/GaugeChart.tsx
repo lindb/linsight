@@ -15,13 +15,14 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PanelSetting, ThemeType, Thresholds, ThresholdStep } from '@src/types';
-import React, { MutableRefObject, useEffect, useRef } from 'react';
+import { FormatRepositoryInst, PanelSetting, ThemeType, Threshold } from '@src/types';
+import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
 import { Chart, registerables } from 'chart.js';
-import { get, cloneDeep, orderBy, isNil } from 'lodash-es';
+import { get, cloneDeep } from 'lodash-es';
 import { toJS } from 'mobx';
-import { DefaultChartConfig, getChartThemeConfig } from './chart.config';
+import { DefaultChartConfig } from './chart.config';
 import { GaugeOptions } from '../types';
+import { CSSKit, FieldKit } from '@src/utils';
 
 Chart.register(...registerables);
 
@@ -31,70 +32,67 @@ export const GaugeChart: React.FC<{ datasets: any; theme: ThemeType; options: Ga
   const { theme, options, datasets, panel } = props;
   const canvasRef = useRef() as MutableRefObject<HTMLCanvasElement | null>;
   const chartInstance = useRef() as MutableRefObject<Chart | null>;
-  const thresholds: Thresholds = get(panel, 'fieldConfig.defaults.thresholds', {});
+  const value = 90;
+  const [activeThreshold, setActiveThreshold] = useState<Threshold>({});
+  const [fontSize, setFontSize] = useState('1rem');
+  const fieldConfig = get(panel, 'fieldConfig.defaults', {});
 
   const showThresholdMarkers = (): boolean => {
     return options.showThresholdMarkers || false;
   };
-
   useEffect(() => {
     if (!canvasRef.current) {
       // if canvas is null, return it.
       return;
     }
-    const chartType = get(options, 'type', 'doughnut');
-    const chartCfg: any = getChartThemeConfig(theme, cloneDeep(DefaultChartConfig));
+    const chartCfg: any = cloneDeep(DefaultChartConfig);
     const dd = [];
+    const formattedThresholds = FieldKit.getFormattedThresholds(fieldConfig);
     if (showThresholdMarkers()) {
-      const thresholdSteps = orderBy(thresholds.steps || [], [(obj) => isNil(obj.value), 'value'], ['asc', 'asc']);
       const data: any[] = [];
       const backgroundColor: any[] = [];
-      thresholdSteps.forEach((step: ThresholdStep) => {
-        data.push(step.value);
+      formattedThresholds.forEach((step: Threshold) => {
+        data.push(step._percent);
         backgroundColor.push(step.color);
       });
-
       dd.push({ data: data, backgroundColor: backgroundColor });
     }
+    const activeThreshold = FieldKit.getActiveThreshold(value, toJS(formattedThresholds));
+
     dd.push({
-      data: [90],
+      data: [value, formattedThresholds[formattedThresholds.length - 1].value - value],
       borderWidth: 1,
-      backgroundColor: ['green', 'rgba(46,50,56, .1)'],
+      backgroundColor: [activeThreshold.color, CSSKit.getColor('--semi-color-fill-0', theme)],
       weight: 10,
+      borderColor: CSSKit.getColor('--semi-color-bg-1', theme),
     });
     const datasets = {
-      labels: ['10%', '100%'],
       datasets: dd,
     };
     if (!chartInstance.current) {
-      chartCfg.data = datasets || [];
+      chartCfg.data = datasets;
       chartCfg.type = 'doughnut';
-      // modifyChartConfigs(chartCfg, config);
-      // modifyChartOptions(chartCfg.options, config);
-      console.log('create new chart', chartInstance, chartCfg, options);
       const canvas = canvasRef.current;
       const chart = new Chart(canvas, chartCfg);
       chartInstance.current = chart;
     } else {
       const chart = chartInstance.current;
-      chart.data = datasets || [];
-      // theme changed
-      chart.options = getChartThemeConfig(theme, {
-        options: get(chart, 'options', {}),
-      }).options;
-
-      // modifyChartConfigs(chart, config);
-      // modifyChartOptions(chart.config.options, config);
+      chart.data = datasets;
       // update chart after dataset or config changed
-      console.log('update chart....', chart, datasets, chartType, toJS(options));
       chart.update();
     }
-  }, [options, datasets, theme]);
+    console.error('render gauge chart');
+    setActiveThreshold(activeThreshold);
+    const chartArea = chartInstance.current.chartArea;
+    setFontSize(`${Math.min(chartArea.height, chartArea.width) / 10}px`);
+  }, [options, datasets, theme, fieldConfig]);
 
   return (
     <div className="gauge-container">
       <div className="gauge-canvas">
-        <div className="percent">34.55%</div>
+        <div className="text" style={{ fontSize: `${fontSize}`, color: activeThreshold.color }}>
+          {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(value)}
+        </div>
         <canvas ref={canvasRef} />
       </div>
     </div>

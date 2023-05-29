@@ -17,7 +17,7 @@ under the License.
 */
 import React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { get } from 'lodash-es';
+import { get, isEmpty } from 'lodash-es';
 import { AddPanelWidget, Panel } from '@src/components';
 import { Observer } from 'mobx-react-lite';
 import { DashboardStore } from '@src/stores';
@@ -26,7 +26,7 @@ import RGL, { WidthProvider } from 'react-grid-layout';
 import { DefaultColumns, DefaultRowHeight, RowPanelType, VisualizationAddPanelType } from '@src/constants';
 import ViewVariables from './components/ViewVariables';
 import { VariableContextProvider } from '@src/contexts';
-import { Variable } from '@src/types';
+import { PanelSetting, Variable } from '@src/types';
 import RowPanel from './components/RowPanel';
 
 const ReactGridLayout = WidthProvider(RGL);
@@ -43,18 +43,26 @@ const View: React.FC = () => {
       }
       if (item.type === RowPanelType) {
         item.gridPos.isResizable = false;
+        const panelsOfRow = get(item, 'panels', []);
+        if (!isEmpty(panelsOfRow)) {
+          panelsOfRow.map((c: any) => {
+            layout.push(c.gridPos);
+          });
+        }
       }
       layout.push(item.gridPos);
     });
     return layout;
   };
 
-  const renderPanel = (panel: any) => {
+  const renderPanel = (panel: PanelSetting) => {
     switch (panel.type) {
       case VisualizationAddPanelType:
         return <AddPanelWidget panel={panel} />;
       case RowPanelType:
-        return <RowPanel panel={panel} />;
+        const panels = [<RowPanel key={panel.id} panel={panel} />];
+        // FIXME: need impl it
+        return panels;
       default:
         return <Panel panel={panel} shortcutKey />;
     }
@@ -62,7 +70,7 @@ const View: React.FC = () => {
 
   const renderPanels = () => {
     const panels = DashboardStore.getPanels();
-    return panels.map((item: any, _index: number) => {
+    return panels.map((item: PanelSetting, _index: number) => {
       if (!item || get(item, '_hidden', false)) {
         return null;
       }
