@@ -17,10 +17,12 @@ under the License.
 */
 import { ThresholdMode, Thresholds } from '@src/types';
 
-export const DEFAULT_THRESHOLDS: Thresholds = {
+export const DefaultThresholds: Thresholds = {
   mode: ThresholdMode.Absolute,
   steps: [
     { value: -Infinity, color: 'green' },
     { value: 80, color: 'red' },
   ],
 };
+
+export const PanelGridPos = ['x', 'y', 'w', 'h'];

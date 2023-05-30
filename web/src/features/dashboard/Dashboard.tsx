@@ -18,7 +18,7 @@ under the License.
 import React, { useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { isEmpty, endsWith, get } from 'lodash-es';
+import { isEmpty, endsWith } from 'lodash-es';
 import { Layout, Typography, Button, SideSheet, Form, Space } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
 import { DashboardStore } from '@src/stores';

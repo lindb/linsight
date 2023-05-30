@@ -17,13 +17,18 @@ under the License.
 */
 import React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { get, isEmpty } from 'lodash-es';
+import { get, pick } from 'lodash-es';
 import { AddPanelWidget, Panel } from '@src/components';
 import { Observer } from 'mobx-react-lite';
 import { DashboardStore } from '@src/stores';
-import { toJS } from 'mobx';
 import RGL, { WidthProvider } from 'react-grid-layout';
-import { DefaultColumns, DefaultRowHeight, RowPanelType, VisualizationAddPanelType } from '@src/constants';
+import {
+  DefaultColumns,
+  DefaultRowHeight,
+  PanelGridPos,
+  RowPanelType,
+  VisualizationAddPanelType,
+} from '@src/constants';
 import ViewVariables from './components/ViewVariables';
 import { VariableContextProvider } from '@src/contexts';
 import { PanelSetting, Variable } from '@src/types';
@@ -37,20 +42,15 @@ const View: React.FC = () => {
 
   const buildLayout = (panels: any) => {
     const layout: any[] = [];
-    toJS(panels || []).map((item: any, _index: number) => {
-      if (!item || get(item, '_hidden', false)) {
+    (panels || []).map((item: any, _index: number) => {
+      if (!item) {
         return;
       }
+      const gridPos = pick(item.gridPos, ['i', ...PanelGridPos]) as ReactGridLayout.Layout;
       if (item.type === RowPanelType) {
-        item.gridPos.isResizable = false;
-        const panelsOfRow = get(item, 'panels', []);
-        if (!isEmpty(panelsOfRow)) {
-          panelsOfRow.map((c: any) => {
-            layout.push(c.gridPos);
-          });
-        }
+        gridPos.isResizable = false;
       }
-      layout.push(item.gridPos);
+      layout.push(gridPos);
     });
     return layout;
   };
@@ -60,21 +60,31 @@ const View: React.FC = () => {
       case VisualizationAddPanelType:
         return <AddPanelWidget panel={panel} />;
       case RowPanelType:
-        const panels = [<RowPanel key={panel.id} panel={panel} />];
-        // FIXME: need impl it
-        return panels;
+        return <RowPanel key={`${panel.id}`} panel={panel} />;
       default:
-        return <Panel panel={panel} shortcutKey />;
+        return <Panel key={`${panel.id}`} panel={panel} shortcutKey />;
     }
   };
 
   const renderPanels = () => {
     const panels = DashboardStore.getPanels();
     return panels.map((item: PanelSetting, _index: number) => {
-      if (!item || get(item, '_hidden', false)) {
+      if (!item) {
         return null;
       }
       return <div key={item.id}>{renderPanel(item)}</div>;
+    });
+  };
+
+  const updatePanelGridPos = (layout: ReactGridLayout.Layout[]) => {
+    // NOTE: if use onLayoutChange will re-layout when component init
+    // and impact lazy load when toggle row
+    (layout || []).forEach((item: any) => {
+      const panel = DashboardStore.getPanel(parseInt(item.i));
+      if (panel) {
+        DashboardStore.updatePanelConfig(panel, { gridPos: item });
+        DashboardStore.sortPanels();
+      }
     });
   };
 
@@ -94,15 +104,8 @@ const View: React.FC = () => {
                     className="layout"
                     layout={buildLayout(DashboardStore.getPanels())}
                     useCSSTransforms={false}
-                    onLayoutChange={(layout: any) => {
-                      (layout || []).forEach((item: any) => {
-                        const panel = DashboardStore.getPanel(parseInt(item.i));
-                        if (panel) {
-                          DashboardStore.updatePanelConfig(panel, { gridPos: item });
-                          DashboardStore.sortPanels();
-                        }
-                      });
-                    }}
+                    onResizeStop={updatePanelGridPos}
+                    onDragStop={updatePanelGridPos}
                     margin={[6, 6]}
                     cols={DefaultColumns}
                     rowHeight={DefaultRowHeight}

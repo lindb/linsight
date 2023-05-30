@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { PanelSetting } from '@src/types';
 import { Button, Form, Modal, Typography } from '@douyinfe/semi-ui';
 import { IconSettingStroked, IconDeleteStroked, IconChevronDownStroked, IconHandle } from '@douyinfe/semi-icons';
@@ -37,9 +37,6 @@ const RowPanel: React.FC<{ panel: PanelSetting }> = (props) => {
   });
   const [showActions, setShowActions] = useState(false);
   const formApi = useRef<any>();
-  useEffect(() => {
-    DashboardStore.collapseRow(panel, collapsed);
-  }, [collapsed, panel]);
   const cls = classNames('dashboard-row-panel', { collapsed: collapsed });
   return (
     <>
@@ -51,11 +48,22 @@ const RowPanel: React.FC<{ panel: PanelSetting }> = (props) => {
         onMouseLeave={() => {
           setShowActions(false);
         }}>
-        <div className="title" onClick={() => setCollapsed(!collapsed)}>
+        <div
+          className="title"
+          onClick={() => {
+            const newCollapsed = !collapsed;
+            DashboardStore.collapseRow(panel, newCollapsed);
+            setCollapsed(newCollapsed);
+          }}>
           <IconChevronDownStroked size="small" rotate={collapsed ? -90 : 0} />
           <Text className="text" strong>
             {panel.title}
           </Text>
+          {panel.collapsed && (
+            <Text size="small" type="tertiary">
+              ({get(panel, 'panels', []).length} panels)
+            </Text>
+          )}
         </div>
         <div className="actions" style={{ visibility: showActions ? 'visible' : 'hidden' }}>
           <Button theme="borderless" type="tertiary" icon={<IconSettingStroked />} onClick={() => setVisible(true)} />
