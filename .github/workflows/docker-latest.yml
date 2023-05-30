@@ -60,7 +60,3 @@ jobs:
           file: Dockerfile-gh
           build-args: |
             LD_FLAGS=-ldflags=-s -w
-<<<<<<< HEAD
-            GITHUB_WORKSPACE=${{ steps.web.outputs.web }}
-=======
->>>>>>> c5bd901 ([bug]: fix docker image not include web)
