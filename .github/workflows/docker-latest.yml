@@ -58,4 +58,5 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           file: Dockerfile-gh
           build-args: |
-            LD_FLAGS=-ldflags=-s -w,GITHUB_WORKSPACE=${{ steps.web.outputs.web }}
+            LD_FLAGS=-ldflags=-s -w
+            GITHUB_WORKSPACE=${{ steps.web.outputs.web }}
