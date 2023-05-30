@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-      - name: Build
+      - name: Build Web
         id: web
         run: |
           make build-frontend
@@ -56,7 +56,11 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          context: ${{ steps.web.outputs.web }}
           file: Dockerfile-gh
           build-args: |
             LD_FLAGS=-ldflags=-s -w
+<<<<<<< HEAD
             GITHUB_WORKSPACE=${{ steps.web.outputs.web }}
+=======
+>>>>>>> c5bd901 ([bug]: fix docker image not include web)
