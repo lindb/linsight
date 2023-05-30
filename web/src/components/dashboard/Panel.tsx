@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Card, Typography, Dropdown } from '@douyinfe/semi-ui';
+import { Card, Typography, Dropdown, Popover } from '@douyinfe/semi-ui';
 import {
   IconLineChartStroked,
   IconEdit2Stroked,
@@ -62,7 +62,13 @@ const PanelHeader = forwardRef(
           {panel.title && (
             <>
               <IconLineChartStroked />
-              <Text>{panel.title}</Text>
+              {panel.description ? (
+                <Popover showArrow arrowPointAtCenter content={<article>{panel.description}</article>}>
+                  <Text>{panel.title}</Text>
+                </Popover>
+              ) : (
+                <Text>{panel.title}</Text>
+              )}
             </>
           )}
         </div>

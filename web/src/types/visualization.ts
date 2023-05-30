@@ -19,6 +19,14 @@ import { ComponentType } from 'react';
 import { DatasourceCategory, Plugin, Query, ThemeType } from '@src/types';
 import { cloneDeep } from 'lodash-es';
 
+export interface GridPos {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  i?: string;
+}
+
 export interface PanelSetting {
   id?: number;
   title?: string;
@@ -28,13 +36,8 @@ export interface PanelSetting {
   options?: object;
   targets?: Query[];
   fieldConfig?: Record<string, FieldConfig>;
-  gridPos?: {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    i?: string;
-  };
+  panels?: PanelSetting[];
+  gridPos?: GridPos;
 }
 
 export interface FieldConfig {

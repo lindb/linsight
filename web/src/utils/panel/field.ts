@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { DEFAULT_THRESHOLDS } from '@src/constants';
+import { DefaultThresholds } from '@src/constants';
 import { FieldConfig, Threshold, ThresholdMode } from '@src/types';
 import { isEmpty, orderBy, isNil, sortedIndexBy } from 'lodash-es';
 
@@ -34,7 +34,7 @@ const getActiveThreshold = (value: number, thresholds: Threshold[]): Threshold =
  * Return sort and format thresholds
  */
 const getFormattedThresholds = (field: FieldConfig): Threshold[] => {
-  const thresholds = field.thresholds ?? DEFAULT_THRESHOLDS;
+  const thresholds = field.thresholds ?? DefaultThresholds;
   const isPercent = thresholds.mode === ThresholdMode.Percenttag;
   const min = isPercent ? 0 : field.min ?? 0;
   const max = isPercent ? 100 : field.max ?? 100;

@@ -16,10 +16,10 @@ specific language governing permissions and limitations
 under the License.
 */
 import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
-import { OptionsEditor } from '@src/plugins/visualizations/pie/OptionsEditor';
-import Logo from '@src/plugins/visualizations/pie/images/logo2.svg';
+import { OptionsEditor } from './OptionsEditor';
+import Logo from './images/logo.svg';
 import Stat from './Stat';
 
-const pie = new VisualizationPlugin(DatasourceCategory.Metric, 'Stat', 'stat', 'Standard stat visualization', Stat);
-pie.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
-VisualizationRepositoryInst.register(pie);
+const stat = new VisualizationPlugin(DatasourceCategory.Metric, 'Stat', 'stat', 'Big stat values', Stat);
+stat.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
+VisualizationRepositoryInst.register(stat);

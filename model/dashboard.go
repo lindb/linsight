@@ -40,14 +40,14 @@ const (
 type Dashboard struct {
 	BaseModel
 
-	OrgID int64 `gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
+	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
 
-	UID     string `gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
+	UID     string `json:"uid" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
 	Title   string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
-	Desc    string `gorm:"column:desc"`
+	Desc    string `json:"desc" gorm:"column:desc"`
 	Version int    `gorm:"column:version"`
 
-	Config datatypes.JSON `gorm:"column:config"`
+	Config datatypes.JSON `json:"-" gorm:"column:config"`
 
 	// FIXME: need remove
 	IsStarred bool `json:"isStarred" gorm:"-"`

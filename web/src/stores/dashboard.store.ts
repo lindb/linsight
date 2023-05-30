@@ -16,25 +16,11 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Notification } from '@src/components';
-import { DefaultColumns, RowPanelType, VisualizationAddPanelType } from '@src/constants';
+import { DefaultColumns, PanelGridPos, RowPanelType, VisualizationAddPanelType } from '@src/constants';
 import { DashboardSrv } from '@src/services';
-import { Dashboard, PanelSetting, Variable, VisualizationRepositoryInst } from '@src/types';
+import { Dashboard, GridPos, PanelSetting, Variable } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
-import {
-  set,
-  get,
-  find,
-  cloneDeep,
-  has,
-  concat,
-  findIndex,
-  forIn,
-  merge,
-  pick,
-  isEmpty,
-  pullAt,
-  maxBy,
-} from 'lodash-es';
+import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
 
 class DashboardStore {
@@ -59,46 +45,71 @@ class DashboardStore {
     return find(panels, { id: panelId });
   }
 
-  getPanelsOfRow(rowPanelId: number | undefined): PanelSetting[] {
-    const panels = this.getPanels();
-    const result: PanelSetting[] = [];
-    const index = findIndex(panels, { id: rowPanelId });
-    if (index < 0) {
-      return result;
-    }
-    for (let i = index + 1; i < panels.length; i++) {
-      const panel = panels[i];
-      if (panel.type === RowPanelType) {
-        break;
-      }
-      result.push(panel);
-    }
-    return result;
-  }
-
   collapseRow(row: PanelSetting, collapsed: boolean) {
-    this.updatePanelConfig(row, { collapsed: collapsed });
-    const children = this.getPanelsOfRow(row.id);
-    (children || []).forEach((child: PanelSetting) => set(child, '_hidden', collapsed));
+    const cfg: PanelSetting = { collapsed: collapsed };
+    if (collapsed) {
+      if (isEmpty(row.panels)) {
+        // if no child try to find children from dashboard's panels
+        const panels = this.getPanels();
+        const childIndexes: number[] = [];
+        this.findPanelsForRow(row.id, (_child: PanelSetting, index: number) => [childIndexes.push(index)]);
+        const children = pullAt(panels, ...childIndexes);
+        cfg.panels = children;
+      }
+    } else {
+      if (row.panels) {
+        // has children, need put all children to dashboard's panels, and clean children
+        const panels = this.getPanels();
+        const index = findIndex(panels, { id: row.id });
+        if (index >= 0) {
+          const rowGridPos = this.getPanelGrid(row);
+          const offsetOfChildren = rowGridPos.y + rowGridPos.h;
+          let yMax = rowGridPos.y;
+          let insertPos = index + 1;
+          row.panels.forEach((child: PanelSetting) => {
+            const childGridPos = this.getPanelGrid(child);
+            childGridPos.y = offsetOfChildren;
+            panels.splice(insertPos, 0, child);
+            insertPos++;
+            yMax = Math.max(yMax, childGridPos.y + childGridPos.h);
+          });
+
+          // re-calc panels' y after current row panel
+          (panels.slice(insertPos) || []).forEach((child: PanelSetting) => {
+            const childGridPos = this.getPanelGrid(child);
+            childGridPos.y += yMax;
+          });
+        }
+        // NOTE: clear panels for row panel
+        cfg.panels = [];
+      }
+    }
+    this.updatePanelConfig(row, cfg);
+    // NOTE: must sort panels
+    this.sortPanels();
   }
 
   clonePanel(panel: PanelSetting) {
     const newPanel: PanelSetting = cloneDeep(panel);
+    if (!newPanel.gridPos || !panel.gridPos) {
+      return;
+    }
     //FIXME: remove other props?
     newPanel.id = this.assignPanelId();
-    if (panel.gridPos?.x + 2 * panel.gridPos?.w <= DefaultColumns) {
+    if (panel.gridPos.x + 2 * panel.gridPos.w <= DefaultColumns) {
       newPanel.gridPos.x += panel.gridPos.w;
     } else {
       newPanel.gridPos.y += panel.gridPos.y;
     }
     this.addPanel(newPanel);
+    console.error(newPanel, toJS(this.dashboard));
   }
 
   createPanelConfig(newID: boolean = true): PanelSetting {
     const cfg: PanelSetting = {
       title: 'Add panel',
       type: VisualizationAddPanelType,
-      gridPos: { w: 12, h: 7, x: 0, y: 0 },
+      gridPos: { w: 12, h: 8, x: 0, y: 0 },
     };
     if (newID) {
       cfg.id = this.assignPanelId();
@@ -107,14 +118,22 @@ class DashboardStore {
   }
 
   addPanel(panel: PanelSetting) {
-    this.setPanelGridId(panel);
     const firstPanelType = get(this.dashboard, 'panels[0].type', null);
     if (firstPanelType === VisualizationAddPanelType) {
       // first panel is add panel widget, ignore this panel
       return;
     }
+    this.setPanelGridId(panel);
     if (has(this.dashboard, 'panels')) {
-      set(this.dashboard, 'panels', concat(panel, this.dashboard.panels));
+      const panels = this.dashboard.panels || [];
+      if (panel.type === VisualizationAddPanelType) {
+        const newPanelHeight = this.getPanelGrid(panel).h;
+        panels.forEach((child: PanelSetting) => {
+          const childGridPos = this.getPanelGrid(child);
+          childGridPos.y += newPanelHeight;
+        });
+      }
+      set(this.dashboard, 'panels', concat(panel, panels));
     } else {
       set(this.dashboard, 'panels', [panel]);
     }
@@ -122,8 +141,14 @@ class DashboardStore {
   }
 
   deleteRowAndChildren(row: PanelSetting) {
-    const children = this.getPanelsOfRow(row.id);
-    (children || []).forEach((child: PanelSetting) => this.deletePanel(child));
+    const childIndexes: number[] = [];
+    this.findPanelsForRow(row.id, (_child: PanelSetting, index: number) => [childIndexes.push(index)]);
+    if (!isEmpty(childIndexes)) {
+      // remove all children
+      const panels = this.getPanels();
+      pullAt(panels, ...childIndexes);
+    }
+
     this.deletePanel(row);
   }
 
@@ -152,13 +177,7 @@ class DashboardStore {
     this.setPanelGridId(panel);
   }
 
-  private setPanelGridId(panel: any) {
-    // NOTE: make sure set grid i
-    set(panel, 'gridPos.i', `${panel.id}`);
-  }
-
   updateDashboardProps(values: any) {
-    console.log(toJS(this.dashboard));
     this.dashboard = merge(this.dashboard, values);
   }
 
@@ -167,9 +186,9 @@ class DashboardStore {
   }
 
   addVariable(variable: any) {
-    const variables = get(this);
+    const variables = this.getVariables();
     if (has(this.dashboard, 'templating.list')) {
-      set(this.dashboard, 'templating.list', concat(this.dashboard.config?.variables, variable));
+      set(this.dashboard, 'templating.list', concat(variables, variable));
     } else {
       set(this.dashboard, 'templating.list', [variable]);
     }
@@ -180,7 +199,7 @@ class DashboardStore {
   }
 
   reorderVariables(startIndex: number, endIndex: number) {
-    const result = Array.from(get(this.dashboard, 'templating.list', []));
+    const result = get(this.dashboard, 'templating.list', []) as Variable[];
     const [removed] = result.splice(startIndex, 1);
     result.splice(endIndex, 0, removed);
     set(this.dashboard, `templating.list`, result);
@@ -197,32 +216,13 @@ class DashboardStore {
   sortPanels() {
     const panels = this.getPanels();
     panels.sort((a: PanelSetting, b: PanelSetting) => {
-      if (a.gridPos?.y === b.gridPos?.y) {
-        return a.gridPos?.x - b.gridPos?.x;
+      const aGridPos = this.getPanelGrid(a);
+      const bGridPos = this.getPanelGrid(b);
+      if (aGridPos.y === bGridPos.y) {
+        return aGridPos.x - bGridPos.x;
       }
-      return a.gridPos?.y - b.gridPos?.y;
+      return aGridPos.y - bGridPos.y;
     });
-  }
-
-  private initDashboard(dashboard: Dashboard) {
-    this.dashboard = dashboard;
-    const panels = this.getPanels();
-    let maxPanel = 0;
-    (panels || []).forEach((panel: PanelSetting) => {
-      if (!panel.id || panel.id < 0) {
-        panel.id = this.assignPanelId();
-      }
-      // NOTE: set grid i here
-      this.setPanelGridId(panel);
-      // calc max panel id
-      if (maxPanel < panel.id) {
-        maxPanel = panel.id;
-      }
-      return panel.id;
-    });
-    if (maxPanel) {
-      this.panelSeq = maxPanel || 0;
-    }
   }
 
   async loadDashbaord(dashboardId: string | null) {
@@ -236,7 +236,7 @@ class DashboardStore {
           {
             title: 'Add panel',
             type: VisualizationAddPanelType,
-            gridPos: { w: 12, h: 7, x: 0, y: 0, i: `${panelId}` }, // NOTE: must set i value(string)
+            gridPos: { w: 12, h: 8, x: 0, y: 0, i: `${panelId}` }, // NOTE: must set i value(string)
             id: panelId,
           },
         ],
@@ -256,12 +256,12 @@ class DashboardStore {
   async saveDashboard() {
     try {
       const dashboard = ObjectKit.removeUnderscoreProperties(toJS(this.dashboard));
-      const panels = get(dashboard, 'panels', []);
-      panels.forEach((panel: PanelSetting) => {
-        // only keep x/y/w/h for grid
-        panel.gridPos = pick(panel.gridPos, ['x', 'y', 'w', 'h']) as any;
-      });
       this.sortPanels();
+      const panels = get(dashboard, 'panels', []);
+      this.forEachAllPanels(panels, (panel: PanelSetting) => {
+        // only keep x/y/w/h for grid
+        panel.gridPos = pick(panel.gridPos, PanelGridPos) as any;
+      });
       // FIXME: remove unused field
       if (isEmpty(this.dashboard.uid)) {
         const uid = await DashboardSrv.createDashboard(dashboard);
@@ -275,6 +275,69 @@ class DashboardStore {
       console.warn('save dashobard error', err);
       Notification.error(ApiKit.getErrorMsg(err));
       return false;
+    }
+  }
+
+  /**
+   * include panels of row
+   */
+  private forEachAllPanels(panels: PanelSetting[], handle: (panel: PanelSetting) => void) {
+    if (isEmpty(panels)) {
+      return;
+    }
+    panels.forEach((panel: PanelSetting) => {
+      handle(panel);
+      if (panel.type === RowPanelType) {
+        this.forEachAllPanels(panel.panels || [], handle);
+      }
+    });
+  }
+
+  private initDashboard(dashboard: Dashboard) {
+    this.dashboard = dashboard;
+    const panels = this.getPanels();
+    // first get max panel id
+    let maxPanelId = 0;
+    this.forEachAllPanels(panels, (panel: PanelSetting) => {
+      maxPanelId = Math.max(maxPanelId, panel.id ?? 0);
+    });
+    this.panelSeq = maxPanelId;
+    // set panel id if not set
+    this.forEachAllPanels(panels, (panel: PanelSetting) => {
+      if (!panel.id || panel.id < 0) {
+        panel.id = this.assignPanelId();
+      }
+      // NOTE: set grid i here
+      this.setPanelGridId(panel);
+    });
+  }
+
+  private getPanelGrid(panel: PanelSetting): GridPos {
+    if (!panel.gridPos) {
+      console.warn('return empty grid, please check panel no grid pos');
+      return {} as GridPos;
+    }
+    return panel.gridPos;
+  }
+
+  private setPanelGridId(panel: PanelSetting) {
+    // NOTE: make sure set grid i
+    const gridPos = this.getPanelGrid(panel);
+    gridPos.i = `${panel.id}`;
+  }
+
+  private findPanelsForRow(rowPanelId: number | undefined, callback: (child: PanelSetting, index: number) => void) {
+    const panels = this.getPanels();
+    const index = findIndex(panels, { id: rowPanelId });
+    if (index < 0) {
+      return;
+    }
+    for (let i = index + 1; i < panels.length; i++) {
+      const panel = panels[i];
+      if (panel.type === RowPanelType) {
+        break;
+      }
+      callback(panel, i);
     }
   }
 }
