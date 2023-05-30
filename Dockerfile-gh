@@ -3,6 +3,7 @@ FROM golang:1.20 as go_builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG LD_FLAGS
+ARG GITHUB_WORKSPACE
 
 WORKDIR /go_workspace
 # Copy the Go Modules manifests
@@ -16,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Copy web static resource
-COPY web/static/ web/static
+COPY ${GITHUB_WORKSPACE}/web/static/ web/static
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
