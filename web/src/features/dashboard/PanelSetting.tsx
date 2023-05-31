@@ -292,9 +292,9 @@ const PanelSetting: React.FC = () => {
         {OptionsEditor && (
           <OptionsEditor
             panel={ObjectKit.merge(VisualizationRepositoryInst.getDefaultOptions(`${panel.type}`), panel)}
-            onOptionsChange={(options: {}) => {
+            onOptionsChange={(options: PanelSetting) => {
               console.error('option ccc', options);
-              modifyPanel({ options: options });
+              modifyPanel(options);
             }}
           />
         )}

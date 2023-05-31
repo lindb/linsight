@@ -27,6 +27,23 @@ export interface GridPos {
   i?: string;
 }
 
+export interface Legend {
+  showLegend?: boolean;
+  displayMode?: LegendDisplayMode;
+  placement?: LegendPlacement;
+  calcs?: string[];
+}
+
+export enum LegendDisplayMode {
+  List = 'list',
+  Table = 'table',
+}
+
+export enum LegendPlacement {
+  Bottom = 'bottom',
+  Right = 'right',
+}
+
 export interface PanelSetting {
   id?: number;
   title?: string;
@@ -40,12 +57,13 @@ export interface PanelSetting {
   gridPos?: GridPos;
 }
 
-export interface FieldConfig {
+export interface FieldConfig<VOptions = any> {
   thresholds?: Thresholds;
   unit?: string;
   decimals?: number;
   min?: number;
   max?: number;
+  custom?: VOptions;
 }
 
 export enum ThresholdMode {
@@ -66,7 +84,7 @@ export interface Threshold {
 
 export interface OptionsEditorProps {
   panel: PanelSetting;
-  onOptionsChange?: (options: object) => void;
+  onOptionsChange?: (options: PanelSetting) => void;
 }
 
 export interface VisualizationProps {
@@ -77,7 +95,7 @@ export interface VisualizationProps {
 
 export interface VisualizationPluginComponents {
   OptionsEditor?: ComponentType<OptionsEditorProps>;
-  DefaultOptions?: object;
+  DefaultOptions?: PanelSetting;
 }
 
 class VisualizationPlugin extends Plugin {
@@ -96,7 +114,7 @@ class VisualizationPlugin extends Plugin {
     this.components.OptionsEditor = optionsEditor;
     return this;
   }
-  setDefaultOptions(options: object): VisualizationPlugin {
+  setDefaultOptions(options: PanelSetting): VisualizationPlugin {
     this.components.DefaultOptions = options;
     return this;
   }

@@ -16,8 +16,9 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ThemeType } from '@src/types';
-import { ColorKit, ObjectKit } from '@src/utils';
-import { has, get, set, forIn, cloneDeep } from 'lodash-es';
+import { ColorKit, CSSKit } from '@src/utils';
+import { has, get, set, forIn } from 'lodash-es';
+import { TimeSeriesOptions } from '../types';
 
 export const format = (chart: any, val: number) => {
   const formatFn: any = get(chart, 'linsight.extend.format');
@@ -30,42 +31,62 @@ export const format = (chart: any, val: number) => {
 const OptionsValueMapping = {
   solid: [],
   dash: [5, 5],
+  dots: [1, 5],
   false: false,
   true: true,
+  linear: 'default',
+  smooth: 'monotone',
 };
 
-const ConfigItemMapping = {
-  'config.type': 'type',
-};
+const ConfigItemMapping = {};
 
 const OptionsMapping = {
   'elements.line.borderWidth': 'lineWidth',
-  'elements.line.borderDash': 'lineStyle',
+  'elements.line.borderDash': 'lineStyle.fill',
   'elements.line.cubicInterpolationMode': 'lineInterpolation',
   'elements.point.radius': 'pointSize',
   'elements.point.hoverRadius': 'pointSize',
+  'scales[x].grid.display': 'axisGridShow',
+  'scales[y].grid.display': 'axisGridShow',
   spanGaps: 'spanNulls',
-  legend: 'legend',
   'scales.y.min': 'min',
   'scales.y.max': 'max',
 };
 
-export const modifyChartConfigs = (chart: any, cfg: object) => {
+export const modifyChartConfigs = (chart: any, cfg: TimeSeriesOptions) => {
   forIn(ConfigItemMapping, (value: string, key: string) => {
     if (has(cfg, value)) {
       const val = get(cfg, value);
       set(chart, key, get(OptionsValueMapping, val, val));
-      // const val = get(cfg, value);
-      // console.log('chart config', key, val, value, isNull(val), isNaN(val));
-      // if (isNull(val) || isNaN(val)) {
-      //   // unset(chart, key);
-      //   console.log('unset...', key, chart, unset(chart, key));
-      // } else {
-      //   set(chart, key, get(OptionsValueMapping, val, val));
     }
   });
+  forIn(OptionsMapping, (value: string, key: string) => {
+    if (has(cfg, value)) {
+      const val = get(cfg, value);
+      set(chart.options, key, get(OptionsValueMapping, val, val));
+    }
+  });
+
   // set fill opacity
-  const fillOpacity = get(cfg, 'fillOpacity', 0);
+  const fillOpacity = cfg.fillOpacity ?? 0;
+  if (cfg.drawStyle === 'bars') {
+    chart.type = 'bar';
+    (chart.data?.datasets || []).forEach((dataset: any) => {
+      dataset.pointBackgroundColor = dataset.borderColor;
+      dataset.fill = true;
+      dataset.backgroundColor = ColorKit.toRGBA(dataset.borderColor, 1);
+    });
+  } else {
+    chart.type = 'line';
+    let pointSize = cfg.showPoints === 'always' ? cfg.pointSize : 0;
+    if (cfg.drawStyle === 'points') {
+      set(chart.options, 'elements.line.borderWidth', 0);
+      pointSize = cfg.pointSize ?? 1;
+    }
+    set(chart.options, 'elements.point.radius', pointSize);
+    set(chart.options, 'elements.point.hoverRadius', pointSize);
+  }
+
   if (fillOpacity <= 0) {
     (chart.data?.datasets || []).forEach((dataset: any) => {
       dataset.pointBackgroundColor = dataset.borderColor;
@@ -80,180 +101,109 @@ export const modifyChartConfigs = (chart: any, cfg: object) => {
   }
 };
 
-export const modifyChartOptions = (chart: any, options: object) => {
-  forIn(OptionsMapping, (value: string, key: string) => {
-    if (has(options, value)) {
-      const val = get(options, value);
-      set(chart, key, get(OptionsValueMapping, val, val));
-    }
-    // const val = get(options, value);
-    // console.log('chart options', key, val, value, isNull(val), isNaN(val));
-    // if (isNull(val) || isNaN(val)) {
-    //   if (has(CleanOptionsIfNull, key)) {
-    //     // unset(chrrt, key);
-    //   }
-    // } else {
-    //   set(chart, key, get(OptionsValueMapping, val, val));
-    // }
-  });
-};
-
-export const DarkChart = {
-  options: {
-    scales: {
-      x: {
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
-        },
-        ticks: {
-          color: 'rgb(249, 249, 249)',
-        },
-      },
-      y: {
-        grid: {
-          color: 'rgba(255, 255, 255, 0.1)',
-        },
-        ticks: {
-          color: 'rgb(249, 249, 249)',
-        },
-      },
-    },
-  },
-};
-
-export const LightChart = {
-  options: {
-    scales: {
-      x: {
-        grid: {
-          color: 'rgba(232, 233, 234, 1)',
-        },
-        ticks: {
-          color: 'rgba(28, 31, 35, 0.8)',
-        },
-      },
-      y: {
-        grid: {
-          color: 'rgba(232, 233, 234, 1)',
-        },
-        ticks: {
-          color: 'rgba(28, 31, 35, 0.8)',
-        },
-      },
-    },
-  },
-};
-
-export function getChartThemeConfig(theme: ThemeType, raw: any) {
-  let chartTheme: any = LightChart;
-  if (theme === ThemeType.Dark) {
-    chartTheme = DarkChart;
-  }
-  // NOTE: IMPORTANT: need clone object, because merge return target object.
-  return cloneDeep(ObjectKit.merge(raw, chartTheme));
-}
-
-export const DefaultChartConfig = {
-  type: 'line',
-  data: {},
-  plugins: {
-    message: {},
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: false,
-    zoom: true,
-    legend: {
-      asTable: true,
-    },
-    spanGaps: false, // if connect null value
-    layout: {
-      padding: 0,
-    },
-    scales: {
-      x: {
-        type: 'category',
-        grid: {
-          lineWidth: 0.3,
-          tickLength: 0,
-        },
-        ticks: {
-          font: {
-            size: 12,
-          },
-          maxRotation: 0, // angle in degrees
-          callback: function (_value: any, index: number, _values: any) {
-            const times = get(this, 'chart.config.data.times', []);
-            const labels = get(this, 'chart.config.data.labels', []);
-            const interval = get(this, 'chart.config.data.interval', 0);
-            if (interval <= 0) {
-              return labels[index];
-            }
-            const time = times[index];
-            // TODO: opt?
-            if ((time - (time % interval)) % (5 * 60 * 1000) == 0) {
-              return labels[index];
-            }
-            return null;
-          },
-        },
-      },
-      y: {
-        grid: {
-          tickLength: 0,
-        },
-        ticks: {
-          font: {
-            size: 12,
-          },
-          callback: function (value: any, index: number, _values: any) {
-            if (index % 2 == 0) {
-              return format(get(this, 'chart'), value);
-            }
-            return null;
-          },
-        },
-        beginAtZero: true,
-      },
-    },
-    plugins: {
-      annotation: {
-        annotations: [],
-      },
+export const getChartConfig = (theme: ThemeType) => {
+  return {
+    type: 'line',
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      zoom: true,
       legend: {
-        display: false,
+        // custom
       },
-      tooltip: {
-        mode: 'dataset',
-        enabled: false,
+      spanGaps: false, // if connect null value
+      layout: {
+        padding: 0,
       },
-      title: {
-        display: false,
+      scales: {
+        x: {
+          type: 'category',
+          grid: {
+            lineWidth: 0.3,
+            tickLength: 0,
+            color: CSSKit.getColor('--semi-color-border', theme),
+          },
+          ticks: {
+            color: CSSKit.getColor('--semi-color-text-2', theme),
+            font: {
+              size: 12,
+            },
+            maxRotation: 0, // angle in degrees
+            callback: function (_value: any, index: number, _values: any) {
+              const times = get(this, 'chart.config.data.times', []);
+              const labels = get(this, 'chart.config.data.labels', []);
+              const interval = get(this, 'chart.config.data.interval', 0);
+              if (interval <= 0) {
+                return labels[index];
+              }
+              const time = times[index];
+              // TODO: opt?
+              if ((time - (time % interval)) % (5 * 60 * 1000) == 0) {
+                return labels[index];
+              }
+              return null;
+            },
+          },
+        },
+        y: {
+          grid: {
+            color: CSSKit.getColor('--semi-color-border', theme),
+            tickLength: 0,
+          },
+          ticks: {
+            color: CSSKit.getColor('--semi-color-text-2', theme),
+            font: {
+              size: 12,
+            },
+            callback: function (value: any, index: number, _values: any) {
+              if (index % 2 == 0) {
+                return format(get(this, 'chart'), value);
+              }
+              return null;
+            },
+          },
+          beginAtZero: true,
+        },
+      },
+      plugins: {
+        annotation: {
+          annotations: [],
+        },
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          mode: 'dataset',
+          enabled: false,
+        },
+        title: {
+          display: false,
+        },
+      },
+      elements: {
+        line: {
+          tension: false, // disables bezier curve
+          borderWidth: 1,
+          fillColor: 'rgba(255, 145, 68, 0.2)',
+          fill: false,
+          cubicInterpolationMode: 'line',
+          borderDash: [],
+        },
+        point: {
+          radius: 0,
+          borderWidth: 0,
+          hoverRadius: 0,
+          hoverBorderWidth: 0,
+        },
+        arc: {
+          borderWidth: 0,
+        },
+      },
+      hover: {
+        mode: 'index',
+        intersect: false,
       },
     },
-    elements: {
-      line: {
-        tension: false, // disables bezier curve
-        borderWidth: 1,
-        fillColor: 'rgba(255, 145, 68, 0.2)',
-        fill: false,
-        cubicInterpolationMode: 'line',
-        borderDash: [],
-      },
-      point: {
-        radius: 0,
-        borderWidth: 0,
-        hoverRadius: 0,
-        hoverBorderWidth: 0,
-      },
-      arc: {
-        borderWidth: 0,
-      },
-    },
-    hover: {
-      mode: 'index',
-      intersect: false,
-    },
-  },
+  };
 };

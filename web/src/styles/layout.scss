@@ -178,4 +178,11 @@ under the License.
   .semi-form-field {
     padding-bottom: 0;
   }
+
+  .semi-slider-handle {
+    width: 14px;
+    height: 14px;
+    margin-top: 9px;
+	background-color:var(--semi-color-primary);
+  }
 }

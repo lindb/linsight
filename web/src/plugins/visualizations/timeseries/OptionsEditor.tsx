@@ -16,16 +16,19 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Collapse, Form, Radio } from '@douyinfe/semi-ui';
-import { OptionsEditorProps } from '@src/types';
-import React from 'react';
+import { Legend, LegendDisplayMode, LegendPlacement, OptionsEditorProps, ThemeType } from '@src/types';
+import React, { useContext } from 'react';
 import { get, cloneDeep, has, set } from 'lodash-es';
 import './components/timeseries.scss';
 import { SliderInput } from '@src/components';
 import Smooth from '@src/plugins/visualizations/timeseries/images/smooth.svg';
 import Line from '@src/plugins/visualizations/timeseries/images/line.svg';
+import DarkSmooth from '@src/plugins/visualizations/timeseries/images/smooth-dark.svg';
+import DarkLine from '@src/plugins/visualizations/timeseries/images/line-dark.svg';
 import ActiveSmooth from '@src/plugins/visualizations/timeseries/images/active-smooth.svg';
 import ActiveLine from '@src/plugins/visualizations/timeseries/images/active-line.svg';
-import { LegendMode, Placement } from './types';
+import { getCustomOptions, TimeSeriesOptions } from './types';
+import { PlatformContext } from '@src/contexts';
 
 const LegendForm: React.FC<OptionsEditorProps> = (props) => {
   const { panel, onOptionsChange } = props;
@@ -34,58 +37,63 @@ const LegendForm: React.FC<OptionsEditorProps> = (props) => {
       className="linsight-form linsight-panel-setting"
       layout="vertical"
       initValues={get(panel, 'options.legend', {})}
-      onValueChange={(values: object) => {
+      onValueChange={(values: Legend) => {
         if (onOptionsChange) {
-          onOptionsChange({ legend: values });
+          onOptionsChange({ options: { legend: values } });
         }
-      }}>
-      <Form.RadioGroup field="mode" label="Mode" type="button">
-        <Radio value={LegendMode.List}>List</Radio>
-        <Radio value={LegendMode.Table}>Table</Radio>
-        <Radio value={LegendMode.Hidden}>Hidden</Radio>
-      </Form.RadioGroup>
-      <Form.RadioGroup field="placement" label="Placement" type="button">
-        <Radio value={Placement.Bottom}>Bottom</Radio>
-        <Radio value={Placement.Right}>Right</Radio>
-      </Form.RadioGroup>
-      <Form.Select
-        field="values"
-        label="Values"
-        placeholder="choose"
-        style={{ width: '100%' }}
-        showClear
-        multiple
-        optionList={[
-          { value: 'total', label: 'Total' },
-          { value: 'count', label: 'Count' },
-          { value: 'mean', label: 'Mean' },
-          { value: 'min', label: 'Min' },
-          { value: 'max', label: 'Max' },
-          { value: 'first', label: 'First' },
-          { value: 'last', label: 'Last' },
-        ]}
-      />
-    </Form>
+      }}
+      render={({ values }: any) => (
+        <>
+          <Form.Switch field="showLegend" label="Visibility" />
+          <div style={{ display: values.showLegend ? 'block' : 'none' }}>
+            <Form.RadioGroup field="displayMode" label="Mode" type="button">
+              <Radio value={LegendDisplayMode.List}>List</Radio>
+              <Radio value={LegendDisplayMode.Table}>Table</Radio>
+            </Form.RadioGroup>
+            <Form.RadioGroup field="placement" label="Placement" type="button">
+              <Radio value={LegendPlacement.Bottom}>Bottom</Radio>
+              <Radio value={LegendPlacement.Right}>Right</Radio>
+            </Form.RadioGroup>
+            <Form.Select
+              field="calcs"
+              label="Values"
+              placeholder="choose"
+              showClear
+              multiple
+              optionList={[
+                { value: 'total', label: 'Total' },
+                { value: 'count', label: 'Count' },
+                { value: 'mean', label: 'Mean' },
+                { value: 'min', label: 'Min' },
+                { value: 'max', label: 'Max' },
+                { value: 'first', label: 'First' },
+                { value: 'last', label: 'Last' },
+              ]}
+            />
+          </div>
+        </>
+      )}></Form>
   );
 };
 
 const GraphForm: React.FC<OptionsEditorProps> = (props) => {
   const { panel, onOptionsChange } = props;
+  const { theme } = useContext(PlatformContext);
 
   const isLineChart = (values: any): boolean => {
-    return get(values, 'type', 'line') === 'line';
+    return get(values, 'drawStyle', 'line') === 'line';
   };
 
-  const showPointSize = (values: any): boolean => {
-    return isLineChart(values) && get(values, 'points', 'always') === 'always';
+  const showPointSize = (values: TimeSeriesOptions): boolean => {
+    return values.drawStyle !== 'bars' && get(values, 'showPoints', 'always') === 'always';
   };
 
   return (
     <Form
       className="linsight-form linsight-panel-setting"
       layout="vertical"
-      initValues={panel.options}
-      onValueChange={(values: object) => {
+      initValues={getCustomOptions(panel)}
+      onValueChange={(values: TimeSeriesOptions) => {
         if (onOptionsChange) {
           const options = cloneDeep(values);
           if (!has(options, 'max')) {
@@ -94,38 +102,43 @@ const GraphForm: React.FC<OptionsEditorProps> = (props) => {
           if (!has(options, 'min')) {
             set(options, 'min', Number.NaN);
           }
-          onOptionsChange(options);
+          onOptionsChange({
+            fieldConfig: {
+              defaults: {
+                custom: values,
+              },
+            },
+          });
         }
       }}
       render={({ formApi, values }: any) => {
         const lineInterpolation = get(values, 'lineInterpolation', 'line');
         return (
           <>
-            <Form.RadioGroup
-              field="type"
-              label="Mode"
-              type="button"
-              onChange={(e) => {
-                if (e.target.value == 'point') {
-                  formApi.setValue('lineWidth', 0);
-                }
-              }}>
-              <Radio value="line">Line</Radio>
-              <Radio value="bar">Bar</Radio>
+            <Form.RadioGroup field="drawStyle" label="Style" type="button">
+              <Radio value="line">Lines</Radio>
+              <Radio value="bars">Bars</Radio>
+              <Radio value="points">Points</Radio>
             </Form.RadioGroup>
             {/*use display fix miss radio value*/}
             <div style={{ display: isLineChart(values) ? 'block' : 'none' }}>
               <Form.RadioGroup
-                initValue={get(values, 'lineInterpolation')}
+                // initValue={get(values, 'lineInterpolation')}
                 field="lineInterpolation"
                 label="Line interpolation"
                 type="button">
-                <Radio value="line">
-                  <img src={`${lineInterpolation === 'line' ? ActiveLine : Line}`} />
-                </Radio>
-                <Radio value="monotone">
-                  <img src={`${lineInterpolation === 'monotone' ? ActiveSmooth : Smooth}`} />
-                </Radio>
+                <Form.Radio value="linear">
+                  <img
+                    src={`${lineInterpolation === 'linear' ? ActiveLine : theme === ThemeType.Dark ? DarkLine : Line}`}
+                  />
+                </Form.Radio>
+                <Form.Radio value="smooth">
+                  <img
+                    src={`${
+                      lineInterpolation === 'smooth' ? ActiveSmooth : theme === ThemeType.Dark ? DarkSmooth : Smooth
+                    }`}
+                  />
+                </Form.Radio>
               </Form.RadioGroup>
               <Form.Slot style={{ paddingBottom: 8 }}>
                 <SliderInput
@@ -149,27 +162,18 @@ const GraphForm: React.FC<OptionsEditorProps> = (props) => {
                   onChange={(val: number) => formApi.setValue('fillOpacity', val)}
                 />
               </Form.Slot>
-              <Form.RadioGroup initValue={get(values, 'lineStyle')} field="lineStyle" label="Line style" type="button">
-                <Radio value="solid">Solid</Radio>
-                <Radio value="dash">Dash</Radio>
+              <Form.RadioGroup field="lineStyle.fill" label="Line style" type="button">
+                <Form.Radio value="solid">Solid</Form.Radio>
+                <Form.Radio value="dash">Dash</Form.Radio>
+                <Form.Radio value="dots">Dots</Form.Radio>
               </Form.RadioGroup>
               <Form.RadioGroup field="spanNulls" label="Connect null values" type="button">
-                <Radio value="false">Never</Radio>
-                <Radio value="true">Always</Radio>
+                <Form.Radio value={false as any}>Never</Form.Radio>
+                <Form.Radio value={true as any}>Always</Form.Radio>
               </Form.RadioGroup>
-              <Form.RadioGroup
-                field="points"
-                label="Show points"
-                type="button"
-                onChange={(e) => {
-                  if (e.target.value == 'never') {
-                    formApi.setValue('pointSize', 0);
-                  } else {
-                    formApi.setValue('pointSize', 1);
-                  }
-                }}>
-                <Radio value="never">Never</Radio>
-                <Radio value="always">Always</Radio>
+              <Form.RadioGroup field="showPoints" label="Show points" type="button">
+                <Form.Radio value="never">Never</Form.Radio>
+                <Form.Radio value="always">Always</Form.Radio>
               </Form.RadioGroup>
             </div>
             <Form.Slot style={{ paddingBottom: 8, display: showPointSize(values) ? 'block' : 'none' }}>
@@ -185,6 +189,10 @@ const GraphForm: React.FC<OptionsEditorProps> = (props) => {
             </Form.Slot>
             <Form.InputNumber field="min" label="Min" />
             <Form.InputNumber field="max" label="Max" />
+            <Form.RadioGroup field="axisGridShow" label="Show grid lines" type="button">
+              <Form.Radio value={true as any}>On</Form.Radio>
+              <Form.Radio value={false as any}>Off</Form.Radio>
+            </Form.RadioGroup>
           </>
         );
       }}

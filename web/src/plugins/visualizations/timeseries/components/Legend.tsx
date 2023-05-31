@@ -19,8 +19,9 @@ import React, { useEffect, useRef } from 'react';
 import classNames from 'classnames';
 import { get, upperFirst, find, isEmpty } from 'lodash-es';
 import { Chart } from 'chart.js';
-import { LegendMode, Placement } from '../types';
 import { format } from './chart.config';
+import { toJS } from 'mobx';
+import { Legend as LegendType, LegendDisplayMode, LegendPlacement } from '@src/types';
 
 const LegendHeader: React.FC<{ values: string[] }> = (props) => {
   const { values } = props;
@@ -75,16 +76,15 @@ const LegendItem: React.FC<{
 
 export const Legend: React.FC<{ chart: any }> = (props) => {
   const { chart } = props;
-  const mode = get(chart, 'options.legend.mode', LegendMode.List);
-  if (!chart || mode === LegendMode.Hidden) {
+  const legend = get(chart, 'options.legend', {}) as LegendType;
+  if (!chart || !legend.showLegend) {
     // if chart not exist or hidden legend, return
     return null;
   }
   const datasets = get(chart, 'data.datasets', []);
-  const placement = get(chart, 'options.legend.placement', Placement.Bottom);
-  const asTable = mode === LegendMode.Table;
-  const toRight = placement === Placement.Right;
-  const values = get(chart, 'options.legend.values', []);
+  const asTable = legend.displayMode === LegendDisplayMode.Table;
+  const toRight = legend.placement === LegendPlacement.Right;
+  const values = legend.calcs || [];
   const legendCls = classNames('time-series-legend', {
     'as-table': asTable,
     'to-right': toRight,

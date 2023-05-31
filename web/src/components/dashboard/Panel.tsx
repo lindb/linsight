@@ -32,6 +32,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import classNames from 'classnames';
 import { get } from 'lodash-es';
+import { ObjectKit } from '@src/utils';
 
 const { Text } = Typography;
 
@@ -184,7 +185,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
       return <div>not support</div>;
     }
     const Visualization = plugin.Visualization;
-    return <Visualization datasets={result} theme={theme} panel={panel} />;
+    return <Visualization datasets={result} theme={theme} panel={ObjectKit.merge(plugin.getDefaultOptions(), panel)} />;
   };
   const panelCls = classNames('dashboard-panel', className, {
     'dashboard-panel-static': isStatic,

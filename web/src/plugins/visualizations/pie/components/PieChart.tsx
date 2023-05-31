@@ -15,13 +15,12 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ThemeType } from '@src/types';
+import { LegendPlacement, ThemeType } from '@src/types';
 import React, { MutableRefObject, useEffect, useRef } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { get, set, cloneDeep } from 'lodash-es';
 import { toJS } from 'mobx';
 import { DefaultChartConfig, getChartThemeConfig, modifyChartConfigs, modifyChartOptions } from './chart.config';
-import { Placement } from '../../timeseries/types';
 import classNames from 'classnames';
 
 Chart.register(...registerables);
@@ -71,7 +70,7 @@ export const PieChart: React.FC<{ datasets: any; theme: ThemeType; config: any }
 
   const timeseriesChartCls = classNames('time-series-container', {
     'chart-cursor-pointer': true,
-    'legend-to-right': get(config, 'legend.placement', Placement.Bottom) === Placement.Right,
+    'legend-to-right': get(config, 'legend.placement', LegendPlacement.Bottom) === LegendPlacement.Right,
   });
 
   return (
