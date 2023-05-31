@@ -87,6 +87,13 @@ export const modifyChartConfigs = (chart: any, cfg: TimeSeriesOptions) => {
     set(chart.options, 'elements.point.hoverRadius', pointSize);
   }
 
+  // stepBefore/stepAfter support grafana
+  if (['step', 'stepBefore', 'stepAfter'].indexOf(`${cfg.lineInterpolation}`) >= 0) {
+    set(chart.options, 'elements.line.stepped', true);
+  } else {
+    set(chart.options, 'elements.line.stepped', false);
+  }
+
   if (fillOpacity <= 0) {
     (chart.data?.datasets || []).forEach((dataset: any) => {
       dataset.pointBackgroundColor = dataset.borderColor;

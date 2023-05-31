@@ -46,7 +46,7 @@ const Explore: React.FC = () => {
     <Layout className="linsight-explore">
       <Header className="linsight-feature-header">
         <div className="explore-header">
-          <Icon icon="icon-explore" />
+          <Icon icon="explore" />
           <DatasourceSelectForm
             noLabel
             value={ds || get(datasources, '[0].setting.uid')}

@@ -25,7 +25,8 @@ export interface TimeSeriesOptions {
   spanNulls?: boolean;
   pointSize?: number;
   showPoints: 'always' | 'never';
-  lineInterpolation?: 'linear' | 'smooth';
+  // stepBefore/stepAfter support grafana setting
+  lineInterpolation?: 'linear' | 'smooth' | 'step' | 'stepBefore' | 'stepAfter';
   lineStyle?: {
     fill: 'solid' | 'dash' | 'dots';
   };

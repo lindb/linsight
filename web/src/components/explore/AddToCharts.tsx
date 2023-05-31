@@ -53,7 +53,7 @@ const AddToCharts = forwardRef((_props: {}, ref) => {
   };
   return (
     <>
-      <Button type="tertiary" onClick={() => setVisible(true)} icon={<Icon icon="icon-repo" />}>
+      <Button type="tertiary" onClick={() => setVisible(true)} icon={<Icon icon="repo" />}>
         Add to chart
       </Button>
       <Modal

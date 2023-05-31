@@ -19,7 +19,7 @@ import React from 'react';
 
 const Icon: React.FC<{ icon: string; style?: React.CSSProperties }> = (props) => {
   const { icon, style } = props;
-  return <i className={`iconfont ${icon}`} style={style} />;
+  return <i className={`linsighticon ${icon}`} style={style} />;
 };
 
 export default Icon;

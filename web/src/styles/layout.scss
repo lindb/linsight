@@ -35,6 +35,11 @@ under the License.
   .semi-select {
     border-radius: 0;
   }
+
+  .button-group {
+    display: flex;
+    gap: 4px;
+  }
 }
 
 .sider-collapse-btn {
@@ -183,6 +188,6 @@ under the License.
     width: 14px;
     height: 14px;
     margin-top: 9px;
-	background-color:var(--semi-color-primary);
+    background-color: var(--semi-color-primary);
   }
 }

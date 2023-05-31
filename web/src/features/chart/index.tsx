@@ -46,7 +46,7 @@ const ChartDetail: React.FC<{ chart: Chart; visible: boolean; setVisible: (visib
   return (
     <SideSheet size="large" closeOnEsc motion={false} visible={visible} onCancel={() => setVisible(false)}>
       <Button
-        icon={<Icon icon="icon-explore" />}
+        icon={<Icon icon="explore" />}
         onClick={() => {
           const params = createSearchParams({ left: JSON.stringify(get(chart, 'config.targets[0]', null)) });
           navigate({ pathname: '/explore', search: params.toString() });

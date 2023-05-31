@@ -88,7 +88,7 @@ under the License.
 
   /* stylelint-disable-next-line no-descending-specificity */
   .legend-content {
-    &.table {
+    &.table-content {
       display: table !important;
       width: 100%;
 
@@ -137,8 +137,6 @@ under the License.
         text-align: right;
         font-size: 12px;
         font-weight: bold;
-
-        // color: rgb(0 100 250);
         color: var(--semi-color-primary);
         cursor: pointer;
         white-space: nowrap;

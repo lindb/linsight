@@ -18,6 +18,7 @@ under the License.
 import { makeAutoObservable, toJS } from 'mobx';
 import { DatasourceInstance, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { find } from 'lodash-es';
+import { DatasourceSrv } from '@src/services';
 
 class DatasourceStore {
   datasources: DatasourceInstance[] = [];
@@ -45,7 +46,6 @@ class DatasourceStore {
     const rs: DatasourceInstance[] = [];
     (settings || []).forEach((setting: DatasourceSetting) => {
       const plugin = DatasourceRepositoryInst.get(setting.type);
-      console.log('set dataosurce...', setting, plugin);
       if (plugin) {
         rs.push({
           setting: setting,
@@ -57,18 +57,13 @@ class DatasourceStore {
     this.datasources = rs;
   }
 
-  async sync() {
-    // FIXME: remove it or add sync logic
-    // const datasources = await DataSourceSrv.fetchDataSources();
-    // (datasources || []).forEach((ds: DataSourceSetting) => {
-    //   const plugin = DataSourceRepositoryInst.get(ds.type);
-    //   if (plugin) {
-    //     plugin.api = new plugin.DSConstructor(ds);
-    //     ds.plugin = plugin;
-    //   }
-    // });
-    // console.log(datasources, 'sync');
-    // this.datasources = datasources;
+  async syncDatasources() {
+    try {
+      const datasources = await DatasourceSrv.fetchDatasources();
+      this.setDatasources(datasources);
+    } catch (err) {
+      console.warn('sync datasources failure', err);
+    }
   }
 }
 

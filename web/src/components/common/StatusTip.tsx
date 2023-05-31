@@ -36,7 +36,7 @@ const StatusTip: React.FC<{
     }
     if (error) {
       if (ApiKit.getErrorCode(error) === 404) {
-        return <Empty image={<Icon icon="icon-empty" style={{ fontSize: 48 }} />} description="Empty result" />;
+        return <Empty image={<Icon icon="empty" style={{ fontSize: 48 }} />} description="Empty result" />;
       }
       return (
         <Text type="danger">
@@ -48,7 +48,7 @@ const StatusTip: React.FC<{
       );
     }
     if (isEmpty) {
-      return <Empty image={<Icon icon="icon-empty" style={{ fontSize: 48 }} />} description="Empty result" />;
+      return <Empty image={<Icon icon="empty" style={{ fontSize: 48 }} />} description="Empty result" />;
     }
   };
   return (

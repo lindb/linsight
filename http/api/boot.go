@@ -55,43 +55,43 @@ func (api *BootAPI) Boot(c *gin.Context) {
 		NavTree: []model.NavItem{
 			{
 				Text: "Explore",
-				Icon: "icon-explore",
+				Icon: "explore",
 				Path: "/explore",
 			},
 			{
 				Text: "Dashboard",
-				Icon: "icon-dashboard",
+				Icon: "dashboard",
 				Children: []model.NavItem{
 					{
 						Text: "Dashboard List",
 						Path: "/dashboards",
-						Icon: "icon-list",
+						Icon: "list",
 					},
 					{
 						Text: "New Dashboard",
 						Path: "/dashboard",
-						Icon: "icon-dashboard-add",
+						Icon: "dashboard-add",
 					},
 					{
 						Text: "Chart Repository",
 						Path: "/charts",
-						Icon: "icon-repo",
+						Icon: "repo",
 					},
 				},
 			},
 			{
 				Text: "Integration",
-				Icon: "icon-integrations",
+				Icon: "integrations",
 				Path: "/integrations",
 			},
 			{
 				Text: "APM",
-				Icon: "icon-tracing",
+				Icon: "tracing",
 				Children: []model.NavItem{
 					{
 						Text: "Service",
 						Path: "/observe/apm/service",
-						Icon: "icon-repo",
+						Icon: "repo",
 						Props: map[string]any{
 							"dashboard": "cgV623b4k",
 						},
@@ -99,7 +99,7 @@ func (api *BootAPI) Boot(c *gin.Context) {
 					{
 						Text: "Dashboard",
 						Path: "/observe/apm/database",
-						Icon: "icon-repo",
+						Icon: "repo",
 						Props: map[string]any{
 							"dashboard": "cgV623b4k4",
 						},
@@ -108,13 +108,13 @@ func (api *BootAPI) Boot(c *gin.Context) {
 			},
 			{
 				Text: "Setting",
-				Icon: "icon-setting",
+				Icon: "setting",
 				Path: "/setting",
 				Children: []model.NavItem{
 					{
 						Text: "Datasource",
 						Path: "/setting/datasources",
-						Icon: "icon-datasource",
+						Icon: "datasource",
 					},
 				},
 			},

@@ -15,12 +15,11 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import classNames from 'classnames';
 import { get, upperFirst, find, isEmpty } from 'lodash-es';
 import { Chart } from 'chart.js';
 import { format } from './chart.config';
-import { toJS } from 'mobx';
 import { Legend as LegendType, LegendDisplayMode, LegendPlacement } from '@src/types';
 
 const LegendHeader: React.FC<{ values: string[] }> = (props) => {
@@ -90,7 +89,7 @@ export const Legend: React.FC<{ chart: any }> = (props) => {
     'to-right': toRight,
   });
   const legendContentCls = classNames('legend-content', {
-    table: asTable,
+    'table-content': asTable,
     active: find(datasets, { hidden: false }),
   });
 
