@@ -15,11 +15,18 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import {
+  DatasourceCategory,
+  Legend,
+  LegendDisplayMode,
+  LegendPlacement,
+  VisualizationPlugin,
+  VisualizationRepositoryInst,
+} from '@src/types';
 import Logo from '@src/plugins/visualizations/timeseries/images/logo.svg';
 import { OptionsEditor } from '@src/plugins/visualizations/timeseries/OptionsEditor';
 import { TimeSeries } from '@src/plugins/visualizations/timeseries/TimeSeries';
-import { LegendMode, Placement } from './types';
+import { TimeSeriesOptions } from './types';
 
 const timeseries = new VisualizationPlugin(
   DatasourceCategory.Metric,
@@ -31,19 +38,28 @@ const timeseries = new VisualizationPlugin(
 timeseries
   .setOptionsEditor(OptionsEditor)
   .setDefaultOptions({
-    options: {
-      type: 'line',
-      lineWidth: 1,
-      lineStyle: 'solid',
-      fillOpacity: 0,
-      points: 'always',
-      pointSize: 1,
-      lineInterpolation: 'line',
-      spanNulls: 'false',
-      legend: {
-        mode: LegendMode.List,
-        placement: Placement.Bottom,
+    fieldConfig: {
+      defaults: {
+        custom: {
+          drawStyle: 'line',
+          lineWidth: 1,
+          showPoints: 'always',
+          fillOpacity: 0,
+          pointSize: 2,
+          spanNulls: false,
+          lineInterpolation: 'linear',
+          lineStyle: {
+            fill: 'solid',
+          },
+        } as TimeSeriesOptions,
       },
+    },
+    options: {
+      legend: {
+        showLegend: true,
+        displayMode: LegendDisplayMode.List,
+        placement: LegendPlacement.Bottom,
+      } as Legend,
     },
   })
   .setLightLogo(Logo)

@@ -15,15 +15,23 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export enum LegendMode {
-  List = 'list',
-  Table = 'table',
-  Hidden = 'hidden',
+import { PanelSetting } from '@src/types';
+import { get } from 'lodash-es';
+
+export interface TimeSeriesOptions {
+  drawStyle: 'line' | 'bars' | 'points';
+  lineWidth?: number;
+  fillOpacity?: number;
+  spanNulls?: boolean;
+  pointSize?: number;
+  showPoints: 'always' | 'never';
+  lineInterpolation?: 'linear' | 'smooth';
+  lineStyle?: {
+    fill: 'solid' | 'dash' | 'dots';
+  };
+  axisGridShow?: boolean;
 }
 
-export enum Placement {
-  Bottom = 'bottom',
-  Right = 'right',
-}
-
-export interface TimeSeriesOptions {}
+export const getCustomOptions = (panel: PanelSetting): TimeSeriesOptions => {
+  return get(panel, 'fieldConfig.defaults.custom', {}) as TimeSeriesOptions;
+};

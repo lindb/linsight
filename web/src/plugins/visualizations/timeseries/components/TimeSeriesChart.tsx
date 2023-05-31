@@ -18,21 +18,22 @@ under the License.
 import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
 import { Legend } from '@src/plugins/visualizations/timeseries/components/Legend';
 import Tooltip from '@src/plugins/visualizations/timeseries/components/Tooltip';
-import {
-  DefaultChartConfig,
-  getChartThemeConfig,
-  modifyChartOptions,
-  modifyChartConfigs,
-} from '@src/plugins/visualizations/timeseries/components/chart.config';
+import { getChartConfig, modifyChartConfigs } from '@src/plugins/visualizations/timeseries/components/chart.config';
 import { Chart, registerables } from 'chart.js';
 import { cloneDeep, get, set, find, isEmpty } from 'lodash-es';
 import classNames from 'classnames';
-import { FormatRepositoryInst, MouseEventType, PanelSetting, SearchParamKeys, ThemeType } from '@src/types';
+import {
+  FormatRepositoryInst,
+  LegendPlacement,
+  MouseEventType,
+  PanelSetting,
+  SearchParamKeys,
+  ThemeType,
+} from '@src/types';
 import { PlatformStore } from '@src/stores';
 import { CSSKit } from '@src/utils';
 import annotationPlugin from 'chartjs-plugin-annotation';
-import { toJS } from 'mobx';
-import { Placement } from '../types';
+import { getCustomOptions } from '../types';
 import moment from 'moment';
 import { DateTimeFormat } from '@src/constants';
 import { useSearchParams } from 'react-router-dom';
@@ -48,10 +49,8 @@ const Zoom = {
   x: 0,
 };
 
-export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel: PanelSetting; options: any }> = (
-  props
-) => {
-  const { theme, options, panel, datasets } = props;
+export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel: PanelSetting }> = (props) => {
+  const { theme, panel, datasets } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedSeries, setSelectedSeries] = useState<string[]>([]);
@@ -268,13 +267,14 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
       // if canvas is null, return it.
       return;
     }
-    const chartType = get(options, 'type', 'line');
-    const chartCfg: any = getChartThemeConfig(theme, cloneDeep(DefaultChartConfig));
+    const customOptions = getCustomOptions(panel);
+    const chartCfg: any = getChartConfig(theme);
+    chartCfg.options.legend = get(panel, 'options.legend', {});
+    console.error('chart cfg', chartCfg, customOptions);
     if (!chartInstance.current) {
       chartCfg.data = datasets || [];
-      modifyChartConfigs(chartCfg, options);
-      modifyChartOptions(chartCfg.options, options);
-      console.log('create new chart', chartInstance, chartCfg, options);
+      modifyChartConfigs(chartCfg, customOptions);
+      // console.log('create new chart', chartInstance, chartCfg, options);
       const canvas = canvasRef.current;
       const chart = new Chart(canvas, chartCfg);
       set(chart, 'linsight.extend.crosshair', crosshairRef.current);
@@ -289,20 +289,16 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
       const chart = chartInstance.current;
       chart.data = datasets || [];
       // theme changed
-      chart.options = getChartThemeConfig(theme, {
-        options: get(chart, 'options', {}),
-      }).options;
+      chart.options = chartCfg.options;
 
-      modifyChartConfigs(chart, options);
-      modifyChartOptions(chart.config.options, options);
+      modifyChartConfigs(chart.config, customOptions);
       // update chart after dataset or config changed
-      console.log('update chart....', chart, chartType, toJS(options));
       chart.update();
     }
 
     set(chartInstance.current, 'linsight.extend.format', function (val: number) {
       const unit = get(panel, 'fieldConfig.defaults.unit', '');
-      const decimals = get(options, 'decimals');
+      const decimals = get(panel, 'field.defaults.decimals', 2);
       return FormatRepositoryInst.get(unit).formatString(val, decimals);
     });
 
@@ -315,7 +311,7 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
     });
     setSelectedSeries(Array.from(currentSelectedSet));
     console.error('re-render time series chart');
-  }, [options, datasets, theme, panel]);
+  }, [datasets, theme, panel]);
 
   /**
    * destroy resource
@@ -338,7 +334,7 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
 
   const timeseriesChartCls = classNames('time-series-container', {
     'chart-cursor-pointer': true,
-    'legend-to-right': get(options, 'legend.placement', Placement.Bottom) === Placement.Right,
+    'legend-to-right': get(panel, 'options.legend.placement') === LegendPlacement.Right,
   });
 
   return (

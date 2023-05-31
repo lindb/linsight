@@ -32,5 +32,5 @@ export const TimeSeries: React.FC<VisualizationProps> = (props) => {
     setDS(DataSetKit.createTimeSeriesDatasets(datasets));
   }, [datasets]);
 
-  return <TimeSeriesChart theme={theme} panel={panel} datasets={ds} options={panel.options} />;
+  return <TimeSeriesChart theme={theme} panel={panel} datasets={ds} />;
 };

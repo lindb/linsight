@@ -134,6 +134,7 @@ const createTimeSeriesDatasets = (resultSet: any): any => {
         };
         for (; timestamp <= endTime!; ) {
           const value = points[`${timestamp}`];
+          // FIXME: need handl null
           const v = value ? Math.floor(value * 1000) / 1000 : 0;
           if (value !== null) {
             stats.count++;
