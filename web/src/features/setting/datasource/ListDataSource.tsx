@@ -17,19 +17,20 @@ under the License.
 */
 import React from 'react';
 import { Button, Card, Divider, Input, List, Typography } from '@douyinfe/semi-ui';
-import { IconSearchStroked, IconPlusStroked, IconDeleteStroked } from '@douyinfe/semi-icons';
+import { IconSearchStroked, IconPlusStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
 import { DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { isEmpty } from 'lodash-es';
 import { createSearchParams, useNavigate } from 'react-router-dom';
-import { StatusTip } from '@src/components';
+import { Icon, StatusTip } from '@src/components';
 import { useRequest } from '@src/hooks';
+import DeleteDatasourceButton from './components/DeleteDatasourceButton';
 
 const { Title, Text } = Typography;
 
 const ListDataSource: React.FC = () => {
   const navigate = useNavigate();
-  const { result, loading, error } = useRequest(['list_datasources'], () => DatasourceSrv.fetchDatasources());
+  const { result, loading, error, refetch } = useRequest(['list_datasources'], () => DatasourceSrv.fetchDatasources());
   return (
     <Card className="linsight-feature">
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -48,7 +49,33 @@ const ListDataSource: React.FC = () => {
             <List.Item
               key={ds.uid}
               header={<img src={`${item?.darkLogo}`} width={48} />}
-              extra={<Button type="danger" icon={<IconDeleteStroked />} />}
+              extra={
+                <div className="button-group">
+                  <Button
+                    type="tertiary"
+                    icon={<Icon icon="dashboard" />}
+                    onClick={() => {
+                      navigate('/dashboard');
+                    }}>
+                    New dashboard
+                  </Button>
+                  <Button
+                    type="tertiary"
+                    icon={<Icon icon="explore" />}
+                    onClick={() => {
+                      navigate('/explore');
+                    }}>
+                    Explore
+                  </Button>
+                  <DeleteDatasourceButton
+                    uid={ds.uid}
+                    name={ds.name}
+                    onCompleted={() => {
+                      refetch();
+                    }}
+                  />
+                </div>
+              }
               main={
                 <div
                   style={{ cursor: 'pointer', width: '100%' }}

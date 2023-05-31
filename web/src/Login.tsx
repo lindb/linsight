@@ -96,7 +96,7 @@ const Login: React.FC = () => {
                 </Form>
                 <Divider align="center">Or</Divider>
                 <div style={{ gap: 8, marginTop: 8, display: 'flex', alignItems: 'center' }}>
-                  <Icon icon="icon-google" style={{ fontSize: 24 }} />
+                  <Icon icon="google" style={{ fontSize: 24 }} />
                   <IconGithubLogo size="extra-large" />
                   <IconFacebook size="extra-large" />
                 </div>

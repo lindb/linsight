@@ -203,7 +203,7 @@ const Dashboard: React.FC = () => {
           {isEditDashboard() && (
             <Button
               type="tertiary"
-              icon={<Icon icon="icon-back2" />}
+              icon={<Icon icon="back2" />}
               onClick={() => {
                 navigate({
                   pathname: '/dashboard',
@@ -214,7 +214,7 @@ const Dashboard: React.FC = () => {
           )}
           <Button
             type="tertiary"
-            icon={<Icon icon="icon-panel-add" />}
+            icon={<Icon icon="panel-add" />}
             onClick={() => {
               DashboardStore.addPanel(DashboardStore.createPanelConfig());
             }}

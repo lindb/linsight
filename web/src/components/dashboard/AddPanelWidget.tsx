@@ -42,7 +42,7 @@ const AddPanelWidget: React.FC<{
         header={
           <div className="panel-header">
             <div className="title">
-              <Icon icon="icon-panel-add" />
+              <Icon icon="panel-add" />
               <Text>{panel.title}</Text>
             </div>
             <IconClose className="close" onClick={() => DashboardStore.deletePanel(panel)} />
@@ -55,7 +55,7 @@ const AddPanelWidget: React.FC<{
               navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
             }}>
             <div>
-              <Icon icon="icon-line-bar" />
+              <Icon icon="line-bar" />
             </div>
             <div>Add a new panel</div>
           </Button>
@@ -69,13 +69,13 @@ const AddPanelWidget: React.FC<{
               });
             }}>
             <div>
-              <Icon icon="icon-center" />
+              <Icon icon="center" />
             </div>
             <div>Add a new row</div>
           </Button>
           <Button>
             <div>
-              <Icon icon="icon-repo" />
+              <Icon icon="repo" />
             </div>
             <div>Add a panel from library</div>
           </Button>

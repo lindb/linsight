@@ -159,7 +159,7 @@ const FeatureMenu: React.FC = () => {
                       <Dropdown.Divider />
                       <Dropdown.Item
                         type="danger"
-                        icon={<Icon icon="icon-signout" />}
+                        icon={<Icon icon="signout" />}
                         onClick={async () => {
                           await UserSrv.logout();
                           navigate('/login');

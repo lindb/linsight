@@ -78,7 +78,7 @@ const PanelHeader = forwardRef(
           render={
             <Dropdown.Menu>
               <Dropdown.Item
-                icon={<Icon icon="icon-eye" />}
+                icon={<Icon icon="eye" />}
                 onClick={() => {
                   searchParams.set('panel', `${panel.id}`);
                   navigate({ pathname: '/dashboard/panel/view', search: searchParams.toString() });
@@ -101,7 +101,7 @@ const PanelHeader = forwardRef(
                 </Dropdown.Item>
               )}
               <Dropdown.Item
-                icon={<Icon icon="icon-explore" />}
+                icon={<Icon icon="explore" />}
                 onClick={() => {
                   searchParams.set('left', JSON.stringify(get(panel, 'targets[0]', {})));
                   searchParams.delete('d');

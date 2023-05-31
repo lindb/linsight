@@ -18,15 +18,17 @@ under the License.
 import React, { useEffect, useRef, useState } from 'react';
 import { isEmpty } from 'lodash-es';
 import { Button, Select, Card, Typography, Form, Space, useFormApi } from '@douyinfe/semi-ui';
-import { IconSaveStroked, IconDeleteStroked } from '@douyinfe/semi-icons';
+import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
 import { DatasourcePlugin, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Notification } from '@src/components';
+import { Icon, Notification } from '@src/components';
 import { ApiKit } from '@src/utils';
 import { useRequest } from '@src/hooks';
+import { DatasourceStore } from '@src/stores';
+import DeleteDatasourceButton from './components/DeleteDatasourceButton';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 const DatasourceSettingForm: React.FC<{ datasource?: DatasourceSetting; SettingEditor: React.ComponentType }> = (
   props
@@ -45,14 +47,18 @@ const EditDataSource: React.FC = () => {
   const formApi = useRef<any>();
   const [submitting, setSubmitting] = useState(false);
   const [type, setType] = useState<string | undefined>(undefined);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const uid = searchParams.get('uid');
   const plugins = DatasourceRepositoryInst.getPlugins();
 
-  const { result: datasource, loading } = useRequest(['load-datasource'], () => DatasourceSrv.getDatasource(`${uid}`), {
-    enabled: !isEmpty(uid),
-  });
+  const { result: datasource, loading } = useRequest(
+    ['load-datasource', uid],
+    () => DatasourceSrv.getDatasource(`${uid}`),
+    {
+      enabled: !isEmpty(uid),
+    }
+  );
 
   useEffect(() => {
     if (datasource) {
@@ -87,14 +93,23 @@ const EditDataSource: React.FC = () => {
               values.uid = uid;
               await DatasourceSrv.updateDatasource(values);
             } else {
-              await DatasourceSrv.createDatasource(values);
+              const uid = await DatasourceSrv.createDatasource(values);
+              searchParams.set('uid', `${uid}`);
+              setSearchParams(searchParams);
             }
+            DatasourceStore.syncDatasources();
           } catch (err) {
             Notification.error(ApiKit.getErrorMsg(err));
           } finally {
             setSubmitting(false);
           }
         }}>
+        <Form.Slot>
+          <Title heading={2} style={{ display: 'flex', justifyItems: 'center' }}>
+            <Icon icon="datasource" style={{ fontSize: 24, marginRight: 6 }} />
+            <span>Datasource setting</span>
+          </Title>
+        </Form.Slot>
         <Form.Input label="Name" field="name" rules={[{ required: true, message: 'Name is required' }]} />
         <Form.Select
           label="Type"
@@ -136,23 +151,21 @@ const EditDataSource: React.FC = () => {
             <Button type="tertiary" onClick={() => navigate('/setting/datasources')}>
               Back
             </Button>
-            <Button type="tertiary" onClick={() => navigate('/explore')}>
+            <Button icon={<Icon icon="explore" />} type="tertiary" onClick={() => navigate('/explore')}>
               Explore
             </Button>
-            <Button
-              type="danger"
-              icon={<IconDeleteStroked />}
-              onClick={async () => {
-                if (uid) {
-                  try {
-                    await DatasourceSrv.deleteDatasource(uid);
-                  } catch (err) {
-                    Notification.error(ApiKit.getErrorMsg(err));
-                  }
-                }
-              }}>
-              Delete
-            </Button>
+            {uid && (
+              <DeleteDatasourceButton
+                uid={uid}
+                name={datasource?.name}
+                onCompleted={() => {
+                  navigate({
+                    pathname: '/setting/datasources',
+                  });
+                }}
+                text="Delete"
+              />
+            )}
             <Button icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
               Save & Test
             </Button>
