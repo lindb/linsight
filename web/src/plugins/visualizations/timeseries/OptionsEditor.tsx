@@ -22,6 +22,9 @@ import { get, cloneDeep, has, set } from 'lodash-es';
 import './components/timeseries.scss';
 import { SliderInput } from '@src/components';
 import Smooth from '@src/plugins/visualizations/timeseries/images/smooth.svg';
+import Step from '@src/plugins/visualizations/timeseries/images/step.svg';
+import ActiveStep from '@src/plugins/visualizations/timeseries/images/active-step.svg';
+import DarkStep from '@src/plugins/visualizations/timeseries/images/step-dark.svg';
 import Line from '@src/plugins/visualizations/timeseries/images/line.svg';
 import DarkSmooth from '@src/plugins/visualizations/timeseries/images/smooth-dark.svg';
 import DarkLine from '@src/plugins/visualizations/timeseries/images/line-dark.svg';
@@ -136,6 +139,17 @@ const GraphForm: React.FC<OptionsEditorProps> = (props) => {
                   <img
                     src={`${
                       lineInterpolation === 'smooth' ? ActiveSmooth : theme === ThemeType.Dark ? DarkSmooth : Smooth
+                    }`}
+                  />
+                </Form.Radio>
+                <Form.Radio value="step">
+                  <img
+                    src={`${
+                      ['step', 'stepBefore', 'stepAfter'].indexOf(lineInterpolation) >= 0
+                        ? ActiveStep
+                        : theme === ThemeType.Dark
+                        ? DarkStep
+                        : Step
                     }`}
                   />
                 </Form.Radio>
