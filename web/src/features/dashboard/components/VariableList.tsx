@@ -17,9 +17,9 @@ under the License.
 */
 import React, { useMemo, useState, forwardRef, useRef, useEffect } from 'react';
 import { DashboardStore } from '@src/stores';
-import { isEmpty, cloneDeep } from 'lodash-es';
+import { isEmpty, cloneDeep, set, get } from 'lodash-es';
 import { Button, Table, Typography } from '@douyinfe/semi-ui';
-import { IconPlusStroked, IconDeleteStroked, IconCopyStroked, IconEyeOpened } from '@douyinfe/semi-icons';
+import { IconPlusStroked, IconDeleteStroked, IconCopyStroked, IconEyeOpened, IconHandle } from '@douyinfe/semi-icons';
 import { StatusTip } from '@src/components';
 import { observer } from 'mobx-react-lite';
 import { useSearchParams } from 'react-router-dom';
@@ -42,9 +42,14 @@ const { Text } = Typography;
 const TableBody = ({ ...props }) => {
   return (
     <Droppable droppableId="table" direction="vertical">
-      {(provided: DroppableProvided, _snapshot: DroppableStateSnapshot) => (
-        <tbody ref={provided.innerRef} {...props}></tbody>
-      )}
+      {(provided: DroppableProvided, _snapshot: DroppableStateSnapshot) => {
+        return (
+          <tbody ref={provided.innerRef} {...props}>
+            {get(props, 'children', [])}
+            {provided.placeholder}
+          </tbody>
+        );
+      }}
     </Droppable>
   );
 };
@@ -54,13 +59,14 @@ const TableRow = (props: any) => {
   return (
     <Draggable key={index} draggableId={`${index}`} index={index}>
       {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => {
+        set(props, 'record._provided', provided);
         return (
           <tr
+            id={`${index}`}
             ref={provided.innerRef}
             {...props}
-            className={classNames('semi-table-row', { 'row-dragging': snapshot.isDragging })}
+            className={classNames('semi-table-row', 'kk', { 'row-dragging': snapshot.isDragging })}
             {...provided.draggableProps}
-            {...provided.dragHandleProps}
             style={DNDKit.getDraggbleItemStyle(provided.draggableProps.style, snapshot)}
           />
         );
@@ -98,7 +104,7 @@ const VariableList: React.FC = () => {
   const components = useMemo(() => {
     return {
       body: {
-        wrapper: (val: any) => <TableBody {...val} />,
+        wrapper: (val: any) => <TableBody {...val} variables={variables} />,
         row: forwardRef(function Row(val: any, _ref: any) {
           return <TableRow {...val} />;
         }),
@@ -107,7 +113,7 @@ const VariableList: React.FC = () => {
         }),
       },
     };
-  }, []);
+  }, [variables]);
 
   return (
     <>
@@ -149,7 +155,7 @@ const VariableList: React.FC = () => {
             return;
           }
 
-          DashboardStore.reorderVariables(source.index, destination.index);
+          DashboardStore.swapVariables(source.index, destination.index);
         }}>
         <Table
           className="lin-variables-table"
@@ -188,7 +194,7 @@ const VariableList: React.FC = () => {
               width: 120,
               render: (_text: any, r: Variable, index: number) => {
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'row', gap: 4 }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'center' }}>
                     <Button
                       type="primary"
                       icon={<IconCopyStroked size="large" />}
@@ -203,6 +209,7 @@ const VariableList: React.FC = () => {
                       icon={<IconDeleteStroked size="large" />}
                       onClick={() => DashboardStore.deleteVariable(`${index}`)}
                     />
+                    <IconHandle className="drag" {...get(r, '_provided.dragHandleProps', {})} size="large" />
                   </div>
                 );
               },

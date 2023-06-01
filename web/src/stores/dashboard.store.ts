@@ -199,7 +199,7 @@ class DashboardStore {
     set(this.dashboard, `templating.list[${index}]`, variable);
   }
 
-  reorderVariables(startIndex: number, endIndex: number) {
+  swapVariables(startIndex: number, endIndex: number) {
     const result = get(this.dashboard, 'templating.list', []) as Variable[];
     const [removed] = result.splice(startIndex, 1);
     result.splice(endIndex, 0, removed);
@@ -227,7 +227,8 @@ class DashboardStore {
   }
 
   isDashboardChanged(): boolean {
-    return this.dashboardTracker.isChanged(this.dashboard);
+    // need remove underscore temp props
+    return this.dashboardTracker.isChanged(ObjectKit.removeUnderscoreProperties(this.dashboard));
   }
 
   async loadDashbaord(dashboardId: string | null) {
