@@ -17,7 +17,14 @@ under the License.
 */
 import React from 'react';
 import { Button, Collapse, Tag, Typography } from '@douyinfe/semi-ui';
-import { IconCopy, IconHandle, IconPlusStroked, IconDeleteStroked } from '@douyinfe/semi-icons';
+import {
+  IconCopy,
+  IconHandle,
+  IconPlusStroked,
+  IconDeleteStroked,
+  IconChevronDown,
+  IconChevronUp,
+} from '@douyinfe/semi-icons';
 import { QueryEditContextProvider } from '@src/contexts';
 import { DatasourceInstance, Query } from '@src/types';
 import { cloneDeep, get } from 'lodash-es';
@@ -51,17 +58,26 @@ const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
     <div className="query-editor">
       <Collapse activeKey={QueryEditorStore.getActiveRefIds()} expandIconPosition="left" clickHeaderToExpand={false}>
         {QueryEditorStore.targets.map((target: Query, index: number) => {
+          const refId = target.refId;
           return (
             <Collapse.Panel
-              key={index}
+              showArrow={false}
+              itemKey={refId}
+              key={refId}
               header={
                 <div className="query-item">
                   <div
                     className="query-desc"
                     onClick={() => {
-                      QueryEditorStore.toggleActiveRefId(target.refId);
+                      QueryEditorStore.toggleActiveRefId(refId);
                     }}>
-                    <Text type="tertiary">{target.refId}</Text>
+                    <Button
+                      icon={QueryEditorStore.isActive(refId) ? <IconChevronDown /> : <IconChevronUp />}
+                      size="small"
+                      theme="borderless"
+                      type="tertiary"
+                    />
+                    <Text type="tertiary">{refId}</Text>
                     <Text type="tertiary" size="small">
                       ({datasource.setting.name})
                     </Text>
@@ -105,8 +121,7 @@ const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
                     <IconHandle className="drag grid-drag-handle" size="large" />
                   </div>
                 </div>
-              }
-              itemKey={target.refId}>
+              }>
               <QueryEditContextProvider
                 initValues={get(target, 'request', {})}
                 onValuesChange={(values: object) => {
