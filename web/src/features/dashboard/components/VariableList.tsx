@@ -17,7 +17,7 @@ under the License.
 */
 import React, { useMemo, useState, forwardRef, useRef, useEffect } from 'react';
 import { DashboardStore } from '@src/stores';
-import { get, isEmpty, cloneDeep } from 'lodash-es';
+import { isEmpty, cloneDeep } from 'lodash-es';
 import { Button, Table, Typography } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconDeleteStroked, IconCopyStroked, IconEyeOpened } from '@douyinfe/semi-icons';
 import { StatusTip } from '@src/components';
@@ -36,21 +36,8 @@ import {
 import classNames from 'classnames';
 import './variables.scss';
 import { Variable, VariableHideType } from '@src/types';
+import { DNDKit } from '@src/utils';
 const { Text } = Typography;
-
-// https://github.com/atlassian/react-beautiful-dnd/blob/master/docs/guides/drop-animation.md#skipping-the-drop-animation
-const getStyle = (style: any, snapshot: DraggableStateSnapshot) => {
-  if (!snapshot.isDropAnimating) {
-    return {
-      ...style,
-    };
-  }
-  return {
-    ...style,
-    // cannot be 0, but make it super tiny
-    transitionDuration: `0.001s`,
-  };
-};
 
 const TableBody = ({ ...props }) => {
   return (
@@ -74,7 +61,7 @@ const TableRow = (props: any) => {
             className={classNames('semi-table-row', { 'row-dragging': snapshot.isDragging })}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
-            style={getStyle(provided.draggableProps.style, snapshot)}
+            style={DNDKit.getDraggbleItemStyle(provided.draggableProps.style, snapshot)}
           />
         );
       }}

@@ -221,8 +221,8 @@ under the License.
   }
 
   .react-resizable-handle::after {
-    border-right: 2px solid var(--semi-color-primary);
-    border-bottom: 2px solid var(--semi-color-primary);
+    border-right: 2px solid var(--semi-color-primary) !important;
+    border-bottom: 2px solid var(--semi-color-primary) !important;
   }
 
   &:hover {

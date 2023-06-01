@@ -94,6 +94,11 @@ class QueryEditorStore {
     this.activeRefIds.add(newTarget.refId);
     this.targets.push(newTarget);
   }
+
+  swapTargets(sourceIndex: number, destIndex: number) {
+    const [removed] = this.targets.splice(sourceIndex, 1);
+    this.targets.splice(destIndex, 0, removed);
+  }
 }
 
 export default new QueryEditorStore();

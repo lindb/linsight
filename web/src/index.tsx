@@ -15,20 +15,9 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useCallback, useState } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
-import {
-  BrowserRouter as Router,
-  Outlet,
-  Route,
-  Routes,
-  unstable_useBlocker as useBlocker,
-  useNavigate,
-  unstable_usePrompt as usePrompt,
-  createBrowserRouter,
-  createRoutesFromElements,
-  RouterProvider,
-} from 'react-router-dom';
+import { Route, Routes, createBrowserRouter, createRoutesFromElements, RouterProvider } from 'react-router-dom';
 import { PlatformContextProvider } from '@src/contexts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import en_US from '@douyinfe/semi-ui/lib/es/locale/source/en_US';

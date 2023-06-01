@@ -25,6 +25,15 @@ under the License.
     border-bottom: 0;
   }
 
+  .placeholder {
+    position: absolute;
+    background: var(--semi-color-primary-light-hover);
+  }
+
+  .query-item-dragging {
+    background: var(--semi-color-bg-2);
+  }
+
   .query-item {
     display: flex;
     width: 100%;
@@ -41,6 +50,10 @@ under the License.
       display: flex;
       align-items: center;
       color: var(--semi-color-text-2);
+
+      .drag {
+        cursor: move;
+      }
     }
 
     .semi-button {
