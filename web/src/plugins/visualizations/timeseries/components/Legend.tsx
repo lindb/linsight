@@ -64,8 +64,8 @@ const LegendItem: React.FC<{
         <i className="legend-series-icon" style={{ backgroundColor: borderColor }} />
         <span className="legend-series-label">{label}</span>
       </span>
-      {values.map((key: string) => (
-        <span key={key} className="legend-series-value">
+      {values.map((key: string, index: number) => (
+        <span key={key + index} className="legend-series-value">
           {format(chart, get(stats, key, 0))}
         </span>
       ))}
@@ -97,8 +97,8 @@ export const Legend: React.FC<{ chart: any }> = (props) => {
     <div className={legendCls}>
       <div className={legendContentCls}>
         {asTable && !isEmpty(datasets) && <LegendHeader values={values} />}
-        {datasets.map((series: any) => {
-          return <LegendItem chart={chart} series={series} key={series.label} values={values} />;
+        {datasets.map((series: any, index: number) => {
+          return <LegendItem chart={chart} series={series} key={series.label + index} values={values} />;
         })}
       </div>
     </div>

@@ -15,8 +15,37 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-.metric-explore {
+.query-editor {
   .semi-collapse-header {
     background-color: var(--semi-color-fill-0);
+    margin: 4px 0;
+  }
+
+  .semi-collapse-item {
+    border-bottom: 0;
+  }
+
+  .query-item {
+    display: flex;
+    width: 100%;
+    align-items: center;
+
+    .query-desc {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      color: var(--semi-color-text-2);
+
+      .semi-button {
+        color: var(--semi-color-text-2);
+        border-radius: 50%;
+      }
+    }
   }
 }

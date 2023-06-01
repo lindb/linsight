@@ -35,7 +35,9 @@ export interface DataQuery {
 }
 
 export interface Query {
-  datasource: { uid: string };
+  datasource: { uid: string; type: string };
+  refId: string;
+  hide?: boolean;
   request: any;
 }
 

@@ -45,7 +45,11 @@ export const useMetric = (queries: Query[]) => {
       }
       (queries || []).forEach((q: Query) => {
         const query = cloneDeep(q);
+        if (query.hide || !query.request || !query.datasource) {
+          return;
+        }
         console.log(toJS(query), 'query.....');
+        // FIXME: move to datasource plugin
         if (!isEmpty(query.request.where)) {
           query.request.where = query.request.where.map((w: any) => {
             if (isString(w.value)) {

@@ -20,30 +20,19 @@ import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
 import { IconBellStroked } from '@douyinfe/semi-icons';
 import SplitPane from 'react-split-pane';
 import { PanelSetting as PanelOptions } from '@src/types';
-import { DatasourceSelectForm, Notification, Panel } from '@src/components';
+import { DatasourceSelectForm, Notification, Panel, QueryEditor } from '@src/components';
 import { get, cloneDeep } from 'lodash-es';
-import { DashboardStore, DatasourceStore } from '@src/stores';
-import { toJS } from 'mobx';
+import { DashboardStore, DatasourceStore, QueryEditorStore } from '@src/stores';
+import { reaction, toJS } from 'mobx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
 import ViewVariables from './components/ViewVariables';
-import { PanelEditContext, PanelEditContextProvider, QueryEditContextProvider } from '@src/contexts';
+import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 import PanelSetting from './PanelSetting';
 import { DefaultVisualizationType, VisualizationAddPanelType } from '@src/constants';
 
 const Split: any = SplitPane;
 const DefaultOptionsEditorSize = 350;
-
-const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
-  const { datasource } = props;
-  const plugin = datasource.plugin;
-  const QueryEditor = plugin.components.QueryEditor;
-
-  if (!QueryEditor) {
-    return null;
-  }
-  return <QueryEditor datasource={datasource} />;
-};
 
 const MetricSetting: React.FC = () => {
   const { panel, modifyPanel } = useContext(PanelEditContext);
@@ -52,36 +41,28 @@ const MetricSetting: React.FC = () => {
     return toJS(get(datasources, '[0]'));
   });
 
-  const QueryEditor = () => {
-    if (!datasource) {
-      return <></>;
-    }
-    const plugin = datasource.plugin;
-    const QueryEditor = plugin.components.QueryEditor;
-    if (!QueryEditor) {
-      return <></>;
-    }
-    // NOTE: init target if empty
-    const targets = get(panel, 'targets', [{}]);
-    return (
-      <>
-        {targets.map((target: any, index: number) => {
-          return (
-            <QueryEditContextProvider
-              key={index}
-              initValues={get(target, 'request', {})}
-              onValuesChange={(values: object) => {
-                modifyPanel({
-                  targets: [{ datasource: { uid: datasource.setting.uid }, request: values }],
-                });
-              }}>
-              <MetricQueryEditor datasource={datasource} />
-            </QueryEditContextProvider>
-          );
-        })}
-      </>
-    );
-  };
+  useEffect(() => {
+    const disposer = [
+      reaction(
+        () => cloneDeep(QueryEditorStore.targets),
+        (newTargets) => {
+          modifyPanel({ targets: newTargets });
+        }
+      ),
+    ];
+    return () => {
+      disposer.forEach((d) => d());
+    };
+  }, [modifyPanel]);
+
+  useEffect(() => {
+    QueryEditorStore.setTargets(get(panel, 'targets', []));
+    return () => {
+      // clear targets
+      QueryEditorStore.setTargets([]);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // NOTE: don't put <panel>
 
   return (
     <div>
@@ -93,7 +74,7 @@ const MetricSetting: React.FC = () => {
           setDatasource(instance);
         }}
       />
-      <QueryEditor />
+      {datasource && <QueryEditor datasource={datasource} />}
     </div>
   );
 };
@@ -135,9 +116,7 @@ const Editor: React.FC<{ initSize: number }> = (props) => {
                 </span>
               }
               itemKey="1">
-              <Card bodyStyle={{ padding: 12 }}>
-                <MemoMetricSetting />
-              </Card>
+              <MemoMetricSetting />
             </TabPane>
             <TabPane
               tab={
