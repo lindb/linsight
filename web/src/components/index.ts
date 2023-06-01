@@ -33,6 +33,7 @@ export { default as DatasourceSelectForm } from '@src/components/input/Datasourc
 export { default as SliderInput } from '@src/components/input/SliderInput';
 export { default as LinSelect } from '@src/components/input/LinSelect';
 
+export { default as QueryEditor } from '@src/components/explore/QueryEditor';
 export { default as MetricExplore } from '@src/components/explore/MetricExplore';
 export { default as AddToCharts } from '@src/components/explore/AddToCharts';
 export { default as AddPanelWidget } from '@src/components/dashboard/AddPanelWidget';
@@ -40,7 +41,6 @@ export { default as Panel } from '@src/components/dashboard/Panel';
 
 export { default as StatsList } from './StatsList';
 export { default as ServiceFilter } from './ServiceFilter';
-export { default as Chart } from './Chart';
 export { default as AddToDashboard } from './AddToDashboard';
 export { default as TraceTimeline } from './TraceTimeline';
 export { default as TraceFlame } from './TraceFlame';

@@ -24,3 +24,4 @@ export { default as CSSKit } from '@src/utils/css';
 export { default as ObjectKit } from '@src/utils/object';
 export { default as VariableKit } from '@src/utils/variable';
 export { default as FieldKit } from '@src/utils/panel/field';
+export { default as StringKit } from '@src/utils/string';

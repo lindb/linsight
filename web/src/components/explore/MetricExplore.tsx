@@ -17,14 +17,12 @@ under the License.
 */
 import React, { useContext, useEffect, useState } from 'react';
 import { DatasourceInstance } from '@src/types';
-import { isEmpty, get } from 'lodash-es';
-import { Card, Collapse, Typography } from '@douyinfe/semi-ui';
-import { IconCopy } from '@douyinfe/semi-icons';
+import { isEmpty } from 'lodash-es';
+import { Card } from '@douyinfe/semi-ui';
 import Panel from '../dashboard/Panel';
-import './metric-explore.scss';
-import { QueryEditContext, QueryEditContextProvider } from '@src/contexts';
+import { QueryEditContext } from '@src/contexts';
 import { useSearchParams } from 'react-router-dom';
-const { Text } = Typography;
+import { QueryEditor } from '..';
 
 const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   const { datasource } = props;
@@ -79,26 +77,7 @@ const MetricExplore: React.FC<{ datasource: DatasourceInstance; onValueChange: (
   return (
     <>
       <Card className="linsight-feature">
-        <div className="metric-explore">
-          <Collapse activeKey={['A']} expandIconPosition="left">
-            <Collapse.Panel
-              header={
-                <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
-                  <div style={{ flex: 1 }}>
-                    <Text>A</Text>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <IconCopy />
-                  </div>
-                </div>
-              }
-              itemKey="A">
-              <QueryEditContextProvider initValues={get(left, 'request', {})}>
-                <MetricQueryEditor datasource={datasource} />
-              </QueryEditContextProvider>
-            </Collapse.Panel>
-          </Collapse>
-        </div>
+        <QueryEditor datasource={datasource} />
       </Card>
       <div className="linsight-feature" style={{ marginTop: 0, height: 300 }}>
         <Panel
