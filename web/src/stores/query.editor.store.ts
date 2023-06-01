@@ -43,6 +43,10 @@ class QueryEditorStore {
     return Array.from(this.activeRefIds.keys());
   }
 
+  isActive(refId: string): boolean {
+    return this.activeRefIds.has(refId);
+  }
+
   toggleActiveRefId(refId: string) {
     if (this.activeRefIds.has(refId)) {
       this.activeRefIds.delete(refId);

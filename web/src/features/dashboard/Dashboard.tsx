@@ -15,11 +15,20 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { DashboardSrv } from '@src/services';
-import { createSearchParams, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { isEmpty, endsWith } from 'lodash-es';
-import { Layout, Typography, Button, SideSheet, Form, Space } from '@douyinfe/semi-ui';
+import {
+  createSearchParams,
+  Route,
+  Routes,
+  useBeforeUnload,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+  unstable_useBlocker as useBlocker,
+} from 'react-router-dom';
+import { isEmpty, startsWith, endsWith } from 'lodash-es';
+import { Layout, Typography, Button, SideSheet, Form, Space, Modal } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
 import { DashboardStore } from '@src/stores';
 import { Icon, Loading, Notification, TimePicker } from '@src/components';
@@ -37,7 +46,6 @@ const { Title } = Typography;
 
 const DashboardStar = observer(() => {
   const { dashboard } = DashboardStore;
-
   if (!dashboard) {
     return null;
   }
@@ -80,7 +88,47 @@ const SaveDashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const dashboardId = searchParams.get('d');
   const [visible, setVisible] = useState(false);
+  const [confirm, setConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const blocking = useRef(true);
+  const nextPath = useRef('');
+
+  /**
+   * Track dashboard if changed when goto other page
+   */
+  useBlocker(
+    useCallback((transition: any) => {
+      const nextPathName = transition.nextLocation.pathname;
+      if (startsWith(nextPathName, '/dashboard')) {
+        return false;
+      }
+      if (!DashboardStore.isDashboardChanged()) {
+        // no changes unblocking
+        return false;
+      }
+      nextPath.current = transition.nextLocation.pathname;
+      if (blocking.current) {
+        setConfirm(true);
+      }
+      return blocking.current;
+    }, [])
+  );
+
+  /**
+   * Track dashboard if changed when close/reflesh page
+   */
+  useBeforeUnload(
+    useCallback((event: BeforeUnloadEvent) => {
+      // TODO: handle ignore dashboard change?
+      if (DashboardStore.isDashboardChanged()) {
+        event.preventDefault();
+        // chrome
+        event.returnValue = '';
+      }
+    }, [])
+  );
+
   const saveDashboard = async (values: any) => {
     try {
       setSubmitting(true);
@@ -96,10 +144,14 @@ const SaveDashboard: React.FC = () => {
         setSearchParams(searchParams);
       }
       setVisible(false);
+      if (!isEmpty(nextPath.current)) {
+        navigate(nextPath.current);
+      }
     } finally {
       setSubmitting(false);
     }
   };
+
   return (
     <>
       <Button
@@ -109,6 +161,38 @@ const SaveDashboard: React.FC = () => {
           setVisible(true);
         }}
       />
+      <Modal
+        title="Unsaved changes"
+        visible={confirm}
+        closeOnEsc
+        onCancel={() => setConfirm(false)}
+        footer={
+          <div>
+            <Button type="tertiary" onClick={() => setConfirm(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="danger"
+              theme="solid"
+              onClick={() => {
+                blocking.current = false;
+                setConfirm(false);
+                navigate(nextPath.current);
+              }}>
+              Discard
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                setConfirm(false);
+                setVisible(true);
+              }}>
+              Save dashboard
+            </Button>
+          </div>
+        }>
+        Do you want to save your changes?
+      </Modal>
       <SideSheet
         size="medium"
         motion={false}

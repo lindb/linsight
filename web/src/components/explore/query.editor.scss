@@ -41,11 +41,11 @@ under the License.
       display: flex;
       align-items: center;
       color: var(--semi-color-text-2);
+    }
 
-      .semi-button {
-        color: var(--semi-color-text-2);
-        border-radius: 50%;
-      }
+    .semi-button {
+      color: var(--semi-color-text-2);
+      border-radius: 50%;
     }
   }
 }

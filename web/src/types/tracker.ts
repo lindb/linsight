@@ -15,14 +15,22 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from '@src/types/tracker';
-export * from '@src/types/theme';
-export * from '@src/types/user';
-export * from '@src/types/plugin';
-export * from '@src/types/datasource';
-export * from '@src/types/visualization';
-export * from '@src/types/dashboard';
-export * from '@src/types/chart';
-export * from '@src/types/feature';
-export * from '@src/types/platform';
-export * from '@src/types/format';
+import { isEqual, cloneDeep } from 'lodash-es';
+
+class Tracker<T> {
+  private val: T;
+  constructor(initVal: T) {
+    // NOTE: need clone val, avoid modify some object
+    this.val = cloneDeep(initVal);
+  }
+
+  setNewVal(newVal: T) {
+    this.val = cloneDeep(newVal);
+  }
+
+  isChanged(newVal: T): boolean {
+    return !isEqual(this.val, newVal);
+  }
+}
+
+export { Tracker };

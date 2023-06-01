@@ -18,14 +18,15 @@ under the License.
 import { Notification } from '@src/components';
 import { DefaultColumns, PanelGridPos, RowPanelType, VisualizationAddPanelType } from '@src/constants';
 import { DashboardSrv } from '@src/services';
-import { Dashboard, GridPos, PanelSetting, Variable } from '@src/types';
+import { Dashboard, GridPos, PanelSetting, Variable, Tracker } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
 import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
 
 class DashboardStore {
-  public dashboard: Dashboard = {};
   private panelSeq = 0;
+  private dashboardTracker: Tracker<Dashboard> = new Tracker<Dashboard>({});
+  public dashboard: Dashboard = {};
 
   constructor() {
     makeAutoObservable(this);
@@ -225,6 +226,10 @@ class DashboardStore {
     });
   }
 
+  isDashboardChanged(): boolean {
+    return this.dashboardTracker.isChanged(this.dashboard);
+  }
+
   async loadDashbaord(dashboardId: string | null) {
     // reset panel seq when load dashboard
     this.panelSeq = 0;
@@ -250,6 +255,7 @@ class DashboardStore {
       console.warn('load dashobard error', err);
       Notification.error(ApiKit.getErrorMsg(err));
     }
+    this.dashboardTracker.setNewVal(this.dashboard);
     return this.dashboard;
   }
 
@@ -265,11 +271,13 @@ class DashboardStore {
       // FIXME: remove unused field
       if (isEmpty(this.dashboard.uid)) {
         const uid = await DashboardSrv.createDashboard(dashboard);
-        this.dashboard.uid = uid;
+        dashboard.uid = uid;
       } else {
         await DashboardSrv.updateDashboard(dashboard);
       }
       Notification.success('Save dashboard successfully!');
+      this.dashboard = dashboard;
+      this.dashboardTracker.setNewVal(dashboard);
       return true;
     } catch (err) {
       console.warn('save dashobard error', err);
