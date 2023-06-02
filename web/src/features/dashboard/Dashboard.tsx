@@ -18,7 +18,6 @@ under the License.
 import React, { useCallback, useRef, useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import {
-  createSearchParams,
   Route,
   Routes,
   useBeforeUnload,
@@ -290,9 +289,12 @@ const Dashboard: React.FC = () => {
               type="tertiary"
               icon={<Icon icon="back2" />}
               onClick={() => {
+                searchParams.delete('panel');
+                searchParams.delete('tab');
+                searchParams.delete('edit');
                 navigate({
                   pathname: '/dashboard',
-                  search: dashboard.uid ? `${createSearchParams({ d: dashboard.uid })}` : '',
+                  search: searchParams.toString(),
                 });
               }}
             />
@@ -309,9 +311,10 @@ const Dashboard: React.FC = () => {
             type="tertiary"
             icon={<IconSettingStroked />}
             onClick={() => {
+              searchParams.delete('panel');
               navigate({
                 pathname: '/dashboard/setting',
-                search: dashboard.uid ? `${createSearchParams({ d: dashboard.uid })}` : '',
+                search: searchParams.toString(),
               });
             }}
           />

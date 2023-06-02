@@ -26,6 +26,7 @@ export { default as Loading } from '@src/components/common/Loading';
 
 // layout components
 export { default as Footer } from '@src/components/layout/Footer';
+export { default as FeatureMenu } from '@src/components/layout/FeatureMenu';
 
 // form components
 export { default as DatasourceSelect } from '@src/components/input/DatasourceSelect';
