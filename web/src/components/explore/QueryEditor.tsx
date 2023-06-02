@@ -47,24 +47,15 @@ import { DNDKit } from '@src/utils';
 
 const { Text } = Typography;
 
-const MetricQueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
-  const { datasource } = props;
-  const plugin = datasource.plugin;
-  const QueryEditor = plugin.components.QueryEditor;
-
-  if (!QueryEditor) {
-    return null;
-  }
-  return <QueryEditor datasource={datasource} />;
-};
-
 const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) => {
   const { datasource } = props;
+  const plugin = datasource.plugin;
+  const QueryEditor = plugin.getQueryEditor();
   return (
     <Collapse activeKey={QueryEditorStore.getActiveRefIds()} expandIconPosition="left" clickHeaderToExpand={false}>
       {toJS(QueryEditorStore.targets).map((target: Query, index: number) => {
         // NOTE: if not ues toJS, mobx observer is not working
-        const refId = target.refId;
+        const refId = `${target.refId}`;
         return (
           <Draggable key={refId} draggableId={refId} index={index}>
             {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => {
@@ -78,7 +69,6 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                   <Collapse.Panel
                     showArrow={false}
                     itemKey={refId}
-                    // style={{ backgroundColor: snapshot.isDragging ? 'red' : 'unset' }}
                     header={
                       <div className="query-item">
                         <div
@@ -142,7 +132,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                       onValuesChange={(values: object) => {
                         QueryEditorStore.updateTargetConfig(index, { request: values } as Query);
                       }}>
-                      <MetricQueryEditor datasource={datasource} />
+                      <QueryEditor datasource={datasource} />
                     </QueryEditContextProvider>
                   </Collapse.Panel>
                 </div>

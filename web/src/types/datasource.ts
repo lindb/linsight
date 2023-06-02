@@ -35,8 +35,8 @@ export interface DataQuery {
 }
 
 export interface Query {
-  datasource: { uid: string; type: string };
-  refId: string;
+  datasource: { uid: string; type?: string };
+  refId?: string;
   hide?: boolean;
   request: any;
 }
@@ -96,9 +96,18 @@ class DatasourcePlugin extends Plugin {
     this.components.QueryEditor = QueryEditor;
     return this;
   }
+
   setVariableEditor(VariableEditor: ComponentType<any>): DatasourcePlugin {
     this.components.VariableEditor = VariableEditor;
     return this;
+  }
+
+  getQueryEditor(): ComponentType<QueryEditorProps> {
+    const editor = this.components.QueryEditor;
+    if (editor) {
+      return editor;
+    }
+    throw new Error('Datasource query editor not implemented.');
   }
 }
 
@@ -108,6 +117,11 @@ abstract class DatasourceAPI {
   constructor(setting: DatasourceSetting) {
     this.setting = setting;
   }
+
+  /**
+   * Rewrite query request, if request invalid return nulll.
+   */
+  abstract rewriteQuery(query: Query, variables: {}): Query | null;
 
   abstract query(req: any, range?: TimeRange): any;
 

@@ -40,6 +40,7 @@ import { observer } from 'mobx-react-lite';
 import ViewPanel from './ViewPanel';
 import './dashboard.scss';
 import { useRequest } from '@src/hooks';
+import { VariableContextProvider } from '@src/contexts';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -318,12 +319,14 @@ const Dashboard: React.FC = () => {
         </div>
       </Header>
       <Content>
-        <Routes>
-          <Route path="/setting" element={<Setting />} />
-          <Route path="/panel/edit" element={<PanelEditor />} />
-          <Route path="/panel/view" element={<ViewPanel />} />
-          <Route path="/" element={<View />} />
-        </Routes>
+        <VariableContextProvider variables={DashboardStore.getVariables()}>
+          <Routes>
+            <Route path="/setting" element={<Setting />} />
+            <Route path="/panel/edit" element={<PanelEditor />} />
+            <Route path="/panel/view" element={<ViewPanel />} />
+            <Route path="/" element={<View />} />
+          </Routes>
+        </VariableContextProvider>
       </Content>
     </Layout>
   );

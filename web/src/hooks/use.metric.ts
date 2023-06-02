@@ -16,26 +16,40 @@ specific language governing permissions and limitations
 under the License.
 */
 import { VariableContext } from '@src/contexts';
+import { DataQuerySrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
-import { Query, SearchParamKeys, TimeRange } from '@src/types';
-import { TemplateKit } from '@src/utils';
-import { isEmpty, cloneDeep, isString } from 'lodash-es';
-import { toJS } from 'mobx';
+import { DataQuery, Query, TimeRange } from '@src/types';
+import { isEmpty, cloneDeep } from 'lodash-es';
 import { useContext } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { useRequest } from './use.request';
 
+const getDataQuery = (queries: Query[], variables: object): DataQuery => {
+  const dataQuery: DataQuery = { queries: [] };
+  (queries || []).forEach((q: Query) => {
+    if (q.hide || !q.datasource) {
+      return;
+    }
+    const ds = DatasourceStore.getDatasource(q.datasource.uid);
+    if (!ds) {
+      return;
+    }
+    // NOTE: need clone new q, because rewrite query will modify it
+    const queryAfterRewrite = ds.api.rewriteQuery(cloneDeep(q), variables);
+    if (isEmpty(queryAfterRewrite)) {
+      return;
+    }
+    // add query request into batch
+    dataQuery.queries.push(queryAfterRewrite);
+  });
+  return dataQuery;
+};
+
 export const useMetric = (queries: Query[]) => {
-  console.log('use metric.......', toJS(queries));
-  const [searchParams] = useSearchParams();
-  const from = searchParams.get(SearchParamKeys.From);
-  const to = searchParams.get(SearchParamKeys.To);
-  const { values } = useContext(VariableContext);
-  console.log('use metric, variable values', values);
+  const { variables, from, to } = useContext(VariableContext);
+  const dataQuery: DataQuery = getDataQuery(queries, variables);
   const { result, loading, refetch, error } = useRequest(
-    ['search_metric_data', queries, from, to, values],
+    ['query_metric_data', dataQuery, from, to], // watch dataQuery/from/to if changed
     async () => {
-      const requests: any[] = [];
       const range: TimeRange = {};
       if (!isEmpty(from)) {
         range.from = `${from}`;
@@ -43,33 +57,10 @@ export const useMetric = (queries: Query[]) => {
       if (!isEmpty(to)) {
         range.to = `${to}`;
       }
-      (queries || []).forEach((q: Query) => {
-        const query = cloneDeep(q);
-        if (query.hide || !query.request || !query.datasource) {
-          return;
-        }
-        console.log(toJS(query), 'query.....');
-        // FIXME: move to datasource plugin
-        if (!isEmpty(query.request.where)) {
-          query.request.where = query.request.where.map((w: any) => {
-            if (isString(w.value)) {
-              w.value = TemplateKit.template(w.value, values);
-            }
-            return w;
-          });
-        }
-        const ds = DatasourceStore.getDatasource(query.datasource.uid);
-        if (!ds) {
-          return;
-        }
-        // add query request into batch
-        requests.push(ds.api.query(query.request, range));
-      });
-      return Promise.allSettled(requests).then((res) => {
-        return res.map((item) => (item.status === 'fulfilled' ? item.value : [])).flat();
-      });
+      dataQuery.range = range;
+      return DataQuerySrv.dataQuery(dataQuery);
     },
-    { enabled: !isEmpty(queries) }
+    { enabled: !isEmpty(dataQuery.queries) }
   );
   return {
     loading,

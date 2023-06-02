@@ -277,7 +277,6 @@ const PanelSetting: React.FC = () => {
     return null;
   }
   const OptionsEditor = plugin.components.OptionsEditor;
-  console.log('xxxxxx.........', toJS(panel));
   return (
     <>
       <Collapse

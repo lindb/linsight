@@ -256,7 +256,6 @@ class DashboardStore {
       console.warn('load dashobard error', err);
       Notification.error(ApiKit.getErrorMsg(err));
     }
-    this.dashboardTracker.setNewVal(this.dashboard);
     return this.dashboard;
   }
 
@@ -276,15 +275,18 @@ class DashboardStore {
       } else {
         await DashboardSrv.updateDashboard(dashboard);
       }
+      this.setDashbaord(dashboard);
       Notification.success('Save dashboard successfully!');
-      this.dashboard = dashboard;
-      this.dashboardTracker.setNewVal(dashboard);
       return true;
     } catch (err) {
       console.warn('save dashobard error', err);
       Notification.error(ApiKit.getErrorMsg(err));
       return false;
     }
+  }
+  private setDashbaord(dashboard: Dashboard) {
+    this.dashboard = dashboard;
+    this.dashboardTracker.setNewVal(dashboard);
   }
 
   /**
@@ -319,6 +321,7 @@ class DashboardStore {
       // NOTE: set grid i here
       this.setPanelGridId(panel);
     });
+    this.dashboardTracker.setNewVal(this.dashboard);
   }
 
   private getPanelGrid(panel: PanelSetting): GridPos {

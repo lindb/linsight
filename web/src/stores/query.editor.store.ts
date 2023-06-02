@@ -16,15 +16,17 @@ specific language governing permissions and limitations
 under the License.
 */
 
-import { Query } from '@src/types';
+import { Query, Tracker } from '@src/types';
 import { makeAutoObservable } from 'mobx';
-import { pullAt, cloneDeep, isEqual, forIn, set } from 'lodash-es';
+import { pullAt, forIn, set } from 'lodash-es';
 import { StringKit } from '@src/utils';
 
 class QueryEditorStore {
   private refIds: Set<string> = new Set();
   private activeRefIds: Set<string> = new Set();
+  private targetsTracker: Tracker<Query[]> = new Tracker<Query[]>([]);
   public targets: Query[] = [];
+
   constructor() {
     makeAutoObservable(this);
   }
@@ -56,12 +58,13 @@ class QueryEditorStore {
   }
 
   setTargets(targets: Query[]) {
-    if (isEqual(this.targets, targets)) {
+    if (!this.targetsTracker.isChanged(targets)) {
       // same targets, ignore it
       return;
     }
-    this.targets = cloneDeep(targets || []);
-    (targets || []).forEach((q: Query) => {
+    this.targets = targets || [];
+    this.targetsTracker.setNewVal(this.targets);
+    (this.targets || []).forEach((q: Query) => {
       if (!q.refId) {
         q.refId = this.genRefId();
       }
