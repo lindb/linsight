@@ -30,9 +30,18 @@ under the License.
     overflow: unset;
   }
 
+  .placeholder {
+    position: absolute;
+    background: var(--semi-color-primary-light-hover);
+  }
+
   .row-dragging {
     display: table;
-    color: var(--semi-color-primary);
-    background: var(--semi-color-primary-light-active);
+    background: var(--semi-color-bg-2);
+  }
+
+  .drag {
+    cursor: move;
+    color: var(--semi-color-text-2);
   }
 }
