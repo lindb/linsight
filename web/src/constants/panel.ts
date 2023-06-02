@@ -26,3 +26,4 @@ export const DefaultThresholds: Thresholds = {
 };
 
 export const PanelGridPos = ['x', 'y', 'w', 'h'];
+export const PanelVisualizationOptions = ['options', 'fieldConfig'];

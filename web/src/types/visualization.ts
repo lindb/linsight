@@ -19,6 +19,11 @@ import { ComponentType } from 'react';
 import { DatasourceCategory, Plugin, Query, ThemeType } from '@src/types';
 import { cloneDeep } from 'lodash-es';
 
+export enum DataSetType {
+  TimeSeries = 'timeseries',
+  SingleStat = 'singleStat',
+}
+
 export interface GridPos {
   x: number;
   y: number;
@@ -100,6 +105,8 @@ export interface VisualizationPluginComponents {
 
 class VisualizationPlugin extends Plugin {
   components: VisualizationPluginComponents = {};
+  getDataSetTypeFn?: (options: PanelSetting) => DataSetType;
+
   constructor(
     public category: DatasourceCategory,
     name: string,
@@ -114,6 +121,7 @@ class VisualizationPlugin extends Plugin {
     this.components.OptionsEditor = optionsEditor;
     return this;
   }
+
   setDefaultOptions(options: PanelSetting): VisualizationPlugin {
     this.components.DefaultOptions = options;
     return this;
@@ -121,6 +129,13 @@ class VisualizationPlugin extends Plugin {
 
   getDefaultOptions(): object {
     return cloneDeep(this.components.DefaultOptions) || {};
+  }
+
+  getDataSetType(options: PanelSetting): DataSetType {
+    if (this.getDataSetTypeFn) {
+      return this.getDataSetTypeFn(options);
+    }
+    return DataSetType.TimeSeries;
   }
 }
 

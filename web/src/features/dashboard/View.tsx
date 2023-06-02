@@ -17,7 +17,7 @@ under the License.
 */
 import React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { get, pick } from 'lodash-es';
+import { pick } from 'lodash-es';
 import { AddPanelWidget, Panel } from '@src/components';
 import { Observer } from 'mobx-react-lite';
 import { DashboardStore } from '@src/stores';
@@ -30,16 +30,12 @@ import {
   VisualizationAddPanelType,
 } from '@src/constants';
 import ViewVariables from './components/ViewVariables';
-import { VariableContextProvider } from '@src/contexts';
-import { PanelSetting, Variable } from '@src/types';
+import { PanelSetting } from '@src/types';
 import RowPanel from './components/RowPanel';
 
 const ReactGridLayout = WidthProvider(RGL);
 
 const View: React.FC = () => {
-  const { dashboard } = DashboardStore;
-  const variables: Variable[] = get(dashboard, 'config.variables', []);
-
   const buildLayout = (panels: any) => {
     const layout: any[] = [];
     (panels || []).map((item: any, _index: number) => {
@@ -89,7 +85,7 @@ const View: React.FC = () => {
   };
 
   return (
-    <VariableContextProvider variables={variables}>
+    <div>
       <ViewVariables className="variables" />
       <AutoSizer disableHeight>
         {({ width }) => {
@@ -119,7 +115,7 @@ const View: React.FC = () => {
           );
         }}
       </AutoSizer>
-    </VariableContextProvider>
+    </div>
   );
 };
 

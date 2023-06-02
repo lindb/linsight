@@ -16,13 +16,29 @@ specific language governing permissions and limitations
 under the License.
 */
 import { DataQuerySrv } from '@src/services';
-import { DatasourceAPI, DatasourceSetting, TimeRange } from '@src/types';
-import { isEmpty } from 'lodash-es';
+import { DatasourceAPI, DatasourceSetting, Query, TimeRange } from '@src/types';
+import { TemplateKit } from '@src/utils';
+import { isEmpty, isString } from 'lodash-es';
 import { toJS } from 'mobx';
 
 export class LinDBDatasource extends DatasourceAPI {
   constructor(setting: DatasourceSetting) {
     super(setting);
+  }
+
+  rewriteQuery(query: Query, variables: {}): Query | null {
+    if (!query.request) {
+      return null;
+    }
+    if (!isEmpty(query.request.where)) {
+      query.request.where = query.request.where.map((w: any) => {
+        if (isString(w.value)) {
+          w.value = TemplateKit.template(w.value, variables);
+        }
+        return w;
+      });
+    }
+    return query;
   }
 
   async fetchMetricNames(namespace: string, prefix?: string): Promise<string[]> {

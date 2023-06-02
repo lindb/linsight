@@ -15,15 +15,23 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
-import { VisualizationProps } from '@src/types';
-import { TimeSeriesChart } from './components/TimeSeriesChart';
-import './components/timeseries.scss';
+.panel {
+  height: 100%;
+  width: 100%;
 
-/**
- * TimeSeries is a visualization component for time series chart.
- */
-export const TimeSeries: React.FC<VisualizationProps> = (props) => {
-  const { panel, theme, datasets } = props;
-  return <TimeSeriesChart theme={theme} panel={panel} datasets={datasets} />;
-};
+  .msg {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+
+    .error-msg {
+      color: var(--semi-color-danger);
+    }
+
+    .empty-msg {
+      color: var(--semi-color-text-2);
+    }
+  }
+}

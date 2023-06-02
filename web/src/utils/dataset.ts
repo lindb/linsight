@@ -18,6 +18,7 @@ under the License.
 import { isEmpty, keys } from 'lodash-es';
 import { ColorKit } from '@src/utils';
 import moment from 'moment';
+import { DataSetType } from '@src/types';
 
 const getGroupByTags = (tags: any): string => {
   if (!tags) {
@@ -204,7 +205,15 @@ const createTimeSeriesDatasets = (resultSet: any): any => {
   return { labels, datasets, interval, times, timeLabels };
 };
 
+const createDatasets = (resultSet: any, type: DataSetType): any => {
+  switch (type) {
+    case DataSetType.SingleStat:
+      return createStatsDatasets(resultSet);
+    default:
+      return createTimeSeriesDatasets(resultSet);
+  }
+};
+
 export default {
-  createStatsDatasets,
-  createTimeSeriesDatasets,
+  createDatasets,
 };

@@ -11,7 +11,8 @@
          "[chore]:",
          "[docs]:",
          "[enhance]:",
-         "[ci]:"
+         "[ci]:",
+         "[opt]:"
       ],
       "ignoreLabels":[
          "ignore-title"

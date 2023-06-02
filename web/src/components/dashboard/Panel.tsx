@@ -23,16 +23,28 @@ import {
   IconCopyStroked,
   IconMenu,
 } from '@douyinfe/semi-icons';
-import { PanelSetting, VisualizationRepositoryInst } from '@src/types';
-import React, { useCallback, useContext, useEffect, useState, forwardRef, useImperativeHandle, useRef } from 'react';
+import { PanelSetting, Tracker, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  MutableRefObject,
+  useMemo,
+} from 'react';
 import { Icon, LazyLoad, SimpleStatusTip } from '@src/components';
 import { PlatformContext } from '@src/contexts';
 import { useMetric } from '@src/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import classNames from 'classnames';
-import { get } from 'lodash-es';
-import { ObjectKit } from '@src/utils';
+import { get, isEmpty, pick } from 'lodash-es';
+import { DataSetKit, ObjectKit } from '@src/utils';
+import './panel.scss';
+import { PanelVisualizationOptions } from '@src/constants';
 
 const { Text } = Typography;
 
@@ -128,16 +140,68 @@ const PanelHeader = forwardRef(
 );
 PanelHeader.displayName = 'PanelHeader';
 
+const getPanelOptions = (panel: PanelSetting, plugin: VisualizationPlugin): PanelSetting => {
+  return pick(ObjectKit.merge(plugin.getDefaultOptions(), panel), PanelVisualizationOptions);
+};
+
+const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationPlugin; result: any }> = (props) => {
+  const { panel, plugin, result } = props;
+  const { theme } = useContext(PlatformContext);
+  const Visualization = plugin.Visualization;
+  const datasetType = plugin.getDataSetType(panel);
+  const [panelCfg, setPanelCfg] = useState<PanelSetting>(() => {
+    return getPanelOptions(panel, plugin);
+  });
+  const [datasets, setDatasets] = useState<any>(() => {
+    return DataSetKit.createDatasets(result, datasetType);
+  });
+  // tracker data/config if changed, opt reduce re-render
+  const resultTrackerRef = useRef() as MutableRefObject<Tracker<any>>;
+  const panelTrackerRef = useRef() as MutableRefObject<Tracker<any>>;
+  /*
+   * do initialize logic
+   */
+  useMemo(() => {
+    resultTrackerRef.current = new Tracker<any>(DataSetKit.createDatasets(result, datasetType));
+    panelTrackerRef.current = new Tracker<any>(panelCfg);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const rs = DataSetKit.createDatasets(result, datasetType);
+    if (resultTrackerRef.current.isChanged(rs)) {
+      resultTrackerRef.current.setNewVal(rs);
+      setDatasets(rs);
+    }
+  }, [result, datasetType]);
+
+  useEffect(() => {
+    const cfg = getPanelOptions(panel, plugin);
+    if (panelTrackerRef.current.isChanged(cfg)) {
+      panelTrackerRef.current.setNewVal(cfg);
+      setPanelCfg(cfg);
+    }
+  }, [panel, plugin]);
+
+  return <Visualization datasets={datasets} theme={theme} panel={panelCfg} />;
+};
+
 const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: boolean; className?: string }> = (
   props
 ) => {
   const { panel, shortcutKey, isStatic, className } = props;
   const [searchParams] = useSearchParams();
-  const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
-  const { loading, error, result } = useMetric(panel?.targets || []);
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const header = useRef<any>();
+  const { loading, error, result } = useMetric(panel?.targets || []);
+  const [datasets, setDatasets] = useState<any>(result);
+  useEffect(() => {
+    if (!loading) {
+      setDatasets(result);
+    }
+  }, [loading, result]);
+
   const handleKeyDown = useCallback(
     (e: any) => {
       if (!e.ctrlKey) {
@@ -182,18 +246,29 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
 
   const renderContent = () => {
     if (!plugin) {
-      return <div>not support</div>;
+      return (
+        <div className="msg">
+          <span className="error-msg">Not support {panel.type} visualization</span>
+        </div>
+      );
     }
-    const Visualization = plugin.Visualization;
-    return <Visualization datasets={result} theme={theme} panel={ObjectKit.merge(plugin.getDefaultOptions(), panel)} />;
+    if (isEmpty(datasets)) {
+      return (
+        <div className="msg">
+          <span className="empty-msg">No data</span>
+        </div>
+      );
+    }
+    return <PanelVisualization panel={panel} plugin={plugin} result={datasets} />;
   };
+
   const panelCls = classNames('dashboard-panel', className, {
     'dashboard-panel-static': isStatic,
   });
 
   return (
     <div
-      style={{ width: '100%', height: '100%' }}
+      className="panel"
       onMouseEnter={() => {
         if (shortcutKey) {
           window.addEventListener('keydown', handleKeyDown);
@@ -217,4 +292,4 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   );
 };
 
-export default Panel;
+export default React.memo(Panel);

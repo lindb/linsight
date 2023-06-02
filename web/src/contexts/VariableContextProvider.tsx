@@ -15,31 +15,56 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Variable } from '@src/types';
+import { SearchParamKeys, Tracker, Variable } from '@src/types';
 import { isEmpty, set } from 'lodash-es';
 
 export const VariableContext = createContext({
-  values: {},
+  variables: {},
+  from: '',
+  to: '',
 });
+
+const getValues = (variables: Variable[], searchParams: URLSearchParams): object => {
+  const newValues = {};
+  variables.forEach((variable: Variable) => {
+    if (searchParams.has(variable.name)) {
+      // FIXME: add multi/all logic
+      set(newValues, variable.name, searchParams.get(variable.name));
+    }
+  });
+  return newValues;
+};
 
 export const VariableContextProvider: React.FC<{ variables: Variable[]; children: React.ReactNode }> = (props) => {
   const { children, variables } = props;
-  const [valuesOfVariable, setValuesOfVariable] = useState({});
   const [searchParams] = useSearchParams();
+  const [valuesOfVariable, setValuesOfVariable] = useState(() => {
+    return getValues(variables, searchParams);
+  });
+  const from = searchParams.get(SearchParamKeys.From) || '';
+  const to = searchParams.get(SearchParamKeys.To) || '';
+  const valuesTrackerRef = useRef() as MutableRefObject<Tracker<any>>;
+
+  useMemo(() => {
+    valuesTrackerRef.current = new Tracker<any>(null);
+  }, []);
+
   useEffect(() => {
     if (isEmpty(variables)) {
       return;
     }
-    const newValues = {};
-    variables.forEach((variable: Variable) => {
-      if (searchParams.has(variable.name)) {
-        // TODO: add multi/all logic
-        set(newValues, variable.name, searchParams.get(variable.name));
-      }
-    });
-    setValuesOfVariable(newValues);
+    const newValues = getValues(variables, searchParams);
+    if (valuesTrackerRef.current.isChanged(newValues)) {
+      valuesTrackerRef.current.setNewVal(newValues);
+      setValuesOfVariable(newValues);
+    }
   }, [searchParams, variables]);
-  return <VariableContext.Provider value={{ values: valuesOfVariable }}>{children}</VariableContext.Provider>;
+
+  return (
+    <VariableContext.Provider value={{ variables: valuesOfVariable, from: from, to: to }}>
+      {children}
+    </VariableContext.Provider>
+  );
 };
