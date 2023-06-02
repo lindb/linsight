@@ -115,6 +115,7 @@ under the License.
 
     .btn {
       cursor: pointer;
+      color: var(--semi-color-text-2);
     }
 
     &:hover {
@@ -232,8 +233,8 @@ under the License.
   }
 }
 
-.react-grid-item.react-grid-placeholder {
-  background: var(--semi-color-primary);
+.react-grid-placeholder {
+  background: var(--semi-color-primary) !important;
 }
 
 /* stylelint-disable-next-line selector-class-pattern */

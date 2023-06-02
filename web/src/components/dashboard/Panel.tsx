@@ -194,6 +194,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const navigate = useNavigate();
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const header = useRef<any>();
+  const container = useRef<any>();
   const { loading, error, result } = useMetric(panel?.targets || []);
   const [datasets, setDatasets] = useState<any>(result);
   useEffect(() => {
@@ -266,14 +267,33 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
     'dashboard-panel-static': isStatic,
   });
 
+  /*
+   * maybe mouse already in panel container, so cannot trigger onMouseEnter
+   */
+  useEffect(() => {
+    const handleMouseMove = (event: any) => {
+      const { left, top, width, height } = container.current.getBoundingClientRect();
+      const x = event.clientX;
+      const y = event.clientY;
+      const isInside = x >= left && x <= left + width && y >= top && y <= top + height;
+      if (isInside) {
+        toggleHeaderMenu(true);
+      }
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, []);
+
   return (
     <div
+      ref={container}
       className="panel"
       onMouseEnter={() => {
         if (shortcutKey) {
           window.addEventListener('keydown', handleKeyDown);
         }
-        toggleHeaderMenu(true);
       }}
       onMouseLeave={() => {
         if (shortcutKey) {
