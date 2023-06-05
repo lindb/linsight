@@ -51,6 +51,7 @@ export enum LegendPlacement {
 
 export interface PanelSetting {
   id?: number;
+  datasource?: { uid: string; type?: string };
   title?: string;
   description?: string;
   type?: string;

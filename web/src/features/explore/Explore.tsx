@@ -16,31 +16,45 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Layout } from '@douyinfe/semi-ui';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { MutableRefObject, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, MetricExplore, TimePicker } from '@src/components';
-import { DatasourceInstance } from '@src/types';
+import { DatasourceInstance, PanelSetting, Tracker } from '@src/types';
 import { useSearchParams } from 'react-router-dom';
 import { DatasourceStore } from '@src/stores';
-import { get } from 'lodash-es';
-import { toJS } from 'mobx';
+import { get, isEmpty } from 'lodash-es';
 import './explore.scss';
+import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 
 const { Header } = Layout;
 
-const Explore: React.FC = () => {
+const ExploreContent: React.FC = () => {
   const { datasources } = DatasourceStore;
-  const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
-    return toJS(get(datasources, '[0]'));
-  });
+  const { panel, modifyPanel } = useContext(PanelEditContext);
   const [searchParams, setSearchParams] = useSearchParams();
   const addToChartBtn = useRef<any>();
-  const ds = searchParams.get('ds');
+  const getDatasource = () => {
+    const datasourceUID = get(panel, 'datasource.uid', get(datasources, '[0].setting.uid'));
+    return DatasourceStore.getDatasource(`${datasourceUID}`);
+  };
+  const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
+    return getDatasource();
+  });
+  const panelTracker = useRef<Tracker<PanelSetting>>() as MutableRefObject<Tracker<PanelSetting>>;
+
+  useMemo(() => {
+    panelTracker.current = new Tracker(panel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // just init
 
   useEffect(() => {
-    if (ds) {
-      setDatasource(DatasourceStore.getDatasource(ds));
+    if (panelTracker.current.isChanged(panel)) {
+      panelTracker.current.setNewVal(panel);
+      searchParams.set('left', JSON.stringify(panel));
+      setSearchParams(searchParams);
+      setDatasource(getDatasource());
     }
-  }, [ds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel]);
 
   return (
     <Layout className="linsight-explore">
@@ -49,10 +63,10 @@ const Explore: React.FC = () => {
           <Icon icon="explore" />
           <DatasourceSelectForm
             noLabel
-            value={ds || get(datasources, '[0].setting.uid')}
+            value={datasource?.setting.uid}
             style={{ width: 200 }}
             onChange={(instance: DatasourceInstance) => {
-              // setSearchParams({ q: JSON.stringify({ datasouce: { uid: instance.setting.uid } }) });
+              modifyPanel({ datasource: { uid: instance.setting.uid } });
             }}
           />
         </div>
@@ -62,17 +76,30 @@ const Explore: React.FC = () => {
           <TimePicker />
         </div>
       </Header>
-      {datasource && (
-        <MetricExplore
-          datasource={datasource}
-          onValueChange={(values: any) => {
-            if (addToChartBtn.current) {
-              addToChartBtn.current.setOptions(values);
-            }
-          }}
-        />
-      )}
+      {datasource && <MetricExplore datasource={datasource} />}
     </Layout>
+  );
+};
+
+const Explore: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const getOptions = (key: string) => {
+    const options = `${searchParams.get(key)}`;
+    if (isEmpty(options)) {
+      return {};
+    }
+    try {
+      return JSON.parse(options);
+    } catch (err) {
+      console.warn('parse metric explore error', err);
+    }
+    return [];
+  };
+  const panelOptions = getOptions('left');
+  return (
+    <PanelEditContextProvider initPanel={panelOptions}>
+      <ExploreContent />
+    </PanelEditContextProvider>
   );
 };
 

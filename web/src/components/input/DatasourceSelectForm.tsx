@@ -17,7 +17,7 @@ under the License.
 */
 import { Form } from '@douyinfe/semi-ui';
 import { DatasourceStore } from '@src/stores';
-import React, { MutableRefObject, useRef } from 'react';
+import React, { MutableRefObject, useMemo, useRef } from 'react';
 import { DatasourceInstance } from '@src/types';
 import { DatasourceSelect } from '@src/components';
 
@@ -31,6 +31,10 @@ const DatasourceSelectForm: React.FC<{
 }> = (props) => {
   const { value, label, labelPosition, noLabel, style, onChange } = props;
   const previousValue = useRef() as MutableRefObject<string>;
+
+  useMemo(() => {
+    previousValue.current = `${value}`;
+  }, [value]);
 
   return (
     <Form

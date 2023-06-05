@@ -67,13 +67,7 @@ const TooltipToolbar: React.FC<{
                 asc: sort.by === SortBy.Value ? !sort.asc : true,
               })
             }
-            icon={
-              <Icon
-                icon={
-                  sort.by === SortBy.Value ? (sort.asc ? 'icon-number-down' : 'icon-number-up') : 'icon-number-sort'
-                }
-              />
-            }
+            icon={<Icon icon={sort.by === SortBy.Value ? (sort.asc ? 'number-down' : 'number-up') : 'number-sort'} />}
             theme={sort.by === SortBy.Value ? 'solid' : 'light'}
           />
           <Button
@@ -85,11 +79,7 @@ const TooltipToolbar: React.FC<{
                 asc: sort.by === SortBy.Name ? !sort.asc : true,
               })
             }
-            icon={
-              <Icon
-                icon={sort.by === SortBy.Name ? (sort.asc ? 'icon-alpha-down' : 'icon-alpha-up') : 'icon-sort-alpha'}
-              />
-            }
+            icon={<Icon icon={sort.by === SortBy.Name ? (sort.asc ? 'alpha-down' : 'alpha-up') : 'sort-alpha'} />}
             theme={sort.by === SortBy.Name ? 'solid' : 'light'}
           />
           <Button

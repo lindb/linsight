@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useState } from 'react';
+import React, { useContext, useState } from 'react';
 import { Button, Collapse, Tag, Typography } from '@douyinfe/semi-ui';
 import {
   IconCopy,
@@ -25,10 +25,9 @@ import {
   IconChevronDown,
   IconChevronUp,
 } from '@douyinfe/semi-icons';
-import { QueryEditContextProvider } from '@src/contexts';
+import { PanelEditContext, QueryEditContextProvider, TargetsContext, TargetsContextProvider } from '@src/contexts';
 import { DatasourceInstance, Query } from '@src/types';
 import { cloneDeep, get, isEmpty } from 'lodash-es';
-import { QueryEditorStore } from '@src/stores';
 import { observer } from 'mobx-react-lite';
 import Icon from '../common/Icon';
 import './query.editor.scss';
@@ -41,7 +40,6 @@ import {
   DroppableProvided,
   DroppableStateSnapshot,
 } from 'react-beautiful-dnd';
-import { toJS } from 'mobx';
 import classNames from 'classnames';
 import { DNDKit } from '@src/utils';
 
@@ -49,12 +47,22 @@ const { Text } = Typography;
 
 const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) => {
   const { datasource } = props;
+  const {
+    targets,
+    activeIds,
+    isActive,
+    toggleActiveRefId,
+    toggleTargetHide,
+    addTarget,
+    deleteTarget,
+    updateTargetConfig,
+  } = useContext(TargetsContext);
   const plugin = datasource.plugin;
   const QueryEditor = plugin.getQueryEditor();
+
   return (
-    <Collapse activeKey={QueryEditorStore.getActiveRefIds()} expandIconPosition="left" clickHeaderToExpand={false}>
-      {toJS(QueryEditorStore.targets).map((target: Query, index: number) => {
-        // NOTE: if not ues toJS, mobx observer is not working
+    <Collapse activeKey={activeIds} expandIconPosition="left" clickHeaderToExpand={false}>
+      {targets.map((target: Query, index: number) => {
         const refId = `${target.refId}`;
         return (
           <Draggable key={refId} draggableId={refId} index={index}>
@@ -74,10 +82,10 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                         <div
                           className="query-desc"
                           onClick={() => {
-                            QueryEditorStore.toggleActiveRefId(refId);
+                            toggleActiveRefId(refId);
                           }}>
                           <Button
-                            icon={QueryEditorStore.isActive(refId) ? <IconChevronDown /> : <IconChevronUp />}
+                            icon={isActive(refId) ? <IconChevronDown /> : <IconChevronUp />}
                             size="small"
                             theme="borderless"
                             type="tertiary"
@@ -100,8 +108,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                             icon={<IconCopy />}
                             onClick={() => {
                               const newTarget = cloneDeep(target);
-                              newTarget.refId = QueryEditorStore.genRefId();
-                              QueryEditorStore.addTarget(newTarget);
+                              addTarget(newTarget);
                             }}
                           />
                           <Button
@@ -111,7 +118,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                             type={target.hide ? 'primary' : 'tertiary'}
                             icon={<Icon icon={target.hide ? 'eye-close' : 'eye'} />}
                             onClick={() => {
-                              QueryEditorStore.toggleTargetHide(index);
+                              toggleTargetHide(index);
                             }}
                           />
                           <Button
@@ -120,7 +127,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                             type="tertiary"
                             icon={<IconDeleteStroked />}
                             onClick={() => {
-                              QueryEditorStore.deleteTarget(index);
+                              deleteTarget(index);
                             }}
                           />
                           <IconHandle className="drag" size="large" {...provided.dragHandleProps} />
@@ -130,7 +137,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                     <QueryEditContextProvider
                       initValues={get(target, 'request', {})}
                       onValuesChange={(values: object) => {
-                        QueryEditorStore.updateTargetConfig(index, { request: values } as Query);
+                        updateTargetConfig(index, { request: values } as Query);
                       }}>
                       <QueryEditor datasource={datasource} />
                     </QueryEditContextProvider>
@@ -145,15 +152,10 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
   );
 });
 
-const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   const { datasource } = props;
-  const plugin = datasource.plugin;
   const [placeholderProps, setPlaceholderProps] = useState<any>({});
-  const QueryEditor = plugin.components.QueryEditor;
-  if (!QueryEditor) {
-    return <></>;
-  }
-
+  const { swapTargets, addTarget } = useContext(TargetsContext);
   return (
     <div className="query-editor">
       <DragDropContext
@@ -174,8 +176,7 @@ const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
           if (destination.droppableId === source.droppableId && destination.index === source.index) {
             return;
           }
-
-          QueryEditorStore.swapTargets(source.index, destination.index);
+          swapTargets(source.index, destination.index);
         }}>
         <Droppable droppableId="query-editors" direction="vertical">
           {(provided: DroppableProvided, _snapshot: DroppableStateSnapshot) => {
@@ -203,14 +204,34 @@ const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
         style={{ marginTop: 12 }}
         icon={<IconPlusStroked />}
         onClick={() => {
-          QueryEditorStore.addTarget({
-            refId: QueryEditorStore.genRefId(),
+          addTarget({
             datasource: { uid: datasource.setting.uid, type: datasource.setting.type },
           } as Query);
         }}>
         Query
       </Button>
     </div>
+  );
+};
+
+const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+  const { datasource } = props;
+  const plugin = datasource.plugin;
+  const { panel, modifyPanel } = useContext(PanelEditContext);
+
+  const QueryEditor = plugin.components.QueryEditor;
+  if (!QueryEditor) {
+    return <></>;
+  }
+
+  return (
+    <TargetsContextProvider
+      initTargets={get(panel, 'targets', [])}
+      onTargetsChange={(targets) => {
+        modifyPanel({ targets: targets });
+      }}>
+      <TargetsEditor datasource={datasource} />
+    </TargetsContextProvider>
   );
 };
 

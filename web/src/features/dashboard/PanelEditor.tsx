@@ -21,9 +21,9 @@ import { IconBellStroked } from '@douyinfe/semi-icons';
 import SplitPane from 'react-split-pane';
 import { PanelSetting as PanelOptions } from '@src/types';
 import { DatasourceSelectForm, Notification, Panel, QueryEditor } from '@src/components';
-import { get, cloneDeep } from 'lodash-es';
-import { DashboardStore, DatasourceStore, QueryEditorStore } from '@src/stores';
-import { reaction, toJS } from 'mobx';
+import { get } from 'lodash-es';
+import { DashboardStore, DatasourceStore } from '@src/stores';
+import { toJS } from 'mobx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
 import ViewVariables from './components/ViewVariables';
@@ -35,34 +35,11 @@ const Split: any = SplitPane;
 const DefaultOptionsEditorSize = 350;
 
 const MetricSetting: React.FC = () => {
-  const { panel, modifyPanel } = useContext(PanelEditContext);
   const { datasources } = DatasourceStore;
+  const { modifyPanel } = useContext(PanelEditContext);
   const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
     return toJS(get(datasources, '[0]'));
   });
-
-  useEffect(() => {
-    const disposer = [
-      reaction(
-        () => cloneDeep(QueryEditorStore.targets),
-        (newTargets) => {
-          modifyPanel({ targets: newTargets });
-        }
-      ),
-    ];
-    return () => {
-      disposer.forEach((d) => d());
-    };
-  }, [modifyPanel]);
-
-  useEffect(() => {
-    QueryEditorStore.setTargets(get(panel, 'targets', []));
-    return () => {
-      // clear targets
-      QueryEditorStore.setTargets([]);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // NOTE: don't put <panel>
 
   return (
     <div>
@@ -72,6 +49,7 @@ const MetricSetting: React.FC = () => {
         style={{ width: 200 }}
         onChange={(instance: DatasourceInstance) => {
           setDatasource(instance);
+          modifyPanel({ datasource: { uid: get(datasource, 'setting.uid', '') } });
         }}
       />
       {datasource && <QueryEditor datasource={datasource} />}
