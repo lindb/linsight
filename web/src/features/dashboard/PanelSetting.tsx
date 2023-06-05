@@ -31,7 +31,6 @@ import {
 import { ColorKit, ObjectKit } from '@src/utils';
 import { get, set, isEmpty, size, isNil, orderBy, maxBy, has, cloneDeep } from 'lodash-es';
 import { PanelEditContext } from '@src/contexts';
-import { toJS } from 'mobx';
 
 const { Text } = Typography;
 

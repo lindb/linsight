@@ -115,8 +115,7 @@ const PanelHeader = forwardRef(
               <Dropdown.Item
                 icon={<Icon icon="explore" />}
                 onClick={() => {
-                  searchParams.set('left', JSON.stringify(get(panel, 'targets[0]', {})));
-                  searchParams.delete('d');
+                  searchParams.set('left', JSON.stringify(pick(panel, ['datasource', 'targets'])));
                   navigate({ pathname: '/explore', search: searchParams.toString() });
                 }}>
                 Explore
@@ -195,7 +194,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const header = useRef<any>();
   const container = useRef<any>();
-  const { loading, error, result } = useMetric(panel?.targets || []);
+  const { loading, error, result } = useMetric(panel?.targets || [], get(panel, 'datasource.uid', ''));
   const [datasets, setDatasets] = useState<any>(result);
   useEffect(() => {
     if (!loading) {
@@ -221,7 +220,8 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
           DashboardStore.clonePanel(panel);
           return;
         case 80: // ctrl+p
-          navigate({ pathname: '/explore' });
+          searchParams.set('left', JSON.stringify(pick(panel, ['datasource', 'targets'])));
+          navigate({ pathname: '/explore', search: searchParams.toString() });
           return;
         case 82: // ctrl+r
           DashboardStore.deletePanel(panel);

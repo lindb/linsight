@@ -19,3 +19,4 @@ export * from './PlatformContextProvider';
 export * from './VariableContextProvider';
 export * from './QueryEditContextProvider';
 export * from './PanelEditContextProvider';
+export * from './TargetsContextProvider';

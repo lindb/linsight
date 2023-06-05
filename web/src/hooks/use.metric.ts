@@ -19,17 +19,21 @@ import { VariableContext } from '@src/contexts';
 import { DataQuerySrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
 import { DataQuery, Query, TimeRange } from '@src/types';
-import { isEmpty, cloneDeep } from 'lodash-es';
+import { isEmpty, cloneDeep, get } from 'lodash-es';
 import { useContext } from 'react';
 import { useRequest } from './use.request';
 
-const getDataQuery = (queries: Query[], variables: object): DataQuery => {
+const getDataQuery = (queries: Query[], variables: object, defaultDatasourceUID?: string): DataQuery => {
   const dataQuery: DataQuery = { queries: [] };
   (queries || []).forEach((q: Query) => {
-    if (q.hide || !q.datasource) {
+    if (q.hide) {
       return;
     }
-    const ds = DatasourceStore.getDatasource(q.datasource.uid);
+    let datasourceUID = get(q.datasource, 'uid');
+    if (isEmpty(datasourceUID)) {
+      datasourceUID = `${defaultDatasourceUID}`;
+    }
+    const ds = DatasourceStore.getDatasource(datasourceUID);
     if (!ds) {
       return;
     }
@@ -38,15 +42,17 @@ const getDataQuery = (queries: Query[], variables: object): DataQuery => {
     if (isEmpty(queryAfterRewrite)) {
       return;
     }
+    // need set datasource, maybe target no datasource setting, using default datasource
+    queryAfterRewrite.datasource = { uid: datasourceUID };
     // add query request into batch
     dataQuery.queries.push(queryAfterRewrite);
   });
   return dataQuery;
 };
 
-export const useMetric = (queries: Query[]) => {
+export const useMetric = (queries: Query[], defaultDatasourceUID?: string) => {
   const { variables, from, to } = useContext(VariableContext);
-  const dataQuery: DataQuery = getDataQuery(queries, variables);
+  const dataQuery: DataQuery = getDataQuery(queries, variables, defaultDatasourceUID);
   const { result, loading, refetch, error } = useRequest(
     ['query_metric_data', dataQuery, from, to], // watch dataQuery/from/to if changed
     async () => {
