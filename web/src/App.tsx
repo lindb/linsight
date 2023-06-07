@@ -17,7 +17,7 @@ under the License.
 */
 import React, { useContext } from 'react';
 import { Layout } from '@douyinfe/semi-ui';
-import { FeatureMenu, Footer } from '@src/components';
+import { ErrorPage, FeatureMenu, Footer } from '@src/components';
 import { PlatformContext } from '@src/contexts';
 import { Feature, FeatureRepositoryInst } from '@src/types';
 import { Navigate, Route, Routes } from 'react-router-dom';
@@ -29,9 +29,9 @@ const Content: React.FC = React.memo(() => {
     <Routes>
       {features.map((feature: Feature) => {
         const Component = feature.Component;
-        return <Route key={feature.Route} path={feature.Route} element={<Component />} />;
+        return <Route key={feature.Route} path={feature.Route} element={<Component />} errorElement={<ErrorPage />} />;
       })}
-      <Route path="*" element={<Navigate to={boot.home || '/explore'} />} />
+      <Route path="*" element={<Navigate to={boot.home || '/explore'} />} errorElement={<ErrorPage />} />
     </Routes>
   );
 });

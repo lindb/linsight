@@ -27,10 +27,17 @@ import {
   unstable_useBlocker as useBlocker,
 } from 'react-router-dom';
 import { isEmpty, startsWith, endsWith } from 'lodash-es';
-import { Layout, Typography, Button, SideSheet, Form, Space, Modal } from '@douyinfe/semi-ui';
-import { IconGridStroked, IconSaveStroked, IconStar, IconSettingStroked, IconStarStroked } from '@douyinfe/semi-icons';
+import { Layout, Typography, Button, SideSheet, Form, Space, Modal, Empty } from '@douyinfe/semi-ui';
+import {
+  IconGridStroked,
+  IconSaveStroked,
+  IconPlusStroked,
+  IconStar,
+  IconSettingStroked,
+  IconStarStroked,
+} from '@douyinfe/semi-icons';
 import { DashboardStore } from '@src/stores';
-import { Icon, Loading, Notification, TimePicker } from '@src/components';
+import { ErrorPage, Icon, Loading, Notification, TimePicker } from '@src/components';
 import Setting from './Setting';
 import PanelEditor from './PanelEditor';
 import View from './View';
@@ -40,9 +47,10 @@ import ViewPanel from './ViewPanel';
 import './dashboard.scss';
 import { useRequest } from '@src/hooks';
 import { VariableContextProvider } from '@src/contexts';
+import NotFoundImg from '@src/images/4042.svg';
 
 const { Header, Content } = Layout;
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 const DashboardStar = observer(() => {
   const { dashboard } = DashboardStore;
@@ -270,17 +278,55 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (!dashboard) {
-    // FIXME: use error page
-    return <div>Dashboard not exit</div>;
+  if (!dashboard || isEmpty(dashboard)) {
+    return (
+      <Layout>
+        <Header className="linsight-feature-header linsight-dashboard">
+          <div className="title">
+            <IconGridStroked size="large" />
+            <Title heading={6} className="name">
+              Not found
+            </Title>
+          </div>
+        </Header>
+        <Content>
+          <Empty
+            title="Oops!"
+            style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}
+            image={<img src={NotFoundImg} style={{ width: 250, height: 250 }} />}
+            darkModeImage={<img src={NotFoundImg} style={{ width: 250, height: 250 }} />}
+            layout="horizontal"
+            description={<Text type="danger">Dashboard not exist</Text>}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button
+                type="tertiary"
+                onClick={() => {
+                  navigate({ pathname: '/dashboards' });
+                }}>
+                Back
+              </Button>
+              <Button
+                icon={<IconPlusStroked />}
+                onClick={() => {
+                  navigate({ pathname: '/dashboard' });
+                }}>
+                New Dashboard
+              </Button>
+            </div>
+          </Empty>
+        </Content>
+      </Layout>
+    );
   }
 
   return (
     <Layout>
-      <Header className="linsight-feature-header dashboard">
+      <Header className="linsight-feature-header linsight-dashboard">
         <div className="title">
           <IconGridStroked size="large" />
-          <Title heading={6}>{DashboardStore.dashboard?.title}</Title>
+          <Title heading={6} className="name">
+            {DashboardStore.dashboard?.title}
+          </Title>
           <DashboardStar />
         </div>
         <div style={{ marginRight: 12, gap: 4, display: 'flex' }}>
@@ -324,10 +370,10 @@ const Dashboard: React.FC = () => {
       <Content>
         <VariableContextProvider variables={DashboardStore.getVariables()}>
           <Routes>
-            <Route path="/setting" element={<Setting />} />
-            <Route path="/panel/edit" element={<PanelEditor />} />
-            <Route path="/panel/view" element={<ViewPanel />} />
-            <Route path="/" element={<View />} />
+            <Route path="/setting" element={<Setting />} errorElement={<ErrorPage />} />
+            <Route path="/panel/edit" element={<PanelEditor />} errorElement={<ErrorPage />} />
+            <Route path="/panel/view" element={<ViewPanel />} errorElement={<ErrorPage />} />
+            <Route path="/" element={<View />} errorElement={<ErrorPage />} />
           </Routes>
         </VariableContextProvider>
       </Content>
