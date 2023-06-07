@@ -15,12 +15,31 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { VisualizationProps } from '@src/types';
-import React from 'react';
-import { PieChart } from './components/PieChart';
-import { PieOptions } from './types';
+.stat-list {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  gap: 2px;
 
-export const Pie: React.FC<VisualizationProps> = (props) => {
-  const { panel, theme, datasets } = props;
-  return <PieChart theme={theme} datasets={datasets} options={(panel.options || {}) as PieOptions} panel={panel} />;
-};
+  .stat-container {
+    height: 100%;
+    width: 100%;
+    padding: 12px;
+
+    &.text-to-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    &.has-background {
+      color: #f7f8fa;
+    }
+  }
+}
+
+.stat-list::before {
+  padding: 0;
+}

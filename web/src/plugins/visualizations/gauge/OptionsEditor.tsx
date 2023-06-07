@@ -17,8 +17,7 @@ under the License.
 */
 import React from 'react';
 import { Collapse, Form, Radio } from '@douyinfe/semi-ui';
-import { OptionsEditorProps } from '@src/types';
-import { OrientationType } from './types';
+import { OptionsEditorProps, OrientationType } from '@src/types';
 
 /**
  * Gauge options editor

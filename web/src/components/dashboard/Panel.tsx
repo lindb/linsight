@@ -273,7 +273,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
     return <PanelVisualization panel={panel} plugin={plugin} result={datasets} />;
   };
 
-  const panelCls = classNames('dashboard-panel', className, {
+  const panelCls = classNames('dashboard-panel', className, `panel-type-${panel.type}`, {
     'dashboard-panel-static': isStatic,
   });
 

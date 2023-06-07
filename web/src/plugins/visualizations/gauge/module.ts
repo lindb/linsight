@@ -18,6 +18,7 @@ under the License.
 import {
   DataSetType,
   DatasourceCategory,
+  OrientationType,
   PanelSetting,
   VisualizationPlugin,
   VisualizationRepositoryInst,
@@ -26,7 +27,7 @@ import { Gauge } from '@src/plugins/visualizations/gauge/Gauge';
 import { OptionsEditor } from '@src/plugins/visualizations/gauge/OptionsEditor';
 import Logo from '@src/plugins/visualizations/gauge/images/logo2.svg';
 import { DefaultThresholds } from '@src/constants';
-import { GaugeOptions, OrientationType } from './types';
+import { GaugeOptions } from './types';
 
 const gauge = new VisualizationPlugin(
   DatasourceCategory.Metric,

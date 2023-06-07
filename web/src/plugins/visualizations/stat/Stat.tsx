@@ -15,10 +15,31 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
+import { OrientationType, VisualizationProps } from '@src/types';
+import React, { useEffect } from 'react';
+import StatChart from './components/StatChart';
+import { StatOptions } from './types';
+import './stat.scss';
 
-const Stat: React.FC = () => {
-  return <div>N/A</div>;
+const Stat: React.FC<VisualizationProps> = (props) => {
+  const { panel, datasets } = props;
+  const options = (panel.options || {}) as StatOptions;
+  useEffect(() => {
+    // hack: change parent div style
+    const parentElements = document.querySelectorAll('.panel-type-stat .semi-card-body') as any;
+    (parentElements || []).forEach((p: any) => {
+      p.style.padding = '0px';
+    });
+  }, []);
+  return (
+    <div
+      className="stat-list"
+      style={{ flexDirection: options.orientation === OrientationType.horizontal ? 'column' : 'row' }}>
+      {(datasets || []).map((ds: any, index: number) => (
+        <StatChart key={index} dataset={ds} options={options} />
+      ))}
+    </div>
+  );
 };
 
 export default Stat;

@@ -15,11 +15,11 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { VisualizationProps } from '@src/types';
+import { OrientationType, VisualizationProps } from '@src/types';
 import React from 'react';
 import { GaugeChart } from './components/GaugeChart';
 import './components/gauge.scss';
-import { GaugeOptions, OrientationType } from './types';
+import { GaugeOptions } from './types';
 
 /*
  * https://www.chartle.com/

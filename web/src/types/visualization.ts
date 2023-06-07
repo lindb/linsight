@@ -19,6 +19,11 @@ import { ComponentType } from 'react';
 import { DatasourceCategory, Plugin, Query, ThemeType } from '@src/types';
 import { cloneDeep } from 'lodash-es';
 
+export enum OrientationType {
+  horizontal = 'horizontal',
+  vertical = 'vertical',
+}
+
 export enum DataSetType {
   TimeSeries = 'timeseries',
   SingleStat = 'singleStat',
