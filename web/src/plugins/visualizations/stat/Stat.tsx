@@ -36,7 +36,7 @@ const Stat: React.FC<VisualizationProps> = (props) => {
       className="stat-list"
       style={{ flexDirection: options.orientation === OrientationType.horizontal ? 'column' : 'row' }}>
       {(datasets || []).map((ds: any, index: number) => (
-        <StatChart key={index} dataset={ds} options={options} />
+        <StatChart key={index} dataset={ds} options={options} panel={panel} />
       ))}
     </div>
   );

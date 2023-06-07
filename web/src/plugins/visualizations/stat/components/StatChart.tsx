@@ -15,14 +15,18 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { FormatRepositoryInst, PanelSetting } from '@src/types';
 import classNames from 'classnames';
 import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
 import { ColorMode, JustifyMode, StatOptions, TextMode } from '../types';
+import { get } from 'lodash-es';
 
-const StatChart: React.FC<{ dataset: any; options: StatOptions }> = (props) => {
-  const { dataset, options } = props;
+const StatChart: React.FC<{ dataset: any; options: StatOptions; panel: PanelSetting }> = (props) => {
+  const { dataset, options, panel } = props;
   const containerRef = useRef() as MutableRefObject<HTMLDivElement>;
   const [fontSize, setFontSize] = useState(14);
+  const fieldConfig = get(panel, 'fieldConfig.defaults', {});
+
   useEffect(() => {
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
@@ -49,7 +53,7 @@ const StatChart: React.FC<{ dataset: any; options: StatOptions }> = (props) => {
               fontSize: `${fontSize * 2}px`,
               lineHeight: 1,
             }}>
-            {dataset.value}
+            {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(dataset.value)}
           </div>
         );
       case TextMode.none:
@@ -65,7 +69,7 @@ const StatChart: React.FC<{ dataset: any; options: StatOptions }> = (props) => {
                 fontWeight: 500,
                 lineHeight: 1,
               }}>
-              {dataset.value}
+              {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(dataset.value)}
             </div>
           </>
         );

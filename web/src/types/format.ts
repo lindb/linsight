@@ -22,7 +22,7 @@ export enum FormatCate {
   Data = 'Data',
   DataRate = 'Data Rate',
   Time = 'Time',
-  Throughtput = 'Throughtput',
+  Throughput = 'Throughput',
 }
 
 export interface Formatted {

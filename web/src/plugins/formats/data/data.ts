@@ -25,9 +25,9 @@ const SI = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'];
 class Binary extends Formatter {
   private units: string[];
   private k: number;
-  constructor(label: string, value: string, units: string[], unit: string, k: number, offset = 0) {
+  constructor(cate: FormatCate, label: string, value: string, units: string[], unit: string, k: number, offset = 0) {
     super({
-      category: FormatCate.Data,
+      category: cate,
       label: label,
       value: value,
     });
