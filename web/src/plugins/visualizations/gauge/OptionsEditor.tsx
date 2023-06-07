@@ -16,8 +16,9 @@ specific language governing permissions and limitations
 under the License.
 */
 import React from 'react';
-import { Collapse, Form } from '@douyinfe/semi-ui';
+import { Collapse, Form, Radio } from '@douyinfe/semi-ui';
 import { OptionsEditorProps } from '@src/types';
+import { OrientationType } from './types';
 
 /**
  * Gauge options editor
@@ -35,9 +36,13 @@ export const OptionsEditor: React.FC<OptionsEditorProps> = (props) => {
           initValues={panel.options}
           onValueChange={(values: object) => {
             if (onOptionsChange) {
-              onOptionsChange(values);
+              onOptionsChange({ options: values });
             }
           }}>
+          <Form.RadioGroup field="orientation" label="Orientation" type="button" extraText="Layout orientation">
+            <Radio value={OrientationType.vertical}>Vertical</Radio>
+            <Radio value={OrientationType.horizontal}>Horizontal</Radio>
+          </Form.RadioGroup>
           <Form.Switch
             field="showThresholdMarkers"
             label="Show threshold markers"

@@ -16,27 +16,24 @@ specific language governing permissions and limitations
 under the License.
 */
 import { VisualizationProps } from '@src/types';
-import { DataSetKit } from '@src/utils';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { GaugeChart } from './components/GaugeChart';
 import './components/gauge.scss';
+import { GaugeOptions, OrientationType } from './types';
 
 /*
  * https://www.chartle.com/
  */
 export const Gauge: React.FC<VisualizationProps> = (props) => {
   const { panel, theme, datasets } = props;
-  const [ds, setDS] = useState<any>();
-
-  useEffect(() => {
-    const datasetsOfGauge = DataSetKit.createStatsDatasets(datasets);
-    setDS({
-      labels: ['10%', '100%'],
-      datasets: [
-        { label: 'a', data: [70, 20, 10], backgroundColor: ['green', 'orange', 'red'] },
-        { label: 'b', data: [34.34, 90], borderWidth: 1, backgroundColor: ['green', 'rgba(46,50,56, .1)'], weight: 10 },
-      ],
-    });
-  }, [datasets]);
-  return <GaugeChart theme={theme} datasets={ds} options={panel.options || {}} panel={panel} />;
+  const options = (panel.options || {}) as GaugeOptions;
+  return (
+    <div
+      className="gauge-list"
+      style={{ flexDirection: options.orientation === OrientationType.horizontal ? 'column' : 'row' }}>
+      {(datasets || []).map((ds: any, index: number) => (
+        <GaugeChart key={index} theme={theme} dataset={ds} options={options} panel={panel} />
+      ))}
+    </div>
+  );
 };

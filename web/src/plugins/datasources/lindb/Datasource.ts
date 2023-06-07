@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { DataQuerySrv } from '@src/services';
-import { DatasourceAPI, DatasourceSetting, Query, TimeRange } from '@src/types';
+import { DataSetType, DatasourceAPI, DatasourceSetting, Query, TimeRange } from '@src/types';
 import { TemplateKit } from '@src/utils';
 import { isEmpty, isString } from 'lodash-es';
 import { toJS } from 'mobx';
@@ -26,7 +26,7 @@ export class LinDBDatasource extends DatasourceAPI {
     super(setting);
   }
 
-  rewriteQuery(query: Query, variables: {}): Query | null {
+  rewriteQuery(query: Query, variables: {}, dataset: DataSetType): Query | null {
     if (!query.request) {
       return null;
     }
@@ -37,6 +37,11 @@ export class LinDBDatasource extends DatasourceAPI {
         }
         return w;
       });
+    }
+    if (dataset !== DataSetType.TimeSeries) {
+      query.request.stats = true;
+    } else {
+      query.request.stats = false;
     }
     return query;
   }

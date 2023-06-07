@@ -16,18 +16,10 @@ specific language governing permissions and limitations
 under the License.
 */
 import { VisualizationProps } from '@src/types';
-import { DataSetKit } from '@src/utils';
-import { toJS } from 'mobx';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { PieChart } from './components/PieChart';
 
 export const Pie: React.FC<VisualizationProps> = (props) => {
   const { panel, theme, datasets } = props;
-  const [ds, setDS] = useState();
-
-  useEffect(() => {
-    setDS(DataSetKit.createStatsDatasets(datasets));
-  }, [datasets]);
-  console.log('pie v.....', toJS(panel), ds);
-  return <PieChart theme={theme} datasets={ds} config={panel.options} />;
+  return <PieChart theme={theme} datasets={datasets} options={panel.options || {}} panel={panel} />;
 };

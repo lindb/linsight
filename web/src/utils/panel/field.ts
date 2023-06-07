@@ -26,7 +26,9 @@ const getActiveThreshold = (value: number, thresholds: Threshold[]): Threshold =
   const idx = sortedIndexBy(thresholds, { value: value }, (o: Threshold) => {
     return o.value;
   });
-
+  if (idx >= (thresholds || []).length) {
+    return thresholds[idx - 1];
+  }
   return thresholds[idx];
 };
 

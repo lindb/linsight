@@ -15,12 +15,14 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export interface GaugeOptions {
-  showThresholdMarkers?: boolean;
-  orientation?: OrientationType;
+import { Legend } from '@src/types';
+
+export interface PieOptions {
+  pieType?: PieType;
+  legend: Legend;
 }
 
-export enum OrientationType {
-  horizontal = 'horizontal',
-  vertical = 'vertical',
+export enum PieType {
+  pie = 'pie',
+  donut = 'donut',
 }

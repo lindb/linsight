@@ -49,14 +49,14 @@ const RowPanel: React.FC<{ panel: PanelSetting }> = (props) => {
           setShowActions(false);
         }}>
         <div
-          className="title"
+          className="row-title"
           onClick={() => {
             const newCollapsed = !collapsed;
             DashboardStore.collapseRow(panel, newCollapsed);
             setCollapsed(newCollapsed);
           }}>
           <IconChevronDownStroked size="small" rotate={collapsed ? -90 : 0} />
-          <Text className="text" strong>
+          <Text className="row-text" strong>
             {panel.title}
           </Text>
           {panel.collapsed && (

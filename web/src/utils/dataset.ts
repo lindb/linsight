@@ -38,12 +38,11 @@ const getGroupByTags = (tags: any): string => {
 const createStatsDatasets = (resultSet: any): any => {
   const datasets: any[] = [];
   let colorIdx = 0;
-  const labels: string[] = [];
   (resultSet || []).forEach((rs: any) => {
     if (!rs) {
       return;
     }
-    const { series, startTime, endTime, interval, metricName } = rs;
+    const { series } = rs;
 
     if (isEmpty(series)) {
       return;
@@ -54,35 +53,22 @@ const createStatsDatasets = (resultSet: any): any => {
       if (!fields) {
         return;
       }
-
       const groupName = getGroupByTags(tags);
-
       for (let key of Object.keys(fields)) {
         const bgColor = ColorKit.getColor(colorIdx++);
-
-        const borderColor = bgColor;
         const label = groupName ? `${groupName}:${key}` : key;
-        const pointBackgroundColor = ColorKit.toRGBA(bgColor, 0.25);
-
         const points: { [timestamp: string]: number } = fields![key];
         const timestamps = keys(points);
-        if (isEmpty(timestamps)) {
-          datasets.push(0);
-        } else {
+        let val = 0;
+        if (!isEmpty(timestamps)) {
           const value = points[`${timestamps[0]}`];
-          const v = value ? Math.floor(value * 1000) / 1000 : 0;
-          datasets.push(v);
+          val = value ? Math.floor(value * 1000) / 1000 : 0;
         }
-
-        labels.push(label);
+        datasets.push({ label: label, value: val, backgroundColor: bgColor });
       }
     });
   });
-  if (isEmpty(datasets)) {
-    // no data in response
-    return;
-  }
-  return { labels, datasets };
+  return datasets;
 };
 
 const createTimeSeriesDatasets = (resultSet: any): any => {
