@@ -16,17 +16,20 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatCate, Formatted, Formatter } from '@src/types';
+import { FormatKit } from '@src/utils';
 
 class Short extends Formatter {
+  private units: string[];
   constructor() {
     super({
       category: FormatCate.Misc,
       label: 'Short',
       value: 'short',
     });
+    this.units = ['', ' K', ' Mil', ' Bil', ' Tri', ' Quadr', ' Quint', ' Sext', ' Sept'];
   }
   format(input: number | null, decimals?: number | undefined): Formatted {
-    return { value: 'short' };
+    return FormatKit.formatUnit(input, this.units, 1000, decimals);
   }
 }
 

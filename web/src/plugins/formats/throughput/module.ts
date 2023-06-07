@@ -16,6 +16,16 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatRepositoryInst } from '@src/types';
-import { CPS } from './throughput';
+import { Throughput } from './throughput';
 
-FormatRepositoryInst.register(new CPS());
+FormatRepositoryInst.register(new Throughput('counts/sec (cps)', 'cps', 'c/s'))
+  .register(new Throughput('ops/sec (ops)', 'ops', 'ops/s'))
+  .register(new Throughput('requests/sec (rps)', 'reqps', 'req/s'))
+  .register(new Throughput('reads/sec (rps)', 'rps', 'rd/s'))
+  .register(new Throughput('writes/sec (wps)', 'wps', 'wr/s'))
+  .register(new Throughput('I/O ops/sec (iops)', 'iops', 'io/s'))
+  .register(new Throughput('counts/min (cpm)', 'cpm', 'c/m'))
+  .register(new Throughput('ops/min (opm)', 'opm', 'ops/m'))
+  .register(new Throughput('requests/min (rpm)', 'reqpm', 'req/m'))
+  .register(new Throughput('reads/min (rpm)', 'rpm', 'rd/m'))
+  .register(new Throughput('writes/min (wps)', 'wpm', 'wr/m'));

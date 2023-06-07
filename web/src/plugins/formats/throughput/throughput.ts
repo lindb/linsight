@@ -16,18 +16,27 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatCate, Formatted, Formatter } from '@src/types';
+import { FormatKit } from '@src/utils';
+import { slice, map } from 'lodash-es';
 
-class CPS extends Formatter {
-  constructor() {
+class Throughput extends Formatter {
+  private units: string[];
+  constructor(label: string, value: string, unit: string, offset = 0) {
     super({
-      category: FormatCate.Throughtput,
-      label: 'Counts/sec (cps)',
-      value: 'cps',
+      category: FormatCate.Throughput,
+      label: label,
+      value: value,
     });
+    this.units = slice(
+      map(['', 'K', 'M', 'B', 'T'], (item) => {
+        return `${item}${unit}`;
+      }),
+      offset
+    );
   }
   format(input: number | null, decimals?: number | undefined): Formatted {
-    return { value: 'cps' };
+    return FormatKit.formatUnit(input, this.units, 1000, decimals);
   }
 }
 
-export { CPS };
+export { Throughput };
