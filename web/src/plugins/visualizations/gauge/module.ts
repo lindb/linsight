@@ -15,13 +15,21 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { DatasourceCategory, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import {
+  DataSetType,
+  DatasourceCategory,
+  OrientationType,
+  PanelSetting,
+  VisualizationPlugin,
+  VisualizationRepositoryInst,
+} from '@src/types';
 import { Gauge } from '@src/plugins/visualizations/gauge/Gauge';
 import { OptionsEditor } from '@src/plugins/visualizations/gauge/OptionsEditor';
 import Logo from '@src/plugins/visualizations/gauge/images/logo2.svg';
 import { DefaultThresholds } from '@src/constants';
+import { GaugeOptions } from './types';
 
-const guage = new VisualizationPlugin(
+const gauge = new VisualizationPlugin(
   DatasourceCategory.Metric,
   'Gauge',
   'gauge',
@@ -29,8 +37,11 @@ const guage = new VisualizationPlugin(
   Gauge
 );
 
-guage
+gauge
   .setOptionsEditor(OptionsEditor)
+  .datesetTypeFn((_options: PanelSetting): DataSetType => {
+    return DataSetType.SingleStat;
+  })
   .setDefaultOptions({
     fieldConfig: {
       defaults: {
@@ -39,8 +50,9 @@ guage
     },
     options: {
       showThresholdMarkers: true,
-    },
+      orientation: OrientationType.vertical,
+    } as GaugeOptions,
   })
   .setDarkLogo(Logo)
   .setLightLogo(Logo);
-VisualizationRepositoryInst.register(guage);
+VisualizationRepositoryInst.register(gauge);

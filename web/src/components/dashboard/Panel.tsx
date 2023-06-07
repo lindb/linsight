@@ -23,7 +23,7 @@ import {
   IconCopyStroked,
   IconMenu,
 } from '@douyinfe/semi-icons';
-import { PanelSetting, Tracker, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
+import { DataSetType, PanelSetting, Tracker, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import React, {
   useCallback,
   useContext,
@@ -41,7 +41,7 @@ import { useMetric } from '@src/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import classNames from 'classnames';
-import { get, isEmpty, pick } from 'lodash-es';
+import { get, isEmpty, pick, cloneDeep, isArray } from 'lodash-es';
 import { DataSetKit, ObjectKit } from '@src/utils';
 import './panel.scss';
 import { PanelVisualizationOptions } from '@src/constants';
@@ -140,7 +140,7 @@ const PanelHeader = forwardRef(
 PanelHeader.displayName = 'PanelHeader';
 
 const getPanelOptions = (panel: PanelSetting, plugin: VisualizationPlugin): PanelSetting => {
-  return pick(ObjectKit.merge(plugin.getDefaultOptions(), panel), PanelVisualizationOptions);
+  return cloneDeep(pick(ObjectKit.merge(plugin.getDefaultOptions(), panel), PanelVisualizationOptions));
 };
 
 const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationPlugin; result: any }> = (props) => {
@@ -167,22 +167,31 @@ const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationP
   }, []);
 
   useEffect(() => {
-    const rs = DataSetKit.createDatasets(result, datasetType);
-    if (resultTrackerRef.current.isChanged(rs)) {
-      resultTrackerRef.current.setNewVal(rs);
-      setDatasets(rs);
-    }
-  }, [result, datasetType]);
-
-  useEffect(() => {
     const cfg = getPanelOptions(panel, plugin);
     if (panelTrackerRef.current.isChanged(cfg)) {
       panelTrackerRef.current.setNewVal(cfg);
       setPanelCfg(cfg);
     }
-  }, [panel, plugin]);
+    const rs = DataSetKit.createDatasets(result, datasetType);
+    if (resultTrackerRef.current.isChanged(rs)) {
+      resultTrackerRef.current.setNewVal(rs);
+      setDatasets(rs);
+    }
+  }, [panel, plugin, datasetType, result]);
 
-  return <Visualization datasets={datasets} theme={theme} panel={panelCfg} />;
+  const getDatasets = () => {
+    // fix when change visualizatin type, throw error
+    // exmaple: timeseries datasets is object, single stat datasets need array
+    if (datasetType === DataSetType.SingleStat) {
+      if (isArray(datasets)) {
+        return datasets;
+      } else {
+        return [];
+      }
+    }
+    return datasets;
+  };
+  return <Visualization datasets={getDatasets()} theme={theme} panel={panelCfg} />;
 };
 
 const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: boolean; className?: string }> = (
@@ -192,9 +201,10 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
+  const datasetType = plugin.getDataSetType(panel);
   const header = useRef<any>();
   const container = useRef<any>();
-  const { loading, error, result } = useMetric(panel?.targets || [], get(panel, 'datasource.uid', ''));
+  const { loading, error, result } = useMetric(panel?.targets || [], datasetType, get(panel, 'datasource.uid', ''));
   const [datasets, setDatasets] = useState<any>(result);
   useEffect(() => {
     if (!loading) {
@@ -263,7 +273,7 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
     return <PanelVisualization panel={panel} plugin={plugin} result={datasets} />;
   };
 
-  const panelCls = classNames('dashboard-panel', className, {
+  const panelCls = classNames('dashboard-panel', className, `panel-type-${panel.type}`, {
     'dashboard-panel-static': isStatic,
   });
 

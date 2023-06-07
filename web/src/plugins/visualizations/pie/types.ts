@@ -15,12 +15,14 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { VisualizationProps } from '@src/types';
-import React from 'react';
-import { PieChart } from './components/PieChart';
-import { PieOptions } from './types';
+import { Legend } from '@src/types';
 
-export const Pie: React.FC<VisualizationProps> = (props) => {
-  const { panel, theme, datasets } = props;
-  return <PieChart theme={theme} datasets={datasets} options={(panel.options || {}) as PieOptions} panel={panel} />;
-};
+export interface PieOptions {
+  pieType?: PieType;
+  legend: Legend;
+}
+
+export enum PieType {
+  pie = 'pie',
+  donut = 'donut',
+}

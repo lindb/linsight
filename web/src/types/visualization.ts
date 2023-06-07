@@ -19,6 +19,11 @@ import { ComponentType } from 'react';
 import { DatasourceCategory, Plugin, Query, ThemeType } from '@src/types';
 import { cloneDeep } from 'lodash-es';
 
+export enum OrientationType {
+  horizontal = 'horizontal',
+  vertical = 'vertical',
+}
+
 export enum DataSetType {
   TimeSeries = 'timeseries',
   SingleStat = 'singleStat',
@@ -36,7 +41,8 @@ export interface Legend {
   showLegend?: boolean;
   displayMode?: LegendDisplayMode;
   placement?: LegendPlacement;
-  calcs?: string[];
+  calcs?: string[]; // time series chart
+  values?: string[]; // pie chart
 }
 
 export enum LegendDisplayMode {
@@ -128,6 +134,11 @@ class VisualizationPlugin extends Plugin {
     return this;
   }
 
+  datesetTypeFn(fn: (options: PanelSetting) => DataSetType): VisualizationPlugin {
+    this.getDataSetTypeFn = fn;
+    return this;
+  }
+
   getDefaultOptions(): object {
     return cloneDeep(this.components.DefaultOptions) || {};
   }
@@ -164,8 +175,12 @@ class VisualizationRepository {
     return plugin.getDefaultOptions();
   }
 
-  public get(type: string): VisualizationPlugin | undefined {
-    return this.visualizations.get(type);
+  public get(type: string): VisualizationPlugin {
+    const plugin = this.visualizations.get(type);
+    if (plugin) {
+      return plugin;
+    }
+    throw new Error('Visualization plugin not implemented.');
   }
 }
 

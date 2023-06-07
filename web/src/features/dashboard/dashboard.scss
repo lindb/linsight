@@ -55,12 +55,12 @@ under the License.
     background-color: var(--semi-color-bg-1);
   }
 
-  .title {
+  .row-title {
     display: flex;
     align-items: center;
     cursor: pointer;
 
-    .text {
+    .row-text {
       padding-right: 4px;
     }
   }

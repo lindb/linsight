@@ -18,12 +18,17 @@ under the License.
 import { VariableContext } from '@src/contexts';
 import { DataQuerySrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
-import { DataQuery, Query, TimeRange } from '@src/types';
+import { DataQuery, DataSetType, Query, TimeRange } from '@src/types';
 import { isEmpty, cloneDeep, get } from 'lodash-es';
 import { useContext } from 'react';
 import { useRequest } from './use.request';
 
-const getDataQuery = (queries: Query[], variables: object, defaultDatasourceUID?: string): DataQuery => {
+const getDataQuery = (
+  queries: Query[],
+  variables: object,
+  dataset: DataSetType,
+  defaultDatasourceUID?: string
+): DataQuery => {
   const dataQuery: DataQuery = { queries: [] };
   (queries || []).forEach((q: Query) => {
     if (q.hide) {
@@ -38,7 +43,7 @@ const getDataQuery = (queries: Query[], variables: object, defaultDatasourceUID?
       return;
     }
     // NOTE: need clone new q, because rewrite query will modify it
-    const queryAfterRewrite = ds.api.rewriteQuery(cloneDeep(q), variables);
+    const queryAfterRewrite = ds.api.rewriteQuery(cloneDeep(q), variables, dataset);
     if (isEmpty(queryAfterRewrite)) {
       return;
     }
@@ -50,9 +55,9 @@ const getDataQuery = (queries: Query[], variables: object, defaultDatasourceUID?
   return dataQuery;
 };
 
-export const useMetric = (queries: Query[], defaultDatasourceUID?: string) => {
+export const useMetric = (queries: Query[], dataset: DataSetType, defaultDatasourceUID?: string) => {
   const { variables, from, to } = useContext(VariableContext);
-  const dataQuery: DataQuery = getDataQuery(queries, variables, defaultDatasourceUID);
+  const dataQuery: DataQuery = getDataQuery(queries, variables, dataset, defaultDatasourceUID);
   const { result, loading, refetch, error } = useRequest(
     ['query_metric_data', dataQuery, from, to], // watch dataQuery/from/to if changed
     async () => {

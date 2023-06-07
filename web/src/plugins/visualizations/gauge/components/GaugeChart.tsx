@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatRepositoryInst, PanelSetting, ThemeType, Threshold } from '@src/types';
-import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
+import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { Chart, registerables } from 'chart.js';
 import { get, cloneDeep } from 'lodash-es';
 import { toJS } from 'mobx';
@@ -26,20 +26,20 @@ import { CSSKit, FieldKit } from '@src/utils';
 
 Chart.register(...registerables);
 
-export const GaugeChart: React.FC<{ datasets: any; theme: ThemeType; options: GaugeOptions; panel: PanelSetting }> = (
+export const GaugeChart: React.FC<{ dataset: any; theme: ThemeType; options: GaugeOptions; panel: PanelSetting }> = (
   props
 ) => {
-  const { theme, options, datasets, panel } = props;
+  const { theme, options, dataset, panel } = props;
   const canvasRef = useRef() as MutableRefObject<HTMLCanvasElement | null>;
   const chartInstance = useRef() as MutableRefObject<Chart | null>;
-  const value = 90;
   const [activeThreshold, setActiveThreshold] = useState<Threshold>({});
   const [fontSize, setFontSize] = useState('1rem');
   const fieldConfig = get(panel, 'fieldConfig.defaults', {});
 
-  const showThresholdMarkers = (): boolean => {
+  const showThresholdMarkers = useCallback((): boolean => {
     return options.showThresholdMarkers || false;
-  };
+  }, [options]);
+
   useEffect(() => {
     if (!canvasRef.current) {
       // if canvas is null, return it.
@@ -57,10 +57,12 @@ export const GaugeChart: React.FC<{ datasets: any; theme: ThemeType; options: Ga
       });
       dd.push({ data: data, backgroundColor: backgroundColor });
     }
-    const activeThreshold = FieldKit.getActiveThreshold(value, toJS(formattedThresholds));
+    const value = dataset.value;
+    const activeThreshold = FieldKit.getActiveThreshold(value, toJS(formattedThresholds)) || {};
 
+    const diff = formattedThresholds[formattedThresholds.length - 1].value || 0 - value;
     dd.push({
-      data: [value, formattedThresholds[formattedThresholds.length - 1].value - value],
+      data: [value, diff > 0 ? diff : 0],
       borderWidth: 1,
       backgroundColor: [activeThreshold.color, CSSKit.getColor('--semi-color-fill-0', theme)],
       weight: 10,
@@ -85,15 +87,16 @@ export const GaugeChart: React.FC<{ datasets: any; theme: ThemeType; options: Ga
     setActiveThreshold(activeThreshold);
     const chartArea = chartInstance.current.chartArea;
     setFontSize(`${Math.min(chartArea.height, chartArea.width) / 10}px`);
-  }, [options, datasets, theme, fieldConfig]);
+  }, [options, dataset, theme, fieldConfig, showThresholdMarkers]);
 
   return (
     <div className="gauge-container">
       <div className="gauge-canvas">
-        <div className="text" style={{ fontSize: `${fontSize}`, color: activeThreshold.color }}>
-          {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(value)}
+        <div className="gauge-text" style={{ fontSize: `${fontSize}`, color: activeThreshold.color }}>
+          {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(dataset.value)}
         </div>
         <canvas ref={canvasRef} />
+        <div className="gauge-label">{dataset.label}</div>
       </div>
     </div>
   );

@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ComponentType } from 'react';
-import { Plugin, Variable } from '@src/types';
+import { DataSetType, Plugin, Variable } from '@src/types';
 
 export enum DatasourceCategory {
   Metric = 'metric',
@@ -121,7 +121,7 @@ abstract class DatasourceAPI {
   /**
    * Rewrite query request, if request invalid return nulll.
    */
-  abstract rewriteQuery(query: Query, variables: {}): Query | null;
+  abstract rewriteQuery(query: Query, variables: {}, dataset: DataSetType): Query | null;
 
   abstract query(req: any, range?: TimeRange): any;
 

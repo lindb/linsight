@@ -17,8 +17,9 @@ under the License.
 */
 import React from 'react';
 
-import { Collapse, Form } from '@douyinfe/semi-ui';
-import { OptionsEditorProps } from '@src/types';
+import { Collapse, Form, Radio } from '@douyinfe/semi-ui';
+import { OptionsEditorProps, OrientationType } from '@src/types';
+import { ColorMode, JustifyMode, TextMode } from './types';
 
 /**
  * Text options editor
@@ -36,14 +37,33 @@ export const OptionsEditor: React.FC<OptionsEditorProps> = (props) => {
           initValues={panel.options}
           onValueChange={(values: object) => {
             if (onOptionsChange) {
-              onOptionsChange(values);
+              onOptionsChange({ options: values });
             }
           }}>
-          <Form.Switch
-            field="showThresholdMarkers"
-            label="Show threshold markers"
-            extraText="Redners the thresholds as an outer bar"
+          <Form.RadioGroup field="orientation" label="Orientation" type="button" extraText="Layout orientation">
+            <Radio value={OrientationType.vertical}>Vertical</Radio>
+            <Radio value={OrientationType.horizontal}>Horizontal</Radio>
+          </Form.RadioGroup>
+          <Form.RadioGroup field="colorMode" label="Color mode" type="button">
+            <Radio value={ColorMode.none}>None</Radio>
+            <Radio value={ColorMode.value}>Value</Radio>
+            <Radio value={ColorMode.background}>Background</Radio>
+          </Form.RadioGroup>
+          <Form.Select
+            field="textMode"
+            label="Text mode"
+            extraText="Control if name and value is displayed or just name"
+            optionList={[
+              { value: TextMode.name, label: 'Name', showTick: false },
+              { value: TextMode.value, label: 'Value', showTick: false },
+              { value: TextMode.valueAndName, label: 'Name and value', showTick: false },
+              { value: TextMode.none, label: 'None', showTick: false },
+            ]}
           />
+          <Form.RadioGroup field="justifyMode" label="Text alignment" type="button">
+            <Radio value={JustifyMode.auto}>Auto</Radio>
+            <Radio value={JustifyMode.center}>Center</Radio>
+          </Form.RadioGroup>
         </Form>
       </Collapse.Panel>
     </Collapse>
