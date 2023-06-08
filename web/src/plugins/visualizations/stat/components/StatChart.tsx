@@ -28,6 +28,7 @@ const StatChart: React.FC<{ dataset: any; options: StatOptions; panel: PanelSett
   const fieldConfig = get(panel, 'fieldConfig.defaults', {});
 
   useEffect(() => {
+    // TODO: need refact
     const resizeObserver = new ResizeObserver((entries) => {
       for (let entry of entries) {
         const { width, height } = entry.contentRect;
@@ -41,6 +42,7 @@ const StatChart: React.FC<{ dataset: any; options: StatOptions; panel: PanelSett
       resizeObserver.disconnect();
     };
   }, []);
+
   const renderContent = () => {
     switch (options.textMode) {
       case TextMode.name:

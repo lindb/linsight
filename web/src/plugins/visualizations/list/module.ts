@@ -22,4 +22,4 @@ import List from './List';
 
 const list = new VisualizationPlugin(DatasourceCategory.Metric, 'List', 'list', 'List stats visualization', List);
 list.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
-VisualizationRepositoryInst.register(list);
+//VisualizationRepositoryInst.register(list);

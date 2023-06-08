@@ -22,4 +22,4 @@ import Table from './Table';
 
 const table = new VisualizationPlugin(DatasourceCategory.Metric, 'Table', 'table', 'Table stats visualization', Table);
 table.setOptionsEditor(OptionsEditor).setDarkLogo(Logo).setLightLogo(Logo);
-VisualizationRepositoryInst.register(table);
+//VisualizationRepositoryInst.register(table);
