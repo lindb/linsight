@@ -53,7 +53,10 @@ const StatChart: React.FC<{ dataset: any; options: StatOptions; panel: PanelSett
               fontSize: `${fontSize * 2}px`,
               lineHeight: 1,
             }}>
-            {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(dataset.value)}
+            {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(
+              dataset.value,
+              get(fieldConfig, 'decimals', 2)
+            )}
           </div>
         );
       case TextMode.none:
@@ -69,7 +72,10 @@ const StatChart: React.FC<{ dataset: any; options: StatOptions; panel: PanelSett
                 fontWeight: 500,
                 lineHeight: 1,
               }}>
-              {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(dataset.value)}
+              {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(
+                dataset.value,
+                get(fieldConfig, 'decimals', 2)
+              )}
             </div>
           </>
         );
