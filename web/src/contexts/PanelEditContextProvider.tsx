@@ -15,11 +15,11 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { createContext, useRef, useState } from 'react';
-import { PanelSetting } from '@src/types';
+import React, { createContext, MutableRefObject, useMemo, useRef, useState } from 'react';
+import { PanelSetting, Tracker } from '@src/types';
 import { ObjectKit } from '@src/utils';
 import { DashboardStore } from '@src/stores';
-import { cloneDeep, isEqual } from 'lodash-es';
+import { cloneDeep } from 'lodash-es';
 
 /*
  * Context for panel editor
@@ -35,16 +35,18 @@ export const PanelEditContext = createContext({
 export const PanelEditContextProvider: React.FC<{ initPanel: PanelSetting; children: React.ReactNode }> = (props) => {
   const { initPanel = {}, children } = props;
   const [panel, setPanel] = useState(initPanel);
-  const previous = useRef(cloneDeep(initPanel));
+  const panelTracker = useRef() as MutableRefObject<Tracker<PanelSetting>>;
+  useMemo(() => {
+    panelTracker.current = new Tracker(initPanel);
+  }, [initPanel]);
   /*
    * Modify panel options
    */
   const modifyPanel = (cfg: PanelSetting) => {
     const newPanel = cloneDeep(ObjectKit.merge(panel || {}, ObjectKit.removeUnderscoreProperties(cfg)));
-    if (!isEqual(previous.current, newPanel)) {
+    if (panelTracker.current.isChanged(newPanel)) {
       console.error('change panel data.......');
-      // NOTE: must clone it, because if not clonet panel=previous
-      previous.current = cloneDeep(newPanel);
+      panelTracker.current.setNewVal(newPanel);
       // NOTE: need modify dashboard's panel to trigger panel options modify event
       // because clone create new object, modify dashboard panel ref
       DashboardStore.updatePanel(newPanel);

@@ -36,6 +36,11 @@ const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
             type: 'timeseries',
             datasource: panel?.datasource,
             targets: panel?.targets,
+            fieldConfig: {
+              defaults: {
+                unit: 'short',
+              },
+            },
           }}
         />
       </div>

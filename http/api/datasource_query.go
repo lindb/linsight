@@ -44,8 +44,8 @@ func (api *DatasourceQueryAPI) DataQuery(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	rs := make([]any, len(req.Queries))
-	for i, query := range req.Queries {
+	rs := make(map[string]any)
+	for _, query := range req.Queries {
 		ds, err := api.deps.DatasourceSrv.GetDatasourceByUID(ctx, query.Datasource.UID)
 		if err != nil {
 			httppkg.Error(c, err)
@@ -61,7 +61,8 @@ func (api *DatasourceQueryAPI) DataQuery(c *gin.Context) {
 			httppkg.Error(c, err)
 			return
 		}
-		rs[i] = resp
+		// TODO: add refID maybe empty?
+		rs[query.RefID] = resp
 	}
 	httppkg.OK(c, rs)
 }

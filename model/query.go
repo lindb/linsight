@@ -32,8 +32,13 @@ type QueryRequest struct {
 type Query struct {
 	Datasource TargetDatasource `json:"datasource" binding:"required"`
 	Request    json.RawMessage  `json:"request"`
+	RefID      string           `json:"refId"`
 }
 
 type TargetDatasource struct {
 	UID string `json:"uid" binding:"required"`
+}
+
+type QueryResponse struct {
+	Results map[string]any `json:"results"`
 }

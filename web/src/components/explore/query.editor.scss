@@ -25,6 +25,10 @@ under the License.
     border-bottom: 0;
   }
 
+  .semi-collapse-content {
+    padding: 0 0 4px 16px;
+  }
+
   .placeholder {
     position: absolute;
     background: var(--semi-color-primary-light-hover);

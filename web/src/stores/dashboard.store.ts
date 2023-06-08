@@ -275,7 +275,7 @@ class DashboardStore {
       } else {
         await DashboardSrv.updateDashboard(dashboard);
       }
-      this.setDashbaord(dashboard);
+      this.initDashboard(dashboard);
       Notification.success('Save dashboard successfully!');
       return true;
     } catch (err) {
@@ -283,10 +283,6 @@ class DashboardStore {
       Notification.error(ApiKit.getErrorMsg(err));
       return false;
     }
-  }
-  private setDashbaord(dashboard: Dashboard) {
-    this.dashboard = dashboard;
-    this.dashboardTracker.setNewVal(dashboard);
   }
 
   /**
