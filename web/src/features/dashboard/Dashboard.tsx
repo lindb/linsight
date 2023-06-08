@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useCallback, useRef, useState } from 'react';
+import React, { MutableRefObject, useCallback, useRef, useState } from 'react';
 import { DashboardSrv } from '@src/services';
 import {
   Route,
@@ -48,6 +48,7 @@ import './dashboard.scss';
 import { useRequest } from '@src/hooks';
 import { VariableContextProvider } from '@src/contexts';
 import NotFoundImg from '@src/images/4042.svg';
+import DashboardSearchModal from './components/DashboardSearchModal';
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -254,6 +255,7 @@ const Dashboard: React.FC = () => {
   const location = useLocation();
   const dashboardId = searchParams.get('d');
   const dashboard = DashboardStore.dashboard;
+  const searchRef = useRef() as MutableRefObject<any>;
   const { loading } = useRequest(
     ['load-dashboard', dashboardId],
     async () => {
@@ -320,64 +322,72 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <Layout>
-      <Header className="linsight-feature-header linsight-dashboard">
-        <div className="title">
-          <IconGridStroked size="large" />
-          <Title heading={6} className="name">
-            {DashboardStore.dashboard?.title}
-          </Title>
-          <DashboardStar />
-        </div>
-        <div style={{ marginRight: 12, gap: 4, display: 'flex' }}>
-          {isEditDashboard() && (
+    <>
+      <DashboardSearchModal ref={searchRef} />
+      <Layout>
+        <Header className="linsight-feature-header linsight-dashboard">
+          <div className="title">
+            <IconGridStroked size="large" />
+            <Title
+              heading={6}
+              className="name"
+              onClick={() => {
+                searchRef.current.toggleSearchModal();
+              }}>
+              {DashboardStore.dashboard?.title}
+            </Title>
+            <DashboardStar />
+          </div>
+          <div style={{ marginRight: 12, gap: 4, display: 'flex' }}>
+            {isEditDashboard() && (
+              <Button
+                type="tertiary"
+                icon={<Icon icon="back2" />}
+                onClick={() => {
+                  searchParams.delete('panel');
+                  searchParams.delete('tab');
+                  searchParams.delete('edit');
+                  navigate({
+                    pathname: '/dashboard',
+                    search: searchParams.toString(),
+                  });
+                }}
+              />
+            )}
             <Button
               type="tertiary"
-              icon={<Icon icon="back2" />}
+              icon={<Icon icon="panel-add" />}
+              onClick={() => {
+                DashboardStore.addPanel(DashboardStore.createPanelConfig());
+              }}
+            />
+            <SaveDashboard />
+            <Button
+              type="tertiary"
+              icon={<IconSettingStroked />}
               onClick={() => {
                 searchParams.delete('panel');
-                searchParams.delete('tab');
-                searchParams.delete('edit');
                 navigate({
-                  pathname: '/dashboard',
+                  pathname: '/dashboard/setting',
                   search: searchParams.toString(),
                 });
               }}
             />
-          )}
-          <Button
-            type="tertiary"
-            icon={<Icon icon="panel-add" />}
-            onClick={() => {
-              DashboardStore.addPanel(DashboardStore.createPanelConfig());
-            }}
-          />
-          <SaveDashboard />
-          <Button
-            type="tertiary"
-            icon={<IconSettingStroked />}
-            onClick={() => {
-              searchParams.delete('panel');
-              navigate({
-                pathname: '/dashboard/setting',
-                search: searchParams.toString(),
-              });
-            }}
-          />
-          <TimePicker />
-        </div>
-      </Header>
-      <Content>
-        <VariableContextProvider variables={DashboardStore.getVariables()}>
-          <Routes>
-            <Route path="/setting" element={<Setting />} errorElement={<ErrorPage />} />
-            <Route path="/panel/edit" element={<PanelEditor />} errorElement={<ErrorPage />} />
-            <Route path="/panel/view" element={<ViewPanel />} errorElement={<ErrorPage />} />
-            <Route path="/" element={<View />} errorElement={<ErrorPage />} />
-          </Routes>
-        </VariableContextProvider>
-      </Content>
-    </Layout>
+            <TimePicker />
+          </div>
+        </Header>
+        <Content>
+          <VariableContextProvider variables={DashboardStore.getVariables()}>
+            <Routes>
+              <Route path="/setting" element={<Setting />} errorElement={<ErrorPage />} />
+              <Route path="/panel/edit" element={<PanelEditor />} errorElement={<ErrorPage />} />
+              <Route path="/panel/view" element={<ViewPanel />} errorElement={<ErrorPage />} />
+              <Route path="/" element={<View />} errorElement={<ErrorPage />} />
+            </Routes>
+          </VariableContextProvider>
+        </Content>
+      </Layout>
+    </>
   );
 };
 
