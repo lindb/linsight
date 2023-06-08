@@ -93,7 +93,10 @@ export const GaugeChart: React.FC<{ dataset: any; theme: ThemeType; options: Gau
     <div className="gauge-container">
       <div className="gauge-canvas">
         <div className="gauge-text" style={{ fontSize: `${fontSize}`, color: activeThreshold.color }}>
-          {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(dataset.value)}
+          {FormatRepositoryInst.get(get(fieldConfig, 'unit', '')).formatString(
+            dataset.value,
+            get(fieldConfig, 'decimals', 2)
+          )}
         </div>
         <canvas ref={canvasRef} />
         <div className="gauge-label">{dataset.label}</div>

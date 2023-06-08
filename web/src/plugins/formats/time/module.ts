@@ -16,16 +16,12 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatRepositoryInst } from '@src/types';
-import { Time } from './time';
+import { day, hour, microsecond, millisecond, minute, second, Time } from './time';
 
-FormatRepositoryInst.register(new Time('nanoseconds (ns)', 'ns'))
-  .register(new Time('microseconds (µs)', 'µs'))
-  .register(new Time('milliseconds (ms)', 'ms'))
-  .register(new Time('seconds (s)', 's'))
-  .register(new Time('minutes (m)', 'm'))
-  .register(new Time('hours (h)', 'h'))
-  .register(new Time('days (d)', 'd'))
-  .register(new Time('duration (ms)', 'dtdurationms'))
-  .register(new Time('duration (s)', 'dtdurations'))
-  .register(new Time('duration (hh:mm:ss)', 'dthms'))
-  .register(new Time('duration (d hh:mm:ss)', 'dtdhms'));
+FormatRepositoryInst.register(new Time('nanoseconds (ns)', 'ns', 1))
+  .register(new Time('microseconds (µs)', 'µs', microsecond))
+  .register(new Time('milliseconds (ms)', 'ms', millisecond))
+  .register(new Time('seconds (s)', 's', second))
+  .register(new Time('minutes (m)', 'm', minute))
+  .register(new Time('hours (h)', 'h', hour))
+  .register(new Time('days (d)', 'd', day));
