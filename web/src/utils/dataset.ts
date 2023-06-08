@@ -15,12 +15,12 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { isEmpty, keys } from 'lodash-es';
+import { isEmpty, keys, forIn, get, trim, find } from 'lodash-es';
 import { ColorKit } from '@src/utils';
 import moment from 'moment';
-import { DataSetType } from '@src/types';
+import { DataSetType, PanelSetting, Query } from '@src/types';
 
-const getGroupByTags = (tags: any): string => {
+const getGroupByTags = (tags?: any): string => {
   if (!tags) {
     return '';
   }
@@ -35,10 +35,19 @@ const getGroupByTags = (tags: any): string => {
   return result.join(',');
 };
 
-const createStatsDatasets = (resultSet: any): any => {
+const formatLegend = (target?: Query, tags?: object): string => {
+  const format = get(target, 'legendFormat', '');
+  if (!isEmpty(format)) {
+    return format.replace(/{{\s*(\w+)\s*}}/g, (_, key) => get(tags, trim(key), ''));
+  }
+  return getGroupByTags(tags);
+};
+
+const createStatsDatasets = (resultSet: any, panel: PanelSetting): any => {
   const datasets: any[] = [];
   let colorIdx = 0;
-  (resultSet || []).forEach((rs: any) => {
+  const targets = get(panel, 'targets', []);
+  forIn(resultSet, (rs: any, refId: string) => {
     if (!rs) {
       return;
     }
@@ -47,17 +56,17 @@ const createStatsDatasets = (resultSet: any): any => {
     if (isEmpty(series)) {
       return;
     }
+    const target = find(targets, { refId: refId });
     series.forEach((item: any) => {
       const { tags, fields } = item;
-
       if (!fields) {
         return;
       }
-      const groupName = getGroupByTags(tags);
-      for (let key of Object.keys(fields)) {
+      const tagLabel = formatLegend(target, tags);
+      forIn(fields, (field: any, key: string) => {
         const bgColor = ColorKit.getColor(colorIdx++);
-        const label = groupName ? `${groupName}:${key}` : key;
-        const points: { [timestamp: string]: number } = fields![key];
+        const label = target?.includeField ? `${isEmpty(tagLabel) ? key : `${tagLabel}:${key}`}` : tagLabel;
+        const points: { [timestamp: string]: number } = field;
         const timestamps = keys(points);
         let val = 0;
         if (!isEmpty(timestamps)) {
@@ -65,13 +74,13 @@ const createStatsDatasets = (resultSet: any): any => {
           val = value ? Math.floor(value * 1000) / 1000 : 0;
         }
         datasets.push({ label: label, value: val, backgroundColor: bgColor });
-      }
+      });
     });
   });
   return datasets;
 };
 
-const createTimeSeriesDatasets = (resultSet: any): any => {
+const createTimeSeriesDatasets = (resultSet: any, panel: PanelSetting): any => {
   const datasets: any[] = [];
   //TODO: calc min interval/max time range
   let timeCtx = {
@@ -80,7 +89,8 @@ const createTimeSeriesDatasets = (resultSet: any): any => {
     interval: 0,
   };
   let colorIdx = 0;
-  (resultSet || []).forEach((rs: any) => {
+  const targets = get(panel, 'targets', []);
+  forIn(resultSet, (rs: any, refId: string) => {
     if (!rs) {
       return;
     }
@@ -89,25 +99,23 @@ const createTimeSeriesDatasets = (resultSet: any): any => {
     if (isEmpty(series)) {
       return;
     }
+    const target = find(targets, { refId: refId });
     timeCtx = { startTime, endTime, interval };
     series.forEach((item: any) => {
       const { tags, fields } = item;
-
       if (!fields) {
         return;
       }
-
-      const groupName = getGroupByTags(tags);
-
-      for (let key of Object.keys(fields)) {
+      const tagLabel = formatLegend(target, tags);
+      forIn(fields, (field: any, key: string) => {
         const bgColor = ColorKit.getColor(colorIdx++);
 
         const borderColor = bgColor;
-        const label = groupName ? `${groupName}:${key}` : key;
         const pointBackgroundColor = ColorKit.toRGBA(bgColor, 0.25);
+        const label = target?.includeField ? `${isEmpty(tagLabel) ? key : `${tagLabel}:${key}`}` : tagLabel;
 
         let data: any = [];
-        const points: { [timestamp: string]: number } = fields![key];
+        const points: { [timestamp: string]: number } = field;
         let i = 0;
         let timestamp = startTime! + i * interval!;
         const stats = {
@@ -143,6 +151,7 @@ const createTimeSeriesDatasets = (resultSet: any): any => {
 
         datasets.push({
           label,
+          refId,
           data,
           borderColor,
           pointBackgroundColor,
@@ -154,7 +163,7 @@ const createTimeSeriesDatasets = (resultSet: any): any => {
             field: key,
           },
         });
-      }
+      });
     });
   });
   if (isEmpty(datasets)) {
@@ -191,12 +200,12 @@ const createTimeSeriesDatasets = (resultSet: any): any => {
   return { labels, datasets, interval, times, timeLabels };
 };
 
-const createDatasets = (resultSet: any, type: DataSetType): any => {
+const createDatasets = (resultSet: any, type: DataSetType, panel: PanelSetting): any => {
   switch (type) {
     case DataSetType.SingleStat:
-      return createStatsDatasets(resultSet);
+      return createStatsDatasets(resultSet, panel);
     default:
-      return createTimeSeriesDatasets(resultSet);
+      return createTimeSeriesDatasets(resultSet, panel);
   }
 };
 

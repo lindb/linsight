@@ -39,6 +39,8 @@ export interface Query {
   refId?: string;
   hide?: boolean;
   request: any;
+  legendFormat?: string;
+  includeField?: boolean;
 }
 
 export interface DatasourceInstance {

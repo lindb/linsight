@@ -135,9 +135,9 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                       </div>
                     }>
                     <QueryEditContextProvider
-                      initValues={get(target, 'request', {})}
-                      onValuesChange={(values: object) => {
-                        updateTargetConfig(index, { request: values } as Query);
+                      initTarget={target}
+                      onTargetChange={(newTarget: Query) => {
+                        updateTargetConfig(index, newTarget);
                       }}>
                       <QueryEditor datasource={datasource} />
                     </QueryEditContextProvider>

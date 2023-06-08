@@ -152,7 +152,7 @@ const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationP
     return getPanelOptions(panel, plugin);
   });
   const [datasets, setDatasets] = useState<any>(() => {
-    return DataSetKit.createDatasets(result, datasetType);
+    return DataSetKit.createDatasets(result, datasetType, panel);
   });
   // tracker data/config if changed, opt reduce re-render
   const resultTrackerRef = useRef() as MutableRefObject<Tracker<any>>;
@@ -161,7 +161,7 @@ const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationP
    * do initialize logic
    */
   useMemo(() => {
-    resultTrackerRef.current = new Tracker<any>(DataSetKit.createDatasets(result, datasetType));
+    resultTrackerRef.current = new Tracker<any>(DataSetKit.createDatasets(result, datasetType, panel));
     panelTrackerRef.current = new Tracker<any>(panelCfg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -172,7 +172,7 @@ const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationP
       panelTrackerRef.current.setNewVal(cfg);
       setPanelCfg(cfg);
     }
-    const rs = DataSetKit.createDatasets(result, datasetType);
+    const rs = DataSetKit.createDatasets(result, datasetType, panel);
     if (resultTrackerRef.current.isChanged(rs)) {
       resultTrackerRef.current.setNewVal(rs);
       setDatasets(rs);
