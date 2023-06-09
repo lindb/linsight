@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ChartSrv } from '@src/services';
-import React, { useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import {
   Card,
   TagInput,
@@ -32,46 +32,124 @@ import {
   Typography,
   SideSheet,
 } from '@douyinfe/semi-ui';
-import { IconPlusStroked, IconSearchStroked, IconStar, IconStarStroked } from '@douyinfe/semi-icons';
+import {
+  IconPlusStroked,
+  IconClose,
+  IconSearchStroked,
+  IconStar,
+  IconStarStroked,
+  IconSaveStroked,
+} from '@douyinfe/semi-icons';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Icon, Panel, StatusTip } from '@src/components';
+import { DatasourceSelectForm, Notification, Icon, MetricExplore, StatusTip } from '@src/components';
 import { isEmpty, get } from 'lodash-es';
 import { useRequest } from '@src/hooks';
-import { Chart, PanelSetting } from '@src/types';
+import { Chart, DatasourceInstance, PanelSetting } from '@src/types';
+import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
+import { DatasourceStore } from '@src/stores';
+import './chart.scss';
+import { ApiKit } from '@src/utils';
 const { Text } = Typography;
 
-const ChartDetail: React.FC<{ chart: Chart; visible: boolean; setVisible: (visible: boolean) => void }> = (props) => {
-  const { visible, setVisible, chart } = props;
+const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> = (props) => {
+  const { chart, setVisible } = props;
+  const { panel, modifyPanel } = useContext(PanelEditContext);
   const navigate = useNavigate();
+  const { datasources } = DatasourceStore;
+  const getDatasource = () => {
+    const datasourceUID = get(panel, 'datasource.uid', get(datasources, '[0].setting.uid'));
+    return DatasourceStore.getDatasource(`${datasourceUID}`);
+  };
+  const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
+    return getDatasource();
+  });
+  const [submitting, setSubmitting] = useState(false);
   return (
-    <SideSheet size="large" closeOnEsc motion={false} visible={visible} onCancel={() => setVisible(false)}>
-      <Button
-        icon={<Icon icon="explore" />}
-        onClick={() => {
-          const params = createSearchParams({ left: JSON.stringify(get(chart, 'config.targets[0]', null)) });
-          navigate({ pathname: '/explore', search: params.toString() });
-        }}>
-        Explore
-      </Button>
-      <Panel panel={chart.config || {}} />
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ flex: 1 }}>
+          <div>{chart.title}</div>
+          <Text type="tertiary">{chart.desc}</Text>
+        </div>
+        <DatasourceSelectForm
+          noLabel
+          value={datasource?.setting.uid}
+          style={{ width: 200 }}
+          onChange={(instance: DatasourceInstance) => {
+            modifyPanel({ datasource: { uid: instance.setting.uid } });
+            setDatasource(instance);
+          }}
+        />
+        <Button
+          icon={<IconSaveStroked />}
+          type="primary"
+          loading={submitting}
+          onClick={async () => {
+            chart.config = panel;
+            setSubmitting(true);
+            try {
+              await ChartSrv.updateChart(chart);
+              Notification.success('Save chart successfully!');
+            } catch (err) {
+              console.warn('save chart error', err);
+              Notification.error(ApiKit.getErrorMsg(err));
+            } finally {
+              setSubmitting(false);
+            }
+          }}>
+          Save
+        </Button>
+        <Button
+          icon={<Icon icon="explore" />}
+          type="tertiary"
+          onClick={() => {
+            const params = createSearchParams({ left: JSON.stringify(get(chart, 'config', null)) });
+            navigate({ pathname: '/explore', search: params.toString() });
+          }}>
+          Explore
+        </Button>
+        <Button icon={<IconClose />} type="tertiary" onClick={() => setVisible(false)} />
+      </div>
+      {datasource && <MetricExplore datasource={datasource} />}
+    </div>
+  );
+};
+
+const ChartDetailModal: React.FC<{ chart: Chart; visible: boolean; setVisible: (visible: boolean) => void }> = (
+  props
+) => {
+  const { visible, setVisible, chart } = props;
+  return (
+    <SideSheet
+      className="chart-detail"
+      size="large"
+      closeOnEsc
+      motion={false}
+      closable={false}
+      visible={visible}
+      onCancel={() => setVisible(false)}>
+      <PanelEditContextProvider initPanel={(chart.config || {}) as PanelSetting}>
+        <ChartDetail chart={chart} setVisible={setVisible} />
+      </PanelEditContextProvider>
     </SideSheet>
   );
 };
 
 const ListChart: React.FC = () => {
-  const [chart, setChart] = useState<PanelSetting>({});
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
   const [visible, setVisible] = useState(false);
+  const currentChart = useRef<PanelSetting>();
 
-  const { result, loading, error, refetch } = useRequest(['fetch-charts', title, ownership], () =>
+  const { result, loading, error } = useRequest(['fetch-charts', title, ownership], () =>
     ChartSrv.searchCharts({ title: title, ownership: ownership })
   );
 
   return (
     <>
+      <ChartDetailModal visible={visible} setVisible={setVisible} chart={currentChart.current || {}} />
       <Card className="linsight-feature" bodyStyle={{ padding: 0 }}>
         <div style={{ margin: 16, display: 'flex', gap: 8 }}>
           <TagInput prefix={<IconSearchStroked />} placeholder="Filter charts" defaultValue={['team:monitor']} />
@@ -146,7 +224,7 @@ const ListChart: React.FC = () => {
                             <Text
                               link
                               onClick={() => {
-                                setChart(r);
+                                currentChart.current = r;
                                 setVisible(true);
                               }}>
                               {r.title}
@@ -168,7 +246,6 @@ const ListChart: React.FC = () => {
           </Col>
         </Row>
       </Card>
-      <ChartDetail visible={visible} setVisible={setVisible} chart={chart} />
     </>
   );
 };

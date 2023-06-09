@@ -15,24 +15,9 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PanelSetting } from '@src/types';
-
-export interface Chart {
-  uid?: string;
-  title?: string;
-  desc?: string;
-  isStarred?: boolean;
-  config?: PanelSetting;
-  variables?: any[];
-}
-
-export interface SearchChart {
-  title?: string;
-  ownership?: string;
-  tags?: string[];
-}
-
-export interface SearchChartResult {
-  total: number;
-  charts: Chart[];
+.chart-detail {
+  .semi-sidesheet-header {
+    align-items: center;
+    padding: 12px 24px;
+  }
 }

@@ -31,18 +31,7 @@ const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
         <QueryEditor datasource={datasource} />
       </Card>
       <div className="linsight-feature" style={{ marginTop: 0, height: 300 }}>
-        <Panel
-          panel={{
-            type: 'timeseries',
-            datasource: panel?.datasource,
-            targets: panel?.targets,
-            fieldConfig: {
-              defaults: {
-                unit: 'short',
-              },
-            },
-          }}
-        />
+        <Panel panel={panel} />
       </div>
     </>
   );

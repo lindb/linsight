@@ -33,6 +33,8 @@ import (
 type ChartService interface {
 	// CreateChart creates a chart.
 	CreateChart(ctx context.Context, chart *model.Chart) (string, error)
+	// UpdateChart updates the chart by uid.
+	UpdateChart(ctx context.Context, chart *model.Chart) error
 	// SearchCharts searches the charts by given params.
 	SearchCharts(ctx context.Context, req *model.SearchChartRequest) (rs []model.Chart, total int64, err error)
 }
@@ -62,6 +64,21 @@ func (srv *chartService) CreateChart(ctx context.Context, chart *model.Chart) (s
 		return "", err
 	}
 	return chart.UID, nil
+}
+
+// UpdateChart updates the chart by uid.
+func (srv *chartService) UpdateChart(ctx context.Context, chart *model.Chart) error {
+	chartFromDB, err := srv.getChartByUID(ctx, chart.UID)
+	if err != nil {
+		return err
+	}
+	user := util.GetUser(ctx)
+	// update datasource
+	chartFromDB.Title = chart.Title
+	chartFromDB.Desc = chart.Desc
+	chartFromDB.Config = chart.Config
+	chartFromDB.UpdatedBy = user.User.ID
+	return srv.db.Update(chartFromDB, "uid=? and org_id=?", chart.UID, user.Org.ID)
 }
 
 // SearchCharts searches the chart by given params.
@@ -99,4 +116,14 @@ func (srv *chartService) SearchCharts(ctx context.Context, //nolint:dupl
 		return nil, 0, err
 	}
 	return rs, count, nil
+}
+
+// getChartByUID returns the chart by uid.
+func (srv *chartService) getChartByUID(ctx context.Context, uid string) (*model.Chart, error) {
+	rs := &model.Chart{}
+	signedUser := util.GetUser(ctx)
+	if err := srv.db.Get(rs, "uid=? and org_id=?", uid, signedUser.Org.ID); err != nil {
+		return nil, err
+	}
+	return rs, nil
 }

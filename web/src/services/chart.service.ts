@@ -23,11 +23,16 @@ const createChart = (chart: Chart): Promise<string> => {
   return ApiKit.POST<string>(ApiPath.Chart, chart);
 };
 
+const updateChart = (chart: Chart): Promise<string> => {
+  return ApiKit.PUT<string>(ApiPath.Chart, chart);
+};
+
 const searchCharts = (req: SearchChart): Promise<SearchChartResult> => {
   return ApiKit.GET<SearchChartResult>(ApiPath.Chart, req);
 };
 
 export default {
   createChart,
+  updateChart,
   searchCharts,
 };
