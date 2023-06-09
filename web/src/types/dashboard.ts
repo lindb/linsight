@@ -75,3 +75,8 @@ export enum SearchParamKeys {
   To = 'to',
   Refresh = 'refresh',
 }
+
+export interface QuickSelectItem {
+  title: string;
+  value: string;
+}

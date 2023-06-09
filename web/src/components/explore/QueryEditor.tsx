@@ -23,7 +23,7 @@ import {
   IconPlusStroked,
   IconDeleteStroked,
   IconChevronDown,
-  IconChevronUp,
+  IconChevronRight,
 } from '@douyinfe/semi-icons';
 import { PanelEditContext, QueryEditContextProvider, TargetsContext, TargetsContextProvider } from '@src/contexts';
 import { DatasourceInstance, Query } from '@src/types';
@@ -85,7 +85,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                             toggleActiveRefId(refId);
                           }}>
                           <Button
-                            icon={isActive(refId) ? <IconChevronDown /> : <IconChevronUp />}
+                            icon={isActive(refId) ? <IconChevronDown /> : <IconChevronRight />}
                             size="small"
                             theme="borderless"
                             type="tertiary"

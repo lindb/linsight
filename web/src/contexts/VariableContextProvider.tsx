@@ -24,6 +24,9 @@ export const VariableContext = createContext({
   variables: {},
   from: '',
   to: '',
+  refreshTime: 0,
+  refreshInterval: '',
+  refresh: () => {},
 });
 
 const getValues = (variables: Variable[], searchParams: URLSearchParams): object => {
@@ -43,8 +46,10 @@ export const VariableContextProvider: React.FC<{ variables: Variable[]; children
   const [valuesOfVariable, setValuesOfVariable] = useState(() => {
     return getValues(variables, searchParams);
   });
+  const [refreshTime, setRefreshTime] = useState(0);
   const from = searchParams.get(SearchParamKeys.From) || '';
   const to = searchParams.get(SearchParamKeys.To) || '';
+  const refreshInterval = searchParams.get(SearchParamKeys.Refresh) || '';
   const valuesTrackerRef = useRef() as MutableRefObject<Tracker<any>>;
 
   useMemo(() => {
@@ -62,8 +67,12 @@ export const VariableContextProvider: React.FC<{ variables: Variable[]; children
     }
   }, [searchParams, variables]);
 
+  const refresh = () => {
+    setRefreshTime(refreshTime + 1);
+  };
+
   return (
-    <VariableContext.Provider value={{ variables: valuesOfVariable, from: from, to: to }}>
+    <VariableContext.Provider value={{ variables: valuesOfVariable, from, to, refreshTime, refresh, refreshInterval }}>
       {children}
     </VariableContext.Provider>
   );
