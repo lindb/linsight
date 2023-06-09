@@ -22,6 +22,7 @@ import (
 
 	httppkg "github.com/lindb/common/pkg/http"
 
+	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
 )
@@ -86,4 +87,14 @@ func (api *ChartAPI) SearchCharts(c *gin.Context) {
 		"total":  total,
 		"charts": charts,
 	})
+}
+
+// DeleteChartByUID deletes chart by given uid.
+func (api *ChartAPI) DeleteChartByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	if err := api.deps.ChartSrv.DeleteChartByUID(c.Request.Context(), uid); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Chart deleted")
 }

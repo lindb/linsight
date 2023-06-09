@@ -45,9 +45,10 @@ import { DashboardSrv } from '@src/services';
 import React, { useEffect, useState } from 'react';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { isEmpty } from 'lodash-es';
-import { StatusTip } from '@src/components';
+import { StatusTip, Notification } from '@src/components';
 import { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import { SearchDashboard } from '@src/types';
+import { ApiKit } from '@src/utils';
 const { Text } = Typography;
 
 const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
@@ -151,9 +152,15 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
                   <Dropdown.Item
                     icon={<IconDeleteStroked />}
                     type="danger"
-                    onClick={() => {
-                      DashboardSrv.deleteDashboard(r.uid);
-                      refetch();
+                    onClick={async () => {
+                      try {
+                        await DashboardSrv.deleteDashboard(r.uid);
+                        refetch();
+                        Notification.success('Dashboard deleted!');
+                      } catch (err) {
+                        console.warn('delete dashboard error', err);
+                        Notification.error(ApiKit.getErrorMsg(err));
+                      }
                     }}>
                     Delete
                   </Dropdown.Item>

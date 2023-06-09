@@ -19,6 +19,10 @@ import { ApiPath } from '@src/constants';
 import { Chart, SearchChart, SearchChartResult } from '@src/types';
 import { ApiKit } from '@src/utils';
 
+const searchCharts = (req: SearchChart): Promise<SearchChartResult> => {
+  return ApiKit.GET<SearchChartResult>(ApiPath.Chart, req);
+};
+
 const createChart = (chart: Chart): Promise<string> => {
   return ApiKit.POST<string>(ApiPath.Chart, chart);
 };
@@ -27,12 +31,13 @@ const updateChart = (chart: Chart): Promise<string> => {
   return ApiKit.PUT<string>(ApiPath.Chart, chart);
 };
 
-const searchCharts = (req: SearchChart): Promise<SearchChartResult> => {
-  return ApiKit.GET<SearchChartResult>(ApiPath.Chart, req);
+const deleteChart = (uid: string): Promise<string> => {
+  return ApiKit.DELETE<string>(`${ApiPath.Chart}/${uid}`);
 };
 
 export default {
+  searchCharts,
   createChart,
   updateChart,
-  searchCharts,
+  deleteChart,
 };

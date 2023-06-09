@@ -31,12 +31,14 @@ import (
 
 // ChartService represents chart repo manager interface.
 type ChartService interface {
+	// SearchCharts searches the charts by given params.
+	SearchCharts(ctx context.Context, req *model.SearchChartRequest) (rs []model.Chart, total int64, err error)
 	// CreateChart creates a chart.
 	CreateChart(ctx context.Context, chart *model.Chart) (string, error)
 	// UpdateChart updates the chart by uid.
 	UpdateChart(ctx context.Context, chart *model.Chart) error
-	// SearchCharts searches the charts by given params.
-	SearchCharts(ctx context.Context, req *model.SearchChartRequest) (rs []model.Chart, total int64, err error)
+	// DeleteChartByUID deletes the chart by uid.
+	DeleteChartByUID(ctx context.Context, uid string) error
 }
 
 // chartService implements ChartService interface.
@@ -116,6 +118,16 @@ func (srv *chartService) SearchCharts(ctx context.Context, //nolint:dupl
 		return nil, 0, err
 	}
 	return rs, count, nil
+}
+
+// DeleteChartByUID deletes the chart by uid.
+func (srv *chartService) DeleteChartByUID(ctx context.Context, uid string) error {
+	signedUser := util.GetUser(ctx)
+	orgID := signedUser.Org.ID
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		// delete chart
+		return tx.Delete(&model.Chart{}, "uid=? and org_id=?", uid, orgID)
+	})
 }
 
 // getChartByUID returns the chart by uid.
