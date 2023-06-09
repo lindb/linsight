@@ -54,6 +54,22 @@ func (api *ChartAPI) CreateChart(c *gin.Context) {
 	httppkg.OK(c, uid)
 }
 
+// UpdateChart updates a chart.
+func (api *ChartAPI) UpdateChart(c *gin.Context) {
+	var chart model.Chart
+	if err := c.ShouldBind(&chart); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	err := api.deps.ChartSrv.UpdateChart(ctx, &chart)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Chart updated")
+}
+
 // SearchCharts searches charts by given params.
 func (api *ChartAPI) SearchCharts(c *gin.Context) {
 	req := &model.SearchChartRequest{}

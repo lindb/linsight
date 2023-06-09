@@ -162,3 +162,64 @@ func TestChartAPI_SearchCharts(t *testing.T) {
 		})
 	}
 }
+
+func TestChartAPI_UpdateChart(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	chartSrv := service.NewMockChartService(ctrl)
+	r := gin.New()
+	api := NewChartAPI(&deps.API{
+		ChartSrv: chartSrv,
+	})
+	r.PUT("/chart", api.UpdateChart)
+	body := encoding.JSONMarshal(&model.Chart{})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: http.NoBody,
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update chart failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update chart successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/chart", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}

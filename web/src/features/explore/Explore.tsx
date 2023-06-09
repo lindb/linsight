@@ -26,7 +26,15 @@ import './explore.scss';
 import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 
 const { Header } = Layout;
-const DefaultPanel = { targets: [{}] };
+const DefaultPanel = {
+  targets: [{}],
+  type: 'timeseries',
+  fieldConfig: {
+    defaults: {
+      unit: 'short',
+    },
+  },
+};
 
 const ExploreContent: React.FC = () => {
   const { datasources } = DatasourceStore;
@@ -50,6 +58,7 @@ const ExploreContent: React.FC = () => {
   useEffect(() => {
     if (panelTracker.current.isChanged(panel)) {
       panelTracker.current.setNewVal(panel);
+      addToChartBtn.current.setOptions(panel);
       searchParams.set('left', JSON.stringify(panel));
       setSearchParams(searchParams);
       setDatasource(getDatasource());
@@ -97,16 +106,20 @@ const Explore: React.FC = () => {
       if (isEmpty(get(panel, 'targets', []))) {
         set(panel, 'targets', [{}]);
       }
+      set(panel, 'type', 'timeseries');
+      set(panel, 'fieldConfig', {
+        defaults: {
+          unit: 'short',
+        },
+      });
       return panel;
     } catch (err) {
       console.warn('parse metric explore error', err);
     }
     return DefaultPanel;
   };
-  const panelOptions = getOptions('left');
-  console.error('ddkkkkkkkk', panelOptions);
   return (
-    <PanelEditContextProvider initPanel={panelOptions}>
+    <PanelEditContextProvider initPanel={getOptions('left')}>
       <ExploreContent />
     </PanelEditContextProvider>
   );

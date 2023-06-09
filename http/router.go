@@ -116,6 +116,8 @@ func (r *Router) RegisterRouters() {
 	// chart repo api
 	router.POST("/charts",
 		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.CreateChart)...)
+	router.PUT("/charts",
+		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.UpdateChart)...)
 	router.GET("/charts",
 		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Read, r.chartAPI.SearchCharts)...)
 
