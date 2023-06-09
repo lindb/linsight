@@ -21,11 +21,12 @@ import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, MetricExplore,
 import { DatasourceInstance, PanelSetting, Tracker } from '@src/types';
 import { useSearchParams } from 'react-router-dom';
 import { DatasourceStore } from '@src/stores';
-import { get, isEmpty } from 'lodash-es';
+import { get, set, isEmpty } from 'lodash-es';
 import './explore.scss';
 import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 
 const { Header } = Layout;
+const DefaultPanel = { targets: [{}] };
 
 const ExploreContent: React.FC = () => {
   const { datasources } = DatasourceStore;
@@ -85,17 +86,25 @@ const Explore: React.FC = () => {
   const [searchParams] = useSearchParams();
   const getOptions = (key: string) => {
     const options = `${searchParams.get(key)}`;
-    if (isEmpty(options)) {
-      return {};
+    if (!options || isEmpty(options)) {
+      return DefaultPanel;
     }
     try {
-      return JSON.parse(options);
+      const panel = JSON.parse(options);
+      if (!panel) {
+        return DefaultPanel;
+      }
+      if (isEmpty(get(panel, 'targets', []))) {
+        set(panel, 'targets', [{}]);
+      }
+      return panel;
     } catch (err) {
       console.warn('parse metric explore error', err);
     }
-    return [];
+    return DefaultPanel;
   };
   const panelOptions = getOptions('left');
+  console.error('ddkkkkkkkk', panelOptions);
   return (
     <PanelEditContextProvider initPanel={panelOptions}>
       <ExploreContent />

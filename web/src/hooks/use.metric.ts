@@ -56,10 +56,10 @@ const getDataQuery = (
 };
 
 export const useMetric = (queries: Query[], dataset: DataSetType, defaultDatasourceUID?: string) => {
-  const { variables, from, to } = useContext(VariableContext);
+  const { variables, from, to, refreshTime } = useContext(VariableContext);
   const dataQuery: DataQuery = getDataQuery(queries, variables, dataset, defaultDatasourceUID);
   const { result, loading, refetch, error } = useRequest(
-    ['query_metric_data', dataQuery, from, to], // watch dataQuery/from/to if changed
+    ['query_metric_data', dataQuery, from, to, refreshTime], // watch dataQuery/from/to if changed
     async () => {
       const range: TimeRange = {};
       if (!isEmpty(from)) {

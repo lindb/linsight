@@ -36,8 +36,8 @@ const OptionsContent: React.FC<{ values: object }> = (props) => {
   const { values } = props;
   const legend = get(values, 'legendFormat', 'Auto');
   const info = [];
-  info.push(<span>Legend: {isEmpty(legend) ? 'Auto' : legend}</span>);
-  info.push(<span>Include field: {`${get(values, 'includeField', false)}`}</span>);
+  info.push(<span key="legend">Legend: {isEmpty(legend) ? 'Auto' : legend}</span>);
+  info.push(<span key="includeField">Include field: {`${get(values, 'includeField', false)}`}</span>);
   return <span className="options-item">{info}</span>;
 };
 

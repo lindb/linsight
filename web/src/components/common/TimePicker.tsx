@@ -17,91 +17,68 @@ under the License.
 */
 import { IconChevronDown, IconRefresh, IconTick } from '@douyinfe/semi-icons';
 import { Button, Dropdown, Input, Popover, Form, SplitButtonGroup, Typography, Space } from '@douyinfe/semi-ui';
-import { isEmpty, find, filter } from 'lodash-es';
-import React, { useState, useRef, MutableRefObject, useEffect } from 'react';
+import { isEmpty, find, filter, get } from 'lodash-es';
+import React, { useState, useRef, MutableRefObject, useEffect, useContext, useCallback } from 'react';
 import moment from 'moment';
-import { DateTimeFormat } from '@src/constants';
+import {
+  AutoRefreshList,
+  DateTimeFormat,
+  DefaultAutoRefreshItem,
+  DefaultQuickItem,
+  QuickSelectList,
+} from '@src/constants';
 import { Icon } from '@src/components';
 import { useSearchParams } from 'react-router-dom';
-import { SearchParamKeys } from '@src/types';
+import { QuickSelectItem, SearchParamKeys } from '@src/types';
+import { VariableContext } from '@src/contexts';
 
 const { Title } = Typography;
-type QuickSelectItem = {
-  title: string;
-  value: string;
-};
-const defaultQuickItem = { title: 'Last 1 hour', value: 'now()-1h' };
-const defaultAutoRefreshItem = { title: 'off', value: '' };
-const quickSelectList: QuickSelectItem[] = [
-  { title: 'Last 15 minutes', value: 'now()-15m' },
-  { title: 'Last 30 minutes', value: 'now()-30m' },
-  defaultQuickItem,
-  { title: 'Last 3 hours', value: 'now()-3h' },
-  { title: 'Last 6 hours', value: 'now()-6h' },
-  { title: 'Last 12 hours', value: 'now()-12h' },
-  { title: 'Last 1 day', value: 'now()-1d' },
-  { title: 'Last 2 days', value: 'now()-2d' },
-  { title: 'Last 3 days', value: 'now()-3d' },
-  { title: 'Last 7 days', value: 'now()-7d' },
-  { title: 'Last 15 days', value: 'now()-15d' },
-  { title: 'Last 30 days', value: 'now()-30d' },
-];
-const autoRefreshList: QuickSelectItem[] = [
-  {
-    value: '',
-    title: 'off',
-  },
-  { value: '10', title: `10s` },
-  { value: '30', title: `30s` },
-  { value: '60', title: `1m` },
-  { value: '300', title: `5m` },
-];
 
 const TimePicker: React.FC = () => {
+  const { from, to, refresh, refreshInterval } = useContext(VariableContext);
   const [searchParams, setSearchParams] = useSearchParams();
-  const from = searchParams.get(SearchParamKeys.From);
-  const to = searchParams.get(SearchParamKeys.To);
-  const refresh = searchParams.get(SearchParamKeys.Refresh);
 
   const formApi = useRef() as MutableRefObject<any>;
-  const [quick, setQuick] = useState<QuickSelectItem | undefined>(defaultQuickItem);
-  const [quickItems, setQuickItems] = useState<QuickSelectItem[]>(quickSelectList);
+  const [quick, setQuick] = useState<QuickSelectItem | undefined>(DefaultQuickItem);
+  const [quickItems, setQuickItems] = useState<QuickSelectItem[]>(QuickSelectList);
   const [visible, setVisible] = useState(false);
-  const [autoRefresh, setAutoRefresh] = useState<QuickSelectItem>(defaultAutoRefreshItem);
+  const [autoRefresh, setAutoRefresh] = useState<QuickSelectItem>(DefaultAutoRefreshItem);
   const countDown = useRef<number>();
   const timeRangeVisible = useRef<boolean>(false);
 
-  const buildCountDown = (interval: number) => {
-    if (countDown.current) {
-      clearInterval(countDown.current);
-    }
+  const buildCountDown = useCallback(
+    (interval: number) => {
+      if (countDown.current) {
+        clearInterval(countDown.current);
+      }
 
-    if (interval) {
-      countDown.current = +setInterval(() => {
-        // FIXME:
-        //URLStore.forceChange();
-      }, 1000 * interval);
-    }
-  };
+      if (interval) {
+        countDown.current = +setInterval(() => {
+          refresh();
+        }, 1000 * interval);
+      }
+    },
+    [refresh]
+  );
 
   useEffect(() => {
     if (isEmpty(from)) {
-      setQuick(defaultQuickItem);
+      setQuick(DefaultQuickItem);
     } else {
-      const quickItem = find(quickSelectList, { value: `${from}` });
+      const quickItem = find(QuickSelectList, { value: `${from}` });
       setQuick(quickItem);
     }
   }, [from]);
 
   useEffect(() => {
-    const refreshItem = find(autoRefreshList, { value: `${refresh}` });
+    const refreshItem = find(AutoRefreshList, { title: `${refreshInterval}` });
     if (refreshItem && refreshItem.value !== '') {
       buildCountDown(parseInt(refreshItem.value));
     } else {
       clearInterval(countDown.current);
     }
-    setAutoRefresh(refreshItem || defaultAutoRefreshItem);
-  }, [refresh]);
+    setAutoRefresh(refreshItem || DefaultAutoRefreshItem);
+  }, [refreshInterval, buildCountDown]);
 
   const renderQuickSelectItem = (items: QuickSelectItem[]) => {
     const SelectItems = items.map((item) => (
@@ -143,7 +120,17 @@ const TimePicker: React.FC = () => {
       <Space style={{ width: 460, padding: 20 }} align="start">
         <div style={{ width: 230 }}>
           <Title heading={5}>Absolute time range</Title>
-          <Form style={{ marginTop: 16 }} className="lin-form" getFormApi={(api: any) => (formApi.current = api)}>
+          <Form
+            style={{ marginTop: 16 }}
+            className="lin-form"
+            getFormApi={(api: any) => (formApi.current = api)}
+            onSubmit={(values: any) => {
+              const from = get(values, SearchParamKeys.From);
+              const to = get(values, SearchParamKeys.To);
+              searchParams.set(SearchParamKeys.From, from ? moment(from.getTime()).format(DateTimeFormat) : '');
+              searchParams.set(SearchParamKeys.To, to ? moment(to.getTime()).format(DateTimeFormat) : '');
+              setSearchParams(searchParams);
+            }}>
             <Form.DatePicker
               field="from"
               type="dateTime"
@@ -164,10 +151,7 @@ const TimePicker: React.FC = () => {
               style={{ marginTop: 12 }}
               onClick={() => {
                 setVisible(false);
-                const from = formApi.current.getValue(SearchParamKeys.From);
-                const to = formApi.current.getValue(SearchParamKeys.To);
-                searchParams.set(SearchParamKeys.From, from ? moment(from.getTime()).format(DateTimeFormat) : '');
-                searchParams.set(SearchParamKeys.To, to ? moment(to.getTime()).format(DateTimeFormat) : '');
+                formApi.current.submitForm();
               }}>
               Apply time range
             </Button>
@@ -182,7 +166,7 @@ const TimePicker: React.FC = () => {
             <Input
               placeholder="Search quick range"
               onChange={(val: string) => {
-                const rs = filter(quickSelectList, (item: QuickSelectItem) => item.title.indexOf(val) >= 0);
+                const rs = filter(QuickSelectList, (item: QuickSelectItem) => item.title.indexOf(val) >= 0);
                 setQuickItems(rs);
               }}
             />
@@ -213,7 +197,7 @@ const TimePicker: React.FC = () => {
         <Button
           icon={<IconRefresh />}
           onClick={() => {
-            //FIXME:
+            refresh();
           }}
         />
         <Dropdown
@@ -221,12 +205,16 @@ const TimePicker: React.FC = () => {
           showTick
           render={
             <Dropdown.Menu>
-              {autoRefreshList.map((item) => (
+              {AutoRefreshList.map((item: QuickSelectItem) => (
                 <Dropdown.Item
                   key={item.title}
                   active={item.value === autoRefresh.value}
                   onClick={() => {
-                    searchParams.set(SearchParamKeys.Refresh, item.value);
+                    if (item.value === '') {
+                      searchParams.delete(SearchParamKeys.Refresh);
+                    } else {
+                      searchParams.set(SearchParamKeys.Refresh, item.title);
+                    }
                     setSearchParams(searchParams);
                   }}>
                   {item.title}
