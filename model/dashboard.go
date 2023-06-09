@@ -18,13 +18,8 @@
 package model
 
 import (
-	"errors"
-	"fmt"
-
-	"github.com/lindb/common/pkg/encoding"
+	"github.com/tidwall/gjson"
 	"gorm.io/datatypes"
-
-	"github.com/lindb/linsight/constant"
 )
 
 type Ownership int
@@ -54,21 +49,11 @@ type Dashboard struct {
 }
 
 // ReadMeta reads dashboard metadata from json data.
-func (d *Dashboard) ReadMeta() error {
-	var dashboardMap map[string]any
-	if err := encoding.JSONUnmarshal(d.Config, &dashboardMap); err != nil {
-		return err
-	}
-	title, ok := dashboardMap["title"]
-	if !ok {
-		return errors.New("title is required")
-	}
-	d.Title = fmt.Sprintf("%v", title)
-	uid, ok := dashboardMap[constant.UID]
-	if ok {
-		d.UID = fmt.Sprintf("%v", uid)
-	}
-	return nil
+func (d *Dashboard) ReadMeta() {
+	json := d.Config.String()
+	d.Title = gjson.Get(json, "title").String()
+	d.Desc = gjson.Get(json, "description").String()
+	d.UID = gjson.Get(json, "uid").String()
 }
 
 // SearchDashboardRequest represents search dashboard request params.

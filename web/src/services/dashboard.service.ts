@@ -34,9 +34,11 @@ const getDashboard = (uid: string): Promise<DashboardDetail> => {
 const deleteDashboard = (uid: string): Promise<string> => {
   return ApiKit.DELETE<string>(`${ApiPath.Dashboard}/${uid}`);
 };
+
 const starDashboard = (uid: string): Promise<string> => {
   return ApiKit.PUT<string>(`${ApiPath.Dashboard}/${uid}/star`);
 };
+
 const unstarDashboard = (uid: string): Promise<string> => {
   return ApiKit.DELETE<string>(`${ApiPath.Dashboard}/${uid}/star`);
 };

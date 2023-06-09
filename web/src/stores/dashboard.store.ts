@@ -18,10 +18,11 @@ under the License.
 import { Notification } from '@src/components';
 import { DefaultColumns, PanelGridPos, RowPanelType, VisualizationAddPanelType } from '@src/constants';
 import { DashboardSrv } from '@src/services';
-import { Dashboard, GridPos, PanelSetting, Variable, Tracker } from '@src/types';
+import { Dashboard, GridPos, PanelSetting, Variable, Tracker, Chart } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
 import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
+import { ChartPendingAddStore } from '.';
 
 class DashboardStore {
   private panelSeq = 0;
@@ -232,31 +233,47 @@ class DashboardStore {
   }
 
   async loadDashbaord(dashboardId: string | null) {
-    // reset panel seq when load dashboard
-    this.panelSeq = 0;
-    if (isEmpty(dashboardId)) {
-      const panelId = this.assignPanelId();
-      this.dashboard = {
-        title: 'New Dashboard',
-        panels: [
-          {
+    try {
+      // reset panel seq when load dashboard
+      this.panelSeq = 0;
+      if (isEmpty(dashboardId)) {
+        const charts = ChartPendingAddStore.getCharts();
+        const panels: PanelSetting[] = [];
+        this.dashboard = {
+          title: ChartPendingAddStore.dashboadTitle || 'New Dashboard',
+        };
+        if (isEmpty(charts)) {
+          const panelId = this.assignPanelId();
+          panels.push({
             title: 'Add panel',
             type: VisualizationAddPanelType,
             gridPos: { w: 12, h: 8, x: 0, y: 0, i: `${panelId}` }, // NOTE: must set i value(string)
             id: panelId,
-          },
-        ],
-      };
+          });
+        } else {
+          charts.forEach((chart: Chart, index: number) => {
+            const panelId = this.assignPanelId();
+            const p = chart.config as PanelSetting;
+            p.id = panelId;
+            p.gridPos = { w: 12, h: 8, x: 12 * (index % 2), y: 0, i: `${panelId}` };
+            panels.push(p);
+          });
+        }
+        this.dashboard.panels = panels;
+        console.error('init dashboard', toJS(this.dashboard), charts);
+        return this.dashboard;
+      }
+      try {
+        const dashboard = await DashboardSrv.getDashboard(`${dashboardId}`);
+        this.initDashboard(dashboard.dashboard);
+      } catch (err) {
+        console.warn('load dashobard error', err);
+        Notification.error(ApiKit.getErrorMsg(err));
+      }
       return this.dashboard;
+    } finally {
+      ChartPendingAddStore.clean();
     }
-    try {
-      const dashboard = await DashboardSrv.getDashboard(`${dashboardId}`);
-      this.initDashboard(dashboard.dashboard);
-    } catch (err) {
-      console.warn('load dashobard error', err);
-      Notification.error(ApiKit.getErrorMsg(err));
-    }
-    return this.dashboard;
   }
 
   async saveDashboard() {

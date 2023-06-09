@@ -15,9 +15,9 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+export { default as PlatformStore } from '@src/stores/platform.store';
 export { default as UserStore } from '@src/stores/user.store';
 export { default as MenuStore } from '@src/stores/menu.store';
-export { default as DashboardStore } from '@src/stores/dashboard.store';
 export { default as DatasourceStore } from '@src/stores/datasource.store';
-export { default as URLStore } from '@src/stores/url.store';
-export { default as PlatformStore } from '@src/stores/platform.store';
+export { default as ChartPendingAddStore } from '@src/stores/chart.pending.store';
+export { default as DashboardStore } from '@src/stores/dashboard.store';

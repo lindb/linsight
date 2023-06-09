@@ -21,7 +21,7 @@ import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, MetricExplore,
 import { DatasourceInstance, PanelSetting, Tracker } from '@src/types';
 import { useSearchParams } from 'react-router-dom';
 import { DatasourceStore } from '@src/stores';
-import { get, set, isEmpty } from 'lodash-es';
+import { get, set, isEmpty, cloneDeep } from 'lodash-es';
 import './explore.scss';
 import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 
@@ -56,9 +56,10 @@ const ExploreContent: React.FC = () => {
   }, []); // just init
 
   useEffect(() => {
+    addToChartBtn.current.setOptions(panel);
+
     if (panelTracker.current.isChanged(panel)) {
       panelTracker.current.setNewVal(panel);
-      addToChartBtn.current.setOptions(panel);
       searchParams.set('left', JSON.stringify(panel));
       setSearchParams(searchParams);
       setDatasource(getDatasource());
@@ -82,7 +83,19 @@ const ExploreContent: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
           <AddToCharts ref={addToChartBtn} />
-          <AddToDashboard btnType="tertiary" btnTheme="light" />
+          <AddToDashboard
+            btnType="tertiary"
+            btnTheme="light"
+            getCharts={() => {
+              const p = cloneDeep(panel);
+              p.title = 'Panel title';
+              return [
+                {
+                  config: p,
+                },
+              ];
+            }}
+          />
           <TimePicker />
         </div>
       </Header>

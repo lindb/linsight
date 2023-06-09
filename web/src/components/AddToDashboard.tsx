@@ -17,23 +17,29 @@ under the License.
 */
 import { Button, Input, Modal, Radio, RadioGroup, Select, Typography } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSearchStroked } from '@douyinfe/semi-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardSrv } from '@src/services';
+import { ChartPendingAddStore } from '@src/stores';
+import { Chart, PanelSetting } from '@src/types';
+import { useNavigate } from 'react-router-dom';
 const { Title, Text } = Typography;
 
-const AddToDashboard: React.FC<{ btnTheme?: any; btnType?: any }> = (props) => {
-  const { btnType, btnTheme } = props;
+const AddToDashboard: React.FC<{
+  btnTheme?: any;
+  btnType?: any;
+  disabled?: boolean;
+  getCharts?: () => Chart[];
+}> = (props) => {
+  const { btnType, btnTheme, disabled, getCharts } = props;
   const [type, setType] = useState('1');
   const [visible, setVisible] = useState(false);
-  //FIXME: need remove.
-  const { data } = useQuery(['dashboard-list'], () => DashboardSrv.getDashboardList());
-
-  console.log('add dashboard btn');
+  const navigate = useNavigate();
+  const title = useRef<any>();
 
   const renderDashboard = () => {
     if (type === '1') {
-      return <Input placeholder="Please input dashboard name" />;
+      return <Input placeholder="Please input dashboard name" onChange={(val: string) => (title.current = val)} />;
     }
     return (
       <Select
@@ -41,29 +47,24 @@ const AddToDashboard: React.FC<{ btnTheme?: any; btnType?: any }> = (props) => {
         filter
         showClear
         prefix={<IconSearchStroked />}
-        style={{ width: '100%' }}>
-        {(data || []).map((item: any) => (
-          <Select.Option key={item.name} value={item.name}>
-            {item.type && <i style={{ marginRight: 4 }} className={`devicon-${item.type}-plain colored`} />}
-            {item.name}
-          </Select.Option>
-        ))}
-      </Select>
+        style={{ width: '100%' }}
+        optionList={[]}
+      />
     );
   };
   return (
     <>
       <Button
         type={btnType || 'tertiary'}
-        theme={btnTheme || 'borderless'}
+        theme={btnTheme || 'light'}
         icon={<IconGridStroked />}
+        disabled={disabled}
         onClick={() => setVisible(true)}>
         Add to dashboard
       </Button>
       <Modal
         size="medium"
-        title="Add metric to dashboard"
-        className="x-monitor"
+        title="Add to dashboard"
         visible={visible}
         motion={false}
         onCancel={() => setVisible(false)}
@@ -77,8 +78,12 @@ const AddToDashboard: React.FC<{ btnTheme?: any; btnType?: any }> = (props) => {
               theme="solid"
               icon={<IconGridStroked />}
               onClick={() => {
+                if (getCharts) {
+                  ChartPendingAddStore.setCharts(getCharts());
+                  ChartPendingAddStore.dashboadTitle = title.current;
+                }
                 setVisible(false);
-                window.open(`${window.location.origin}/dashboard/view`);
+                navigate({ pathname: '/dashboard' });
               }}>
               Open Dashboard
             </Button>

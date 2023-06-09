@@ -44,7 +44,7 @@ func NewDashboardAPI(deps *depspkg.API) *DashboardAPI {
 }
 
 // CreateDashboard creates a new dashboard.
-func (api *DashboardAPI) CreateDashboard(c *gin.Context) {
+func (api *DashboardAPI) CreateDashboard(c *gin.Context) { //nolint:dupl
 	var dashboardJSON datatypes.JSON
 	if err := c.ShouldBind(&dashboardJSON); err != nil {
 		httppkg.Error(c, err)
@@ -53,10 +53,7 @@ func (api *DashboardAPI) CreateDashboard(c *gin.Context) {
 	dashboard := &model.Dashboard{
 		Config: dashboardJSON,
 	}
-	if err := dashboard.ReadMeta(); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
+	dashboard.ReadMeta()
 	ctx := c.Request.Context()
 	uid, err := api.deps.DashboardSrv.CreateDashboard(ctx, dashboard)
 	if err != nil {
@@ -76,10 +73,7 @@ func (api *DashboardAPI) UpdateDashboard(c *gin.Context) {
 	dashboard := &model.Dashboard{
 		Config: dashboardJSON,
 	}
-	if err := dashboard.ReadMeta(); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
+	dashboard.ReadMeta()
 	ctx := c.Request.Context()
 	if err := api.deps.DashboardSrv.UpdateDashboard(ctx, dashboard); err != nil {
 		httppkg.Error(c, err)

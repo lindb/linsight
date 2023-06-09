@@ -19,6 +19,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
 
 	httppkg "github.com/lindb/common/pkg/http"
 
@@ -40,14 +41,18 @@ func NewChartAPI(deps *depspkg.API) *ChartAPI {
 }
 
 // CreateChart creates a new chart.
-func (api *ChartAPI) CreateChart(c *gin.Context) {
-	var chart model.Chart
-	if err := c.ShouldBind(&chart); err != nil {
+func (api *ChartAPI) CreateChart(c *gin.Context) { //nolint:dupl
+	var chartJSON datatypes.JSON
+	if err := c.ShouldBind(&chartJSON); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
+	chart := &model.Chart{
+		Config: chartJSON,
+	}
+	chart.ReadMeta()
 	ctx := c.Request.Context()
-	uid, err := api.deps.ChartSrv.CreateChart(ctx, &chart)
+	uid, err := api.deps.ChartSrv.CreateChart(ctx, chart)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
@@ -57,13 +62,17 @@ func (api *ChartAPI) CreateChart(c *gin.Context) {
 
 // UpdateChart updates a chart.
 func (api *ChartAPI) UpdateChart(c *gin.Context) {
-	var chart model.Chart
-	if err := c.ShouldBind(&chart); err != nil {
+	var chartJSON datatypes.JSON
+	if err := c.ShouldBind(&chartJSON); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
+	chart := &model.Chart{
+		Config: chartJSON,
+	}
+	chart.ReadMeta()
 	ctx := c.Request.Context()
-	err := api.deps.ChartSrv.UpdateChart(ctx, &chart)
+	err := api.deps.ChartSrv.UpdateChart(ctx, chart)
 	if err != nil {
 		httppkg.Error(c, err)
 		return

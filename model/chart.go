@@ -17,7 +17,10 @@
 
 package model
 
-import "gorm.io/datatypes"
+import (
+	"github.com/tidwall/gjson"
+	"gorm.io/datatypes"
+)
 
 // Chart represents chart basic information.
 type Chart struct {
@@ -33,6 +36,14 @@ type Chart struct {
 	Config datatypes.JSON `json:"config" gorm:"column:config"`
 
 	IsStarred bool `json:"isStarred" gorm:"-"`
+}
+
+// ReadMeta reads metadata from config json.
+func (c *Chart) ReadMeta() {
+	json := c.Config.String()
+	c.UID = gjson.Get(json, "uid").String()
+	c.Title = gjson.Get(json, "title").String()
+	c.Desc = gjson.Get(json, "description").String()
 }
 
 // SearchChartRequest represents search chart request params.
