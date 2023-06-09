@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
@@ -181,6 +182,23 @@ func TestChartService_UpdateChart(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestChartService_DeleteChartByUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+
+	srv := NewChartService(mockDB)
+	t.Run("delete successfully", func(t *testing.T) {
+		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+		err := srv.DeleteChartByUID(ctx, "1234")
+		assert.NoError(t, err)
+	})
 }
 
 func TestChartService_getChartByUID(t *testing.T) {

@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ChartSrv } from '@src/services';
-import React, { useContext, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Card,
   TagInput,
@@ -30,110 +30,19 @@ import {
   Button,
   Table,
   Typography,
-  SideSheet,
+  Dropdown,
+  Modal,
 } from '@douyinfe/semi-ui';
-import {
-  IconPlusStroked,
-  IconClose,
-  IconSearchStroked,
-  IconStar,
-  IconStarStroked,
-  IconSaveStroked,
-} from '@douyinfe/semi-icons';
-import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { DatasourceSelectForm, Notification, Icon, MetricExplore, StatusTip } from '@src/components';
-import { isEmpty, get } from 'lodash-es';
+import { IconPlusStroked, IconSearchStroked, IconHandle, IconDeleteStroked } from '@douyinfe/semi-icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { StatusTip, Notification } from '@src/components';
+import { isEmpty } from 'lodash-es';
 import { useRequest } from '@src/hooks';
-import { Chart, DatasourceInstance, PanelSetting } from '@src/types';
-import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
-import { DatasourceStore } from '@src/stores';
+import { Chart } from '@src/types';
 import './chart.scss';
+import ChartDetailModal from './ChartDetail';
 import { ApiKit } from '@src/utils';
 const { Text } = Typography;
-
-const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> = (props) => {
-  const { chart, setVisible } = props;
-  const { panel, modifyPanel } = useContext(PanelEditContext);
-  const navigate = useNavigate();
-  const { datasources } = DatasourceStore;
-  const getDatasource = () => {
-    const datasourceUID = get(panel, 'datasource.uid', get(datasources, '[0].setting.uid'));
-    return DatasourceStore.getDatasource(`${datasourceUID}`);
-  };
-  const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
-    return getDatasource();
-  });
-  const [submitting, setSubmitting] = useState(false);
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <div style={{ flex: 1 }}>
-          <div>{chart.title}</div>
-          <Text type="tertiary">{chart.desc}</Text>
-        </div>
-        <DatasourceSelectForm
-          noLabel
-          value={datasource?.setting.uid}
-          style={{ width: 200 }}
-          onChange={(instance: DatasourceInstance) => {
-            modifyPanel({ datasource: { uid: instance.setting.uid } });
-            setDatasource(instance);
-          }}
-        />
-        <Button
-          icon={<IconSaveStroked />}
-          type="primary"
-          loading={submitting}
-          onClick={async () => {
-            chart.config = panel;
-            setSubmitting(true);
-            try {
-              await ChartSrv.updateChart(chart);
-              Notification.success('Save chart successfully!');
-            } catch (err) {
-              console.warn('save chart error', err);
-              Notification.error(ApiKit.getErrorMsg(err));
-            } finally {
-              setSubmitting(false);
-            }
-          }}>
-          Save
-        </Button>
-        <Button
-          icon={<Icon icon="explore" />}
-          type="tertiary"
-          onClick={() => {
-            const params = createSearchParams({ left: JSON.stringify(get(chart, 'config', null)) });
-            navigate({ pathname: '/explore', search: params.toString() });
-          }}>
-          Explore
-        </Button>
-        <Button icon={<IconClose />} type="tertiary" onClick={() => setVisible(false)} />
-      </div>
-      {datasource && <MetricExplore datasource={datasource} />}
-    </div>
-  );
-};
-
-const ChartDetailModal: React.FC<{ chart: Chart; visible: boolean; setVisible: (visible: boolean) => void }> = (
-  props
-) => {
-  const { visible, setVisible, chart } = props;
-  return (
-    <SideSheet
-      className="chart-detail"
-      size="large"
-      closeOnEsc
-      motion={false}
-      closable={false}
-      visible={visible}
-      onCancel={() => setVisible(false)}>
-      <PanelEditContextProvider initPanel={(chart.config || {}) as PanelSetting}>
-        <ChartDetail chart={chart} setVisible={setVisible} />
-      </PanelEditContextProvider>
-    </SideSheet>
-  );
-};
 
 const ListChart: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -141,9 +50,11 @@ const ListChart: React.FC = () => {
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
   const [visible, setVisible] = useState(false);
-  const currentChart = useRef<PanelSetting>();
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const currentChart = useRef<Chart>();
 
-  const { result, loading, error } = useRequest(['fetch-charts', title, ownership], () =>
+  const { result, loading, error, refetch } = useRequest(['fetch-charts', title, ownership], () =>
     ChartSrv.searchCharts({ title: title, ownership: ownership })
   );
 
@@ -187,7 +98,7 @@ const ListChart: React.FC = () => {
             <div style={{ marginLeft: 16, marginRight: 16, marginBottom: 16 }}>
               <Card bodyStyle={{ padding: 0, margin: 8 }} title={<Card.Meta title="All Charts" />}>
                 <Table
-                  rowKey="id"
+                  rowKey="uid"
                   showHeader
                   className="linsight"
                   size="small"
@@ -198,20 +109,8 @@ const ListChart: React.FC = () => {
                       ? false
                       : { total: result?.total || 0, pageSize: 20, style: { marginLeft: 8 } }
                   }
+                  rowSelection={{}}
                   columns={[
-                    {
-                      title: <IconStar />,
-                      key: 'favorite',
-                      width: 40,
-                      align: 'center',
-                      dataIndex: 'status',
-                      render: (_text: any, r: any, _index: any) => {
-                        if (r.favorite) {
-                          return <IconStar style={{ cursor: 'pointer' }} />;
-                        }
-                        return <IconStarStroked style={{ cursor: 'pointer' }} />;
-                      },
-                    },
                     {
                       title: 'Title',
                       key: 'title',
@@ -239,6 +138,32 @@ const ListChart: React.FC = () => {
                       align: 'left',
                       dataIndex: 'desc',
                     },
+                    {
+                      key: 'action',
+                      width: 50,
+                      align: 'center',
+                      dataIndex: 'action',
+                      render: (_text: any, r: any, _index: any) => {
+                        return (
+                          <Dropdown
+                            render={
+                              <Dropdown.Menu>
+                                <Dropdown.Item
+                                  icon={<IconDeleteStroked />}
+                                  type="danger"
+                                  onClick={() => {
+                                    currentChart.current = r;
+                                    setDeleteVisible(true);
+                                  }}>
+                                  Delete
+                                </Dropdown.Item>
+                              </Dropdown.Menu>
+                            }>
+                            <IconHandle style={{ cursor: 'pointer' }} />
+                          </Dropdown>
+                        );
+                      },
+                    },
                   ]}
                 />
               </Card>
@@ -246,6 +171,50 @@ const ListChart: React.FC = () => {
           </Col>
         </Row>
       </Card>
+      <Modal
+        title={
+          <div>
+            Delete [<Text type="danger">{currentChart.current?.title}</Text>] chart
+          </div>
+        }
+        motion={false}
+        visible={deleteVisible}
+        onCancel={() => setDeleteVisible(false)}
+        footer={
+          <>
+            <Button
+              type="tertiary"
+              onClick={() => {
+                setDeleteVisible(false);
+              }}>
+              Cancel
+            </Button>
+            <Button
+              type="danger"
+              theme="solid"
+              loading={submitting}
+              onClick={async () => {
+                setSubmitting(true);
+                try {
+                  if (currentChart.current && currentChart.current.uid) {
+                    await ChartSrv.deleteChart(currentChart.current.uid);
+                    setDeleteVisible(false);
+                    refetch();
+                    Notification.success('Chart deleted!');
+                  }
+                } catch (err) {
+                  console.warn('delete chart error', err);
+                  Notification.error(ApiKit.getErrorMsg(err));
+                } finally {
+                  setSubmitting(false);
+                }
+              }}>
+              Yes
+            </Button>
+          </>
+        }>
+        Are you sure you want to remove this chart?
+      </Modal>
     </>
   );
 };

@@ -118,6 +118,8 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.CreateChart)...)
 	router.PUT("/charts",
 		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.UpdateChart)...)
+	router.DELETE("/charts/:uid",
+		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.DeleteChartByUID)...)
 	router.GET("/charts",
 		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Read, r.chartAPI.SearchCharts)...)
 
