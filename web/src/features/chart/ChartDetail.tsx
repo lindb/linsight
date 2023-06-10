@@ -25,7 +25,7 @@ import { Chart, DatasourceInstance, PanelSetting } from '@src/types';
 import { ApiKit } from '@src/utils';
 import React, { useContext, useState } from 'react';
 import { createSearchParams, useNavigate } from 'react-router-dom';
-import { get } from 'lodash-es';
+import { get, unset } from 'lodash-es';
 const { Text } = Typography;
 
 const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> = (props) => {
@@ -80,7 +80,10 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
           icon={<Icon icon="explore" />}
           type="tertiary"
           onClick={() => {
-            const params = createSearchParams({ left: JSON.stringify(get(chart, 'config', null)) });
+            const panel = get(chart, 'config', {});
+            unset(panel, 'title');
+            unset(panel, 'description');
+            const params = createSearchParams({ left: JSON.stringify(panel) });
             navigate({ pathname: '/explore', search: params.toString() });
           }}>
           Explore

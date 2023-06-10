@@ -35,7 +35,7 @@ import {
 } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconSearchStroked, IconHandle, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { StatusTip, Notification } from '@src/components';
+import { StatusTip, Notification, AddToDashboard } from '@src/components';
 import { isEmpty } from 'lodash-es';
 import { useRequest } from '@src/hooks';
 import { Chart } from '@src/types';
@@ -52,7 +52,9 @@ const ListChart: React.FC = () => {
   const [visible, setVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [chartSelected, setChartSelected] = useState(false);
   const currentChart = useRef<Chart>();
+  const currentSelectedRows = useRef<any>();
 
   const { result, loading, error, refetch } = useRequest(['fetch-charts', title, ownership], () =>
     ChartSrv.searchCharts({ title: title, ownership: ownership })
@@ -96,7 +98,23 @@ const ListChart: React.FC = () => {
           </Col>
           <Col span={20}>
             <div style={{ marginLeft: 16, marginRight: 16, marginBottom: 16 }}>
-              <Card bodyStyle={{ padding: 0, margin: 8 }} title={<Card.Meta title="All Charts" />}>
+              <Card
+                bodyStyle={{ padding: 0, margin: 8 }}
+                title={
+                  <Card.Meta
+                    title={
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div>All charts</div>
+                        <AddToDashboard
+                          disabled={!chartSelected}
+                          getCharts={() => {
+                            return currentSelectedRows.current;
+                          }}
+                        />
+                      </div>
+                    }
+                  />
+                }>
                 <Table
                   rowKey="uid"
                   showHeader
@@ -109,7 +127,12 @@ const ListChart: React.FC = () => {
                       ? false
                       : { total: result?.total || 0, pageSize: 20, style: { marginLeft: 8 } }
                   }
-                  rowSelection={{}}
+                  rowSelection={{
+                    onChange: (selectedRowKeys: any, selectedRows: any) => {
+                      currentSelectedRows.current = selectedRows;
+                      setChartSelected(!isEmpty(selectedRowKeys));
+                    },
+                  }}
                   columns={[
                     {
                       title: 'Title',

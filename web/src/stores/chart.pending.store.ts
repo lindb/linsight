@@ -15,8 +15,30 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export * from '@src/hooks/use.ui';
-export * from '@src/hooks/use.metric';
-export * from '@src/hooks/use.request';
-export * from '@src/hooks/use.event';
-export * from '@src/hooks/use.variable';
+import { Chart } from '@src/types';
+import { makeAutoObservable, toJS } from 'mobx';
+
+class ChartPendingAddStore {
+  public charts: Chart[] = [];
+  public dashboadTitle: string = '';
+
+  constructor() {
+    makeAutoObservable(this);
+  }
+
+  setCharts(charts: Chart[]) {
+    this.charts = charts;
+  }
+
+  getCharts(): Chart[] {
+    const charts = toJS(this.charts);
+    return charts || [];
+  }
+
+  clean() {
+    this.charts = [];
+    this.dashboadTitle = '';
+  }
+}
+
+export default new ChartPendingAddStore();

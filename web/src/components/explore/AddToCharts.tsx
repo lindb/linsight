@@ -19,7 +19,7 @@ import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { Button, Form, Modal } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { PanelSetting } from '@src/types';
-import { ApiKit } from '@src/utils';
+import { ApiKit, ObjectKit } from '@src/utils';
 import { ChartSrv } from '@src/services';
 import { Icon, Notification } from '@src/components';
 
@@ -41,8 +41,7 @@ const AddToCharts = forwardRef((_props: {}, ref) => {
   const saveChart = async (values: any) => {
     setSubmitting(true);
     try {
-      values.config = chartOptions.current;
-      await ChartSrv.createChart(values);
+      await ChartSrv.createChart(ObjectKit.merge(chartOptions.current || {}, values));
       Notification.success('Save chart successfully');
       setVisible(false);
     } catch (err) {
@@ -84,12 +83,13 @@ const AddToCharts = forwardRef((_props: {}, ref) => {
         }>
         <Form
           className="linsight-form"
+          allowEmpty
           getFormApi={(api: any) => (formApi.current = api)}
           onSubmit={(values: any) => {
             saveChart(values);
           }}>
           <Form.Input field="title" label="Title" rules={[{ required: true, message: 'Title is required' }]} />
-          <Form.TextArea field="desc" label="Description" />
+          <Form.TextArea field="description" label="Description" />
         </Form>
       </Modal>
     </>
