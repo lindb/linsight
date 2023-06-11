@@ -15,27 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package model
 
-import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
-)
+// Team represents the team inforamtion.
+type Team struct {
+	BaseModel
 
-type API struct {
-	Config *config.Server
+	// current selected org.
+	OrgID int64 `json:"-" gorm:"column:org_id"`
 
-	OrgSrv  service.OrgService
-	UserSrv service.UserService
-	TeamSrv service.TeamService
+	UID   string `json:"uid" gorm:"column:uid;index:u_idx_team_uid,unique"`
+	Name  string `json:"name" gorm:"column:name;index:u_idx_team_name,unique"`
+	Email string `json:"email" gorm:"column:email"`
+}
 
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+// SearchTeamRequest represents search team request params.
+type SearchTeamRequest struct {
+	PagingParam
+	Name string `form:"name" json:"name"`
 }
