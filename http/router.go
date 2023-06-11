@@ -34,6 +34,7 @@ type Router struct {
 	loginAPI           *api.LoginAPI
 	bootAPI            *api.BootAPI
 	orgAPI             *api.OrgAPI
+	teamAPI            *api.TeamAPI
 	userAPI            *api.UserAPI
 	datasourceAPI      *api.DatasourceAPI
 	datasourceQueryAPI *api.DatasourceQueryAPI
@@ -48,7 +49,9 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		deps:               deps,
 		loginAPI:           api.NewLoginAPI(deps),
 		bootAPI:            api.NewBootAPI(deps),
+		orgAPI:             api.NewOrgAPI(deps),
 		userAPI:            api.NewUserAPI(deps),
+		teamAPI:            api.NewTeamAPI(deps),
 		datasourceAPI:      api.NewDatasourceAPI(deps),
 		datasourceQueryAPI: api.NewDatasourceQueryAPI(deps),
 
@@ -76,6 +79,15 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.DeleteOrg)...)
 	router.GET("/orgs/:uid",
 		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Read, r.orgAPI.GetOrg)...)
+
+	router.GET("/org/teams",
+		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.teamAPI.SearchTeams)...)
+	router.POST("/org/teams",
+		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.CreateTeam)...)
+	router.PUT("/org/teams",
+		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.UpdateTeam)...)
+	router.DELETE("/org/teams/:uid",
+		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.DeleteTeamByUID)...)
 
 	router.POST("/user",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.CreateUser)...)

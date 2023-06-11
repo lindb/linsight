@@ -75,7 +75,7 @@ func (srv *chartService) UpdateChart(ctx context.Context, chart *model.Chart) er
 		return err
 	}
 	user := util.GetUser(ctx)
-	// update datasource
+	// update chart
 	chartFromDB.Title = chart.Title
 	chartFromDB.Desc = chart.Desc
 	chartFromDB.Config = chart.Config

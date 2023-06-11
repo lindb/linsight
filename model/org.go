@@ -15,27 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package model
 
-import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
-)
+type Org struct {
+	BaseModel
 
-type API struct {
-	Config *config.Server
-
-	OrgSrv  service.OrgService
-	UserSrv service.UserService
-	TeamSrv service.TeamService
-
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+	UID  string `json:"uid" gorm:"column:uid;index:u_idx_org_uid,unique"`
+	Name string `json:"name" gorm:"column:name;index:u_idx_org_name,unique"`
 }

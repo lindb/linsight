@@ -40,17 +40,17 @@ func init() {
 	gin.SetMode(gin.ReleaseMode)
 }
 
-func TestChartAPI_CreateChart(t *testing.T) {
+func TestTeamAPI_CreateTeam(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	chartSrv := service.NewMockChartService(ctrl)
+	teamSrv := service.NewMockTeamService(ctrl)
 	r := gin.New()
-	api := NewChartAPI(&deps.API{
-		ChartSrv: chartSrv,
+	api := NewTeamAPI(&deps.API{
+		TeamSrv: teamSrv,
 	})
-	r.POST("/charts", api.CreateChart)
-	body := encoding.JSONMarshal(&model.Chart{})
+	r.POST("/teams", api.CreateTeam)
+	body := encoding.JSONMarshal(&model.Team{})
 
 	cases := []struct {
 		name    string
@@ -66,20 +66,20 @@ func TestChartAPI_CreateChart(t *testing.T) {
 			},
 		},
 		{
-			name: "create chart failure",
+			name: "create team failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				chartSrv.EXPECT().CreateChart(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
+				teamSrv.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "create chart successfully",
+			name: "create team successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				chartSrv.EXPECT().CreateChart(gomock.Any(), gomock.Any()).Return("1234", nil)
+				teamSrv.EXPECT().CreateTeam(gomock.Any(), gomock.Any()).Return("1234", nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -90,7 +90,7 @@ func TestChartAPI_CreateChart(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/charts", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/teams", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -102,17 +102,17 @@ func TestChartAPI_CreateChart(t *testing.T) {
 	}
 }
 
-func TestChartAPI_SearchCharts(t *testing.T) {
+func TestTeamAPI_SearchTeams(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	chartSrv := service.NewMockChartService(ctrl)
+	teamSrv := service.NewMockTeamService(ctrl)
 	r := gin.New()
-	api := NewChartAPI(&deps.API{
-		ChartSrv: chartSrv,
+	api := NewTeamAPI(&deps.API{
+		TeamSrv: teamSrv,
 	})
-	r.PUT("/charts", api.SearchCharts)
-	params := encoding.JSONMarshal(&model.SearchChartRequest{})
+	r.PUT("/teams", api.SearchTeams)
+	params := encoding.JSONMarshal(&model.SearchTeamRequest{})
 
 	cases := []struct {
 		name    string
@@ -128,20 +128,20 @@ func TestChartAPI_SearchCharts(t *testing.T) {
 			},
 		},
 		{
-			name: "search chart failure",
+			name: "search team failure",
 			body: bytes.NewBuffer(params),
 			prepare: func() {
-				chartSrv.EXPECT().SearchCharts(gomock.Any(), gomock.Any()).Return(nil, int64(0), fmt.Errorf("err"))
+				teamSrv.EXPECT().SearchTeams(gomock.Any(), gomock.Any()).Return(nil, int64(0), fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "search chart successfully",
+			name: "search team successfully",
 			body: bytes.NewBuffer(params),
 			prepare: func() {
-				chartSrv.EXPECT().SearchCharts(gomock.Any(), gomock.Any()).Return(nil, int64(0), nil)
+				teamSrv.EXPECT().SearchTeams(gomock.Any(), gomock.Any()).Return(nil, int64(0), nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -151,7 +151,7 @@ func TestChartAPI_SearchCharts(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/charts", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/teams", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -163,17 +163,17 @@ func TestChartAPI_SearchCharts(t *testing.T) {
 	}
 }
 
-func TestChartAPI_UpdateChart(t *testing.T) {
+func TestTeamAPI_UpdateTeam(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	chartSrv := service.NewMockChartService(ctrl)
+	teamSrv := service.NewMockTeamService(ctrl)
 	r := gin.New()
-	api := NewChartAPI(&deps.API{
-		ChartSrv: chartSrv,
+	api := NewTeamAPI(&deps.API{
+		TeamSrv: teamSrv,
 	})
-	r.PUT("/chart", api.UpdateChart)
-	body := encoding.JSONMarshal(&model.Chart{})
+	r.PUT("/team", api.UpdateTeam)
+	body := encoding.JSONMarshal(&model.Team{})
 
 	cases := []struct {
 		name    string
@@ -189,20 +189,20 @@ func TestChartAPI_UpdateChart(t *testing.T) {
 			},
 		},
 		{
-			name: "update chart failure",
+			name: "update team failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				teamSrv.EXPECT().UpdateTeam(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "update chart successfully",
+			name: "update team successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(nil)
+				teamSrv.EXPECT().UpdateTeam(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -212,7 +212,7 @@ func TestChartAPI_UpdateChart(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/chart", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/team", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -224,16 +224,16 @@ func TestChartAPI_UpdateChart(t *testing.T) {
 	}
 }
 
-func TestChartAPI_DeleteChartByUID(t *testing.T) {
+func TestTeamAPI_DeleteTeamByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	chartSrv := service.NewMockChartService(ctrl)
+	teamSrv := service.NewMockTeamService(ctrl)
 	r := gin.New()
-	api := NewChartAPI(&deps.API{
-		ChartSrv: chartSrv,
+	api := NewTeamAPI(&deps.API{
+		TeamSrv: teamSrv,
 	})
-	r.DELETE("/chart/:uid", api.DeleteChartByUID)
+	r.DELETE("/team/:uid", api.DeleteTeamByUID)
 
 	cases := []struct {
 		name    string
@@ -241,18 +241,18 @@ func TestChartAPI_DeleteChartByUID(t *testing.T) {
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "delete chart failure",
+			name: "delete team failure",
 			prepare: func() {
-				chartSrv.EXPECT().DeleteChartByUID(gomock.Any(), "1234").Return(fmt.Errorf("err"))
+				teamSrv.EXPECT().DeleteTeamByUID(gomock.Any(), "1234").Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "delete chart successfully",
+			name: "delete team successfully",
 			prepare: func() {
-				chartSrv.EXPECT().DeleteChartByUID(gomock.Any(), "1234").Return(nil)
+				teamSrv.EXPECT().DeleteTeamByUID(gomock.Any(), "1234").Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -262,7 +262,7 @@ func TestChartAPI_DeleteChartByUID(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/chart/1234", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/team/1234", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {

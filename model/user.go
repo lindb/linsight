@@ -19,13 +19,6 @@ package model
 
 import "github.com/lindb/linsight/accesscontrol"
 
-type Org struct {
-	BaseModel
-
-	UID  string `json:"uid" gorm:"column:uid;index:u_idx_org_uid,unique"`
-	Name string `json:"name" gorm:"column:name;index:u_idx_org_name,unique"`
-}
-
 type User struct {
 	BaseModel
 

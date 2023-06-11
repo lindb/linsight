@@ -69,6 +69,7 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.Preference{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Dashboard{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Chart{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Team{}))
 	org := dbpkg.NewMigration(&model.Org{})
 	org.AddInitRecord(
 		&model.Org{Name: "Admin Org", UID: uuid.GenerateShortUUID()},
