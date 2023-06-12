@@ -177,7 +177,7 @@ const FeatureMenu: React.FC = () => {
                     </Dropdown.Menu>
                   }>
                   <div
-                    className="user"
+                    className="user-info"
                     style={collapsed ? { justifyContent: 'center' } : { justifyContent: 'start', paddingLeft: 10 }}>
                     <IconUser size="large" />
                     {!collapsed && (

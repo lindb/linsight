@@ -15,19 +15,16 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ErrorPage } from '@src/components';
-import React from 'react';
-import { Route, Routes } from 'react-router-dom';
-import NewTeam from './NewTeam';
-import TeamList from './TeamList';
+export interface OrgResult {
+  organizations?: Org[];
+  total?: number;
+}
 
-const Team: React.FC = () => {
-  return (
-    <Routes>
-      <Route path="/new" element={<NewTeam />} errorElement={<ErrorPage />} />
-      <Route path="/" element={<TeamList />} errorElement={<ErrorPage />} />
-    </Routes>
-  );
-};
+export interface Org {
+  uid?: string;
+  name?: string;
+}
 
-export default Team;
+export interface SearchOrg {
+  name?: string;
+}

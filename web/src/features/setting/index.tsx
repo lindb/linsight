@@ -23,6 +23,8 @@ import NewTeam from './team/NewTeam';
 import './setting.scss';
 import EditTeam from './team/EditTeam';
 import EditDataSource from './datasource/EditDataSource';
+import NewOrg from './org/NewOrg';
+import EditOrg from './org/EditOrg';
 
 const SettingHome: React.FC = () => {
   return (
@@ -31,6 +33,8 @@ const SettingHome: React.FC = () => {
       <Route path="/org/teams/new" element={<NewTeam />} errorElement={<ErrorPage />} />
       <Route path="/datasource/new" element={<EditDataSource />} errorElement={<ErrorPage />} />
       <Route path="/datasource/edit" element={<EditDataSource />} errorElement={<ErrorPage />} />
+      <Route path="/orgs/new" element={<NewOrg />} errorElement={<ErrorPage />} />
+      <Route path="/orgs/edit" element={<EditOrg />} errorElement={<ErrorPage />} />
       <Route path="/*" element={<Setting />} errorElement={<ErrorPage />} />
     </Routes>
   );

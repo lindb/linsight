@@ -17,9 +17,18 @@
 
 package model
 
+// Org represents organization information.
 type Org struct {
 	BaseModel
 
 	UID  string `json:"uid" gorm:"column:uid;index:u_idx_org_uid,unique"`
 	Name string `json:"name" gorm:"column:name;index:u_idx_org_name,unique"`
+
+	// TODO: add info?
+}
+
+// SearchOrgRequest represents search organization request params.
+type SearchOrgRequest struct {
+	PagingParam
+	Name string `form:"name" json:"name"`
 }

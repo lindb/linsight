@@ -20,6 +20,8 @@ export enum ApiPath {
   Logout = '/logout',
   Boot = '/boot',
   User = '/users',
+  Team = '/org/teams',
+  Org = '/orgs',
   Preference = '/user/preference',
   Datasources = '/datasources',
   Datasource = '/datasource',
@@ -27,5 +29,4 @@ export enum ApiPath {
   DataQuery = '/data/query',
   MetadataQuery = '/metadata/query',
   Chart = '/charts',
-  Team = '/org/teams',
 }

@@ -28,12 +28,12 @@ import (
 	"github.com/lindb/linsight/pkg/db"
 )
 
-func TestTeamService_SearchTeams(t *testing.T) {
+func TestOrgService_SearchOrg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewTeamService(mockDB)
+	srv := NewOrgService(mockDB)
 
 	cases := []struct {
 		name    string
@@ -43,36 +43,36 @@ func TestTeamService_SearchTeams(t *testing.T) {
 		{
 			name: "count failure",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and name like ?",
-					gomock.Any(), gomock.Any()).Return(int64(0), fmt.Errorf("err"))
+				mockDB.EXPECT().Count(gomock.Any(), "name like ?",
+					gomock.Any()).Return(int64(0), fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
 			name: "count 0",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and name like ?",
-					gomock.Any(), gomock.Any()).Return(int64(0), nil)
+				mockDB.EXPECT().Count(gomock.Any(), "name like ?",
+					gomock.Any()).Return(int64(0), nil)
 			},
 			wantErr: false,
 		},
 		{
 			name: "find failure",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and name like ?",
-					gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "org_id=? and name like ?",
-					gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().Count(gomock.Any(), "name like ?",
+					gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "name like ?",
+					gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
 			name: "find successfully",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and name like ?",
-					gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "org_id=? and name like ?",
-					gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Count(gomock.Any(), "name like ?",
+					gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "name like ?",
+					gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -82,7 +82,7 @@ func TestTeamService_SearchTeams(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, _, err := srv.SearchTeams(ctx, &model.SearchTeamRequest{
+			_, _, err := srv.SearchOrg(ctx, &model.SearchOrgRequest{
 				Name: "name",
 				PagingParam: model.PagingParam{
 					Limit:  10,
@@ -96,26 +96,26 @@ func TestTeamService_SearchTeams(t *testing.T) {
 	}
 }
 
-func TestTeamService_CreateTeam(t *testing.T) {
+func TestOrgService_CreateOrg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewTeamService(mockDB)
+	srv := NewOrgService(mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "create team failure",
+			name: "create org failure",
 			prepare: func() {
 				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "create team successfully",
+			name: "create org successfully",
 			prepare: func() {
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 			},
@@ -127,7 +127,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.CreateTeam(ctx, &model.Team{})
+			_, err := srv.CreateOrg(ctx, &model.Org{})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -135,37 +135,37 @@ func TestTeamService_CreateTeam(t *testing.T) {
 	}
 }
 
-func TestTeamService_UpdateTeam(t *testing.T) {
+func TestOrgService_UpdateOrg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewTeamService(mockDB)
+	srv := NewOrgService(mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "get team failure",
+			name: "get org failure",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "update team failure",
+			name: "update org failure",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "update team failure",
+			name: "update org failure",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "uid=?", "1234").Return(nil)
 			},
 			wantErr: false,
 		},
@@ -175,42 +175,37 @@ func TestTeamService_UpdateTeam(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.UpdateTeam(ctx, &model.Team{UID: "1234"})
+			err := srv.UpdateOrg(ctx, &model.Org{UID: "1234"})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
 		})
 	}
 }
-
-func TestTeamService_DeleteTeamByUID(t *testing.T) {
+func TestOrgService_DeleteOrgByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
-		return fn(mockDB)
-	}).AnyTimes()
-
-	srv := NewTeamService(mockDB)
+	srv := NewOrgService(mockDB)
 	t.Run("delete successfully", func(t *testing.T) {
-		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-		err := srv.DeleteTeamByUID(ctx, "1234")
+		mockDB.EXPECT().Delete(gomock.Any(), "uid=?", "1234").Return(nil)
+		err := srv.DeleteOrgByUID(ctx, "1234")
 		assert.NoError(t, err)
 	})
 }
 
-func TestTeamService_GetTeamByUID(t *testing.T) {
+func TestOrgService_GetOrgByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := NewTeamService(mockDB)
-	t.Run("get team successfully", func(t *testing.T) {
-		mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-		team, err := srv.GetTeamByUID(ctx, "1234")
-		assert.NotNil(t, team)
+	srv := NewOrgService(mockDB)
+	t.Run("get org successfully", func(t *testing.T) {
+		mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+		org, err := srv.GetOrgByUID(ctx, "1234")
+		assert.NotNil(t, org)
 		assert.NoError(t, err)
 	})
 }

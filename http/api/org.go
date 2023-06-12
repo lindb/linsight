@@ -21,20 +21,24 @@ import (
 	"github.com/gin-gonic/gin"
 	httppkg "github.com/lindb/common/pkg/http"
 
+	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
 )
 
+// OrgAPI represents org related api handlers.
 type OrgAPI struct {
 	deps *depspkg.API
 }
 
+// NewOrgAPI creates an OrgAPI instance.
 func NewOrgAPI(deps *depspkg.API) *OrgAPI {
 	return &OrgAPI{
 		deps: deps,
 	}
 }
 
+// CreateOrg creates a new org.
 func (api *OrgAPI) CreateOrg(c *gin.Context) {
 	org := &model.Org{}
 	if err := c.ShouldBind(org); err != nil {
@@ -50,6 +54,7 @@ func (api *OrgAPI) CreateOrg(c *gin.Context) {
 	httppkg.OK(c, uid)
 }
 
+// UpdateOrg updates an org.
 func (api *OrgAPI) UpdateOrg(c *gin.Context) {
 	org := &model.Org{}
 	if err := c.ShouldBind(org); err != nil {
@@ -61,20 +66,22 @@ func (api *OrgAPI) UpdateOrg(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
-	httppkg.OK(c, "update org success")
+	httppkg.OK(c, "Organization updated")
 }
 
-func (api *OrgAPI) DeleteOrg(c *gin.Context) {
-	uid := c.Param("uid")
-	if err := api.deps.OrgSrv.DeleteOrg(c.Request.Context(), uid); err != nil {
+// DeleteOrgByUID deletes the org by given uid.
+func (api *OrgAPI) DeleteOrgByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	if err := api.deps.OrgSrv.DeleteOrgByUID(c.Request.Context(), uid); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	httppkg.OK(c, "delete org success")
+	httppkg.OK(c, "Organization deleted")
 }
 
-func (api *OrgAPI) GetOrg(c *gin.Context) {
-	uid := c.Param("uid")
+// GetOrgByUID returns the org by given uid.
+func (api *OrgAPI) GetOrgByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
 	org, err := api.deps.OrgSrv.GetOrgByUID(c.Request.Context(), uid)
 	if err != nil {
 		httppkg.Error(c, err)
@@ -83,11 +90,20 @@ func (api *OrgAPI) GetOrg(c *gin.Context) {
 	httppkg.OK(c, org)
 }
 
+// SearchOrg searches organizations by given params.
 func (api *OrgAPI) SearchOrg(c *gin.Context) {
-	orgs, err := api.deps.OrgSrv.SearchOrg(c.Request.Context())
+	req := &model.SearchOrgRequest{}
+	if err := c.ShouldBind(req); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	org, total, err := api.deps.OrgSrv.SearchOrg(c.Request.Context(), req)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	httppkg.OK(c, orgs)
+	httppkg.OK(c, gin.H{
+		"total":         total,
+		"organizations": org,
+	})
 }
