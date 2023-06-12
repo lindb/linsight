@@ -15,17 +15,19 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export enum ApiPath {
-  Login = '/login',
-  Logout = '/logout',
-  Boot = '/boot',
-  User = '/users',
-  Preference = '/user/preference',
-  Datasources = '/datasources',
-  Datasource = '/datasource',
-  Dashboard = '/dashboards',
-  DataQuery = '/data/query',
-  MetadataQuery = '/metadata/query',
-  Chart = '/charts',
-  Team = '/org/teams',
-}
+import { ErrorPage } from '@src/components';
+import React from 'react';
+import { Route, Routes } from 'react-router-dom';
+import NewTeam from './NewTeam';
+import TeamList from './TeamList';
+
+const Team: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/new" element={<NewTeam />} errorElement={<ErrorPage />} />
+      <Route path="/" element={<TeamList />} errorElement={<ErrorPage />} />
+    </Routes>
+  );
+};
+
+export default Team;

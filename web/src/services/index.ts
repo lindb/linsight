@@ -15,7 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export { default as UserSrv } from '@src/services/user.service';
+export { default as UserSrv } from './user.service';
+export { default as TeamSrv } from './team.service';
 export { default as PlatformSrv } from './platform.service';
 export { default as MetricSrv } from './metric.service';
 export { default as APMSrv } from './apm.service';

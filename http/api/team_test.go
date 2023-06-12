@@ -273,3 +273,53 @@ func TestTeamAPI_DeleteTeamByUID(t *testing.T) {
 		})
 	}
 }
+
+func TestTeamAPI_GetTeamByUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	teamSrv := service.NewMockTeamService(ctrl)
+	r := gin.New()
+	api := NewTeamAPI(&deps.API{
+		TeamSrv: teamSrv,
+	})
+	r.GET("/team/:uid", api.GetTeamByUID)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "get team failure",
+			prepare: func() {
+				teamSrv.EXPECT().GetTeamByUID(gomock.Any(), "1234").Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "get team successfully",
+			prepare: func() {
+				teamSrv.EXPECT().GetTeamByUID(gomock.Any(), "1234").Return(nil, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/team/1234", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}

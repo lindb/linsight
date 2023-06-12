@@ -15,9 +15,9 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect, useRef, useState } from 'react';
-import { isEmpty } from 'lodash-es';
-import { Button, Select, Card, Typography, Form, Space, useFormApi } from '@douyinfe/semi-ui';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { isEmpty, get } from 'lodash-es';
+import { Button, Select, Card, Typography, Form, Space, useFormApi, Tag } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
 import { DatasourcePlugin, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
@@ -27,6 +27,7 @@ import { ApiKit } from '@src/utils';
 import { useRequest } from '@src/hooks';
 import { DatasourceStore } from '@src/stores';
 import DeleteDatasourceButton from './components/DeleteDatasourceButton';
+import { PlatformContext } from '@src/contexts';
 
 const { Text, Title } = Typography;
 
@@ -44,6 +45,7 @@ const DatasourceSettingForm: React.FC<{ datasource?: DatasourceSetting; SettingE
 };
 
 const EditDataSource: React.FC = () => {
+  const { theme, boot } = useContext(PlatformContext);
   const formApi = useRef<any>();
   const [submitting, setSubmitting] = useState(false);
   const [type, setType] = useState<string | undefined>(undefined);
@@ -77,9 +79,36 @@ const EditDataSource: React.FC = () => {
     }
     return null;
   };
+  const gotoDatasourceList = () => {
+    navigate({ pathname: '/setting/datasources' });
+  };
 
   return (
-    <Card className="linsight-feature" loading={!isEmpty(uid) && loading}>
+    <Card
+      loading={!isEmpty(uid) && loading}
+      className="setting-page"
+      bordered={false}
+      bodyStyle={{ padding: 12 }}
+      title={
+        <Card.Meta
+          className="setting-meta"
+          title={
+            <div className="meta-title">
+              <Title heading={3} style={{ cursor: 'pointer' }} onClick={gotoDatasourceList} underline>
+                Datasource
+              </Title>
+              <Title heading={3}>/ {isEmpty(uid) ? 'New Datasource' : get(datasource, 'name', 'N/A')}</Title>
+            </div>
+          }
+          description={
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Text>Current organization:</Text>
+              <Tag>{get(boot, 'user.org.name', 'N/A')}</Tag>
+            </div>
+          }
+          avatar={<Icon icon="datasource" />}
+        />
+      }>
       <Form
         labelPosition="left"
         labelAlign="right"
@@ -104,12 +133,6 @@ const EditDataSource: React.FC = () => {
             setSubmitting(false);
           }
         }}>
-        <Form.Slot>
-          <Title heading={2} style={{ display: 'flex', justifyItems: 'center' }}>
-            <Icon icon="datasource" style={{ fontSize: 24, marginRight: 6 }} />
-            <span>Datasource setting</span>
-          </Title>
-        </Form.Slot>
         <Form.Input label="Name" field="name" rules={[{ required: true, message: 'Name is required' }]} />
         <Form.Select
           label="Type"
@@ -124,7 +147,7 @@ const EditDataSource: React.FC = () => {
             }
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <img src={`${plugin.darkLogo}`} width={20} />
+                <img src={`${plugin.getLogo(theme)}`} width={20} />
                 <Text>{plugin.Name}</Text>
               </div>
             );
