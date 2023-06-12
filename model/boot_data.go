@@ -17,11 +17,13 @@
 
 package model
 
+import "gorm.io/datatypes"
+
 type BootData struct {
-	Home        string       `json:"home,omitempty"`
-	User        SignedUser   `json:"user"`
-	NavTree     []NavItem    `json:"navTree"`
-	Datasources []Datasource `json:"datasources"`
+	Home        string         `json:"home,omitempty"`
+	User        SignedUser     `json:"user"`
+	NavTree     datatypes.JSON `json:"navTree"`
+	Datasources []Datasource   `json:"datasources"`
 }
 
 type NavItem struct {

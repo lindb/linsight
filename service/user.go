@@ -34,6 +34,7 @@ import (
 
 // UserService represents user manager interface.
 type UserService interface {
+	// CreateUser creates a new user, returns the user's uid, if fail returns error.
 	CreateUser(ctx context.Context, user *model.User) (string, error)
 	UpdateUser(ctx context.Context, user *model.User) error
 	// SavePreference saves the preference of user.
@@ -44,13 +45,14 @@ type UserService interface {
 	GetPreference(ctx context.Context, orgID, userID int64) (*model.Preference, error)
 }
 
-// userService implements UserService interface.
+// userService implements the UserService interface.
 type userService struct {
 	db dbpkg.DB
 
 	cache sync.Map // TODO: use cache
 }
 
+// NewUserService creates an UserService instance.
 func NewUserService(db dbpkg.DB) UserService {
 	return &userService{
 		db: db,
@@ -120,13 +122,14 @@ func (srv *userService) UpdateUser(ctx context.Context, user *model.User) error 
 	return nil
 }
 
+// CreateUser creates a new user, returns the user's uid, if fail returns error.
 func (srv *userService) CreateUser(ctx context.Context, user *model.User) (string, error) {
 	uid := uuid.GenerateShortUUID()
 	user.UID = uid
 	signedUser := util.GetUser(ctx)
 	user.CreatedBy = signedUser.User.ID
 	user.UpdatedBy = signedUser.User.ID
-	if err := srv.db.Update(&user, "email=?", user.Email); err != nil {
+	if err := srv.db.Create(&user); err != nil {
 		return "", err
 	}
 	return uid, nil

@@ -27,3 +27,6 @@ var IndexFile string
 
 //go:embed accesscontrol/rbac_model.conf
 var RBACModel string
+
+//go:embed config/nav.json
+var DefaultNav string

@@ -15,19 +15,19 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export enum ApiPath {
-  Login = '/login',
-  Logout = '/logout',
-  Boot = '/boot',
-  User = '/users',
-  Team = '/org/teams',
-  Nav = '/org/nav',
-  Org = '/orgs',
-  Preference = '/user/preference',
-  Datasources = '/datasources',
-  Datasource = '/datasource',
-  Dashboard = '/dashboards',
-  DataQuery = '/data/query',
-  MetadataQuery = '/metadata/query',
-  Chart = '/charts',
-}
+import { ApiPath } from '@src/constants';
+import { Nav } from '@src/types';
+import { ApiKit } from '@src/utils';
+
+const updateNav = (nav: Nav): Promise<string> => {
+  return ApiKit.PUT<string>(ApiPath.Nav, nav);
+};
+
+const getNav = (): Promise<Nav> => {
+  return ApiKit.GET<Nav>(ApiPath.Nav);
+};
+
+export default {
+  updateNav,
+  getNav,
+};

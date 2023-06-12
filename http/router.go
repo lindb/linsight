@@ -35,6 +35,7 @@ type Router struct {
 	bootAPI            *api.BootAPI
 	orgAPI             *api.OrgAPI
 	teamAPI            *api.TeamAPI
+	navAPI             *api.NavAPI
 	userAPI            *api.UserAPI
 	datasourceAPI      *api.DatasourceAPI
 	datasourceQueryAPI *api.DatasourceQueryAPI
@@ -52,6 +53,7 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		orgAPI:             api.NewOrgAPI(deps),
 		userAPI:            api.NewUserAPI(deps),
 		teamAPI:            api.NewTeamAPI(deps),
+		navAPI:             api.NewNavAPI(deps),
 		datasourceAPI:      api.NewDatasourceAPI(deps),
 		datasourceQueryAPI: api.NewDatasourceQueryAPI(deps),
 
@@ -90,6 +92,11 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.UpdateTeam)...)
 	router.DELETE("/org/teams/:uid",
 		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.DeleteTeamByUID)...)
+
+	router.GET("/org/nav",
+		middleware.Authorize(r.deps, accesscontrol.Nav, accesscontrol.Read, r.navAPI.GetNav)...)
+	router.PUT("/org/nav",
+		middleware.Authorize(r.deps, accesscontrol.Nav, accesscontrol.Write, r.navAPI.UpdateNav)...)
 
 	router.POST("/user",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.CreateUser)...)

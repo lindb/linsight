@@ -15,28 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package model
 
-import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
-)
+import "gorm.io/datatypes"
 
-type API struct {
-	Config *config.Server
+// Nav represents the navigation config information.
+type Nav struct {
+	BaseModel
+	// current selected org.
+	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_nav_org_id,unique"`
 
-	OrgSrv  service.OrgService
-	UserSrv service.UserService
-	TeamSrv service.TeamService
-	NavSrv  service.NavService
-
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+	Config        datatypes.JSON `json:"config" gorm:"column:config"`
+	DefaultConfig datatypes.JSON `json:"defaultConfig" gorm:"column:default_config"`
 }

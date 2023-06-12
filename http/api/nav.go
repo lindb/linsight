@@ -27,36 +27,43 @@ import (
 	"github.com/lindb/linsight/pkg/util"
 )
 
-// BootAPI represents boot information related api handlers.
-type BootAPI struct {
+// NavAPI represents navigation related api handlers.
+type NavAPI struct {
 	deps *depspkg.API
 }
 
-// NewBootAPI creates a BootAPI instance.
-func NewBootAPI(deps *depspkg.API) *BootAPI {
-	return &BootAPI{
+// NewNavAPI creates a NavAPI instance.
+func NewNavAPI(deps *depspkg.API) *NavAPI {
+	return &NavAPI{
 		deps: deps,
 	}
 }
 
-// Boot gets boot information after signed in.
-func (api *BootAPI) Boot(c *gin.Context) {
-	datasources, err := api.deps.DatasourceSrv.GetDatasources(c.Request.Context())
+// UpdateNav updates the navigation.
+func (api *NavAPI) UpdateNav(c *gin.Context) {
+	var nav model.Nav
+	if err := c.ShouldBind(&nav); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	signedUser := util.GetUser(ctx)
+	err := api.deps.NavSrv.UpdateNav(ctx, signedUser.Org.ID, &nav)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	signedUser := util.GetUser(c.Request.Context())
-	nav, err := api.deps.NavSrv.GetNavByOrgID(c.Request.Context(), signedUser.Org.ID)
+	httppkg.OK(c, "Navigation updated")
+}
+
+// GetNav returns the navigation for current org.
+func (api *NavAPI) GetNav(c *gin.Context) {
+	ctx := c.Request.Context()
+	signedUser := util.GetUser(ctx)
+	nav, err := api.deps.NavSrv.GetNavByOrgID(ctx, signedUser.Org.ID)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	// FIXME: need modify nav item data based on use setting
-	httppkg.OK(c, &model.BootData{
-		Home:        "/dashboards",
-		User:        *signedUser,
-		Datasources: datasources,
-		NavTree:     nav.Config,
-	})
+	httppkg.OK(c, nav)
 }
