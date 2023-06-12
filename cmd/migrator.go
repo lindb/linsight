@@ -21,7 +21,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"gorm.io/datatypes"
 
+	"github.com/lindb/linsight"
 	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
@@ -85,6 +87,14 @@ func runMigration(_ *cobra.Command, _ []string) error {
 		&model.User{Name: "admin"},
 	)
 	migrator.AddMigration(user)
+	nav := dbpkg.NewMigration(&model.Nav{})
+	nav.AddInitRecord(&model.Nav{
+		BaseModel:     model.BaseModel{},
+		OrgID:         1,
+		Config:        datatypes.JSON(linsight.DefaultNav),
+		DefaultConfig: datatypes.JSON(linsight.DefaultNav),
+	}, &model.Nav{OrgID: 1})
+	migrator.AddMigration(nav)
 	if err = migrator.Run(); err != nil {
 		panic(err)
 	}

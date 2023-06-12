@@ -42,6 +42,7 @@ import { Icon } from '@src/components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ListDataSource from './datasource/ListDataSource';
 import OrgList from './org/OrgList';
+import MenuSetting from './menu/MenuSetting';
 const { Meta } = Card;
 const { Text, Title } = Typography;
 
@@ -88,6 +89,9 @@ const Setting: React.FC = () => {
         </TabPane>
         <TabPane itemKey="/setting/orgs" tab="Organization" icon={<Icon icon="org" style={{ marginRight: 8 }} />}>
           <OrgList />
+        </TabPane>
+        <TabPane itemKey="/setting/menu" tab="Menu" icon={<Icon icon="menu" style={{ marginRight: 8 }} />}>
+          <MenuSetting />
         </TabPane>
       </Tabs>
     </Card>

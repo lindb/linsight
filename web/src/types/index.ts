@@ -20,6 +20,7 @@ export * from '@src/types/theme';
 export * from '@src/types/user';
 export * from '@src/types/team';
 export * from '@src/types/org';
+export * from '@src/types/nav';
 export * from '@src/types/plugin';
 export * from '@src/types/datasource';
 export * from '@src/types/visualization';

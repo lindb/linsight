@@ -1,0 +1,170 @@
+@font-face {
+  font-family: linsighticon; /* Project id 3914684 */
+  src: url('//at.alicdn.com/t/c/font_3914684_g46kcye604l.woff2?t=1686557970025') format('woff2'),
+    url('//at.alicdn.com/t/c/font_3914684_g46kcye604l.woff?t=1686557970025') format('woff'),
+    url('//at.alicdn.com/t/c/font_3914684_g46kcye604l.ttf?t=1686557970025') format('truetype');
+}
+
+.linsighticon {
+  font-family: linsighticon !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.menu::before {
+  content: '\e652';
+}
+
+.org::before {
+  content: '\e668';
+}
+
+.user::before {
+  content: '\e7af';
+}
+
+.team::before {
+  content: '\e7ae';
+}
+
+.eye-close::before {
+  content: '\e8ff';
+}
+
+.stat::before {
+  content: '\e617';
+}
+
+.list2::before {
+  content: '\e611';
+}
+
+.table::before {
+  content: '\e900';
+}
+
+.text::before {
+  content: '\e959';
+}
+
+.eye::before {
+  content: '\e78f';
+}
+
+.signout::before {
+  content: '\e6c4';
+}
+
+.back2::before {
+  content: '\e650';
+}
+
+.back1::before {
+  content: '\e6cc';
+}
+
+.back::before {
+  content: '\e627';
+}
+
+.datasource::before {
+  content: '\e6ef';
+}
+
+.list::before {
+  content: '\e65e';
+}
+
+.dashboard-add::before {
+  content: '\e667';
+}
+
+.integrations::before {
+  content: '\e63e';
+}
+
+.alerting::before {
+  content: '\e677';
+}
+
+.metrics::before {
+  content: '\e688';
+}
+
+.docker::before {
+  content: '\e616';
+}
+
+.tracing::before {
+  content: '\e6f9';
+}
+
+.logging::before {
+  content: '\e6fb';
+}
+
+.explore::before {
+  content: '\e833';
+}
+
+.sort-alpha::before {
+  content: '\e8b5';
+}
+
+.alpha-down::before {
+  content: '\f0c6';
+}
+
+.alpha-up::before {
+  content: '\eb9c';
+}
+
+.number-sort::before {
+  content: '\e8b4';
+}
+
+.number-down::before {
+  content: '\f0ca';
+}
+
+.number-up::before {
+  content: '\f0cb';
+}
+
+.setting::before {
+  content: '\e607';
+}
+
+.dashboard::before {
+  content: '\e612';
+}
+
+.google::before {
+  content: '\ea0c';
+}
+
+.empty::before {
+  content: '\e6a6';
+}
+
+.center::before {
+  content: '\e802';
+}
+
+.line-bar::before {
+  content: '\e620';
+}
+
+.repo::before {
+  content: '\e61f';
+}
+
+.chart::before {
+  content: '\e631';
+}
+
+.panel-add::before {
+  content: '\e665';
+}

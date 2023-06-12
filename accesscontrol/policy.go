@@ -29,6 +29,7 @@ const (
 	Org                 ResourceType = "org"
 	User                ResourceType = "user"
 	Team                ResourceType = "team"
+	Nav                 ResourceType = "nav"
 	Datasource          ResourceType = "datasource"
 	DatasourceDataQuery ResourceType = "datasource_data_query"
 	Dashboard           ResourceType = "dashboard"
@@ -76,6 +77,8 @@ func BuildPolicyDefinitions() []Policy {
 		AddPolicy(RoleLin, Org, Read).
 		AddPolicy(RoleAdmin, Team, Write).
 		AddPolicy(RoleAdmin, Team, Read).
+		AddPolicy(RoleAdmin, Org, Write).
+		AddPolicy(RoleAdmin, Org, Read).
 		AddPolicy(RoleViewer, User, Write).
 		AddPolicy(RoleViewer, User, Read).
 		AddPolicy(RoleAdmin, Datasource, Write).
