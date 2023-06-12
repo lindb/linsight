@@ -126,6 +126,11 @@ func (api *BootAPI) Boot(c *gin.Context) {
 						Path: "/setting/org/teams",
 						Icon: "team",
 					},
+					{
+						Text: "Organization",
+						Path: "/setting/orgs",
+						Icon: "org",
+					},
 				},
 			},
 		},

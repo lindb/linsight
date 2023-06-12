@@ -55,7 +55,7 @@ func (api *TeamAPI) CreateTeam(c *gin.Context) {
 	httppkg.OK(c, uid)
 }
 
-// TeamChart updates a team.
+// UpdateTeam updates a team.
 func (api *TeamAPI) UpdateTeam(c *gin.Context) {
 	var team model.Team
 	if err := c.ShouldBind(&team); err != nil {

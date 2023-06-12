@@ -71,14 +71,14 @@ func (r *Router) RegisterRouters() {
 
 	router.GET("/orgs",
 		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Read, r.orgAPI.SearchOrg)...)
-	router.POST("/org",
+	router.POST("/orgs",
 		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.CreateOrg)...)
-	router.PUT("/org",
+	router.PUT("/orgs",
 		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.UpdateOrg)...)
 	router.DELETE("/orgs/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.DeleteOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.DeleteOrgByUID)...)
 	router.GET("/orgs/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Read, r.orgAPI.GetOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Read, r.orgAPI.GetOrgByUID)...)
 
 	router.GET("/org/teams",
 		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.teamAPI.SearchTeams)...)

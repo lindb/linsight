@@ -19,6 +19,7 @@ package service
 
 import (
 	"context"
+	"strings"
 
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
@@ -26,24 +27,35 @@ import (
 	"github.com/lindb/linsight/pkg/uuid"
 )
 
+//go:generate mockgen -source=./org.go -destination=./org_mock.go -package=service
+
+// OrgService represents organization manager interface.
 type OrgService interface {
+	// CreateOrg creates a new organization, returns organization uid, if fail returns error.
 	CreateOrg(ctx context.Context, org *model.Org) (string, error)
+	// UpdateOrg updates the organization basic information.
 	UpdateOrg(ctx context.Context, org *model.Org) error
-	DeleteOrg(ctx context.Context, uid string) error
+	// DeleteOrgByUID deletes the organization by given uid.
+	DeleteOrgByUID(ctx context.Context, uid string) error
+	// GetOrgByUID returns the organization by given uid.
 	GetOrgByUID(ctx context.Context, uid string) (*model.Org, error)
-	SearchOrg(ctx context.Context) ([]model.Org, error)
+	// SearchOrg searches the organization by given params.
+	SearchOrg(ctx context.Context, req *model.SearchOrgRequest) ([]model.Org, int64, error)
 }
 
+// orgService implements OrgService interface.
 type orgService struct {
 	db dbpkg.DB
 }
 
+// NewOrgService create an OrgService instance.
 func NewOrgService(db dbpkg.DB) OrgService {
 	return &orgService{
 		db: db,
 	}
 }
 
+// CreateOrg creates a new organization, returns organization uid, if fail returns error.
 func (srv *orgService) CreateOrg(ctx context.Context, org *model.Org) (string, error) {
 	uid := uuid.GenerateShortUUID()
 	signedUser := util.GetUser(ctx)
@@ -56,6 +68,7 @@ func (srv *orgService) CreateOrg(ctx context.Context, org *model.Org) (string, e
 	return uid, nil
 }
 
+// UpdateOrg updates the organization basic information.
 func (srv *orgService) UpdateOrg(ctx context.Context, org *model.Org) error {
 	orgFromDB, err := srv.GetOrgByUID(ctx, org.UID)
 	if err != nil {
@@ -67,11 +80,13 @@ func (srv *orgService) UpdateOrg(ctx context.Context, org *model.Org) error {
 	return srv.db.Update(orgFromDB, "uid=?", org.UID)
 }
 
-func (srv *orgService) DeleteOrg(ctx context.Context, uid string) error {
+// DeleteOrgByUID deletes the organization by given uid.
+func (srv *orgService) DeleteOrgByUID(ctx context.Context, uid string) error {
 	// FIXME: delete all resources
 	return srv.db.Delete(&model.Org{}, "uid=?", uid)
 }
 
+// GetOrgByUID returns the organization by given uid.
 func (srv *orgService) GetOrgByUID(ctx context.Context, uid string) (*model.Org, error) {
 	org := &model.Org{}
 	if err := srv.db.Get(org, "uid=?", uid); err != nil {
@@ -80,10 +95,33 @@ func (srv *orgService) GetOrgByUID(ctx context.Context, uid string) (*model.Org,
 	return org, nil
 }
 
-func (srv *orgService) SearchOrg(ctx context.Context) ([]model.Org, error) {
+// SearchOrg searches the organization by given params.
+func (srv *orgService) SearchOrg(ctx context.Context, req *model.SearchOrgRequest) ([]model.Org, int64, error) {
 	var rs []model.Org
-	if err := srv.db.Find(rs); err != nil {
-		return nil, err
+	conditions := []string{}
+	params := []any{}
+	if req.Name != "" {
+		conditions = append(conditions, "name like ?")
+		params = append(params, req.Name+"%")
 	}
-	return rs, nil
+	offset := 0
+	limit := 20
+	if req.Offset > 0 {
+		offset = req.Offset
+	}
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+	where := strings.Join(conditions, " and ")
+	count, err := srv.db.Count(&model.Org{}, where, params...)
+	if err != nil {
+		return nil, 0, err
+	}
+	if count == 0 {
+		return nil, 0, nil
+	}
+	if err := srv.db.FindForPaging(&rs, offset, limit, "id desc", where, params...); err != nil {
+		return nil, 0, err
+	}
+	return rs, count, nil
 }
