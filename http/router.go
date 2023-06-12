@@ -82,6 +82,8 @@ func (r *Router) RegisterRouters() {
 
 	router.GET("/org/teams",
 		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.teamAPI.SearchTeams)...)
+	router.GET("/org/teams/:uid",
+		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.teamAPI.GetTeamByUID)...)
 	router.POST("/org/teams",
 		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.CreateTeam)...)
 	router.PUT("/org/teams",

@@ -116,6 +116,16 @@ func (api *BootAPI) Boot(c *gin.Context) {
 						Path: "/setting/datasources",
 						Icon: "datasource",
 					},
+					{
+						Text: "User",
+						Path: "/setting/org/users",
+						Icon: "user",
+					},
+					{
+						Text: "Team",
+						Path: "/setting/org/teams",
+						Icon: "team",
+					},
 				},
 			},
 		},

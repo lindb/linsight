@@ -15,17 +15,17 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export enum ApiPath {
-  Login = '/login',
-  Logout = '/logout',
-  Boot = '/boot',
-  User = '/users',
-  Preference = '/user/preference',
-  Datasources = '/datasources',
-  Datasource = '/datasource',
-  Dashboard = '/dashboards',
-  DataQuery = '/data/query',
-  MetadataQuery = '/metadata/query',
-  Chart = '/charts',
-  Team = '/org/teams',
+export interface TeamResult {
+  teams?: Team[];
+  total?: number;
+}
+
+export interface Team {
+  uid?: string;
+  name?: string;
+  email?: string;
+}
+
+export interface SearchTeam {
+  name?: string;
 }

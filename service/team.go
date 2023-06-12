@@ -39,6 +39,8 @@ type TeamService interface {
 	UpdateTeam(ctx context.Context, team *model.Team) error
 	// DeleteTeamByUID deletes a team by team uid.
 	DeleteTeamByUID(ctx context.Context, teamUID string) error
+	// GetTeamByUID returns team by tean uid.
+	GetTeamByUID(ctx context.Context, uid string) (*model.Team, error)
 }
 
 // teamService implements TeamService interface.
@@ -73,7 +75,7 @@ func (srv *teamService) SearchTeams(ctx context.Context,
 		limit = req.Limit
 	}
 	where := strings.Join(conditions, " and ")
-	count, err := srv.db.Count(&model.Chart{}, where, params...)
+	count, err := srv.db.Count(&model.Team{}, where, params...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -123,6 +125,11 @@ func (srv *teamService) DeleteTeamByUID(ctx context.Context, teamUID string) err
 		// TODO: delete other?
 		return tx.Delete(&model.Team{}, "uid=? and org_id=?", teamUID, orgID)
 	})
+}
+
+// GetTeamByUID returns team by tean uid.
+func (srv *teamService) GetTeamByUID(ctx context.Context, uid string) (*model.Team, error) {
+	return srv.getTeamByUID(ctx, uid)
 }
 
 // getTeamByUID returns the team by uid.

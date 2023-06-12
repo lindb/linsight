@@ -98,3 +98,14 @@ func (api *TeamAPI) DeleteTeamByUID(c *gin.Context) {
 	}
 	httppkg.OK(c, "Team deleted")
 }
+
+// GetTeamByUID returns team by given uid.
+func (api *TeamAPI) GetTeamByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	team, err := api.deps.TeamSrv.GetTeamByUID(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, team)
+}

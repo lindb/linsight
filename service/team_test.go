@@ -199,3 +199,18 @@ func TestTeamService_DeleteTeamByUID(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestTeamService_GetTeamByUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+
+	srv := NewTeamService(mockDB)
+	t.Run("get team successfully", func(t *testing.T) {
+		mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+		team, err := srv.GetTeamByUID(ctx, "1234")
+		assert.NotNil(t, team)
+		assert.NoError(t, err)
+	})
+}

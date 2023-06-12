@@ -15,8 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
-import { Button, Card, Divider, Input, List, Typography } from '@douyinfe/semi-ui';
+import React, { useContext } from 'react';
+import { Button, Divider, Input, List, Typography } from '@douyinfe/semi-ui';
 import { IconSearchStroked, IconPlusStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
 import { DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
@@ -25,21 +25,24 @@ import { createSearchParams, useNavigate } from 'react-router-dom';
 import { Icon, StatusTip } from '@src/components';
 import { useRequest } from '@src/hooks';
 import DeleteDatasourceButton from './components/DeleteDatasourceButton';
+import { PlatformContext } from '@src/contexts';
 
 const { Title, Text } = Typography;
 
 const ListDataSource: React.FC = () => {
+  const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
   const { result, loading, error, refetch } = useRequest(['list_datasources'], () => DatasourceSrv.fetchDatasources());
   return (
-    <Card className="linsight-feature">
+    <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         <Input prefix={<IconSearchStroked />} placeholder="Filter datasources" />
-        <Button icon={<IconPlusStroked />} onClick={() => navigate('/setting/datasource')}>
+        <Button icon={<IconPlusStroked />} onClick={() => navigate('/setting/datasource/new')}>
           New
         </Button>
       </div>
       <List
+        size="small"
         bordered
         dataSource={result}
         emptyContent={<StatusTip isLoading={loading} isEmpty={isEmpty(result)} error={error} />}
@@ -48,7 +51,7 @@ const ListDataSource: React.FC = () => {
           return (
             <List.Item
               key={ds.uid}
-              header={<img src={`${item?.darkLogo}`} width={48} />}
+              header={<img src={`${item?.getLogo(theme)}`} width={48} />}
               extra={
                 <div className="button-group">
                   <Button
@@ -81,7 +84,7 @@ const ListDataSource: React.FC = () => {
                   style={{ cursor: 'pointer', width: '100%' }}
                   onClick={() =>
                     navigate({
-                      pathname: '/setting/datasource',
+                      pathname: '/setting/datasource/edit',
                       search: `${createSearchParams({
                         uid: ds.uid,
                       })}`,
@@ -99,7 +102,7 @@ const ListDataSource: React.FC = () => {
           );
         }}
       />
-    </Card>
+    </div>
   );
 };
 
