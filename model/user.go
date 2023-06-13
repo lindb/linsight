@@ -37,10 +37,12 @@ type User struct {
 type Preference struct {
 	BaseModel
 
-	OrgID     int64  `json:"-" gorm:"column:org_id;index:u_idx_pref_org,unique"`
-	UserID    int64  `json:"-" gorm:"column:user_id;index:u_idx_pref_user,unique"`
-	Theme     string `json:"theme" gorm:"column:theme"`
-	Collapsed bool   `json:"collapsed" gorm:"column:collapsed"`
+	OrgID    int64  `json:"-" gorm:"column:org_id;index:u_idx_pref_org,unique"`
+	UserID   int64  `json:"-" gorm:"column:user_id;index:u_idx_pref_user,unique"`
+	HomePage string `json:"homePage" gorm:"column:home_page"`
+	Theme    string `json:"theme" gorm:"column:theme"`
+	// use pointer to fix gorm not update bool value
+	Collapsed *bool `json:"collapsed" gorm:"column:collapsed"`
 }
 
 type UserToken struct {

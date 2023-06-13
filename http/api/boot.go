@@ -54,7 +54,7 @@ func (api *BootAPI) Boot(c *gin.Context) {
 	}
 	// FIXME: need modify nav item data based on use setting
 	httppkg.OK(c, &model.BootData{
-		Home:        "/dashboards",
+		Home:        signedUser.Preference.HomePage,
 		User:        *signedUser,
 		Datasources: datasources,
 		NavTree:     nav.Config,

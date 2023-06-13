@@ -55,18 +55,45 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   });
 
   useEffect(() => {
+    const handleDarkModeChange = (event: any) => {
+      if (theme !== ThemeType.System) {
+        return;
+      }
+      if (event.matches) {
+        document.body.setAttribute('theme-mode', 'dark');
+      } else {
+        document.body.removeAttribute('theme-mode');
+      }
+    };
+    let darkModeMedia: MediaQueryList;
+    if (window.matchMedia) {
+      // watch os system theme change
+      darkModeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      darkModeMedia.addEventListener('change', handleDarkModeChange);
+    }
+    return () => {
+      if (darkModeMedia) {
+        darkModeMedia.removeEventListener('change', handleDarkModeChange);
+      }
+    };
+  }, [theme]);
+
+  useEffect(() => {
     if (result) {
       MenuStore.setMenus(result.navTree);
       DatasourceStore.setDatasources(result.datasources);
       setTheme(result.user.preference?.theme || ThemeType.Default);
-      setCollapsed(result.user.preference?.collapsed || true);
+      setCollapsed(result.user.preference?.collapsed);
       setBoot(result);
       setIsLoading(false);
     }
   }, [result, error]);
 
   useEffect(() => {
-    if (theme === ThemeType.Dark) {
+    const isDark =
+      theme === ThemeType.Dark ||
+      (theme === ThemeType.System && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    if (isDark) {
       document.body.setAttribute('theme-mode', 'dark');
     } else {
       document.body.removeAttribute('theme-mode');

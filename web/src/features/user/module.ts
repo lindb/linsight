@@ -15,30 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-.setting-page {
-  .setting-meta {
-    .semi-card-meta-avatar {
-      display: flex;
-      align-items: center;
+import { Feature, FeatureRepositoryInst } from '@src/types';
+import User from './User';
 
-      .semi-icon {
-        font-size: 54px !important;
-      }
-
-      i {
-        font-size: 54px;
-      }
-    }
-
-    .meta-title {
-      display: flex;
-      flex-direction: row;
-      gap: 6px;
-    }
-  }
-
-  .setting-buttons {
-    display: flex;
-    gap: 4px;
-  }
-}
+FeatureRepositoryInst.register(new Feature('/user/*', User));

@@ -57,8 +57,9 @@ type Server struct {
 func NewDefaultServer() *Server {
 	return &Server{
 		Database: &Database{
-			Type: "sqlite",
-			DSN:  "linsight.db",
+			Type:  "sqlite",
+			DSN:   "linsight.db",
+			Debug: true,
 		},
 		HTTP: &HTTP{
 			Port:         8080,

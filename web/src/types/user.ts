@@ -21,10 +21,7 @@ export interface User {
   name: string;
   email: string;
   isDisabled: boolean;
-  preference?: {
-    theme: ThemeType;
-    collapsed: boolean;
-  };
+  preference?: Preference;
 }
 
 export interface LoginUser {
@@ -35,4 +32,5 @@ export interface LoginUser {
 export interface Preference {
   theme?: ThemeType;
   collapsed?: boolean;
+  homePage?: string;
 }

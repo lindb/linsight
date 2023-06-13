@@ -27,10 +27,12 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
+// UserAPI represents user related api handlers.
 type UserAPI struct {
 	deps *depspkg.API
 }
 
+// NewUserAPI creates an UserAPI instance.
 func NewUserAPI(deps *depspkg.API) *UserAPI {
 	return &UserAPI{
 		deps: deps,
@@ -81,7 +83,22 @@ func (api *UserAPI) GetUser(c *gin.Context) {
 	httppkg.OK(c, user)
 }
 
-// SavePreference saves the preference of user.
+// GetPreference returns the preference of current signed user.
+func (api *UserAPI) GetPreference(c *gin.Context) {
+	pref := &model.Preference{}
+	if err := c.ShouldBind(pref); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	pref, err := api.deps.UserSrv.GetPreference(c.Request.Context())
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, pref)
+}
+
+// SavePreference saves the preference of current signed user.
 func (api *UserAPI) SavePreference(c *gin.Context) {
 	pref := &model.Preference{}
 	if err := c.ShouldBind(pref); err != nil {

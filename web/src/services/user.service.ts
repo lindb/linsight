@@ -35,6 +35,10 @@ const savePreference = (preference: Preference): Promise<string> => {
   return ApiKit.PUT<string>(ApiPath.Preference, preference);
 };
 
+const getPreference = (): Promise<Preference> => {
+  return ApiKit.GET<Preference>(ApiPath.Preference);
+};
+
 const getUser = (userId: number): Promise<User> => {
   return ApiKit.GET<User>(`${ApiPath.User}/${userId}`);
 };
@@ -44,5 +48,6 @@ export default {
   logout,
   saveUser,
   getUser,
+  getPreference,
   savePreference,
 };

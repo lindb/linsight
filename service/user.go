@@ -37,12 +37,13 @@ type UserService interface {
 	// CreateUser creates a new user, returns the user's uid, if fail returns error.
 	CreateUser(ctx context.Context, user *model.User) (string, error)
 	UpdateUser(ctx context.Context, user *model.User) error
-	// SavePreference saves the preference of user.
-	SavePreference(ctx context.Context, pref *model.Preference) error
 	GetSignedUser(ctx context.Context, userID int64) (*model.SignedUser, error)
 	GetUserByName(ctx context.Context, nameOrEmail string) (*model.User, error)
 	GetUser(ctx context.Context, userID int64) (*model.User, error)
-	GetPreference(ctx context.Context, orgID, userID int64) (*model.Preference, error)
+	// GetPreference returns the preference of current signed user for current org.
+	GetPreference(ctx context.Context) (*model.Preference, error)
+	// GetPreference returns the preference of current signed user for current org.
+	SavePreference(ctx context.Context, pref *model.Preference) error
 }
 
 // userService implements the UserService interface.
@@ -78,7 +79,7 @@ func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model
 	if err != nil {
 		return nil, err
 	}
-	pref, err := srv.GetPreference(ctx, user.OrgID, user.ID)
+	pref, err := srv.getPreference(ctx, user.OrgID, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -135,23 +136,20 @@ func (srv *userService) CreateUser(ctx context.Context, user *model.User) (strin
 	return uid, nil
 }
 
-func (srv *userService) GetPreference(ctx context.Context, orgID, userID int64) (*model.Preference, error) {
-	pref := model.Preference{}
-	if err := srv.db.Get(&pref, "org_id=? and user_id=?", orgID, userID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &pref, nil
+// GetPreference returns the preference of current signed user for current org.
+func (srv *userService) GetPreference(ctx context.Context) (*model.Preference, error) {
+	signedUser := util.GetUser(ctx)
+	orgID := signedUser.Org.ID
+	userID := signedUser.User.ID
+	return srv.getPreference(ctx, orgID, userID)
 }
 
-// SavePreference saves the preference of user.
+// SavePreference saves the preference of signed user for current org.
 func (srv *userService) SavePreference(ctx context.Context, pref *model.Preference) error {
 	signedUser := util.GetUser(ctx)
 	orgID := signedUser.Org.ID
 	userID := signedUser.User.ID
-	prefFormDB, err := srv.GetPreference(ctx, orgID, userID)
+	prefFormDB, err := srv.getPreference(ctx, orgID, userID)
 	if err != nil {
 		return err
 	}
@@ -165,9 +163,22 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 		pref.UpdatedBy = userID
 		return srv.db.Create(pref)
 	} else {
-		pref.UserID = userID
-		pref.OrgID = orgID
-		pref.UpdatedBy = userID
-		return srv.db.Update(&pref, "org_id=? and user_id=?", orgID, userID)
+		prefFormDB.UpdatedBy = userID
+		prefFormDB.Theme = pref.Theme
+		prefFormDB.Collapsed = pref.Collapsed
+		prefFormDB.HomePage = pref.HomePage
+		return srv.db.Update(&prefFormDB, "org_id=? and user_id=?", orgID, userID)
 	}
+}
+
+// getPreference returns the preference by given org/user.
+func (srv *userService) getPreference(_ context.Context, orgID, userID int64) (*model.Preference, error) {
+	pref := model.Preference{}
+	if err := srv.db.Get(&pref, "org_id=? and user_id=?", orgID, userID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &pref, nil
 }

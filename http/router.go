@@ -104,6 +104,8 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.UpdateUser)...)
 	router.GET("/users/:uid",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.GetUser)...)
+	router.GET("/user/preference",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.GetPreference)...)
 	router.PUT("/user/preference",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.SavePreference)...)
 
