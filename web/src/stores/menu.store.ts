@@ -31,7 +31,6 @@ class MenuStore {
 
   setMenus(menus: any) {
     this.menus.clear();
-    console.log('mmmuu...', menus);
     menus.forEach((item: any) => {
       if (item.children) {
         item.children.forEach((child: any) => {

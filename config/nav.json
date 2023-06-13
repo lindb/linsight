@@ -1,32 +1,32 @@
 [
     {
-        "text": "Explore",
+        "label": "Explore",
         "icon": "explore",
         "path": "/explore",
         "children": null,
         "props": null
     },
     {
-        "text": "Dashboard",
+        "label": "Dashboard",
         "icon": "dashboard",
         "path": "",
         "children": [
             {
-                "text": "Dashboard List",
+                "label": "Dashboard List",
                 "icon": "list",
                 "path": "/dashboards",
                 "children": null,
                 "props": null
             },
             {
-                "text": "New Dashboard",
+                "label": "New Dashboard",
                 "icon": "dashboard-add",
                 "path": "/dashboard",
                 "children": null,
                 "props": null
             },
             {
-                "text": "Chart Repository",
+                "label": "Chart Repository",
                 "icon": "repo",
                 "path": "/charts",
                 "children": null,
@@ -36,19 +36,19 @@
         "props": null
     },
     {
-        "text": "Integration",
+        "label": "Integration",
         "icon": "integrations",
         "path": "/integrations",
         "children": null,
         "props": null
     },
     {
-        "text": "APM",
+        "label": "APM",
         "icon": "tracing",
         "path": "",
         "children": [
             {
-                "text": "Service",
+                "label": "Service",
                 "icon": "repo",
                 "path": "/observe/apm/service",
                 "children": null,
@@ -57,7 +57,7 @@
                 }
             },
             {
-                "text": "Dashboard",
+                "label": "Dashboard",
                 "icon": "repo",
                 "path": "/observe/apm/database",
                 "children": null,
@@ -69,33 +69,33 @@
         "props": null
     },
     {
-        "text": "Setting",
+        "label": "Setting",
         "icon": "setting",
         "path": "/setting",
         "children": [
             {
-                "text": "Datasource",
+                "label": "Datasource",
                 "icon": "datasource",
                 "path": "/setting/datasources",
                 "children": null,
                 "props": null
             },
             {
-                "text": "User",
+                "label": "User",
                 "icon": "user",
                 "path": "/setting/org/users",
                 "children": null,
                 "props": null
             },
             {
-                "text": "Team",
+                "label": "Team",
                 "icon": "team",
                 "path": "/setting/org/teams",
                 "children": null,
                 "props": null
             },
             {
-                "text": "Organization",
+                "label": "Organization",
                 "icon": "org",
                 "path": "/setting/orgs",
                 "children": null,
