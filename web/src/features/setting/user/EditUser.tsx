@@ -35,7 +35,7 @@ const EditUser: React.FC = () => {
         onSubmit={async (values: any) => {
           try {
             setSubmitting(true);
-            await UserSrv.saveUser(values);
+            await UserSrv.savePreference(values.preference);
           } finally {
             // FIXME: handle err
             setSubmitting(false);
@@ -47,6 +47,7 @@ const EditUser: React.FC = () => {
           <Radio value="default">Default</Radio>
           <Radio value="light">Light</Radio>
           <Radio value="dark">Dark</Radio>
+          <Radio value="system">System</Radio>
         </Form.RadioGroup>
         <Form.Slot>
           <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>

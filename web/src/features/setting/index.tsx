@@ -20,7 +20,6 @@ import { ErrorPage } from '@src/components';
 import { Route, Routes } from 'react-router-dom';
 import Setting from './Setting';
 import NewTeam from './team/NewTeam';
-import './setting.scss';
 import EditTeam from './team/EditTeam';
 import EditDataSource from './datasource/EditDataSource';
 import NewOrg from './org/NewOrg';

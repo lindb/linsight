@@ -162,7 +162,7 @@ func TestTeamService_UpdateTeam(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "update team failure",
+			name: "update team successfully",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)

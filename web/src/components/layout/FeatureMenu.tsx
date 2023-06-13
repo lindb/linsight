@@ -161,7 +161,8 @@ const FeatureMenu: React.FC = () => {
                         {get(boot, 'user.name')}@{get(boot, 'user.org.name')}
                       </Dropdown.Item>
                       <Dropdown.Divider />
-                      <Dropdown.Item onClick={() => navigate('/setting/user/edit')}>Personal Settings</Dropdown.Item>
+                      <Dropdown.Item onClick={() => navigate('/user/profile')}>Your profile</Dropdown.Item>
+
                       <Dropdown.Item icon={theme !== ThemeType.Dark ? <IconMoon /> : <IconSun />} onClick={toggleTheme}>
                         {upperFirst(theme)}
                       </Dropdown.Item>
