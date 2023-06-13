@@ -29,12 +29,22 @@ under the License.
   .menu-form {
     padding-left: 12px;
 
+    .semi-form-field {
+      padding-top: 8px;
+      padding-bottom: 8px;
+    }
+
     .semi-select {
       width: 300px;
     }
 
     .semi-input-wrapper {
       width: 300px;
+    }
+
+    .semi-form-slot-main {
+      display: flex;
+      align-items: center;
     }
   }
 }

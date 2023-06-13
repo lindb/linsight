@@ -33,6 +33,7 @@ export const PlatformContext = React.createContext({
   collapsed: false,
   toggleTheme: () => {},
   toggleCollapse: () => {},
+  sync: () => {},
 });
 
 /*
@@ -45,7 +46,7 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
   const [theme, setTheme] = useState<ThemeType>(ThemeType.Default);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
-  const { result, error } = useRequest(['bootstrap'], async () => {
+  const { result, error, refetch } = useRequest(['bootstrap'], async () => {
     // load all features
     import.meta.glob(['../features/*/module.ts', '../plugins/**/module.ts'], { eager: true });
     // after load plugins moduels build format tree datasources
@@ -124,6 +125,7 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
         collapsed,
         toggleTheme: handleToggleTheme,
         toggleCollapse: handleToggleCollapsed,
+        sync: refetch,
       }}>
       {renderContent()}
     </PlatformContext.Provider>

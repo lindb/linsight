@@ -28,6 +28,7 @@ import Logo from '@src/images/logo.svg';
 import { ThemeType } from '@src/types';
 import { UserSrv } from '@src/services';
 import { matchPath } from 'react-router';
+import { v4 as uuidv4 } from 'uuid';
 
 const { Text } = Typography;
 
@@ -47,13 +48,13 @@ const FeatureMenu: React.FC = () => {
     (boot.navTree || []).forEach((item: any) => {
       if (!isEmpty(item.path)) {
         if (matchPath(`${item.path}/*`, path)) {
-          menu.push(item.path || item.text);
+          menu.push(item.path || item.label);
           return;
         }
       }
       (item.children || []).forEach((subItem: any) => {
         if (matchPath(`${subItem.path}/*`, path)) {
-          menu.push(subItem.path || subItem.text);
+          menu.push(subItem.path || subItem.label);
           return;
         }
       });
@@ -67,18 +68,18 @@ const FeatureMenu: React.FC = () => {
         if (item.children) {
           return (
             <Nav.Sub
-              key={item.text}
+              key={uuidv4()}
               level={0}
-              itemKey={item.path || item.text}
+              itemKey={item.path || item.label}
               icon={<Icon icon={item.icon} style={{ fontSize: 20 }} />}
-              text={item.text}>
+              text={item.label}>
               {item.children.map((child: any) => (
                 <Nav.Item
                   level={1}
-                  key={`${child.text}item`}
+                  key={uuidv4()}
                   icon={<Icon icon={child.icon} style={{ fontSize: 20 }} />}
-                  text={child.text}
-                  itemKey={child.path || child.text}
+                  text={child.label}
+                  itemKey={child.path || child.label}
                   onClick={() => navigate(child.path)}
                 />
               ))}
@@ -90,16 +91,16 @@ const FeatureMenu: React.FC = () => {
           return (
             <Nav.Sub
               level={0}
-              key={item.text}
-              itemKey={item.path || item.text}
+              key={uuidv4()}
+              itemKey={item.path || item.label}
               icon={<Icon icon={item.icon} style={{ fontSize: 20 }} />}
-              text={item.text}>
+              text={item.label}>
               <Nav.Item
                 level={1}
                 icon={<Icon icon={item.icon} style={{ fontSize: 20 }} />}
-                itemKey={item.path || item.text}
-                key={`${item.text}item`}
-                text={item.text}
+                itemKey={item.path || item.label}
+                key={uuidv4()}
+                text={item.label}
                 onClick={() => navigate(item.path)}
               />
             </Nav.Sub>
@@ -109,9 +110,9 @@ const FeatureMenu: React.FC = () => {
           <Nav.Item
             level={0}
             icon={<Icon icon={item.icon} style={{ fontSize: 20 }} />}
-            itemKey={item.path || item.text}
-            key={`${item.text}item`}
-            text={item.text}
+            itemKey={item.path || item.label}
+            key={uuidv4()}
+            text={item.label}
             onClick={() => navigate(item.path)}
           />
         );
