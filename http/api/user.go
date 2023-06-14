@@ -111,3 +111,17 @@ func (api *UserAPI) SavePreference(c *gin.Context) {
 	}
 	httppkg.OK(c, "Preferences saved")
 }
+
+// ChangePassword changes user password.
+func (api *UserAPI) ChangePassword(c *gin.Context) {
+	changePWD := &model.ChangeUserPassword{}
+	if err := c.ShouldBind(changePWD); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	if err := api.deps.UserSrv.ChangePassword(c.Request.Context(), changePWD); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "User password changed")
+}

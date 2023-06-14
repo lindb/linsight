@@ -27,6 +27,7 @@ import (
 
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
+	"github.com/lindb/linsight/pkg/util"
 )
 
 func TestUserService_GetPreference(t *testing.T) {
@@ -93,6 +94,63 @@ func TestUserService_SavePreference(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
 			err := srv.SavePreference(ctx, &model.Preference{})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestUserSerivce_ChangePassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(10)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "old password invalid",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(10)).Return(nil)
+			},
+			wantErr: true,
+		},
+		{
+			name: "change password successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(10)).DoAndReturn(func(m any, s string, _ int64) error {
+					fmt.Println(m)
+					fmt.Println(s)
+					user := m.(*model.User)
+					user.Password = util.EncodePassword("12345", user.Salt)
+					user.ID = 10
+					return nil
+				})
+				mockDB.EXPECT().Update(gomock.Any(), "id=?", int64(10)).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.ChangePassword(ctx, &model.ChangeUserPassword{
+				OldPassword: "12345",
+				NewPassword: "123456",
+			})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

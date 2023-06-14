@@ -44,6 +44,8 @@ type UserService interface {
 	GetPreference(ctx context.Context) (*model.Preference, error)
 	// GetPreference returns the preference of current signed user for current org.
 	SavePreference(ctx context.Context, pref *model.Preference) error
+	// ChangePassword changes user password.
+	ChangePassword(ctx context.Context, changePWD *model.ChangeUserPassword) error
 }
 
 // userService implements the UserService interface.
@@ -108,7 +110,7 @@ func (srv *userService) GetUserByName(ctx context.Context, nameOrEmail string) (
 
 func (srv *userService) GetUser(ctx context.Context, userID int64) (*model.User, error) {
 	user := &model.User{}
-	if err := srv.db.Get(&user, "id=?", userID); err != nil {
+	if err := srv.db.Get(user, "id=?", userID); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -117,7 +119,7 @@ func (srv *userService) GetUser(ctx context.Context, userID int64) (*model.User,
 func (srv *userService) UpdateUser(ctx context.Context, user *model.User) error {
 	signedUser := util.GetUser(ctx)
 	user.UpdatedBy = signedUser.User.ID
-	if err := srv.db.Update(&user, "email=?", user.Email); err != nil {
+	if err := srv.db.Update(user, "email=?", user.Email); err != nil {
 		return err
 	}
 	return nil
@@ -130,7 +132,7 @@ func (srv *userService) CreateUser(ctx context.Context, user *model.User) (strin
 	signedUser := util.GetUser(ctx)
 	user.CreatedBy = signedUser.User.ID
 	user.UpdatedBy = signedUser.User.ID
-	if err := srv.db.Create(&user); err != nil {
+	if err := srv.db.Create(user); err != nil {
 		return "", err
 	}
 	return uid, nil
@@ -167,8 +169,27 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 		prefFormDB.Theme = pref.Theme
 		prefFormDB.Collapsed = pref.Collapsed
 		prefFormDB.HomePage = pref.HomePage
-		return srv.db.Update(&prefFormDB, "org_id=? and user_id=?", orgID, userID)
+		return srv.db.Update(prefFormDB, "org_id=? and user_id=?", orgID, userID)
 	}
+}
+
+// ChangePassword changes user password.
+func (srv *userService) ChangePassword(ctx context.Context, changePWD *model.ChangeUserPassword) error {
+	signedUser := util.GetUser(ctx)
+	userID := signedUser.User.ID
+	user, err := srv.GetUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	pwd := util.EncodePassword(changePWD.OldPassword, user.Salt)
+	// check old password
+	if pwd != user.Password {
+		return errors.New("old password invalid")
+	}
+	newPWD := util.EncodePassword(changePWD.NewPassword, user.Salt)
+	user.Password = newPWD
+
+	return srv.db.Update(user, "id=?", userID)
 }
 
 // getPreference returns the preference by given org/user.

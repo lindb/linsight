@@ -34,3 +34,9 @@ export interface Preference {
   collapsed?: boolean;
   homePage?: string;
 }
+
+export interface ChangePassword {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}

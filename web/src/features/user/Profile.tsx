@@ -15,15 +15,15 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Button, Card, Form, Radio, TabPane, Tabs } from '@douyinfe/semi-ui';
-import { IconSaveStroked, IconCandlestickChartStroked } from '@douyinfe/semi-icons';
+import { Button, Form, Radio } from '@douyinfe/semi-ui';
+import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { PlatformContext } from '@src/contexts';
 import { UserSrv } from '@src/services';
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Icon } from '@src/components';
+import { Notification } from '@src/components';
 import { useRequest } from '@src/hooks';
 import { Preference } from '@src/types';
+import { ApiKit } from '@src/utils';
 
 const Profile: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
@@ -32,11 +32,11 @@ const Profile: React.FC = () => {
     return UserSrv.getPreference();
   });
   const preferenceFormApi = useRef<any>();
-  const location = useLocation();
-  const navigate = useNavigate();
+
   useEffect(() => {
     preferenceFormApi.current.setValues(preference);
   }, [preference]);
+
   return (
     <div>
       <Form
@@ -49,8 +49,10 @@ const Profile: React.FC = () => {
             setSubmitting(true);
             await UserSrv.savePreference(values);
             sync();
+            Notification.success('Preference save successfully!');
+          } catch (err) {
+            Notification.error(ApiKit.getErrorMsg(err));
           } finally {
-            // FIXME: handle err
             setSubmitting(false);
           }
         }}>
