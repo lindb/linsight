@@ -108,6 +108,8 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.GetPreference)...)
 	router.PUT("/user/preference",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.SavePreference)...)
+	router.PUT("/user/password/change",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.ChangePassword)...)
 
 	router.POST("/datasource",
 		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.datasourceAPI.CreateDatasource)...)

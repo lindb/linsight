@@ -27,6 +27,7 @@ type User struct {
 
 	UID        string `gorm:"column:uid;u_idx_user_uid,unique"`
 	Name       string `gorm:"column:name"`
+	UserName   string `gorm:"column:user_name"`
 	Email      string `gorm:"column:email;index:u_idx_user_email,unique"`
 	Password   string `gorm:"column:password"`
 	Salt       string `gorm:"column:salt"`
@@ -77,4 +78,11 @@ type SignedUser struct {
 	Org        *Org                   `json:"org"`
 	Role       accesscontrol.RoleType `json:"role"`
 	Preference *Preference            `json:"preference,omitempty"`
+}
+
+// ChangeUserPassword represents change user password params.
+type ChangeUserPassword struct {
+	// TODO: add check rule
+	OldPassword string `json:"oldPassword"`
+	NewPassword string `json:"newPassword"`
 }

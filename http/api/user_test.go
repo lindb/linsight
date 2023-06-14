@@ -151,3 +151,64 @@ func TestUserAPI_SavePreference(t *testing.T) {
 		})
 	}
 }
+
+func TestUserAPI_ChangePassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.PUT("/user/password/change", api.ChangePassword)
+	body := encoding.JSONMarshal(&model.Preference{})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: http.NoBody,
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "change password failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().ChangePassword(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "change password successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().ChangePassword(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/user/password/change", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}

@@ -20,6 +20,7 @@ export enum ApiPath {
   Logout = '/logout',
   Boot = '/boot',
   User = '/users',
+  ChangePassword = '/user/password/change',
   Team = '/org/teams',
   Nav = '/org/nav',
   Org = '/orgs',

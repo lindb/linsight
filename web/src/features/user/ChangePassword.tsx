@@ -15,20 +15,81 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Button, Form } from '@douyinfe/semi-ui';
-import React from 'react';
+import { Banner, Button, Form } from '@douyinfe/semi-ui';
+import { UserSrv } from '@src/services';
+import { ChangePassword } from '@src/types';
+import React, { useRef, useState } from 'react';
+import { Notification } from '@src/components';
+import { isEmpty } from 'lodash-es';
 import { useNavigate } from 'react-router-dom';
+import { ApiKit } from '@src/utils';
 
 const ChangePassword: React.FC = () => {
   const navigate = useNavigate();
+  const formApi = useRef<any>();
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
   return (
-    <Form className="linsight-form">
+    <Form
+      className="linsight-form"
+      onSubmit={async (values: ChangePassword) => {
+        setSubmitting(true);
+        try {
+          await UserSrv.changePassword(values);
+          setErrorMsg('');
+          formApi.current.setValues({});
+          Notification.success('Password change successfully');
+        } catch (err) {
+          setErrorMsg(ApiKit.getErrorMsg(err));
+        } finally {
+          setSubmitting(false);
+        }
+      }}
+      validateFields={(values: ChangePassword) => {
+        const errors: any = {};
+        if (values.newPassword !== values.confirmPassword) {
+          errors.confirmPassword = 'Confirm password not match new password';
+        }
+        if (isEmpty(errors)) {
+          return null;
+        }
+        return errors;
+      }}
+      getFormApi={(api: any) => {
+        formApi.current = api;
+      }}>
       <Form.Section text="Change your password">
-        <Form.Input field="oldPassword" label="Old passowrd" mode="password" />
-        <Form.Input field="newPassword" label="New passowrd" mode="password" />
-        <Form.Input field="confirmPassword" label="Confirm passowrd" mode="password" />
+        <Form.Input
+          field="oldPassword"
+          label="Old passowrd"
+          mode="password"
+          rules={[{ required: true, message: 'Old password is requred' }]}
+        />
+        <Form.Input
+          field="newPassword"
+          label="New passowrd"
+          mode="password"
+          rules={[{ required: true, message: 'New password is requred' }]}
+        />
+        <Form.Input
+          field="confirmPassword"
+          label="Confirm passowrd"
+          mode="password"
+          rules={[{ required: true, message: 'Confirm password is requred' }]}
+        />
+        {!isEmpty(errorMsg) && (
+          <Form.Slot>
+            <Banner fullMode={false} type="danger" description={errorMsg} />
+          </Form.Slot>
+        )}
         <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
-          <Button>Change Password</Button>
+          <Button
+            loading={submitting}
+            onClick={() => {
+              formApi.current.submitForm();
+            }}>
+            Change Password
+          </Button>
           <Button
             type="tertiary"
             onClick={() => {
