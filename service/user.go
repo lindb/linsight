@@ -20,6 +20,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 
 	"gorm.io/gorm"
@@ -35,11 +36,16 @@ import (
 // UserService represents user manager interface.
 type UserService interface {
 	// CreateUser creates a new user, returns the user's uid, if fail returns error.
-	CreateUser(ctx context.Context, user *model.User) (string, error)
+	CreateUser(ctx context.Context, user *model.CreateUserRequest) (string, error)
+	// UpdateUser updates user basic information.
 	UpdateUser(ctx context.Context, user *model.User) error
+	// GetUserByUID returns user basic information by given uid.
+	GetUserByUID(ctx context.Context, uid string) (*model.User, error)
+	// SearchUser returns user list by query condition.
+	SearchUser(ctx context.Context, req *model.SearchUserRequest) (users []model.User, total int64, err error)
+	// TODO:
 	GetSignedUser(ctx context.Context, userID int64) (*model.SignedUser, error)
 	GetUserByName(ctx context.Context, nameOrEmail string) (*model.User, error)
-	GetUser(ctx context.Context, userID int64) (*model.User, error)
 	// GetPreference returns the preference of current signed user for current org.
 	GetPreference(ctx context.Context) (*model.Preference, error)
 	// GetPreference returns the preference of current signed user for current org.
@@ -67,7 +73,7 @@ func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model
 	if ok {
 		return val.(*model.SignedUser), nil
 	}
-	user, err := srv.GetUser(ctx, userID)
+	user, err := srv.getUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -89,8 +95,9 @@ func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model
 	signedUser := &model.SignedUser{
 		User:       user,
 		Name:       user.Name,
+		UserName:   user.UserName,
 		Email:      user.Email,
-		IsDisabled: user.IsDisabled,
+		IsDisabled: *user.IsDisabled,
 		Org:        org,
 		Role:       orgUser.Role,
 		Preference: pref,
@@ -108,7 +115,7 @@ func (srv *userService) GetUserByName(ctx context.Context, nameOrEmail string) (
 	return user, nil
 }
 
-func (srv *userService) GetUser(ctx context.Context, userID int64) (*model.User, error) {
+func (srv *userService) getUser(_ context.Context, userID int64) (*model.User, error) {
 	user := &model.User{}
 	if err := srv.db.Get(user, "id=?", userID); err != nil {
 		return nil, err
@@ -116,26 +123,91 @@ func (srv *userService) GetUser(ctx context.Context, userID int64) (*model.User,
 	return user, nil
 }
 
-func (srv *userService) UpdateUser(ctx context.Context, user *model.User) error {
+// CreateUser creates a new user, returns the user's uid, if fail returns error.
+func (srv *userService) CreateUser(ctx context.Context, user *model.CreateUserRequest) (string, error) {
+	uid := uuid.GenerateShortUUID()
+	// encode password
+	salt, _ := util.GetRandomString(10)
+	pwd := util.EncodePassword(user.Password, salt)
+	if user.Name == "" {
+		user.Name = user.UserName
+	}
+	newUser := &model.User{
+		UID:      uid,
+		Password: pwd,
+		Salt:     salt,
+		Name:     user.Name,
+		UserName: user.UserName,
+		Email:    user.Email,
+	}
 	signedUser := util.GetUser(ctx)
-	user.UpdatedBy = signedUser.User.ID
-	if err := srv.db.Update(user, "email=?", user.Email); err != nil {
+	newUser.CreatedBy = signedUser.User.ID
+	newUser.UpdatedBy = signedUser.User.ID
+	if err := srv.db.Create(newUser); err != nil {
+		return "", err
+	}
+	return uid, nil
+}
+
+// UpdateUser updates user basic information.
+func (srv *userService) UpdateUser(ctx context.Context, user *model.User) error {
+	userFromDB, err := srv.GetUserByUID(ctx, user.UID)
+	if err != nil {
+		return err
+	}
+	signedUser := util.GetUser(ctx)
+	// FIXME: check UserName if exist
+	userFromDB.UserName = user.UserName
+	userFromDB.Name = user.Name
+	userFromDB.Email = user.Email
+	userFromDB.UpdatedBy = signedUser.User.ID
+	if err := srv.db.Update(userFromDB, "uid=?", user.UID); err != nil {
 		return err
 	}
 	return nil
 }
 
-// CreateUser creates a new user, returns the user's uid, if fail returns error.
-func (srv *userService) CreateUser(ctx context.Context, user *model.User) (string, error) {
-	uid := uuid.GenerateShortUUID()
-	user.UID = uid
-	signedUser := util.GetUser(ctx)
-	user.CreatedBy = signedUser.User.ID
-	user.UpdatedBy = signedUser.User.ID
-	if err := srv.db.Create(user); err != nil {
-		return "", err
+// GetUserByUID returns user basic information by given uid.
+func (srv *userService) GetUserByUID(ctx context.Context, uid string) (*model.User, error) {
+	user := &model.User{}
+	if err := srv.db.Get(&user, "uid=?", uid); err != nil {
+		return nil, err
 	}
-	return uid, nil
+	return user, nil
+}
+
+// SearchUser returns user list by query condition.
+func (srv *userService) SearchUser(ctx context.Context, req *model.SearchUserRequest) (users []model.User, total int64, err error) {
+	conditions := []string{}
+	params := []any{}
+	if req.Query != "" {
+		conditions = append(conditions, "name like ?")
+		params = append(params, req.Query+"%")
+		conditions = append(conditions, "user_name like ?")
+		params = append(params, req.Query+"%")
+		conditions = append(conditions, "email like ?")
+		params = append(params, req.Query+"%")
+	}
+	offset := 0
+	limit := 20
+	if req.Offset > 0 {
+		offset = req.Offset
+	}
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+	where := strings.Join(conditions, " or ")
+	count, err := srv.db.Count(&model.User{}, where, params...)
+	if err != nil {
+		return nil, 0, err
+	}
+	if count == 0 {
+		return nil, 0, nil
+	}
+	if err := srv.db.FindForPaging(&users, offset, limit, "id desc", where, params...); err != nil {
+		return nil, 0, err
+	}
+	return users, count, nil
 }
 
 // GetPreference returns the preference of current signed user for current org.
@@ -177,7 +249,7 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 func (srv *userService) ChangePassword(ctx context.Context, changePWD *model.ChangeUserPassword) error {
 	signedUser := util.GetUser(ctx)
 	userID := signedUser.User.ID
-	user, err := srv.GetUser(ctx, userID)
+	user, err := srv.getUser(ctx, userID)
 	if err != nil {
 		return err
 	}

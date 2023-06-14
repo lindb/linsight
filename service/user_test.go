@@ -157,3 +157,173 @@ func TestUserSerivce_ChangePassword(t *testing.T) {
 		})
 	}
 }
+
+func TestUserService_GetUserByUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+
+	srv := NewUserService(mockDB)
+	t.Run("get user successfully", func(t *testing.T) {
+		mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+		user, err := srv.GetUserByUID(ctx, "1234")
+		assert.NotNil(t, user)
+		assert.NoError(t, err)
+	})
+}
+
+func TestUserService_SearchUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "count failure",
+			prepare: func() {
+				mockDB.EXPECT().Count(gomock.Any(), "name like ? or user_name like ? or email like ?",
+					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "count 0",
+			prepare: func() {
+				mockDB.EXPECT().Count(gomock.Any(), "name like ? or user_name like ? or email like ?",
+					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "find failure",
+			prepare: func() {
+				mockDB.EXPECT().Count(gomock.Any(), "name like ? or user_name like ? or email like ?",
+					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "name like ? or user_name like ? or email like ?",
+					gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "find successfully",
+			prepare: func() {
+				mockDB.EXPECT().Count(gomock.Any(), "name like ? or user_name like ? or email like ?",
+					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "name like ? or user_name like ? or email like ?",
+					gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			_, _, err := srv.SearchUser(ctx, &model.SearchUserRequest{
+				Query: "name",
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestUserService_CreateUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "create user failure",
+			prepare: func() {
+				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "create user successfully",
+			prepare: func() {
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			_, err := srv.CreateUser(ctx, &model.CreateUserRequest{})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestUserService_UpdateUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update user successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "uid=?", "1234").Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.UpdateUser(ctx, &model.User{UID: "1234"})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}

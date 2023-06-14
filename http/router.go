@@ -98,12 +98,14 @@ func (r *Router) RegisterRouters() {
 	router.PUT("/org/nav",
 		middleware.Authorize(r.deps, accesscontrol.Nav, accesscontrol.Write, r.navAPI.UpdateNav)...)
 
-	router.POST("/user",
+	router.POST("/users",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.CreateUser)...)
-	router.PUT("/user",
+	router.PUT("/users",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.UpdateUser)...)
+	router.GET("/users",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.SearchUser)...)
 	router.GET("/users/:uid",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.GetUser)...)
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.GetUserByUID)...)
 	router.GET("/user/preference",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.GetPreference)...)
 	router.PUT("/user/preference",

@@ -64,7 +64,7 @@ func (srv *authenticateService) Authenticate(ctx context.Context, loginUser *mod
 	if err != nil {
 		return nil, err
 	}
-	if user.IsDisabled {
+	if *user.IsDisabled {
 		return nil, constant.ErrUserDisabled
 	}
 	pwd := util.EncodePassword(loginUser.Password, user.Salt)

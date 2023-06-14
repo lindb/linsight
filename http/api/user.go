@@ -18,11 +18,10 @@
 package api
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 	httppkg "github.com/lindb/common/pkg/http"
 
+	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
 )
@@ -39,8 +38,9 @@ func NewUserAPI(deps *depspkg.API) *UserAPI {
 	}
 }
 
+// CreateUser creates a new user.
 func (api *UserAPI) CreateUser(c *gin.Context) {
-	user := &model.User{}
+	user := &model.CreateUserRequest{}
 	if err := c.ShouldBind(user); err != nil {
 		httppkg.Error(c, err)
 		return
@@ -54,6 +54,7 @@ func (api *UserAPI) CreateUser(c *gin.Context) {
 	httppkg.OK(c, uid)
 }
 
+// UpdateUser updates user basic information.
 func (api *UserAPI) UpdateUser(c *gin.Context) {
 	user := &model.User{}
 	if err := c.ShouldBind(user); err != nil {
@@ -67,15 +68,28 @@ func (api *UserAPI) UpdateUser(c *gin.Context) {
 	httppkg.OK(c, user)
 }
 
-func (api *UserAPI) GetUser(c *gin.Context) {
-	uid := c.Param("uid")
-	userID, err := strconv.ParseInt(uid, 10, 64)
+// SearchUser searches users by given params.
+func (api *UserAPI) SearchUser(c *gin.Context) {
+	req := &model.SearchUserRequest{}
+	if err := c.ShouldBind(req); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	users, total, err := api.deps.UserSrv.SearchUser(c.Request.Context(), req)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	// FIXME:
-	user, err := api.deps.UserSrv.GetUser(c.Request.Context(), userID)
+	httppkg.OK(c, gin.H{
+		"total": total,
+		"users": users,
+	})
+}
+
+// GetUserByUID returns user by uid.
+func (api *UserAPI) GetUserByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	user, err := api.deps.UserSrv.GetUserByUID(c.Request.Context(), uid)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
@@ -85,11 +99,6 @@ func (api *UserAPI) GetUser(c *gin.Context) {
 
 // GetPreference returns the preference of current signed user.
 func (api *UserAPI) GetPreference(c *gin.Context) {
-	pref := &model.Preference{}
-	if err := c.ShouldBind(pref); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
 	pref, err := api.deps.UserSrv.GetPreference(c.Request.Context())
 	if err != nil {
 		httppkg.Error(c, err)

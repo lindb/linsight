@@ -34,6 +34,7 @@ const deleteTeam = (teamUID: string): Promise<string> => {
 const fetchTeams = (params: SearchTeam): Promise<TeamResult[]> => {
   return ApiKit.GET<TeamResult[]>(ApiPath.Team, params);
 };
+
 const GetTeamByUID = (teamUID: string): Promise<Team> => {
   return ApiKit.GET<Team>(`${ApiPath.Team}/${teamUID}`);
 };

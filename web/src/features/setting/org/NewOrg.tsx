@@ -36,7 +36,7 @@ const NewOrg: React.FC = () => {
     <Card
       className="setting-page"
       bordered={false}
-      bodyStyle={{ padding: 12 }}
+      bodyStyle={{ padding: 24 }}
       title={
         <Meta
           className="setting-meta"
@@ -53,6 +53,7 @@ const NewOrg: React.FC = () => {
         />
       }>
       <Form
+        className="linsight-form setting-form"
         getFormApi={(api: any) => (formApi.current = api)}
         onSubmit={async (values: Org) => {
           try {
@@ -67,18 +68,20 @@ const NewOrg: React.FC = () => {
           }
         }}>
         <Form.Input label="Organizatio name" field="name" rules={[{ required: true, message: 'Name is required' }]} />
-        <div className="setting-buttons">
-          <Button type="tertiary" onClick={gotoOrgListPage}>
-            Back
-          </Button>
-          <Button
-            loading={submitting}
-            onClick={() => {
-              formApi.current.submitForm();
-            }}>
-            Create
-          </Button>
-        </div>
+        <Form.Slot>
+          <div className="setting-buttons">
+            <Button type="tertiary" onClick={gotoOrgListPage}>
+              Back
+            </Button>
+            <Button
+              loading={submitting}
+              onClick={() => {
+                formApi.current.submitForm();
+              }}>
+              Create
+            </Button>
+          </div>
+        </Form.Slot>
       </Form>
     </Card>
   );

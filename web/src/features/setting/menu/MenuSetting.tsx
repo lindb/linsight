@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Col, Form, Row, Select, Tag, Tree, Typography } from '@douyinfe/semi-ui';
+import { Button, Col, Empty, Form, Row, Select, Tag, Tree, Typography } from '@douyinfe/semi-ui';
 import {
   IconSaveStroked,
   IconPlusStroked,
@@ -34,6 +34,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { PlatformContext } from '@src/contexts';
 import { ApiKit, ObjectKit } from '@src/utils';
 import FormSlot from '@douyinfe/semi-ui/lib/es/form/slot';
+import EmptyImg from '@src/images/empty.svg';
+
 const { Text } = Typography;
 
 const getSupportIconFonts = (): any[] => {
@@ -59,6 +61,7 @@ const MenuSetting: React.FC = () => {
   const formApi = useRef<any>();
   const tree = useRef<Map<string, any>>(new Map());
   const [currentParent, setCurrentParent] = useState<any>();
+  const [editing, setEditing] = useState(false);
 
   useMemo(() => {
     iconOptions.current = getSupportIconFonts();
@@ -141,6 +144,7 @@ const MenuSetting: React.FC = () => {
             icon={<IconPlusStroked />}
             type="tertiary"
             onClick={() => {
+              setEditing(true);
               addNewMenu({ node: null, children: navTree.config });
             }}>
             Add
@@ -186,6 +190,7 @@ const MenuSetting: React.FC = () => {
                 ellipsis={{ showTooltip: true }}
                 style={{ flex: 1 }}
                 onClick={() => {
+                  setEditing(true);
                   setCurrentParent(null);
                   formApi.current.setValues(item.raw, { isOverride: true });
                 }}>
@@ -198,6 +203,7 @@ const MenuSetting: React.FC = () => {
                   type="tertiary"
                   size="small"
                   onClick={() => {
+                    setEditing(true);
                     item.raw.children = item.raw.children || [];
                     addNewMenu({ node: item.raw, children: item.raw.children });
                   }}
@@ -224,7 +230,19 @@ const MenuSetting: React.FC = () => {
         />
       </Col>
       <Col span={14} className="menu-form">
+        {!editing && (
+          <Empty
+            title="Oops! No edit menu"
+            style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 50 }}
+            image={<img src={EmptyImg} style={{ width: 150, height: 150 }} />}
+            darkModeImage={<img src={EmptyImg} style={{ width: 150, height: 150 }} />}
+            layout="horizontal"
+            description="Please select edit menu"
+          />
+        )}
         <Form
+          style={{ display: editing ? 'block' : 'none', paddingLeft: 24 }}
+          className="linsight-form"
           labelPosition="left"
           labelAlign="right"
           labelWidth={120}

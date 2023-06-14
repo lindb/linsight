@@ -43,6 +43,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import ListDataSource from './datasource/ListDataSource';
 import OrgList from './org/OrgList';
 import MenuSetting from './menu/MenuSetting';
+import UserList from './user/UserList';
 const { Meta } = Card;
 const { Text, Title } = Typography;
 
@@ -54,7 +55,7 @@ const Setting: React.FC = () => {
     <Card
       className="setting-page"
       bordered={false}
-      bodyStyle={{ padding: 12 }}
+      bodyStyle={{ padding: '0px 24px 24px 24px' }}
       title={
         <Meta
           className="setting-meta"
@@ -81,8 +82,8 @@ const Setting: React.FC = () => {
           icon={<Icon icon="datasource" style={{ marginRight: 8 }} />}>
           <ListDataSource />
         </TabPane>
-        <TabPane itemKey="/setting/org/users" tab="User" icon={<Icon icon="user" style={{ marginRight: 8 }} />}>
-          user list
+        <TabPane itemKey="/setting/users" tab="User" icon={<Icon icon="user" style={{ marginRight: 8 }} />}>
+          <UserList />
         </TabPane>
         <TabPane itemKey="/setting/org/teams" tab="Team" icon={<Icon icon="team" style={{ marginRight: 8 }} />}>
           <TeamList />

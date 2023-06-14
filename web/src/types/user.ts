@@ -18,6 +18,8 @@ under the License.
 import { ThemeType } from '@src/types';
 
 export interface User {
+  uid?: string;
+  userName: string;
   name: string;
   email: string;
   isDisabled: boolean;
@@ -39,4 +41,13 @@ export interface ChangePassword {
   oldPassword: string;
   newPassword: string;
   confirmPassword: string;
+}
+
+export interface UserResult {
+  users?: User[];
+  total?: number;
+}
+
+export interface SearchUser {
+  query?: string;
 }

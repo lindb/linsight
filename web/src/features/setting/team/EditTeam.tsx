@@ -58,6 +58,7 @@ const EditTeam: React.FC = () => {
       <Tabs defaultActiveKey={location.pathname}>
         <TabPane itemKey="/setting/org/teams/edit/setting" tab="Setting" icon={<IconCandlestickChartStroked />}>
           <Form
+            className="linsight-form setting-form"
             getFormApi={(api: any) => (formApi.current = api)}
             onSubmit={async (values: Team) => {
               try {
@@ -73,18 +74,20 @@ const EditTeam: React.FC = () => {
             }}>
             <Form.Input label="Name" field="name" rules={[{ required: true, message: 'Name is required' }]} />
             <Form.Input label="Email" field="email" />
-            <div className="setting-buttons">
-              <Button type="tertiary" onClick={gotoTeamListPage}>
-                Back
-              </Button>
-              <Button
-                loading={submitting}
-                onClick={() => {
-                  formApi.current.submitForm();
-                }}>
-                Update
-              </Button>
-            </div>
+            <Form.Slot>
+              <div className="setting-buttons">
+                <Button type="tertiary" onClick={gotoTeamListPage}>
+                  Back
+                </Button>
+                <Button
+                  loading={submitting}
+                  onClick={() => {
+                    formApi.current.submitForm();
+                  }}>
+                  Update
+                </Button>
+              </div>
+            </Form.Slot>
           </Form>
         </TabPane>
       </Tabs>
@@ -94,7 +97,7 @@ const EditTeam: React.FC = () => {
     <Card
       className="setting-page"
       bordered={false}
-      bodyStyle={{ padding: 12 }}
+      bodyStyle={{ padding: '0px 24px 24px 24px' }}
       title={
         <Meta
           className="setting-meta"

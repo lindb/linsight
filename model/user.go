@@ -19,19 +19,28 @@ package model
 
 import "github.com/lindb/linsight/accesscontrol"
 
+// User represents the user basic information.
 type User struct {
 	BaseModel
 
 	// current selected org.
-	OrgID int64 `gorm:"column:org_id"`
+	OrgID int64 `json:"-" gorm:"column:org_id"`
 
-	UID        string `gorm:"column:uid;u_idx_user_uid,unique"`
-	Name       string `gorm:"column:name"`
-	UserName   string `gorm:"column:user_name"`
-	Email      string `gorm:"column:email;index:u_idx_user_email,unique"`
-	Password   string `gorm:"column:password"`
-	Salt       string `gorm:"column:salt"`
-	IsDisabled bool   `gorm:"column:is_disabled"`
+	UID        string `json:"uid" gorm:"column:uid;index:u_idx_user_uid,unique"`
+	Name       string `json:"name" gorm:"column:name"`
+	UserName   string `json:"userName" gorm:"column:user_name;index:u_idx_user_uname,unique"`
+	Email      string `json:"email" gorm:"column:email;index:u_idx_user_email,unique"`
+	Password   string `json:"-" gorm:"column:password"`
+	Salt       string `json:"-" gorm:"column:salt"`
+	IsDisabled *bool  `json:"isDisabled" gorm:"column:is_disabled"`
+}
+
+// CreateUserRequest represents create new user request
+type CreateUserRequest struct {
+	Name     string `json:"name"`
+	UserName string `json:"userName" binding:"required"`
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 // Preference represents the preference of user.
@@ -46,6 +55,7 @@ type Preference struct {
 	Collapsed *bool `json:"collapsed" gorm:"column:collapsed"`
 }
 
+// UserToken represents user's login token and history.
 type UserToken struct {
 	BaseModel
 
@@ -56,6 +66,7 @@ type UserToken struct {
 	ClientIP  string `json:"clientIp" gorm:"column:client_ip"`
 }
 
+// OrgUser represents user and org related information.
 type OrgUser struct {
 	BaseModel
 
@@ -70,8 +81,10 @@ type LoginUser struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// SignedUser represents the signed user information.
 type SignedUser struct {
 	User       *User                  `json:"-"`
+	UserName   string                 `json:"userName"`
 	Name       string                 `json:"name"`
 	Email      string                 `json:"email"`
 	IsDisabled bool                   `json:"isDisabled"`
@@ -82,7 +95,13 @@ type SignedUser struct {
 
 // ChangeUserPassword represents change user password params.
 type ChangeUserPassword struct {
-	// TODO: add check rule
-	OldPassword string `json:"oldPassword"`
-	NewPassword string `json:"newPassword"`
+	OldPassword string `json:"oldPassword" binding:"required"`
+	NewPassword string `json:"newPassword" binding:"required"`
+}
+
+// SearchUserRequest represents search user request params.
+type SearchUserRequest struct {
+	PagingParam
+
+	Query string `form:"query" json:"query"`
 }

@@ -34,7 +34,7 @@ const OrgList: React.FC = () => {
   const [deleteVisible, setDeleteVisible] = useState(false);
   const params = useRef() as MutableRefObject<SearchOrg>;
   const currentOrg = useRef() as MutableRefObject<Org>;
-  const { loading, result, error, refetch } = useRequest(['load_org'], () => {
+  const { loading, result, error, refetch } = useRequest(['search_orgs'], () => {
     return OrgSrv.fetchOrg(params.current);
   });
   const searchOrg = debounce(refetch, 200);
@@ -48,6 +48,7 @@ const OrgList: React.FC = () => {
             params.current = { name: value };
             searchOrg();
           }}
+          onEnterPress={() => searchOrg()}
         />
         <Button
           icon={<IconPlusStroked />}

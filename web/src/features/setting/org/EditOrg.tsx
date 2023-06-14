@@ -52,6 +52,7 @@ const EditOrg: React.FC = () => {
     }
     return (
       <Form
+        className="linsight-form setting-form"
         getFormApi={(api: any) => (formApi.current = api)}
         onSubmit={async (values: Org) => {
           try {
@@ -66,18 +67,20 @@ const EditOrg: React.FC = () => {
           }
         }}>
         <Form.Input label="Organization name" field="name" rules={[{ required: true, message: 'Name is required' }]} />
-        <div className="setting-buttons">
-          <Button type="tertiary" onClick={gotoOrgListPage}>
-            Back
-          </Button>
-          <Button
-            loading={submitting}
-            onClick={() => {
-              formApi.current.submitForm();
-            }}>
-            Update
-          </Button>
-        </div>
+        <Form.Slot>
+          <div className="setting-buttons">
+            <Button type="tertiary" onClick={gotoOrgListPage}>
+              Back
+            </Button>
+            <Button
+              loading={submitting}
+              onClick={() => {
+                formApi.current.submitForm();
+              }}>
+              Update
+            </Button>
+          </div>
+        </Form.Slot>
       </Form>
     );
   };
@@ -85,7 +88,7 @@ const EditOrg: React.FC = () => {
     <Card
       className="setting-page"
       bordered={false}
-      bodyStyle={{ padding: 12 }}
+      bodyStyle={{ padding: 24 }}
       title={
         <Meta
           className="setting-meta"
