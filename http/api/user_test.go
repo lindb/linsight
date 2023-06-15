@@ -505,7 +505,7 @@ func TestUserAPI_DisableserByUID(t *testing.T) {
 	}
 }
 
-func TestUserAPI_NebaleUserByUID(t *testing.T) {
+func TestUserAPI_EnableUserByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -544,6 +544,232 @@ func TestUserAPI_NebaleUserByUID(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
 			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/users/1234/enable", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_GetOrgListByUserUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.GET("/users/:uid/orgs", api.GetOrgListByUserUID)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "get org list failure",
+			prepare: func() {
+				userSrv.EXPECT().GetOrgListByUserUID(gomock.Any(), "1234").Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "get org list successfully",
+			prepare: func() {
+				userSrv.EXPECT().GetOrgListByUserUID(gomock.Any(), "1234").Return(nil, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/users/1234/orgs", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_AddOrg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.POST("/users/:uid/orgs", api.AddOrg)
+	body := encoding.JSONMarshal(&model.UserOrgInfo{})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: http.NoBody,
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "add user's org failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().AddOrg(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "add user's org successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().AddOrg(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/users/1234/orgs", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_UpdateOrg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.PUT("/users/:uid/orgs", api.UpdateOrg)
+	body := encoding.JSONMarshal(&model.UserOrgInfo{})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: http.NoBody,
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update user's org failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().UpdateOrg(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update user's org successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().UpdateOrg(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/users/1234/orgs", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_DeleteOrg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.DELETE("/users/:uid/orgs/:orgUid", api.RemoveOrg)
+	body := encoding.JSONMarshal(&model.UserOrgInfo{})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "remove user's org failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().RemoveOrg(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "remove user's org successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().RemoveOrg(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/users/1234/orgs/4321", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {

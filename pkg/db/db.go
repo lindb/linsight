@@ -20,6 +20,7 @@ package db
 import (
 	"fmt"
 	"io"
+	reflect "reflect"
 
 	"github.com/pkg/errors"
 	"gorm.io/driver/mysql"
@@ -41,6 +42,10 @@ type DB interface {
 	Create(obj any) error
 	// Update updates record by given conditions.
 	Update(obj any, where ...any) error
+	// Updates update attributes, values can be map/struct.
+	Updates(obj, values any, where ...any) error
+	// UpdateSingle updates record with single column value.
+	UpdateSingle(obj any, col string, value any, where ...any) error
 	// Delete deletes record by given conditions.
 	Delete(obj any, where ...any) error
 	// Get gets record that match given conditions.
@@ -55,6 +60,8 @@ type DB interface {
 	Exist(out any, where ...any) (bool, error)
 	// Transaction does some db operators in transaction.
 	Transaction(fc func(tx DB) error) error
+	// ExecRaw executes raw sql.
+	ExecRaw(out any, query string, args ...any) error
 	// RawDB returns raw gorm db.
 	RawDB() *gorm.DB
 }
@@ -144,6 +151,25 @@ func (db *db) UpdateWithResult(obj any, where ...any) (int64, error) {
 	return m.RowsAffected, errors.WithStack(m.Error)
 }
 
+// Updates update attributes, value can be map/struct.
+func (db *db) Updates(obj, value any, where ...any) error {
+	m := db.gdb.Model(obj)
+	if len(where) > 0 {
+		m = m.Where(where[0], where[1:]...)
+	}
+	return m.Updates(value).Error
+}
+
+// UpdateSingle updates record with single column value.
+func (db *db) UpdateSingle(obj any, col string, value any, where ...any) error {
+	m := db.gdb.Model(obj)
+	if len(where) > 0 {
+		m = m.Where(where[0], where[1:]...)
+	}
+	err := m.Update(col, value).Error
+	return errors.WithStack(err)
+}
+
 // Find finds records that match given conditions.
 func (db *db) Find(out any, where ...any) error {
 	err := db.gdb.Find(out, where...).Error
@@ -217,6 +243,22 @@ func (db *db) Transaction(fc func(tx DB) error) error {
 // RawDB returns raw gorm db.
 func (db *db) RawDB() *gorm.DB {
 	return db.gdb
+}
+
+// ExecRaw executes raw sql.
+func (db *db) ExecRaw(out any, query string, args ...any) error {
+	tp := reflect.TypeOf(out)
+	kind := tp.Kind()
+	if kind == reflect.Ptr {
+		kind = tp.Elem().Kind()
+	}
+	tx := db.gdb.Raw(query, args...).Scan(out)
+	if kind != reflect.Slice && kind != reflect.Array {
+		if tx.RowsAffected == 0 {
+			return errors.WithStack(gorm.ErrRecordNotFound)
+		}
+	}
+	return errors.WithStack(tx.Error)
 }
 
 // Close closes db, then waits for all queries that have started processing on the server.

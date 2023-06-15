@@ -51,3 +51,16 @@ export interface UserResult {
 export interface SearchUser {
   query?: string;
 }
+
+export interface UserOrg {
+  userUid: string;
+  orgUid: string;
+  orgName: string;
+  role: string;
+}
+
+export const RoleList = [
+  { label: 'Admin', value: 'Admin', showTick: false },
+  { label: 'Editor', value: 'Editor', showTick: false },
+  { label: 'Viewer', value: 'Viewer', showTick: false },
+];

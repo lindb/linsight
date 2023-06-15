@@ -156,3 +156,57 @@ func (api *UserAPI) ChangePassword(c *gin.Context) {
 	}
 	httppkg.OK(c, "User password changed")
 }
+
+// GetOrgListByUserUID returns the org list than user belong.
+func (api *UserAPI) GetOrgListByUserUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	orgList, err := api.deps.UserSrv.GetOrgListByUserUID(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, orgList)
+}
+
+// AddOrg adds user org related(join org).
+func (api *UserAPI) AddOrg(c *gin.Context) {
+	userOrg := &model.UserOrgInfo{}
+	if err := c.ShouldBind(userOrg); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	userOrg.UserUID = c.Param(constant.UID)
+	if err := api.deps.UserSrv.AddOrg(c.Request.Context(), userOrg); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Organization added")
+}
+
+// RemoveOrg removes user org related(leave org).
+func (api *UserAPI) RemoveOrg(c *gin.Context) {
+	userOrg := &model.UserOrgInfo{
+		UserUID: c.Param(constant.UID),
+		OrgUID:  c.Param("orgUid"),
+	}
+	if err := api.deps.UserSrv.RemoveOrg(c.Request.Context(), userOrg); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Organization removed")
+}
+
+// UpdateOrg updates user org realted.
+func (api *UserAPI) UpdateOrg(c *gin.Context) {
+	userOrg := &model.UserOrgInfo{}
+	if err := c.ShouldBind(userOrg); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	userOrg.UserUID = c.Param(constant.UID)
+	if err := api.deps.UserSrv.UpdateOrg(c.Request.Context(), userOrg); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Organization updated")
+}

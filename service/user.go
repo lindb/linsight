@@ -20,7 +20,6 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -52,26 +51,38 @@ type UserService interface {
 	GetSignedUser(ctx context.Context, userID int64) (*model.SignedUser, error)
 	// GetUserByName returns user by given username or email.
 	GetUserByName(ctx context.Context, nameOrEmail string) (*model.User, error)
+
 	// GetPreference returns the preference of current signed user for current org.
 	GetPreference(ctx context.Context) (*model.Preference, error)
 	// GetPreference returns the preference of current signed user for current org.
 	SavePreference(ctx context.Context, pref *model.Preference) error
 	// ChangePassword changes user password.
 	ChangePassword(ctx context.Context, changePWD *model.ChangeUserPassword) error
+
+	// GetOrgListByUserUID returns org list which user belongs.
+	GetOrgListByUserUID(ctx context.Context, uid string) ([]model.UserOrgInfo, error)
+	// AddOrg creates user's org(user join org.).
+	AddOrg(ctx context.Context, userOrg *model.UserOrgInfo) error
+	// RemoveOrg removes user's org(user leave org.).
+	RemoveOrg(ctx context.Context, userOrg *model.UserOrgInfo) error
+	// UpdateOrg updates user's org(such as role etc.)
+	UpdateOrg(ctx context.Context, userOrg *model.UserOrgInfo) error
 }
 
 // userService implements the UserService interface.
 type userService struct {
-	db dbpkg.DB
+	db     dbpkg.DB
+	orgSrv OrgService
 
 	cache sync.Map // TODO: use cache
 }
 
 // NewUserService creates an UserService instance.
-func NewUserService(db dbpkg.DB) UserService {
+func NewUserService(db dbpkg.DB, orgSrv OrgService) UserService {
 	return &userService{
-		db:    db,
-		cache: sync.Map{},
+		db:     db,
+		orgSrv: orgSrv,
+		cache:  sync.Map{},
 	}
 }
 
@@ -90,15 +101,9 @@ func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model
 		Name:       user.Name,
 		UserName:   user.UserName,
 		Email:      user.Email,
-		IsDisabled: false, // default enabled
+		IsDisabled: user.IsDisabled,
 	}
-	if user.IsDisabled != nil {
-		// if IsDisabled has value, using it
-		signedUser.IsDisabled = *user.IsDisabled
-	}
-	fmt.Println(user.OrgID)
 	if user.OrgID > 0 {
-		fmt.Println("errr")
 		// if user belongs org
 		var org model.Org
 		var orgUser model.OrgUser
@@ -111,6 +116,7 @@ func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model
 			return nil, err
 		}
 		signedUser.Org = &org
+		// FIXME: need add Lin Role check
 		signedUser.Role = orgUser.Role
 	}
 	pref, err := srv.getPreference(ctx, user.ID)
@@ -132,14 +138,6 @@ func (srv *userService) GetUserByName(ctx context.Context, nameOrEmail string) (
 	user := &model.User{}
 	// TODO: do tolower?
 	if err := srv.db.Get(&user, "user_name=? or email=?", nameOrEmail, nameOrEmail); err != nil {
-		return nil, err
-	}
-	return user, nil
-}
-
-func (srv *userService) getUser(_ context.Context, userID int64) (*model.User, error) {
-	user := &model.User{}
-	if err := srv.db.Get(user, "id=?", userID); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -266,11 +264,12 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 		pref.UpdatedBy = userID
 		return srv.db.Create(pref)
 	} else {
-		prefFormDB.UpdatedBy = userID
-		prefFormDB.Theme = pref.Theme
-		prefFormDB.Collapsed = pref.Collapsed
-		prefFormDB.HomePage = pref.HomePage
-		return srv.db.Update(prefFormDB, "user_id=?", userID)
+		return srv.db.Updates(&model.Preference{}, map[string]any{
+			"theme":      pref.Theme,
+			"collapsed":  pref.Collapsed,
+			"home_page":  pref.HomePage,
+			"updated_by": userID,
+		}, "user_id=?", userID)
 	}
 }
 
@@ -293,6 +292,91 @@ func (srv *userService) ChangePassword(ctx context.Context, changePWD *model.Cha
 	return srv.db.Update(user, "id=?", userID)
 }
 
+// GetOrgListByUserUID returns org list which user belongs.
+func (srv *userService) GetOrgListByUserUID(ctx context.Context, uid string) (rs []model.UserOrgInfo, err error) {
+	user, err := srv.GetUserByUID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	sql := `
+	select 
+		u.uid as user_uid,o.uid as org_uid,o.name as org_name,ou.role 
+	from users u,orgs o,org_users ou 
+		where u.id=ou.user_id and o.id=ou.org_id and u.id=?`
+	err = srv.db.ExecRaw(&rs, sql, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+// AddOrg creates user's org(user join org.).
+func (srv *userService) AddOrg(ctx context.Context, userOrg *model.UserOrgInfo) error {
+	user, org, err := srv.getUserAndOrg(ctx, userOrg.UserUID, userOrg.OrgUID)
+	if err != nil {
+		return err
+	}
+	signedUser := util.GetUser(ctx)
+	userID := signedUser.User.ID
+	uo := &model.OrgUser{
+		UserID: user.ID,
+		OrgID:  org.ID,
+		Role:   userOrg.Role,
+	}
+	uo.CreatedBy = userID
+	uo.UpdatedBy = userID
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		if err := tx.Create(uo); err != nil {
+			return err
+		}
+		if user.OrgID <= 0 {
+			// set default select org.
+			user.OrgID = org.ID
+			return tx.Update(user, "id=?", user.ID)
+		}
+		return nil
+	})
+}
+
+// RemoveOrg removes user's org(user leave org.).
+func (srv *userService) RemoveOrg(ctx context.Context, userOrg *model.UserOrgInfo) error {
+	user, org, err := srv.getUserAndOrg(ctx, userOrg.UserUID, userOrg.OrgUID)
+	if err != nil {
+		return err
+	}
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		if err := tx.Delete(&model.OrgUser{}, "org_id=? and user_id=?", org.ID, user.ID); err != nil {
+			return err
+		}
+		orgUsers := []model.OrgUser{}
+		err := tx.Find(orgUsers, "user_id=?", user.ID)
+		if err != nil {
+			return err
+		}
+		orgID := int64(0)
+		if len(orgUsers) > 0 {
+			// set default select org.
+			orgID = orgUsers[0].OrgID
+		}
+		return tx.UpdateSingle(&model.User{}, "org_id", orgID, "id=?", user.ID)
+	})
+}
+
+// UpdateOrg updates user's org(such as role etc.)
+func (srv *userService) UpdateOrg(ctx context.Context, userOrg *model.UserOrgInfo) error {
+	user, org, err := srv.getUserAndOrg(ctx, userOrg.UserUID, userOrg.OrgUID)
+	if err != nil {
+		return err
+	}
+	signedUser := util.GetUser(ctx)
+	userID := signedUser.User.ID
+	uo := &model.OrgUser{
+		Role: userOrg.Role,
+	}
+	uo.UpdatedBy = userID
+	return srv.db.Update(uo, "org_id=? and user_id=?", org.ID, user.ID)
+}
+
 // getPreference returns the preference by given org/user.
 func (srv *userService) getPreference(_ context.Context, userID int64) (*model.Preference, error) {
 	pref := model.Preference{}
@@ -306,12 +390,28 @@ func (srv *userService) getPreference(_ context.Context, userID int64) (*model.P
 }
 
 // setUserDisableState sets user's disable state.
-func (srv *userService) setUserDisableState(ctx context.Context, uid string, disable bool) error {
-	userFromDB, err := srv.GetUserByUID(ctx, uid)
-	if err != nil {
-		return err
-	}
-	userFromDB.IsDisabled = &disable
+func (srv *userService) setUserDisableState(_ context.Context, uid string, disable bool) error {
+	return srv.db.UpdateSingle(&model.User{}, "is_disabled", disable, "uid=?", uid)
+}
 
-	return srv.db.Update(userFromDB, "uid=?", uid)
+// getUserAndOrg returns user and org by given user/org uid.
+func (srv *userService) getUserAndOrg(ctx context.Context, userUID, orgUID string) (*model.User, *model.Org, error) {
+	user, err := srv.GetUserByUID(ctx, userUID)
+	if err != nil {
+		return nil, nil, err
+	}
+	org, err := srv.orgSrv.GetOrgByUID(ctx, orgUID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return user, org, nil
+}
+
+// getUser returns user by id.
+func (srv *userService) getUser(_ context.Context, userID int64) (*model.User, error) {
+	user := &model.User{}
+	if err := srv.db.Get(user, "id=?", userID); err != nil {
+		return nil, err
+	}
+	return user, nil
 }

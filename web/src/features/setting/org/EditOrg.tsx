@@ -33,7 +33,7 @@ const EditOrg: React.FC = () => {
   const orgUID = `${searchParams.get('uid')}`;
   const formApi = useRef<any>();
   const [submitting, setSubmitting] = useState(false);
-  const { loading, result } = useRequest(['get_org', orgUID], () => OrgSrv.GetOrgByUID(orgUID));
+  const { loading, result } = useRequest(['get_org', orgUID], () => OrgSrv.getOrgByUID(orgUID));
   const gotoOrgListPage = () => {
     navigate({ pathname: '/setting/orgs' });
   };

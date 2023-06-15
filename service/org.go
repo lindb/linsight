@@ -21,6 +21,10 @@ import (
 	"context"
 	"strings"
 
+	"gorm.io/datatypes"
+
+	"github.com/lindb/linsight"
+	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
@@ -41,6 +45,8 @@ type OrgService interface {
 	GetOrgByUID(ctx context.Context, uid string) (*model.Org, error)
 	// SearchOrg searches the organization by given params.
 	SearchOrg(ctx context.Context, req *model.SearchOrgRequest) ([]model.Org, int64, error)
+	// GetOrgListForSignedUser returns all org for current signed user can manage.
+	GetOrgListForSignedUser(ctx context.Context) ([]model.Org, error)
 }
 
 // orgService implements OrgService interface.
@@ -58,11 +64,25 @@ func NewOrgService(db dbpkg.DB) OrgService {
 // CreateOrg creates a new organization, returns organization uid, if fail returns error.
 func (srv *orgService) CreateOrg(ctx context.Context, org *model.Org) (string, error) {
 	uid := uuid.GenerateShortUUID()
-	signedUser := util.GetUser(ctx)
-	org.UID = uid
-	org.CreatedBy = signedUser.User.ID
-	org.UpdatedBy = signedUser.User.ID
-	if err := srv.db.Create(org); err != nil {
+	err := srv.db.Transaction(func(tx dbpkg.DB) error {
+		signedUser := util.GetUser(ctx)
+		org.UID = uid
+		org.CreatedBy = signedUser.User.ID
+		org.UpdatedBy = signedUser.User.ID
+		if err := tx.Create(org); err != nil {
+			return err
+		}
+		// add nav tree for new org
+		nav := &model.Nav{
+			OrgID:         org.ID,
+			Config:        datatypes.JSON(linsight.DefaultNav),
+			DefaultConfig: datatypes.JSON(linsight.DefaultNav),
+		}
+		nav.CreatedBy = signedUser.User.ID
+		nav.UpdatedBy = signedUser.User.ID
+		return tx.Create(nav)
+	})
+	if err != nil {
 		return "", err
 	}
 	return uid, nil
@@ -124,4 +144,24 @@ func (srv *orgService) SearchOrg(ctx context.Context, req *model.SearchOrgReques
 		return nil, 0, err
 	}
 	return rs, count, nil
+}
+
+// GetOrgListForSignedUser returns all org for current signed user can manage.
+func (srv *orgService) GetOrgListForSignedUser(ctx context.Context) (rs []model.Org, err error) {
+	conditions := []string{}
+	params := []any{}
+	signedUser := util.GetUser(ctx)
+	// if role is Lin can return all orgs, else return orgs which has admin role
+	if signedUser.Role != accesscontrol.RoleLin {
+		conditions = append(conditions, "id in (select ou.org_id from org_users ou where ou.user_id=?)")
+		params = append(params, signedUser.User.ID)
+		conditions = append(conditions, "role=?")
+		params = append(params, accesscontrol.RoleAdmin)
+	}
+	findParams := []any{strings.Join(conditions, " and ")}
+	findParams = append(findParams, params...)
+	if err := srv.db.Find(&rs, findParams...); err != nil {
+		return nil, err
+	}
+	return rs, nil
 }

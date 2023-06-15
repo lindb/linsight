@@ -19,11 +19,9 @@ package model
 
 import "github.com/lindb/linsight/accesscontrol"
 
-var collapsed = true
-
 // DefaultUserPreference represents default preference if user not set.
 var DefaultUserPreference = Preference{
-	Collapsed: &collapsed,
+	Collapsed: true,
 	Theme:     "light",
 }
 
@@ -40,7 +38,7 @@ type User struct {
 	Email      string `json:"email" gorm:"column:email;index:u_idx_user_email,unique"`
 	Password   string `json:"-" gorm:"column:password"`
 	Salt       string `json:"-" gorm:"column:salt"`
-	IsDisabled *bool  `json:"isDisabled" gorm:"column:is_disabled"`
+	IsDisabled bool   `json:"isDisabled" gorm:"column:is_disabled"`
 }
 
 // CreateUserRequest represents create new user request
@@ -55,11 +53,10 @@ type CreateUserRequest struct {
 type Preference struct {
 	BaseModel
 
-	UserID   int64  `json:"-" gorm:"column:user_id;index:u_idx_pref_user,unique"`
-	HomePage string `json:"homePage" gorm:"column:home_page"`
-	Theme    string `json:"theme" gorm:"column:theme"`
-	// use pointer to fix gorm not update bool value
-	Collapsed *bool `json:"collapsed" gorm:"column:collapsed"`
+	UserID    int64  `json:"-" gorm:"column:user_id;index:u_idx_pref_user,unique"`
+	HomePage  string `json:"homePage" gorm:"column:home_page"`
+	Theme     string `json:"theme" gorm:"column:theme"`
+	Collapsed bool   `json:"collapsed" gorm:"column:collapsed"`
 }
 
 // UserToken represents user's login token and history.
@@ -80,6 +77,14 @@ type OrgUser struct {
 	UserID int64                  `gorm:"column:user_id;index:u_idx_org_user,unique"`
 	OrgID  int64                  `gorm:"column:org_id;index:u_idx_org_user,unique"`
 	Role   accesscontrol.RoleType `gorm:"column:role"`
+}
+
+// UserOrgInfo represents user's org info.
+type UserOrgInfo struct {
+	UserUID string                 `json:"userUid"`
+	OrgUID  string                 `json:"orgUid"`
+	OrgName string                 `json:"orgName"`
+	Role    accesscontrol.RoleType `json:"role"`
 }
 
 // LoginUser represents the parameters of login request.

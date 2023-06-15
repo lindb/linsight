@@ -18,12 +18,15 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/lindb/linsight/accesscontrol"
+	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
 )
@@ -102,6 +105,11 @@ func TestOrgService_CreateOrg(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	srv := NewOrgService(mockDB)
+
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+
 	cases := []struct {
 		name    string
 		prepare func()
@@ -115,8 +123,17 @@ func TestOrgService_CreateOrg(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "create nav successfully",
+			prepare: func() {
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
 			name: "create org successfully",
 			prepare: func() {
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -206,6 +223,29 @@ func TestOrgService_GetOrgByUID(t *testing.T) {
 		mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
 		org, err := srv.GetOrgByUID(ctx, "1234")
 		assert.NotNil(t, org)
+		assert.NoError(t, err)
+	})
+}
+
+func TestOrgService_GetOrgListForSignedUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewOrgService(mockDB)
+
+	t.Run("get org list fail", func(t *testing.T) {
+		mockDB.EXPECT().Find(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+		rs, err := srv.GetOrgListForSignedUser(ctx)
+		assert.Error(t, err)
+		assert.Nil(t, rs)
+	})
+
+	t.Run("get org list successfully for lin", func(t *testing.T) {
+		mockDB.EXPECT().Find(gomock.Any(), gomock.Any()).Return(nil)
+		_, err := srv.GetOrgListForSignedUser(context.WithValue(context.TODO(), constant.LinSightSignedKey, &model.SignedUser{
+			Role: accesscontrol.RoleLin,
+		}))
 		assert.NoError(t, err)
 	})
 }

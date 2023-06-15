@@ -27,6 +27,7 @@ import (
 	"github.com/lindb/linsight/http/middleware"
 )
 
+// Router represents http api router.
 type Router struct {
 	engine *gin.Engine
 	deps   *depspkg.API
@@ -44,6 +45,7 @@ type Router struct {
 	chartAPI     *api.ChartAPI
 }
 
+// NewRouter creates a Router instance.
 func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 	return &Router{
 		engine:             engine,
@@ -62,6 +64,7 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 	}
 }
 
+// RegisterRouters registers all http api routers.
 func (r *Router) RegisterRouters() {
 	r.engine.Use(middleware.InitContext(r.deps))
 
@@ -93,6 +96,9 @@ func (r *Router) RegisterRouters() {
 	router.DELETE("/org/teams/:uid",
 		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.DeleteTeamByUID)...)
 
+	router.GET("/user/orgs",
+		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.orgAPI.GetOrgListForSignedUser)...)
+
 	router.GET("/org/nav",
 		middleware.Authorize(r.deps, accesscontrol.Nav, accesscontrol.Read, r.navAPI.GetNav)...)
 	router.PUT("/org/nav",
@@ -106,6 +112,14 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.SearchUser)...)
 	router.GET("/users/:uid",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.GetUserByUID)...)
+	router.GET("/users/:uid/orgs",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.GetOrgListByUserUID)...)
+	router.POST("/users/:uid/orgs",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.AddOrg)...)
+	router.PUT("/users/:uid/orgs",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.UpdateOrg)...)
+	router.DELETE("/users/:uid/orgs/:orgUid",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.RemoveOrg)...)
 	router.PUT("/users/:uid/disable",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.DisableUserByUID)...)
 	router.PUT("/users/:uid/enable",

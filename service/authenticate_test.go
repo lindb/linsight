@@ -57,8 +57,7 @@ func TestAuthenticateService_Authenticate(t *testing.T) {
 		{
 			name: "user is disabled",
 			prepare: func() {
-				disabled := true
-				userSrv.EXPECT().GetUserByName(gomock.Any(), gomock.Any()).Return(&model.User{IsDisabled: &disabled}, nil)
+				userSrv.EXPECT().GetUserByName(gomock.Any(), gomock.Any()).Return(&model.User{IsDisabled: true}, nil)
 			},
 			assert: func(user *model.User, err error) {
 				assert.Nil(t, user)
@@ -68,8 +67,7 @@ func TestAuthenticateService_Authenticate(t *testing.T) {
 		{
 			name: "invalid credentials",
 			prepare: func() {
-				disabled := false
-				userSrv.EXPECT().GetUserByName(gomock.Any(), gomock.Any()).Return(&model.User{Password: "pwd", IsDisabled: &disabled}, nil)
+				userSrv.EXPECT().GetUserByName(gomock.Any(), gomock.Any()).Return(&model.User{Password: "pwd"}, nil)
 			},
 			assert: func(user *model.User, err error) {
 				assert.Nil(t, user)
@@ -79,9 +77,8 @@ func TestAuthenticateService_Authenticate(t *testing.T) {
 		{
 			name: "successfully",
 			prepare: func() {
-				disabled := false
 				userSrv.EXPECT().GetUserByName(gomock.Any(), gomock.Any()).
-					Return(&model.User{Password: util.EncodePassword("pwd", "123456"), Salt: "123456", IsDisabled: &disabled}, nil)
+					Return(&model.User{Password: util.EncodePassword("pwd", "123456"), Salt: "123456"}, nil)
 			},
 			assert: func(user *model.User, err error) {
 				assert.NotNil(t, user)

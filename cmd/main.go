@@ -111,11 +111,12 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	if err := authorizeSrv.Initialize(); err != nil {
 		panic(err)
 	}
-	userSrv := service.NewUserService(db)
+	orgSrv := service.NewOrgService(db)
+	userSrv := service.NewUserService(db, orgSrv)
 	starSrv := service.NewStarService(db)
 	return &deps.API{
 		Config:          cfg,
-		OrgSrv:          service.NewOrgService(db),
+		OrgSrv:          orgSrv,
 		UserSrv:         userSrv,
 		TeamSrv:         service.NewTeamService(db),
 		NavSrv:          service.NewNavService(db),

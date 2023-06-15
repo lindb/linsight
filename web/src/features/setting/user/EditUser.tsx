@@ -25,6 +25,7 @@ import { useRequest } from '@src/hooks';
 import { get } from 'lodash-es';
 import { User } from '@src/types';
 import { ApiKit } from '@src/utils';
+import OrgList from './OrgList';
 const { Meta } = Card;
 const { Title, Text } = Typography;
 
@@ -47,118 +48,125 @@ const EditUser: React.FC = () => {
   };
 
   return (
-    <Card
-      className="setting-page"
-      loading={loading}
-      bordered={false}
-      bodyStyle={{ padding: 24 }}
-      title={
-        <Meta
-          className="setting-meta"
-          title={
-            <div className="meta-title">
-              <Title heading={3} style={{ cursor: 'pointer' }} onClick={() => gotoUserListPage()} underline>
-                Users
-              </Title>
-              <Title heading={3}>/ {get(result, 'userName', 'N/A')}</Title>
-            </div>
-          }
-          description={
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Text>Setting for current user</Text>
-            </div>
-          }
-          avatar={<Icon icon="user" />}
-        />
-      }>
-      <Form
-        className="linsight-form setting-form"
-        initValues={result || {}}
-        allowEmpty
-        onSubmit={async (values: User) => {
-          try {
-            setSubmitting(true);
-            values.uid = uid;
-            await UserSrv.updateUser(values);
-            Notification.success('Update user successfully!');
-          } catch (err) {
-            Notification.error(ApiKit.getErrorMsg(err));
-          } finally {
-            setSubmitting(false);
-          }
-        }}>
-        <Form.Section text="Basic Information">
-          <Form.Input field="userName" label="Username" rules={[{ required: true, message: 'Password is required' }]} />
-          <Form.Input field="name" label="Name" />
-          <Form.Input field="email" label="Email" rules={[{ required: true, message: 'Password is required' }]} />
-          <Form.Slot>
-            <div className="setting-buttons">
-              <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
-                Save
-              </Button>
+    <>
+      <Card
+        className="setting-page"
+        loading={loading}
+        bordered={false}
+        bodyStyle={{ padding: 24 }}
+        title={
+          <Meta
+            className="setting-meta"
+            title={
+              <div className="meta-title">
+                <Title heading={3} style={{ cursor: 'pointer' }} onClick={() => gotoUserListPage()} underline>
+                  Users
+                </Title>
+                <Title heading={3}>/ {get(result, 'userName', 'N/A')}</Title>
+              </div>
+            }
+            description={
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Text>Setting for current user</Text>
+              </div>
+            }
+            avatar={<Icon icon="user" />}
+          />
+        }>
+        <Form
+          className="linsight-form setting-form"
+          initValues={result || {}}
+          allowEmpty
+          onSubmit={async (values: User) => {
+            try {
+              setSubmitting(true);
+              values.uid = uid;
+              await UserSrv.updateUser(values);
+              Notification.success('Update user successfully!');
+            } catch (err) {
+              Notification.error(ApiKit.getErrorMsg(err));
+            } finally {
+              setSubmitting(false);
+            }
+          }}>
+          <Form.Section text="Basic Information">
+            <Form.Input
+              field="userName"
+              label="Username"
+              rules={[{ required: true, message: 'Password is required' }]}
+            />
+            <Form.Input field="name" label="Name" />
+            <Form.Input field="email" label="Email" rules={[{ required: true, message: 'Password is required' }]} />
+            <Form.Slot>
+              <div className="setting-buttons">
+                <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
+                  Save
+                </Button>
+                <Button
+                  type="tertiary"
+                  loading={submitting}
+                  onClick={async () => {
+                    try {
+                      setSubmitting(true);
+                      if (userIsDisable()) {
+                        await UserSrv.enableUserByUID(uid);
+                        await refetch();
+                        Notification.success('User enabled!');
+                      } else {
+                        setVisible(true);
+                      }
+                    } catch (err) {
+                      Notification.error(ApiKit.getErrorMsg(err));
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}>
+                  {userIsDisable() ? 'Enable User' : 'Disable User'}
+                </Button>
+              </div>
+            </Form.Slot>
+          </Form.Section>
+        </Form>
+        <OrgList userUid={uid} />
+        <Modal
+          title={<div>Disable user</div>}
+          motion={false}
+          visible={visible}
+          onCancel={() => setVisible(false)}
+          footer={
+            <>
               <Button
                 type="tertiary"
+                onClick={() => {
+                  setVisible(false);
+                }}>
+                Cancel
+              </Button>
+              <Button
+                type="danger"
+                theme="solid"
                 loading={submitting}
                 onClick={async () => {
                   try {
                     setSubmitting(true);
-                    if (userIsDisable()) {
-                      await UserSrv.enableUserByUID(uid);
-                      await refetch();
-                      Notification.success('User enabled!');
-                    } else {
-                      setVisible(true);
-                    }
+                    await UserSrv.disableUserByUID(uid);
+                    await refetch();
+                    Notification.success('User disabled!');
+                    setVisible(false);
                   } catch (err) {
                     Notification.error(ApiKit.getErrorMsg(err));
                   } finally {
                     setSubmitting(false);
                   }
                 }}>
-                {userIsDisable() ? 'Enable User' : 'Disable User'}
+                Yes
               </Button>
-            </div>
-          </Form.Slot>
-        </Form.Section>
-      </Form>
-      <Modal
-        title={<div>Disable user</div>}
-        motion={false}
-        visible={visible}
-        onCancel={() => setVisible(false)}
-        footer={
-          <>
-            <Button
-              type="tertiary"
-              onClick={() => {
-                setVisible(false);
-              }}>
-              Cancel
-            </Button>
-            <Button
-              type="danger"
-              theme="solid"
-              loading={submitting}
-              onClick={async () => {
-                try {
-                  setSubmitting(true);
-                  await UserSrv.disableUserByUID(uid);
-                  await refetch();
-                  Notification.success('User disabled!');
-                  setVisible(false);
-                } catch (err) {
-                  Notification.error(ApiKit.getErrorMsg(err));
-                } finally {
-                  setSubmitting(false);
-                }
-              }}>
-              Yes
-            </Button>
-          </>
-        }>
-        Are you sure you want to disable this user?
-      </Modal>
-    </Card>
+            </>
+          }>
+          Are you sure you want to disable this user?
+        </Modal>
+      </Card>
+    </>
   );
 };
 

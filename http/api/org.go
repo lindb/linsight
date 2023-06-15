@@ -107,3 +107,13 @@ func (api *OrgAPI) SearchOrg(c *gin.Context) {
 		"organizations": org,
 	})
 }
+
+// GetOrgListForSignedUser returns all org for current signed user can manage.
+func (api *OrgAPI) GetOrgListForSignedUser(c *gin.Context) {
+	orgs, err := api.deps.OrgSrv.GetOrgListForSignedUser(c.Request.Context())
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, orgs)
+}
