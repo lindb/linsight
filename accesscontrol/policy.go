@@ -79,8 +79,8 @@ func BuildPolicyDefinitions() []Policy {
 		AddPolicy(RoleAdmin, Team, Read).
 		AddPolicy(RoleAdmin, Org, Write).
 		AddPolicy(RoleAdmin, Org, Read).
-		AddPolicy(RoleViewer, User, Write).
-		AddPolicy(RoleViewer, User, Read).
+		AddPolicy(RoleAdmin, User, Write).
+		AddPolicy(RoleAdmin, User, Read).
 		AddPolicy(RoleAdmin, Datasource, Write).
 		AddPolicy(RoleViewer, Datasource, Read).
 		AddPolicy(RoleViewer, DatasourceDataQuery, Read).

@@ -162,7 +162,10 @@ func TestUserAPI_ChangePassword(t *testing.T) {
 		UserSrv: userSrv,
 	})
 	r.PUT("/user/password/change", api.ChangePassword)
-	body := encoding.JSONMarshal(&model.Preference{})
+	body := encoding.JSONMarshal(&model.ChangeUserPassword{
+		OldPassword: "admin",
+		NewPassword: "admin",
+	})
 
 	cases := []struct {
 		name    string
@@ -184,6 +187,7 @@ func TestUserAPI_ChangePassword(t *testing.T) {
 				userSrv.EXPECT().ChangePassword(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
+				fmt.Println(resp)
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
@@ -202,6 +206,244 @@ func TestUserAPI_ChangePassword(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
 			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/user/password/change", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_CreateUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.POST("/users", api.CreateUser)
+	body := encoding.JSONMarshal(&model.CreateUserRequest{
+		UserName: "user",
+		Password: "pwd",
+		Email:    "email",
+	})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: http.NoBody,
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "create user failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "create user successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().CreateUser(gomock.Any(), gomock.Any()).Return("1234", nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+				assert.Equal(t, `"1234"`, resp.Body.String())
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/users", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_SearchUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.PUT("/users", api.SearchUser)
+	params := encoding.JSONMarshal(&model.SearchUserRequest{})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: bytes.NewBuffer([]byte("{abc")),
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "search user failure",
+			body: bytes.NewBuffer(params),
+			prepare: func() {
+				userSrv.EXPECT().SearchUser(gomock.Any(), gomock.Any()).Return(nil, int64(0), fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "search user successfully",
+			body: bytes.NewBuffer(params),
+			prepare: func() {
+				userSrv.EXPECT().SearchUser(gomock.Any(), gomock.Any()).Return(nil, int64(0), nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/users", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_UpdateUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.PUT("/users", api.UpdateUser)
+	body := encoding.JSONMarshal(&model.User{})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: http.NoBody,
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update user failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().UpdateUser(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update user successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().UpdateUser(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/users", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_GetUserByUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.GET("/users/:uid", api.GetUserByUID)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "get user failure",
+			prepare: func() {
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), "1234").Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "get user successfully",
+			prepare: func() {
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), "1234").Return(nil, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/users/1234", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {

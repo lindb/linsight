@@ -41,7 +41,7 @@ const User: React.FC = () => {
         <Card.Meta
           className="setting-meta"
           title={<Title heading={3}>{user.name}</Title>}
-          description={user.name}
+          description={user.userName}
           avatar={<Icon icon="profile" />}
         />
       }>

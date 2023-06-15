@@ -24,10 +24,14 @@ import EditTeam from './team/EditTeam';
 import EditDataSource from './datasource/EditDataSource';
 import NewOrg from './org/NewOrg';
 import EditOrg from './org/EditOrg';
+import NewUser from './user/NewUser';
+import EditUser from './user/EditUser';
 
 const SettingHome: React.FC = () => {
   return (
     <Routes>
+      <Route path="/users/new" element={<NewUser />} errorElement={<ErrorPage />} />
+      <Route path="/users/edit" element={<EditUser />} errorElement={<ErrorPage />} />
       <Route path="/org/teams/edit/*" element={<EditTeam />} errorElement={<ErrorPage />} />
       <Route path="/org/teams/new" element={<NewTeam />} errorElement={<ErrorPage />} />
       <Route path="/datasource/new" element={<EditDataSource />} errorElement={<ErrorPage />} />

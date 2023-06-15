@@ -34,7 +34,7 @@ const TeamList: React.FC = () => {
   const [deleteVisible, setDeleteVisible] = useState(false);
   const params = useRef() as MutableRefObject<SearchTeam>;
   const currentTeam = useRef() as MutableRefObject<Team>;
-  const { loading, result, error, refetch } = useRequest(['load_teams'], () => {
+  const { loading, result, error, refetch } = useRequest(['search_teams'], () => {
     return TeamSrv.fetchTeams(params.current);
   });
   const searchTeam = debounce(refetch, 200);
@@ -48,6 +48,7 @@ const TeamList: React.FC = () => {
             params.current = { name: value };
             searchTeam();
           }}
+          onEnterPress={() => searchTeam()}
         />
         <Button
           icon={<IconPlusStroked />}

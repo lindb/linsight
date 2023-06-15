@@ -16,26 +16,21 @@ specific language governing permissions and limitations
 under the License.
 */
 import React, { useState } from 'react';
-import { Button, Card, Form, Typography } from '@douyinfe/semi-ui';
+import { Banner, Button, Card, Form, Typography } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { UserSrv } from '@src/services';
 import { Icon, Notification } from '@src/components';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useRequest } from '@src/hooks';
-import { get } from 'lodash-es';
+import { useNavigate } from 'react-router-dom';
 import { User } from '@src/types';
 import { ApiKit } from '@src/utils';
+import { isEmpty } from 'lodash-es';
+
 const { Meta } = Card;
 const { Title, Text } = Typography;
 
-const EditUser: React.FC = () => {
+const NewUser: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
-  const [searchParams] = useSearchParams();
-  const uid = `${searchParams.get('uid')}`;
-  const { loading, result } = useRequest(['get_user', uid], () => {
-    return UserSrv.getUserByUID(uid);
-  });
-
+  const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
   const gotoUserListPage = () => {
@@ -45,7 +40,6 @@ const EditUser: React.FC = () => {
   return (
     <Card
       className="setting-page"
-      loading={loading}
       bordered={false}
       bodyStyle={{ padding: 24 }}
       title={
@@ -54,14 +48,14 @@ const EditUser: React.FC = () => {
           title={
             <div className="meta-title">
               <Title heading={3} style={{ cursor: 'pointer' }} onClick={() => gotoUserListPage()} underline>
-                Users
+                Setting
               </Title>
-              <Title heading={3}>/ {get(result, 'userName', 'N/A')}</Title>
+              <Title heading={3}>/ New User</Title>
             </div>
           }
           description={
             <div style={{ display: 'flex', gap: 8 }}>
-              <Text>Setting for current user</Text>
+              <Text>Create a new Linsight user</Text>
             </div>
           }
           avatar={<Icon icon="user" />}
@@ -69,33 +63,46 @@ const EditUser: React.FC = () => {
       }>
       <Form
         className="linsight-form setting-form"
-        initValues={result || {}}
-        allowEmpty
         onSubmit={async (values: User) => {
           try {
             setSubmitting(true);
-            values.uid = uid;
-            await UserSrv.updateUser(values);
-            Notification.success('Update user successfully!');
+            await UserSrv.createUser(values);
+            setErrorMsg('');
+            Notification.success('Create user successfully');
+            gotoUserListPage();
           } catch (err) {
-            Notification.error(ApiKit.getErrorMsg(err));
+            setErrorMsg(ApiKit.getErrorMsg(err));
           } finally {
             setSubmitting(false);
           }
         }}>
-        <Form.Section text="Basic Information">
-          <Form.Input field="userName" label="Username" rules={[{ required: true, message: 'Password is required' }]} />
-          <Form.Input field="name" label="Name" />
-          <Form.Input field="email" label="Email" rules={[{ required: true, message: 'Password is required' }]} />
+        <Form.Input field="userName" label="Username" rules={[{ required: true, message: 'Password is required' }]} />
+        <Form.Input field="name" label="Name" />
+        <Form.Input field="email" label="Email" rules={[{ required: true, message: 'Password is required' }]} />
+        <Form.Input
+          field="password"
+          label="Password"
+          mode="password"
+          rules={[{ required: true, message: 'Password is required' }]}
+        />
+        {!isEmpty(errorMsg) && (
           <Form.Slot>
-            <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
-              Save
-            </Button>
+            <Banner fullMode={false} type="danger" description={errorMsg} />
           </Form.Slot>
-        </Form.Section>
+        )}
+        <Form.Slot>
+          <div className="setting-buttons">
+            <Button type="tertiary" onClick={gotoUserListPage}>
+              Back
+            </Button>
+            <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
+              Create User
+            </Button>
+          </div>
+        </Form.Slot>
       </Form>
     </Card>
   );
 };
 
-export default EditUser;
+export default NewUser;

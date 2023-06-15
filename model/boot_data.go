@@ -19,11 +19,12 @@ package model
 
 import "gorm.io/datatypes"
 
+// BootData represents Linsight boot data.
 type BootData struct {
 	Home        string         `json:"home,omitempty"`
 	User        SignedUser     `json:"user"`
-	NavTree     datatypes.JSON `json:"navTree"`
-	Datasources []Datasource   `json:"datasources"`
+	NavTree     datatypes.JSON `json:"navTree,omitempty"`
+	Datasources []Datasource   `json:"datasources,omitempty"`
 }
 
 type NavItem struct {
