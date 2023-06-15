@@ -35,10 +35,9 @@ func TestUserService_GetPreference(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-
 	srv := NewUserService(mockDB)
 	t.Run("get user's preference successfully", func(t *testing.T) {
-		mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(12), int64(10)).Return(nil)
+		mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(10)).Return(nil)
 		pref, err := srv.GetPreference(ctx)
 		assert.NotNil(t, pref)
 		assert.NoError(t, err)
@@ -59,30 +58,30 @@ func TestUserService_SavePreference(t *testing.T) {
 		{
 			name: "get user's preference failure",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(12), int64(10)).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(10)).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
 			name: "update user's preference failure",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(12), int64(10)).Return(nil)
-				mockDB.EXPECT().Update(gomock.Any(), "org_id=? and user_id=?", int64(12), int64(10)).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(10)).Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "user_id=?", int64(10)).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
 			name: "update user's preference successfully",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(12), int64(10)).Return(nil)
-				mockDB.EXPECT().Update(gomock.Any(), "org_id=? and user_id=?", int64(12), int64(10)).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(10)).Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "user_id=?", int64(10)).Return(nil)
 			},
 			wantErr: false,
 		},
 		{
 			name: "create user's preference successfully",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(12), int64(10)).Return(gorm.ErrRecordNotFound)
+				mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(10)).Return(gorm.ErrRecordNotFound)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -321,6 +320,102 @@ func TestUserService_UpdateUser(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
 			err := srv.UpdateUser(ctx, &model.User{UID: "1234"})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestUserService_GetSignedUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB)
+	disabled := true
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(1234)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "no org, get preference failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(1234)).
+					DoAndReturn(func(user *model.User, _ string, _ int64) error {
+						user.ID = 1234
+						user.IsDisabled = &disabled
+						return nil
+					})
+				mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(1234)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "has org, get user org fail",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(1234)).
+					DoAndReturn(func(user *model.User, _ string, _ int64) error {
+						user.ID = 1234
+						user.OrgID = 1
+						fmt.Println("sss")
+						return nil
+					})
+				mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(1), int64(1234)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "has org, get org fail",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(1234)).
+					DoAndReturn(func(user *model.User, _ string, _ int64) error {
+						user.ID = 1234
+						user.OrgID = 1
+						fmt.Println("sss")
+						return nil
+					})
+				mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(1), int64(1234)).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(1)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "has org, get preference ok",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(1234)).
+					DoAndReturn(func(user *model.User, _ string, _ int64) error {
+						user.ID = 1234
+						user.OrgID = 1
+						fmt.Println("sss")
+						return nil
+					})
+				mockDB.EXPECT().Get(gomock.Any(), "org_id=? and user_id=?", int64(1), int64(1234)).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "id=?", int64(1)).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(1234)).Return(gorm.ErrRecordNotFound)
+			},
+			wantErr: false,
+		},
+		{
+			name:    "get from cache",
+			prepare: func() {},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			_, err := srv.GetSignedUser(ctx, 1234)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

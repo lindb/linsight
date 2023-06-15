@@ -31,7 +31,7 @@ class MenuStore {
 
   setMenus(menus: any) {
     this.menus.clear();
-    menus.forEach((item: any) => {
+    (menus || []).forEach((item: any) => {
       if (item.children) {
         item.children.forEach((child: any) => {
           if (child.path) {

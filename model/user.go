@@ -19,6 +19,14 @@ package model
 
 import "github.com/lindb/linsight/accesscontrol"
 
+var collapsed = true
+
+// DefaultUserPreference represents default preference if user not set.
+var DefaultUserPreference = Preference{
+	Collapsed: &collapsed,
+	Theme:     "light",
+}
+
 // User represents the user basic information.
 type User struct {
 	BaseModel
@@ -47,7 +55,6 @@ type CreateUserRequest struct {
 type Preference struct {
 	BaseModel
 
-	OrgID    int64  `json:"-" gorm:"column:org_id;index:u_idx_pref_org,unique"`
 	UserID   int64  `json:"-" gorm:"column:user_id;index:u_idx_pref_user,unique"`
 	HomePage string `json:"homePage" gorm:"column:home_page"`
 	Theme    string `json:"theme" gorm:"column:theme"`

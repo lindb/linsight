@@ -157,9 +157,7 @@ const FeatureMenu: React.FC = () => {
                   position="right"
                   render={
                     <Dropdown.Menu className="linsight-user">
-                      <Dropdown.Item disabled>
-                        {get(boot, 'user.name')}@{get(boot, 'user.org.name')}
-                      </Dropdown.Item>
+                      <Dropdown.Item disabled>{get(boot, 'user.name')}</Dropdown.Item>
                       <Dropdown.Divider />
                       <Dropdown.Item onClick={() => navigate('/user/profile')}>Your profile</Dropdown.Item>
 

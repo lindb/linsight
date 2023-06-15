@@ -21,6 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	httppkg "github.com/lindb/common/pkg/http"
+	"github.com/lindb/common/pkg/logger"
 
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
@@ -30,33 +31,40 @@ import (
 // BootAPI represents boot information related api handlers.
 type BootAPI struct {
 	deps *depspkg.API
+
+	logger logger.Logger
 }
 
 // NewBootAPI creates a BootAPI instance.
 func NewBootAPI(deps *depspkg.API) *BootAPI {
 	return &BootAPI{
-		deps: deps,
+		deps:   deps,
+		logger: logger.GetLogger("API", "Boot"),
 	}
 }
 
 // Boot gets boot information after signed in.
 func (api *BootAPI) Boot(c *gin.Context) {
-	datasources, err := api.deps.DatasourceSrv.GetDatasources(c.Request.Context())
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
 	signedUser := util.GetUser(c.Request.Context())
-	nav, err := api.deps.NavSrv.GetNavByOrgID(c.Request.Context(), signedUser.Org.ID)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
+	boot := &model.BootData{
+		Home: signedUser.Preference.HomePage,
+		User: *signedUser,
 	}
-	// FIXME: need modify nav item data based on use setting
-	httppkg.OK(c, &model.BootData{
-		Home:        signedUser.Preference.HomePage,
-		User:        *signedUser,
-		Datasources: datasources,
-		NavTree:     nav.Config,
-	})
+	if signedUser.Org != nil {
+		// if user belong a org, get datasource/nav for org level.
+		datasources, err := api.deps.DatasourceSrv.GetDatasources(c.Request.Context())
+		if err != nil {
+			api.logger.Error("get datasources for current org fail", logger.Error(err))
+		} else {
+			boot.Datasources = datasources
+		}
+		nav, err := api.deps.NavSrv.GetNavByOrgID(c.Request.Context(), signedUser.Org.ID)
+		if err != nil {
+			api.logger.Error("get nav tree for current org fail", logger.Error(err))
+		} else {
+			boot.NavTree = nav.Config
+		}
+	}
+
+	httppkg.OK(c, boot)
 }

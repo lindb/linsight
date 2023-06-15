@@ -20,6 +20,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -43,8 +44,9 @@ type UserService interface {
 	GetUserByUID(ctx context.Context, uid string) (*model.User, error)
 	// SearchUser returns user list by query condition.
 	SearchUser(ctx context.Context, req *model.SearchUserRequest) (users []model.User, total int64, err error)
-	// TODO:
+	// GetSignedUser returns user basic information by user id.
 	GetSignedUser(ctx context.Context, userID int64) (*model.SignedUser, error)
+	// GetUserByName returns user by given username or email.
 	GetUserByName(ctx context.Context, nameOrEmail string) (*model.User, error)
 	// GetPreference returns the preference of current signed user for current org.
 	GetPreference(ctx context.Context) (*model.Preference, error)
@@ -68,6 +70,7 @@ func NewUserService(db dbpkg.DB) UserService {
 	}
 }
 
+// GetSignedUser returns user basic information by user id.
 func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model.SignedUser, error) {
 	val, ok := srv.cache.Load(userID)
 	if ok {
@@ -77,39 +80,53 @@ func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model
 	if err != nil {
 		return nil, err
 	}
-	orgUser := model.OrgUser{}
-	err = srv.db.Get(&orgUser, "org_id=? and user_id=?", user.OrgID, user.ID)
-	if err != nil {
-		return nil, err
-	}
-	org := &model.Org{}
-	err = srv.db.Get(org, "id=?", user.OrgID)
-	if err != nil {
-		return nil, err
-	}
-	pref, err := srv.getPreference(ctx, user.OrgID, user.ID)
-	if err != nil {
-		return nil, err
-	}
-
 	signedUser := &model.SignedUser{
 		User:       user,
 		Name:       user.Name,
 		UserName:   user.UserName,
 		Email:      user.Email,
-		IsDisabled: *user.IsDisabled,
-		Org:        org,
-		Role:       orgUser.Role,
-		Preference: pref,
+		IsDisabled: false, // default enabled
 	}
+	if user.IsDisabled != nil {
+		// if IsDisabled has value, using it
+		signedUser.IsDisabled = *user.IsDisabled
+	}
+	fmt.Println(user.OrgID)
+	if user.OrgID > 0 {
+		fmt.Println("errr")
+		// if user belongs org
+		var org model.Org
+		var orgUser model.OrgUser
+		err = srv.db.Get(&orgUser, "org_id=? and user_id=?", user.OrgID, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		err = srv.db.Get(&org, "id=?", user.OrgID)
+		if err != nil {
+			return nil, err
+		}
+		signedUser.Org = &org
+		signedUser.Role = orgUser.Role
+	}
+	pref, err := srv.getPreference(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if pref == nil {
+		// if preference not found, set default value
+		pref = &model.DefaultUserPreference
+	}
+	signedUser.Preference = pref
+
 	srv.cache.Store(userID, signedUser)
 	return signedUser, nil
 }
 
+// GetUserByName returns user by given username or email.
 func (srv *userService) GetUserByName(ctx context.Context, nameOrEmail string) (*model.User, error) {
 	user := &model.User{}
 	// TODO: do tolower?
-	if err := srv.db.Get(&user, "name=? or email=?", nameOrEmail, nameOrEmail); err != nil {
+	if err := srv.db.Get(&user, "user_name=? or email=?", nameOrEmail, nameOrEmail); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -213,17 +230,15 @@ func (srv *userService) SearchUser(ctx context.Context, req *model.SearchUserReq
 // GetPreference returns the preference of current signed user for current org.
 func (srv *userService) GetPreference(ctx context.Context) (*model.Preference, error) {
 	signedUser := util.GetUser(ctx)
-	orgID := signedUser.Org.ID
 	userID := signedUser.User.ID
-	return srv.getPreference(ctx, orgID, userID)
+	return srv.getPreference(ctx, userID)
 }
 
 // SavePreference saves the preference of signed user for current org.
 func (srv *userService) SavePreference(ctx context.Context, pref *model.Preference) error {
 	signedUser := util.GetUser(ctx)
-	orgID := signedUser.Org.ID
 	userID := signedUser.User.ID
-	prefFormDB, err := srv.getPreference(ctx, orgID, userID)
+	prefFormDB, err := srv.getPreference(ctx, userID)
 	if err != nil {
 		return err
 	}
@@ -232,7 +247,6 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 	}()
 	if prefFormDB == nil {
 		pref.UserID = userID
-		pref.OrgID = orgID
 		pref.CreatedBy = userID
 		pref.UpdatedBy = userID
 		return srv.db.Create(pref)
@@ -241,7 +255,7 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 		prefFormDB.Theme = pref.Theme
 		prefFormDB.Collapsed = pref.Collapsed
 		prefFormDB.HomePage = pref.HomePage
-		return srv.db.Update(prefFormDB, "org_id=? and user_id=?", orgID, userID)
+		return srv.db.Update(prefFormDB, "user_id=?", userID)
 	}
 }
 
@@ -265,9 +279,9 @@ func (srv *userService) ChangePassword(ctx context.Context, changePWD *model.Cha
 }
 
 // getPreference returns the preference by given org/user.
-func (srv *userService) getPreference(_ context.Context, orgID, userID int64) (*model.Preference, error) {
+func (srv *userService) getPreference(_ context.Context, userID int64) (*model.Preference, error) {
 	pref := model.Preference{}
-	if err := srv.db.Get(&pref, "org_id=? and user_id=?", orgID, userID); err != nil {
+	if err := srv.db.Get(&pref, "user_id=?", userID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

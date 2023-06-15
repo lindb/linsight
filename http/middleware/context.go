@@ -36,6 +36,7 @@ func getUserToken(c *gin.Context, deps *depspkg.API) (*model.UserToken, error) {
 	return deps.AuthenticateSrv.LookupToken(c.Request.Context(), token)
 }
 
+// InitContext initializes the signed context.
 func InitContext(deps *depspkg.API) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		initSignedUser(c, deps)
