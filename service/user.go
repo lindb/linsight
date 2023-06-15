@@ -44,6 +44,10 @@ type UserService interface {
 	GetUserByUID(ctx context.Context, uid string) (*model.User, error)
 	// SearchUser returns user list by query condition.
 	SearchUser(ctx context.Context, req *model.SearchUserRequest) (users []model.User, total int64, err error)
+	// DisableUser disables user.
+	DisableUser(ctx context.Context, uid string) error
+	// EnableUser enbles user.
+	EnableUser(ctx context.Context, uid string) error
 	// GetSignedUser returns user basic information by user id.
 	GetSignedUser(ctx context.Context, userID int64) (*model.SignedUser, error)
 	// GetUserByName returns user by given username or email.
@@ -66,7 +70,8 @@ type userService struct {
 // NewUserService creates an UserService instance.
 func NewUserService(db dbpkg.DB) UserService {
 	return &userService{
-		db: db,
+		db:    db,
+		cache: sync.Map{},
 	}
 }
 
@@ -227,6 +232,16 @@ func (srv *userService) SearchUser(ctx context.Context, req *model.SearchUserReq
 	return users, count, nil
 }
 
+// DisableUser disables user.
+func (srv *userService) DisableUser(ctx context.Context, uid string) error {
+	return srv.setUserDisableState(ctx, uid, true)
+}
+
+// EnableUser enbles user.
+func (srv *userService) EnableUser(ctx context.Context, uid string) error {
+	return srv.setUserDisableState(ctx, uid, false)
+}
+
 // GetPreference returns the preference of current signed user for current org.
 func (srv *userService) GetPreference(ctx context.Context) (*model.Preference, error) {
 	signedUser := util.GetUser(ctx)
@@ -288,4 +303,15 @@ func (srv *userService) getPreference(_ context.Context, userID int64) (*model.P
 		return nil, err
 	}
 	return &pref, nil
+}
+
+// setUserDisableState sets user's disable state.
+func (srv *userService) setUserDisableState(ctx context.Context, uid string, disable bool) error {
+	userFromDB, err := srv.GetUserByUID(ctx, uid)
+	if err != nil {
+		return err
+	}
+	userFromDB.IsDisabled = &disable
+
+	return srv.db.Update(userFromDB, "uid=?", uid)
 }

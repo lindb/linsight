@@ -97,6 +97,28 @@ func (api *UserAPI) GetUserByUID(c *gin.Context) {
 	httppkg.OK(c, user)
 }
 
+// DisableUserByUID disables user by uid.
+func (api *UserAPI) DisableUserByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	err := api.deps.UserSrv.DisableUser(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "User disabled")
+}
+
+// EnableUserByUID enables user by uid.
+func (api *UserAPI) EnableUserByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	err := api.deps.UserSrv.EnableUser(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "User enabled")
+}
+
 // GetPreference returns the preference of current signed user.
 func (api *UserAPI) GetPreference(c *gin.Context) {
 	pref, err := api.deps.UserSrv.GetPreference(c.Request.Context())

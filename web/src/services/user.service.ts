@@ -59,6 +59,14 @@ const updateUser = (user: User): Promise<string> => {
   return ApiKit.PUT<string>(ApiPath.User, user);
 };
 
+const disableUserByUID = (uid: string): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.User}/${uid}/disable`);
+};
+
+const enableUserByUID = (uid: string): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.User}/${uid}/enable`);
+};
+
 export default {
   login,
   logout,
@@ -67,6 +75,8 @@ export default {
   createUser,
   fetchUsers,
   updateUser,
+  disableUserByUID,
+  enableUserByUID,
   getPreference,
   savePreference,
   changePassword,
