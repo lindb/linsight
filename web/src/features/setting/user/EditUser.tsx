@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import React, { useState } from 'react';
-import { Button, Card, Form, Typography } from '@douyinfe/semi-ui';
+import { Button, Card, Form, Modal, Typography } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { UserSrv } from '@src/services';
 import { Icon, Notification } from '@src/components';
@@ -30,16 +30,20 @@ const { Title, Text } = Typography;
 
 const EditUser: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [searchParams] = useSearchParams();
   const uid = `${searchParams.get('uid')}`;
-  const { loading, result } = useRequest(['get_user', uid], () => {
+  const { loading, result, refetch } = useRequest(['get_user', uid], () => {
     return UserSrv.getUserByUID(uid);
   });
-
   const navigate = useNavigate();
 
   const gotoUserListPage = () => {
     navigate({ pathname: '/setting/users' });
+  };
+
+  const userIsDisable = () => {
+    return get(result, 'isDisabled', false);
   };
 
   return (
@@ -88,12 +92,72 @@ const EditUser: React.FC = () => {
           <Form.Input field="name" label="Name" />
           <Form.Input field="email" label="Email" rules={[{ required: true, message: 'Password is required' }]} />
           <Form.Slot>
-            <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
-              Save
-            </Button>
+            <div className="setting-buttons">
+              <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
+                Save
+              </Button>
+              <Button
+                type="tertiary"
+                loading={submitting}
+                onClick={async () => {
+                  try {
+                    setSubmitting(true);
+                    if (userIsDisable()) {
+                      await UserSrv.enableUserByUID(uid);
+                      await refetch();
+                      Notification.success('User enabled!');
+                    } else {
+                      setVisible(true);
+                    }
+                  } catch (err) {
+                    Notification.error(ApiKit.getErrorMsg(err));
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}>
+                {userIsDisable() ? 'Enable User' : 'Disable User'}
+              </Button>
+            </div>
           </Form.Slot>
         </Form.Section>
       </Form>
+      <Modal
+        title={<div>Disable user</div>}
+        motion={false}
+        visible={visible}
+        onCancel={() => setVisible(false)}
+        footer={
+          <>
+            <Button
+              type="tertiary"
+              onClick={() => {
+                setVisible(false);
+              }}>
+              Cancel
+            </Button>
+            <Button
+              type="danger"
+              theme="solid"
+              loading={submitting}
+              onClick={async () => {
+                try {
+                  setSubmitting(true);
+                  await UserSrv.disableUserByUID(uid);
+                  await refetch();
+                  Notification.success('User disabled!');
+                  setVisible(false);
+                } catch (err) {
+                  Notification.error(ApiKit.getErrorMsg(err));
+                } finally {
+                  setSubmitting(false);
+                }
+              }}>
+              Yes
+            </Button>
+          </>
+        }>
+        Are you sure you want to disable this user?
+      </Modal>
     </Card>
   );
 };

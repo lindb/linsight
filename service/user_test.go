@@ -422,3 +422,55 @@ func TestUserService_GetSignedUser(t *testing.T) {
 		})
 	}
 }
+
+func TestUserService_DisableUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "disable user successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "uid=?", "1234").Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.DisableUser(ctx, "1234")
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestUserService_EnableUser(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB)
+	mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+	mockDB.EXPECT().Update(gomock.Any(), "uid=?", "1234").Return(nil)
+	err := srv.EnableUser(ctx, "1234")
+	assert.NoError(t, err)
+}
