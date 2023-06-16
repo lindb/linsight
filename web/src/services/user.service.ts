@@ -16,7 +16,16 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { ChangePassword, LoginUser, Preference, SearchUser, User, UserOrg, UserResult } from '@src/types';
+import {
+  ChangePassword,
+  LoginUser,
+  Preference,
+  ResetPassword,
+  SearchUser,
+  User,
+  UserOrg,
+  UserResult,
+} from '@src/types';
 import { ApiKit } from '@src/utils';
 
 const login = (user: LoginUser): Promise<string> => {
@@ -41,6 +50,10 @@ const getPreference = (): Promise<Preference> => {
 
 const changePassword = (changePassword: ChangePassword): Promise<string> => {
   return ApiKit.PUT<string>(ApiPath.ChangePassword, changePassword);
+};
+
+const resetPassword = (resetPassword: ResetPassword): Promise<string> => {
+  return ApiKit.PUT<string>(ApiPath.ResetPassword, resetPassword);
 };
 
 const createUser = (user: User): Promise<string> => {
@@ -100,6 +113,7 @@ export default {
   getPreference,
   savePreference,
   changePassword,
+  resetPassword,
   getOrgListForUser,
   createUserOrg,
   updateUserOrg,

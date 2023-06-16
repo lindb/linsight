@@ -56,8 +56,11 @@ type UserService interface {
 	GetPreference(ctx context.Context) (*model.Preference, error)
 	// GetPreference returns the preference of current signed user for current org.
 	SavePreference(ctx context.Context, pref *model.Preference) error
+
 	// ChangePassword changes user password.
 	ChangePassword(ctx context.Context, changePWD *model.ChangeUserPassword) error
+	// ResetPassword resets user password.
+	ResetPassword(ctx context.Context, resetPWD *model.ResetUserPassword) error
 
 	// GetOrgListByUserUID returns org list which user belongs.
 	GetOrgListByUserUID(ctx context.Context, uid string) ([]model.UserOrgInfo, error)
@@ -286,9 +289,17 @@ func (srv *userService) ChangePassword(ctx context.Context, changePWD *model.Cha
 		return errors.New("old password invalid")
 	}
 	newPWD := util.EncodePassword(changePWD.NewPassword, user.Salt)
-	user.Password = newPWD
+	return srv.db.UpdateSingle(&model.User{}, "password", newPWD, "id=?", userID)
+}
 
-	return srv.db.Update(user, "id=?", userID)
+// ResetPassword resets user password.
+func (srv *userService) ResetPassword(ctx context.Context, resetPWD *model.ResetUserPassword) error {
+	user, err := srv.GetUserByUID(ctx, resetPWD.UserUID)
+	if err != nil {
+		return err
+	}
+	newPWD := util.EncodePassword(resetPWD.Password, user.Salt)
+	return srv.db.UpdateSingle(&model.User{}, "password", newPWD, "uid=?", resetPWD.UserUID)
 }
 
 // GetOrgListByUserUID returns org list which user belongs.

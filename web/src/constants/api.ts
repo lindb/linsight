@@ -21,6 +21,7 @@ export enum ApiPath {
   Boot = '/boot',
   User = '/users',
   ChangePassword = '/user/password/change',
+  ResetPassword = '/user/password/reset',
   Team = '/org/teams',
   Nav = '/org/nav',
   Org = '/orgs',

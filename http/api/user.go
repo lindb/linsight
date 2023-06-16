@@ -157,6 +157,20 @@ func (api *UserAPI) ChangePassword(c *gin.Context) {
 	httppkg.OK(c, "User password changed")
 }
 
+// ResetPassword resets user password.
+func (api *UserAPI) ResetPassword(c *gin.Context) {
+	resetPWD := &model.ResetUserPassword{}
+	if err := c.ShouldBind(resetPWD); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	if err := api.deps.UserSrv.ResetPassword(c.Request.Context(), resetPWD); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "User password changed")
+}
+
 // GetOrgListByUserUID returns the org list than user belong.
 func (api *UserAPI) GetOrgListByUserUID(c *gin.Context) {
 	uid := c.Param(constant.UID)

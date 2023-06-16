@@ -134,7 +134,7 @@ func TestUserSerivce_ChangePassword(t *testing.T) {
 					user.ID = 10
 					return nil
 				})
-				mockDB.EXPECT().Update(gomock.Any(), "id=?", int64(10)).Return(nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(), "id=?", int64(10)).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -147,6 +147,49 @@ func TestUserSerivce_ChangePassword(t *testing.T) {
 			err := srv.ChangePassword(ctx, &model.ChangeUserPassword{
 				OldPassword: "12345",
 				NewPassword: "123456",
+			})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestUserSerivce_ResetPassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB, nil)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "reset password successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(), "uid=?", "1234").Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.ResetPassword(ctx, &model.ResetUserPassword{
+				UserUID:  "1234",
+				Password: "123456",
 			})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)

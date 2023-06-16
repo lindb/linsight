@@ -81,6 +81,7 @@ const SwitchOrg: React.FC<{
               return (
                 <Button
                   loading={submitting}
+                  icon={<Icon icon="switch" />}
                   onClick={async () => {
                     setSubmitting(true);
                     try {

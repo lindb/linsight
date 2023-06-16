@@ -43,6 +43,11 @@ export interface ChangePassword {
   confirmPassword: string;
 }
 
+export interface ResetPassword {
+  userUid: string;
+  password: string;
+}
+
 export interface UserResult {
   users?: User[];
   total?: number;
