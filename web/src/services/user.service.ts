@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { ChangePassword, LoginUser, Preference, SearchUser, User, UserResult } from '@src/types';
+import { ChangePassword, LoginUser, Preference, SearchUser, User, UserOrg, UserResult } from '@src/types';
 import { ApiKit } from '@src/utils';
 
 const login = (user: LoginUser): Promise<string> => {
@@ -67,6 +67,22 @@ const enableUserByUID = (uid: string): Promise<string> => {
   return ApiKit.PUT<string>(`${ApiPath.User}/${uid}/enable`);
 };
 
+const getOrgListForUser = (uid: string): Promise<UserOrg> => {
+  return ApiKit.GET<UserOrg>(`${ApiPath.User}/${uid}/orgs`);
+};
+
+const createUserOrg = (uid: string, userOrg: UserOrg): Promise<string> => {
+  return ApiKit.POST<string>(`${ApiPath.User}/${uid}/orgs`, userOrg);
+};
+
+const updateUserOrg = (uid: string, userOrg: UserOrg): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.User}/${uid}/orgs`, userOrg);
+};
+
+const deleteUserOrg = (uid: string, orgUid: string): Promise<string> => {
+  return ApiKit.DELETE<string>(`${ApiPath.User}/${uid}/orgs/${orgUid}`);
+};
+
 export default {
   login,
   logout,
@@ -80,4 +96,8 @@ export default {
   getPreference,
   savePreference,
   changePassword,
+  getOrgListForUser,
+  createUserOrg,
+  updateUserOrg,
+  deleteUserOrg,
 };

@@ -83,8 +83,8 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	salt, _ := util.GetRandomString(10)
 	pwd := util.EncodePassword("admin", salt)
 	user.AddInitRecord(
-		&model.User{Name: "admin", Password: pwd, Salt: salt, OrgID: 1, Email: "admin@admin.io"},
-		&model.User{Name: "admin"},
+		&model.User{Name: "admin", UserName: "admin", Password: pwd, Salt: salt, OrgID: 1, Email: "admin@admin.io"},
+		&model.User{UserName: "admin"},
 	)
 	migrator.AddMigration(user)
 	nav := dbpkg.NewMigration(&model.Nav{})

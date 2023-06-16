@@ -35,8 +35,12 @@ const fetchOrg = (params: SearchOrg): Promise<OrgResult[]> => {
   return ApiKit.GET<OrgResult[]>(ApiPath.Org, params);
 };
 
-const GetOrgByUID = (orgUID: string): Promise<Org> => {
+const getOrgByUID = (orgUID: string): Promise<Org> => {
   return ApiKit.GET<Org>(`${ApiPath.Org}/${orgUID}`);
+};
+
+const getOrgsForCurrentUser = (): Promise<Org[]> => {
+  return ApiKit.GET<Org[]>(ApiPath.UserOrg);
 };
 
 export default {
@@ -44,5 +48,6 @@ export default {
   updateOrg,
   deleteOrg,
   fetchOrg,
-  GetOrgByUID,
+  getOrgByUID,
+  getOrgsForCurrentUser,
 };

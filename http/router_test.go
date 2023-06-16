@@ -15,20 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package util
+package http
 
 import (
-	"context"
+	"testing"
 
-	"github.com/lindb/linsight/constant"
-	"github.com/lindb/linsight/model"
+	"github.com/gin-gonic/gin"
+
+	"github.com/lindb/linsight/http/deps"
 )
 
-// GetUser returns signed user information from context.
-func GetUser(ctx context.Context) *model.SignedUser {
-	signedUser := ctx.Value(constant.LinSightSignedKey)
-	if signedUser == nil {
-		return nil
-	}
-	return signedUser.(*model.SignedUser)
+func TestRouter_RegisterRouters(t *testing.T) {
+	r := NewRouter(gin.New(), &deps.API{})
+	r.RegisterRouters()
 }

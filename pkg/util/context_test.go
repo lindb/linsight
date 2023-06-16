@@ -19,16 +19,16 @@ package util
 
 import (
 	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
 )
 
-// GetUser returns signed user information from context.
-func GetUser(ctx context.Context) *model.SignedUser {
-	signedUser := ctx.Value(constant.LinSightSignedKey)
-	if signedUser == nil {
-		return nil
-	}
-	return signedUser.(*model.SignedUser)
+func TestContext_GetUser(t *testing.T) {
+	assert.Nil(t, GetUser(context.TODO()))
+	ctx := context.WithValue(context.TODO(), constant.LinSightSignedKey, &model.SignedUser{})
+	assert.NotNil(t, GetUser(ctx))
 }
