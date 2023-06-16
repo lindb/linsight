@@ -118,6 +118,8 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.AddOrg)...)
 	router.PUT("/users/:uid/orgs",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.UpdateOrg)...)
+	router.PUT("/user/orgs/switch/:orgUid",
+		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.SwitchOrg)...)
 	router.DELETE("/users/:uid/orgs/:orgUid",
 		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.RemoveOrg)...)
 	router.PUT("/users/:uid/disable",

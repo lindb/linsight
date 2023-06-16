@@ -210,3 +210,13 @@ func (api *UserAPI) UpdateOrg(c *gin.Context) {
 	}
 	httppkg.OK(c, "Organization updated")
 }
+
+// SwitchOrg switches target org.
+func (api *UserAPI) SwitchOrg(c *gin.Context) {
+	orgUID := c.Param("orgUid")
+	if err := api.deps.UserSrv.SwitchOrg(c.Request.Context(), orgUID); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Organization removed")
+}

@@ -45,7 +45,13 @@ func NewBootAPI(deps *depspkg.API) *BootAPI {
 
 // Boot gets boot information after signed in.
 func (api *BootAPI) Boot(c *gin.Context) {
-	signedUser := util.GetUser(c.Request.Context())
+	user := util.GetUser(c.Request.Context())
+	// need read data from backend
+	signedUser, err := api.deps.UserSrv.GetSignedUser(c.Request.Context(), user.User.ID)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
 	boot := &model.BootData{
 		Home: signedUser.Preference.HomePage,
 		User: *signedUser,

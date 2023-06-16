@@ -397,11 +397,6 @@ func TestUserService_GetSignedUser(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		{
-			name:    "get from cache",
-			prepare: func() {},
-			wantErr: false,
-		},
 	}
 
 	for _, tt := range cases {
@@ -498,6 +493,19 @@ func TestUserSerivce_AddOrg(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "create user's org successfully, user selected org",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").
+					DoAndReturn(func(user *model.User, _, _ string) error {
+						user.OrgID = 1
+						return nil
+					})
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "1234").Return(&model.Org{}, nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range cases {
@@ -560,7 +568,11 @@ func TestUserSerivce_RemoveOrg(t *testing.T) {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "1234").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				mockDB.EXPECT().Find(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Find(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(orgs *[]model.OrgUser, _ string, _ int64) error {
+						*orgs = append(*orgs, model.OrgUser{})
+						return nil
+					})
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -664,6 +676,64 @@ func TestUserSerivce_GetOrgListByUserUID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
 			_, err := srv.GetOrgListByUserUID(ctx, "1234")
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestUserSerivce_SwitchOrg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewUserService(mockDB, nil)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get org failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "check user org failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "user org not exist",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
+			},
+			wantErr: true,
+		},
+		{
+			name: "switch org successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
+				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), "org_id", gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.SwitchOrg(ctx, "1234")
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
