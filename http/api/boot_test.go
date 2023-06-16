@@ -39,13 +39,28 @@ func TestBootAPI_Boot(t *testing.T) {
 
 	datasourceSrv := service.NewMockDatasourceService(ctrl)
 	navSrv := service.NewMockNavService(ctrl)
+	userSrv := service.NewMockUserService(ctrl)
 	r := gin.New()
 
 	api := NewBootAPI(&deps.API{
 		DatasourceSrv: datasourceSrv,
 		NavSrv:        navSrv,
+		UserSrv:       userSrv,
 	})
 	r.GET("/boot", api.Boot)
+	signedUser := &model.SignedUser{
+		Org: &model.Org{
+			BaseModel: model.BaseModel{
+				ID: 12,
+			},
+		},
+		User: &model.User{
+			BaseModel: model.BaseModel{
+				ID: 10,
+			},
+		},
+		Preference: &model.DefaultUserPreference,
+	}
 
 	cases := []struct {
 		name    string
@@ -53,21 +68,17 @@ func TestBootAPI_Boot(t *testing.T) {
 		prepare func()
 	}{
 		{
-			name: "user belong one org but get resource fail",
-			ctx: context.WithValue(context.TODO(), constant.LinSightSignedKey, &model.SignedUser{
-				Org: &model.Org{
-					BaseModel: model.BaseModel{
-						ID: 12,
-					},
-				},
-				User: &model.User{
-					BaseModel: model.BaseModel{
-						ID: 10,
-					},
-				},
-				Preference: &model.DefaultUserPreference,
-			}),
+			name: "get signed user fail",
+			ctx:  context.WithValue(context.TODO(), constant.LinSightSignedKey, signedUser),
 			prepare: func() {
+				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
+			},
+		},
+		{
+			name: "user belong one org but get resource fail",
+			ctx:  context.WithValue(context.TODO(), constant.LinSightSignedKey, signedUser),
+			prepare: func() {
+				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, fmt.Errorf("err"))
 				navSrv.EXPECT().GetNavByOrgID(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
@@ -88,6 +99,7 @@ func TestBootAPI_Boot(t *testing.T) {
 				Preference: &model.DefaultUserPreference,
 			}),
 			prepare: func() {
+				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, nil)
 				navSrv.EXPECT().GetNavByOrgID(gomock.Any(), gomock.Any()).Return(&model.Nav{}, nil)
 			},
@@ -102,6 +114,10 @@ func TestBootAPI_Boot(t *testing.T) {
 					},
 				},
 			}),
+			prepare: func() {
+				signedUser.Org = nil
+				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
+			},
 		},
 	}
 	for _, tt := range cases {

@@ -780,3 +780,53 @@ func TestUserAPI_DeleteOrg(t *testing.T) {
 		})
 	}
 }
+
+func TestUserAPI_SwitchOrg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.PUT("/users/orgs/:orgUid", api.SwitchOrg)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "switch org failure",
+			prepare: func() {
+				userSrv.EXPECT().SwitchOrg(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "switch org successfully",
+			prepare: func() {
+				userSrv.EXPECT().SwitchOrg(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/users/orgs/4321", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}

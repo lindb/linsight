@@ -83,6 +83,10 @@ const deleteUserOrg = (uid: string, orgUid: string): Promise<string> => {
   return ApiKit.DELETE<string>(`${ApiPath.User}/${uid}/orgs/${orgUid}`);
 };
 
+const switchOrg = (orgUid: string): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.SwitchOrg}/${orgUid}`);
+};
+
 export default {
   login,
   logout,
@@ -100,4 +104,5 @@ export default {
   createUserOrg,
   updateUserOrg,
   deleteUserOrg,
+  switchOrg,
 };

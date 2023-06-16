@@ -20,23 +20,98 @@ import { MenuStore } from '@src/stores';
 import React, { useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isEmpty, get, upperFirst } from 'lodash-es';
-import { Button, Dropdown, Nav, Typography } from '@douyinfe/semi-ui';
+import { Button, Dropdown, Modal, Nav, Table, Tag, Typography } from '@douyinfe/semi-ui';
 import { IconChevronRightStroked, IconUser, IconMoon, IconSun } from '@douyinfe/semi-icons';
+import { Notification } from '@src/components';
 import Icon from '../common/Icon';
 import Sider from '@douyinfe/semi-ui/lib/es/layout/Sider';
 import Logo from '@src/images/logo.svg';
-import { ThemeType } from '@src/types';
+import { ThemeType, UserOrg } from '@src/types';
 import { UserSrv } from '@src/services';
 import { matchPath } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
+import { useRequest } from '@src/hooks';
+import { ApiKit } from '@src/utils';
 
 const { Text } = Typography;
+
+const SwitchOrg: React.FC<{
+  userUid: string;
+  currentOrgUid: string;
+  visible: boolean;
+  setVisible: (v: boolean) => void;
+}> = (props) => {
+  const { userUid, currentOrgUid, visible, setVisible } = props;
+  const { sync } = useContext(PlatformContext);
+  const { result: orgList, loading } = useRequest(['get_org_list_for_current_user', userUid], () => {
+    return UserSrv.getOrgListForUser(userUid);
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  return (
+    <Modal
+      motion={false}
+      footer={null}
+      title="Switch organization"
+      visible={visible}
+      bodyStyle={{ paddingBottom: 24 }}
+      closeOnEsc
+      onCancel={() => setVisible(false)}>
+      <Table
+        bordered
+        size="small"
+        rowKey="orgUid"
+        loading={loading}
+        dataSource={orgList || []}
+        pagination={false}
+        columns={[
+          {
+            title: 'Org. name',
+            dataIndex: 'orgName',
+          },
+          {
+            title: 'Role',
+            dataIndex: 'role',
+          },
+          {
+            render: (_text: string, r: UserOrg, _index: number) => {
+              if (r.orgUid === currentOrgUid) {
+                return <Tag color="orange">Current</Tag>;
+              }
+              return (
+                <Button
+                  loading={submitting}
+                  onClick={async () => {
+                    setSubmitting(true);
+                    try {
+                      await UserSrv.switchOrg(r.orgUid);
+                      Notification.success('Switch organization successfully!');
+                      sync();
+                      setVisible(false);
+                    } catch (err) {
+                      Notification.error(ApiKit.getErrorMsg(err));
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}>
+                  Switch
+                </Button>
+              );
+            },
+          },
+        ]}
+      />
+    </Modal>
+  );
+};
 
 const FeatureMenu: React.FC = () => {
   const { boot, collapsed, toggleCollapse, toggleTheme, theme } = useContext(PlatformContext);
   const navigate = useNavigate();
   const location = useLocation();
   const [menus, setMenus] = useState([]);
+  const currentOrg = get(boot, 'user.org');
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     MenuStore.setCurrentMenu(location.pathname);
@@ -123,6 +198,16 @@ const FeatureMenu: React.FC = () => {
 
   return (
     <>
+      {visible && (
+        <SwitchOrg
+          userUid={get(boot, 'user.uid')}
+          currentOrgUid={currentOrg.uid}
+          visible={visible}
+          setVisible={(v: boolean) => {
+            setVisible(v);
+          }}
+        />
+      )}
       <div className="nav-menu-no-icon"></div>
       <Button
         style={{
@@ -159,8 +244,17 @@ const FeatureMenu: React.FC = () => {
                     <Dropdown.Menu className="linsight-user">
                       <Dropdown.Item disabled>{get(boot, 'user.name')}</Dropdown.Item>
                       <Dropdown.Divider />
+                      {currentOrg && (
+                        <Dropdown.Item
+                          onClick={() => {
+                            setVisible(true);
+                          }}>
+                          <span style={{ marginRight: 8 }}>Organization:</span>
+                          <Tag color="orange">{currentOrg.name}</Tag>
+                        </Dropdown.Item>
+                      )}
                       <Dropdown.Item onClick={() => navigate('/user/profile')}>Your profile</Dropdown.Item>
-
+                      <Dropdown.Item onClick={() => navigate('/user/password')}>Change password</Dropdown.Item>
                       <Dropdown.Item icon={theme !== ThemeType.Dark ? <IconMoon /> : <IconSun />} onClick={toggleTheme}>
                         {upperFirst(theme)}
                       </Dropdown.Item>

@@ -25,6 +25,7 @@ export enum ApiPath {
   Nav = '/org/nav',
   Org = '/orgs',
   UserOrg = '/user/orgs',
+  SwitchOrg = '/user/orgs/switch',
   Preference = '/user/preference',
   Datasources = '/datasources',
   Datasource = '/datasource',

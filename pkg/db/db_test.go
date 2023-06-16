@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	errs "github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
@@ -385,6 +386,144 @@ func TestDB_Delete(t *testing.T) {
 	mock.ExpectCommit()
 	err := database.Delete(&user, "name = ?", "test")
 	assert.NoError(t, err)
+}
+
+func TestDB_UpdateSingle(t *testing.T) {
+	database, mock := GetDBMock(t)
+	// updateByID one column
+	expectSQL := "UPDATE `users` SET `name`=?,`updated_at`=? WHERE `id` = ?"
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(expectSQL)).
+		WithArgs("name", sqlmock.AnyArg(), 1).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	err := database.UpdateSingle(&User{}, "name", "name", "`id` = ?", 1)
+	assert.NoError(t, err)
+	//	updateByID all rows
+	mock.ExpectBegin()
+	mock.ExpectRollback()
+	err = database.UpdateSingle(&User{
+		ID: 0,
+	}, "name", "xx")
+	assert.Error(t, err)
+	assert.Equal(t, gorm.ErrMissingWhereClause, errs.Cause(err))
+	//	updateByID error
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(expectSQL)).
+		WithArgs("name", sqlmock.AnyArg(), 1).
+		WillReturnError(errors.New("xx"))
+	mock.ExpectRollback()
+	err = database.UpdateSingle(&User{}, "name", "name", "`id` = ?", 1)
+	assert.Error(t, err)
+	assert.Equal(t, "xx", err.Error())
+}
+
+func TestDB_Updates(t *testing.T) {
+	database, mock := GetDBMock(t)
+	// updateByID one column
+	expectSQL := "UPDATE `users` SET `name`=?,`updated_at`=? WHERE `id` = ?"
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(expectSQL)).
+		WithArgs("name", sqlmock.AnyArg(), 1).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	err := database.Updates(&User{}, map[string]any{"name": "name"}, "`id` = ?", 1)
+	assert.NoError(t, err)
+	//	updateByID all rows
+	mock.ExpectBegin()
+	mock.ExpectRollback()
+	err = database.Updates(&User{
+		ID: 0,
+	}, map[string]any{"name": "xx"})
+	assert.Error(t, err)
+	assert.Equal(t, gorm.ErrMissingWhereClause, errs.Cause(err))
+	//	updateByID error
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta(expectSQL)).
+		WithArgs("name", sqlmock.AnyArg(), 1).
+		WillReturnError(errors.New("xx"))
+	mock.ExpectRollback()
+	err = database.Updates(&User{}, map[string]any{"name": "name"}, "`id` = ?", 1)
+	assert.Error(t, err)
+	assert.Equal(t, "xx", err.Error())
+}
+
+func TestDB_ExecRaw(t *testing.T) {
+	database, mock := GetDBMock(t)
+	expectSQL := "select name from users where id=?"
+	mock.ExpectQuery(regexp.QuoteMeta(expectSQL)).
+		WithArgs(1).
+		WillReturnError(errors.New("xx"))
+	err := database.ExecRaw(&[]User{}, expectSQL, 1)
+	assert.Error(t, err)
+	assert.Equal(t, "xx", err.Error())
+	mock.ExpectQuery(regexp.QuoteMeta(expectSQL)).
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"name"}))
+	err = database.ExecRaw(&User{}, expectSQL, 1)
+	assert.Error(t, err)
+	assert.Equal(t, gorm.ErrRecordNotFound, errs.Cause(err))
+}
+
+func TestDB_Transaction(t *testing.T) {
+	database, mock := GetDBMock(t)
+	// commit
+	expectValue := &User{
+		Name:      "test",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		CreatedBy: 1,
+		UpdatedBy: 2,
+	}
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT INTO `users`").
+		WithArgs("test", sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1), int64(2)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+	err := database.Transaction(func(tx DB) error {
+		err := tx.Create(expectValue)
+		if err != nil {
+			return err
+		}
+		assert.Equal(t, int64(1), expectValue.ID)
+		return nil
+	})
+	assert.NoError(t, err)
+	expectValue.ID = 0
+	// rollback
+	// gorm will ignore zero values
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT INTO `users`").
+		WithArgs("test", sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1), int64(2)).
+		WillReturnError(errors.New("xx"))
+	mock.ExpectRollback()
+	err0 := database.Transaction(func(tx DB) error {
+		err = tx.Create(expectValue)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	assert.Error(t, err0)
+	// commit error, rollback
+	mock.MatchExpectationsInOrder(true)
+	mock.ExpectBegin()
+	mock.ExpectExec("INSERT INTO `users`").
+		WithArgs("test", sqlmock.AnyArg(), sqlmock.AnyArg(), int64(1), int64(2)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit().WillReturnError(errors.New("xx"))
+	mock.ExpectRollback().WillReturnError(nil)
+	err1 := database.Transaction(func(tx DB) error {
+		err = tx.Create(expectValue)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	assert.Error(t, err1)
+	assert.Equal(t, "xx", err1.Error())
 }
 
 func GetDBMock(t *testing.T) (DB, sqlmock.Sqlmock) {

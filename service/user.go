@@ -67,6 +67,8 @@ type UserService interface {
 	RemoveOrg(ctx context.Context, userOrg *model.UserOrgInfo) error
 	// UpdateOrg updates user's org(such as role etc.)
 	UpdateOrg(ctx context.Context, userOrg *model.UserOrgInfo) error
+	// SwitchOrg switches target org.
+	SwitchOrg(ctx context.Context, orgUID string) error
 }
 
 // userService implements the UserService interface.
@@ -88,16 +90,13 @@ func NewUserService(db dbpkg.DB, orgSrv OrgService) UserService {
 
 // GetSignedUser returns user basic information by user id.
 func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model.SignedUser, error) {
-	val, ok := srv.cache.Load(userID)
-	if ok {
-		return val.(*model.SignedUser), nil
-	}
 	user, err := srv.getUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	signedUser := &model.SignedUser{
 		User:       user,
+		UID:        user.UID,
 		Name:       user.Name,
 		UserName:   user.UserName,
 		Email:      user.Email,
@@ -190,7 +189,7 @@ func (srv *userService) UpdateUser(ctx context.Context, user *model.User) error 
 // GetUserByUID returns user basic information by given uid.
 func (srv *userService) GetUserByUID(ctx context.Context, uid string) (*model.User, error) {
 	user := &model.User{}
-	if err := srv.db.Get(&user, "uid=?", uid); err != nil {
+	if err := srv.db.Get(user, "uid=?", uid); err != nil {
 		return nil, err
 	}
 	return user, nil
@@ -349,7 +348,7 @@ func (srv *userService) RemoveOrg(ctx context.Context, userOrg *model.UserOrgInf
 			return err
 		}
 		orgUsers := []model.OrgUser{}
-		err := tx.Find(orgUsers, "user_id=?", user.ID)
+		err := tx.Find(&orgUsers, "user_id=?", user.ID)
 		if err != nil {
 			return err
 		}
@@ -375,6 +374,25 @@ func (srv *userService) UpdateOrg(ctx context.Context, userOrg *model.UserOrgInf
 	}
 	uo.UpdatedBy = userID
 	return srv.db.Update(uo, "org_id=? and user_id=?", org.ID, user.ID)
+}
+
+// SwitchOrg switches target org.
+func (srv *userService) SwitchOrg(ctx context.Context, orgUID string) error {
+	signedUser := util.GetUser(ctx)
+	var org model.Org
+	err := srv.db.Get(&org, "uid=?", orgUID)
+	if err != nil {
+		return err
+	}
+	// check target org if exist
+	exist, err := srv.db.Exist(&model.OrgUser{}, "user_id=? and org_id=?", signedUser.User.ID, org.ID)
+	if err != nil {
+		return err
+	}
+	if !exist {
+		return errors.New("organization not exist")
+	}
+	return srv.db.UpdateSingle(&model.User{}, "org_id", org.ID, "id=?", signedUser.User.ID)
 }
 
 // getPreference returns the preference by given org/user.
