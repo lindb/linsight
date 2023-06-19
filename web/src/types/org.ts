@@ -28,3 +28,10 @@ export interface Org {
 export interface SearchOrg {
   name?: string;
 }
+
+export interface OrgUser {
+  userUid: string;
+  name: string;
+  userName: string;
+  email: string;
+}

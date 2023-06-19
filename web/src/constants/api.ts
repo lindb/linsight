@@ -25,6 +25,7 @@ export enum ApiPath {
   Team = '/org/teams',
   Nav = '/org/nav',
   Org = '/orgs',
+  OrgUsers = '/org/users',
   UserOrg = '/user/orgs',
   SwitchOrg = '/user/orgs/switch',
   Preference = '/user/preference',

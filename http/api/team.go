@@ -25,6 +25,7 @@ import (
 	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
+	"github.com/lindb/linsight/pkg/http"
 )
 
 // TeamAPI represents team related api handlers.
@@ -108,4 +109,70 @@ func (api *TeamAPI) GetTeamByUID(c *gin.Context) {
 		return
 	}
 	httppkg.OK(c, team)
+}
+
+// GetTeamMembers returns member list for team.
+func (api *TeamAPI) GetTeamMembers(c *gin.Context) {
+	req := &model.SearchTeamMemberRequest{}
+	if err := c.ShouldBindWith(req, http.QueryJSONBind); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	members, total, err := api.deps.TeamSrv.GetTeamMembers(c.Request.Context(), c.Param(constant.UID), req)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, gin.H{
+		"total":   total,
+		"members": members,
+	})
+}
+
+// AddTeamMembers adds new members to team.
+func (api *TeamAPI) AddTeamMembers(c *gin.Context) {
+	var members model.AddTeamMember
+	if err := c.ShouldBind(&members); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	err := api.deps.TeamSrv.AddTeamMembers(ctx, c.Param(constant.UID), &members)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Members added")
+}
+
+// UpdateTeamMember updates team member.
+func (api *TeamAPI) UpdateTeamMember(c *gin.Context) {
+	var member model.UpdateTeamMember
+	if err := c.ShouldBind(&member); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	err := api.deps.TeamSrv.UpdateTeamMember(ctx, c.Param(constant.UID), &member)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Member updated")
+}
+
+// RemoveTeamMember removes member from team.
+func (api *TeamAPI) RemoveTeamMember(c *gin.Context) {
+	var members model.RemoveTeamMember
+	if err := c.ShouldBind(&members); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	ctx := c.Request.Context()
+	err := api.deps.TeamSrv.RemoveTeamMember(ctx, c.Param(constant.UID), &members)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Members removed")
 }

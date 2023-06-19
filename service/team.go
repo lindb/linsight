@@ -41,17 +41,32 @@ type TeamService interface {
 	DeleteTeamByUID(ctx context.Context, teamUID string) error
 	// GetTeamByUID returns team by tean uid.
 	GetTeamByUID(ctx context.Context, uid string) (*model.Team, error)
+
+	// GetTeamMembers returns member list for team.
+	GetTeamMembers(
+		ctx context.Context,
+		teamUID string,
+		req *model.SearchTeamMemberRequest,
+	) (rs []model.TeamMemberInfo, total int64, err error)
+	// AddTeamMembers adds new team members.
+	AddTeamMembers(ctx context.Context, teamUID string, members *model.AddTeamMember) error
+	// UpdateTeamMember updates team member.
+	UpdateTeamMember(ctx context.Context, teamUID string, member *model.UpdateTeamMember) error
+	// RemoveTeamMember removes members from team.
+	RemoveTeamMember(ctx context.Context, teamUID string, members *model.RemoveTeamMember) error
 }
 
 // teamService implements TeamService interface.
 type teamService struct {
-	db dbpkg.DB
+	db      dbpkg.DB
+	userSrv UserService
 }
 
 // NewTeamService creates a TeamService instance.
-func NewTeamService(db dbpkg.DB) TeamService {
+func NewTeamService(db dbpkg.DB, userSrv UserService) TeamService {
 	return &teamService{
-		db: db,
+		db:      db,
+		userSrv: userSrv,
 	}
 }
 
@@ -140,4 +155,139 @@ func (srv *teamService) getTeamByUID(ctx context.Context, uid string) (*model.Te
 		return nil, err
 	}
 	return rs, nil
+}
+
+// AddTeamMembers adds new team members.
+func (srv *teamService) AddTeamMembers(ctx context.Context, teamUID string, members *model.AddTeamMember) error {
+	team, err := srv.getTeamByUID(ctx, teamUID)
+	if err != nil {
+		return err
+	}
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		permission := members.Permission
+		for _, userUID := range members.UserUIDs {
+			// TODO: batch?
+			user, err := srv.userSrv.GetUserByUID(ctx, userUID)
+			if err != nil {
+				return err
+			}
+			// check member if exist
+			exist, err := srv.db.Exist(&model.TeamMember{},
+				"org_id=? and team_id=? and user_id=?", team.OrgID, team.ID, user.ID)
+			if err != nil {
+				return err
+			}
+			if exist {
+				// ignore if member exist
+				continue
+			}
+			if err := tx.Create(&model.TeamMember{
+				OrgID:      team.OrgID,
+				TeamID:     team.ID,
+				UserID:     user.ID,
+				Permission: permission,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// GetTeamMembers returns member list for team.
+func (srv *teamService) GetTeamMembers(
+	ctx context.Context,
+	teamUID string,
+	req *model.SearchTeamMemberRequest,
+) (rs []model.TeamMemberInfo, total int64, err error) {
+	team, err := srv.getTeamByUID(ctx, teamUID)
+	if err != nil {
+		return nil, 0, err
+	}
+	conditions := []string{"org_id=?", "team_id=?"}
+	params := []any{team.OrgID, team.ID}
+	if req.User != "" {
+		conditions = append(conditions, "user_id in (select id from users where (name like ? or user_name like ? or email like ?))")
+		params = append(params, req.User+"%", req.User+"%", req.User+"%")
+	}
+	if len(req.Permissions) > 0 {
+		conditions = append(conditions, "permission in ?")
+		params = append(params, req.Permissions)
+	}
+	where := strings.Join(conditions, " and ")
+	count, err := srv.db.Count(&model.TeamMember{}, where, params...)
+	if err != nil {
+		return nil, 0, err
+	}
+	if count == 0 {
+		return nil, 0, nil
+	}
+
+	// reset params
+	params = []any{team.OrgID, team.ID}
+	sql := `
+	select 
+		u.uid as user_uid,u.name as name,u.user_name as user_name,tm.permission as permission  
+	from users u,team_members tm 
+		where u.id=tm.user_id and tm.org_id=? and tm.team_id=?`
+
+	if req.User != "" {
+		sql += " and (u.name like ? or u.user_name like ? or u.email like ?)"
+		params = append(params, req.User+"%", req.User+"%", req.User+"%")
+	}
+	if len(req.Permissions) > 0 {
+		sql += " and tm.permission in ?"
+		params = append(params, req.Permissions)
+	}
+	offset := 0
+	limit := 20
+	if req.Offset > 0 {
+		offset = req.Offset
+	}
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+	sql += " order by tm.id desc limit ? offset ?"
+	params = append(params, limit, offset)
+	if err := srv.db.ExecRaw(&rs, sql, params...); err != nil {
+		return nil, 0, err
+	}
+	return rs, count, nil
+}
+
+// RemoveTeamMember removes members from team.
+func (srv *teamService) RemoveTeamMember(ctx context.Context, teamUID string, members *model.RemoveTeamMember) error {
+	team, err := srv.getTeamByUID(ctx, teamUID)
+	if err != nil {
+		return err
+	}
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		for _, userUID := range members.UserUIDs {
+			// TODO: batch?
+			user, err := srv.userSrv.GetUserByUID(ctx, userUID)
+			if err != nil {
+				return err
+			}
+			if err := tx.Delete(&model.TeamMember{},
+				"org_id=? and team_id=? and user_id=?", team.OrgID, team.ID, user.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// UpdateTeamMember updates team member.
+func (srv *teamService) UpdateTeamMember(ctx context.Context, teamUID string, member *model.UpdateTeamMember) error {
+	team, err := srv.getTeamByUID(ctx, teamUID)
+	if err != nil {
+		return err
+	}
+	user, err := srv.userSrv.GetUserByUID(ctx, member.UserUID)
+	if err != nil {
+		return err
+	}
+	return srv.db.UpdateSingle(&model.TeamMember{},
+		"permission", member.Permission,
+		"org_id=? and team_id=? and user_id=?", team.OrgID, team.ID, user.ID)
 }

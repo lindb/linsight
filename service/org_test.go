@@ -249,3 +249,26 @@ func TestOrgService_GetOrgListForSignedUser(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestOrgService_GetUserListForSignedOrg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewOrgService(mockDB)
+
+	t.Run("get user list fail", func(t *testing.T) {
+		mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(fmt.Errorf("err"))
+		rs, err := srv.GetUserListForSignedOrg(ctx, "user")
+		assert.Error(t, err)
+		assert.Nil(t, rs)
+	})
+
+	t.Run("get user list successfully", func(t *testing.T) {
+		mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil)
+		_, err := srv.GetUserListForSignedOrg(ctx, "user")
+		assert.NoError(t, err)
+	})
+}

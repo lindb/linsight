@@ -95,6 +95,17 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.UpdateTeam)...)
 	router.DELETE("/org/teams/:uid",
 		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.DeleteTeamByUID)...)
+	router.POST("/org/teams/:uid/members",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.AddTeamMembers)...)
+	router.PUT("/org/teams/:uid/members",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.UpdateTeamMember)...)
+	router.GET("/org/teams/:uid/members",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.teamAPI.GetTeamMembers)...)
+	router.PUT("/org/teams/:uid/members/remove",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.RemoveTeamMember)...)
+
+	router.GET("/org/users",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.orgAPI.GetUserListForSignedOrg)...)
 
 	router.GET("/user/orgs",
 		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.orgAPI.GetOrgListForSignedUser)...)

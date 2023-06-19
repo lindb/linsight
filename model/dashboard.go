@@ -18,12 +18,57 @@
 package model
 
 import (
+	"encoding/json"
+	"strings"
+
+	"github.com/lindb/common/pkg/encoding"
 	"github.com/tidwall/gjson"
 	"gorm.io/datatypes"
 )
 
+// for testing
+var (
+	jsonUnmarshalFn = encoding.JSONUnmarshal
+)
+
+type PermissionType int
+
+const (
+	PermissionUnknown PermissionType = iota
+	PermissionMember
+	PermissionAdmin
+)
+
+var permissionTypes = [...]string{"Unknown", "Member", "Admin"}
+
+// String returns the string value of permission type.
+func (p PermissionType) String() string {
+	if p < PermissionUnknown || p > PermissionAdmin {
+		return "Unknown"
+	}
+	return permissionTypes[p]
+}
+
+func (p PermissionType) MarshalJSON() ([]byte, error) {
+	return json.Marshal(p.String())
+}
+
+func (p *PermissionType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := jsonUnmarshalFn(data, &s); err != nil {
+		return err
+	}
+	*p = 0
+	for i := 0; i < len(permissionTypes); i++ {
+		if strings.Contains(s, permissionTypes[i]) {
+			*p = PermissionType(i)
+			return nil
+		}
+	}
+	return nil
+}
+
 type Ownership int
-type JSONType datatypes.JSON
 
 const (
 	Any Ownership = iota
@@ -50,10 +95,10 @@ type Dashboard struct {
 
 // ReadMeta reads dashboard metadata from json data.
 func (d *Dashboard) ReadMeta() {
-	json := d.Config.String()
-	d.Title = gjson.Get(json, "title").String()
-	d.Desc = gjson.Get(json, "description").String()
-	d.UID = gjson.Get(json, "uid").String()
+	jsonData := d.Config.String()
+	d.Title = gjson.Get(jsonData, "title").String()
+	d.Desc = gjson.Get(jsonData, "description").String()
+	d.UID = gjson.Get(jsonData, "uid").String()
 }
 
 // SearchDashboardRequest represents search dashboard request params.

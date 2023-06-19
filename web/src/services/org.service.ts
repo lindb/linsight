@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { SearchOrg, Org, OrgResult } from '@src/types';
+import { SearchOrg, Org, OrgResult, OrgUser } from '@src/types';
 import { ApiKit } from '@src/utils';
 
 const createOrg = (org: Org): Promise<string> => {
@@ -43,6 +43,10 @@ const getOrgsForCurrentUser = (): Promise<Org[]> => {
   return ApiKit.GET<Org[]>(ApiPath.UserOrg);
 };
 
+const getUsersForCurrentOrg = (params: { prefix?: string }): Promise<OrgUser[]> => {
+  return ApiKit.GET<OrgUser[]>(ApiPath.OrgUsers, params);
+};
+
 export default {
   createOrg,
   updateOrg,
@@ -50,4 +54,5 @@ export default {
   fetchOrg,
   getOrgByUID,
   getOrgsForCurrentUser,
+  getUsersForCurrentOrg,
 };
