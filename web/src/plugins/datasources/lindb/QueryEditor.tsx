@@ -110,6 +110,7 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
   const { datasource } = props;
   const { target, modifyTarget } = useContext(QueryEditContext);
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
+  const namespace = get(datasource, 'setting.config.namespace', '');
 
   return (
     <>
@@ -120,16 +121,27 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
         initValues={get(target, 'request', {})}
         onSubmit={(values: any) => {
           const newValues = ObjectKit.cleanEmptyProperties(values);
+          if (!isEmpty(namespace)) {
+            // use namespace from datasource setting
+            newValues.namespace = namespace;
+          }
           // change query edit context's values
           modifyTarget({ request: newValues } as Query);
         }}>
         {({ formApi }) => (
           <>
-            <NamespaceSelect datasource={api} style={{ minWidth: 240 }} />
-            <MetricNameSelect datasource={api} style={{ minWidth: 240 }} />
-            <FieldSelect datasource={api} style={{ minWidth: 240 }} />
-            <WhereConditonSelect datasource={api} style={{ minWidth: 270 }} />
+            {isEmpty(namespace) && (
+              <NamespaceSelect
+                label={get(datasource, 'setting.config.alias', 'Namespace')}
+                datasource={api}
+                style={{ minWidth: 240 }}
+              />
+            )}
+            <MetricNameSelect ns={namespace} datasource={api} style={{ minWidth: 240 }} />
+            <FieldSelect ns={namespace} datasource={api} style={{ minWidth: 240 }} />
+            <WhereConditonSelect ns={namespace} datasource={api} style={{ minWidth: 270 }} />
             <TagKeySelect
+              ns={namespace}
               field="groupBy"
               placeholder="Please select group by tag key"
               multiple

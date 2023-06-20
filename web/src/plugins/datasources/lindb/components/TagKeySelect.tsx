@@ -22,6 +22,7 @@ import { useFieldState } from '@douyinfe/semi-ui';
 
 const TagKeySelect: React.FC<{
   datasource: LinDBDatasource;
+  ns?: string;
   field?: string;
   label?: string;
   style?: CSSProperties;
@@ -34,6 +35,7 @@ const TagKeySelect: React.FC<{
 }> = (props) => {
   const {
     datasource,
+    ns,
     multiple,
     label,
     style,
@@ -56,7 +58,7 @@ const TagKeySelect: React.FC<{
       labelPosition={labelPosition}
       reloadKeys={[metricField, namespaceField]}
       loader={async (_prefix?: string) => {
-        const values = await datasource.getTagKeys(namespace, metricName);
+        const values = await datasource.getTagKeys(ns || namespace, metricName);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
           optionList.push({ value: item, label: item, showTick: false });

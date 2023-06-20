@@ -152,11 +152,12 @@ const TagKeySelect: React.FC<{
 
 const WhereConditonSelect: React.FC<{
   datasource: LinDBDatasource;
+  ns?: string;
   metricField?: string;
   namespaceField?: string;
   style?: CSSProperties;
 }> = (props) => {
-  const { datasource, metricField = 'metric', namespaceField = 'namespace', style } = props;
+  const { datasource, ns, metricField = 'metric', namespaceField = 'namespace', style } = props;
   const [visible, setVisible] = useState(false);
   const [currentTagKey, setCurrentTagKey] = useState('');
   const { value: metricName } = useFieldState(metricField);
@@ -236,7 +237,7 @@ const WhereConditonSelect: React.FC<{
               <TagKeySelect
                 currentTagKey={currentTagKey}
                 datasource={datasource}
-                namespace={namespace}
+                namespace={ns || namespace}
                 metric={metricName}
                 onChangeTagKey={(tagKey: string) => {
                   setCurrentTagKey(tagKey);
@@ -246,7 +247,7 @@ const WhereConditonSelect: React.FC<{
             <Col span={12}>
               <TagValueSelect
                 datasource={datasource}
-                namespace={namespace}
+                namespace={ns || namespace}
                 metric={metricName}
                 tagKey={currentTagKey}
                 where={where}

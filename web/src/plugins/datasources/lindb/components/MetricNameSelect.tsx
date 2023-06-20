@@ -25,13 +25,14 @@ import { LinDBDatasource } from '../Datasource';
  */
 const MetricNameSelect: React.FC<{
   datasource: LinDBDatasource;
+  ns?: string;
   label?: string;
   field?: string;
   style?: CSSProperties;
   namespaceField?: string;
   labelPosition?: 'top' | 'left' | 'inset';
 }> = (props) => {
-  const { datasource, label, style, field = 'metric', namespaceField = 'namespace', labelPosition } = props;
+  const { datasource, ns, label, style, field = 'metric', namespaceField = 'namespace', labelPosition } = props;
   const formApi = useFormApi();
   const { value: namespace } = useFieldState(namespaceField);
   return (
@@ -43,7 +44,7 @@ const MetricNameSelect: React.FC<{
       labelPosition={labelPosition}
       reloadKeys={[namespaceField]}
       loader={async (prefix?: string) => {
-        const values = await datasource.fetchMetricNames(namespace, prefix);
+        const values = await datasource.fetchMetricNames(ns || namespace, prefix);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
           optionList.push({ value: item, label: item, showTick: false });

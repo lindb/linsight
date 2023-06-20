@@ -37,7 +37,7 @@ const NamespaceSelect: React.FC<{
       style={style}
       label={label}
       field={field}
-      placeholder="Please select metric"
+      placeholder="Please select namespace"
       labelPosition={labelPosition}
       loader={async (prefix?: string) => {
         const values = await datasource.fetchNamespaces(prefix);

@@ -25,6 +25,7 @@ import { LinDBDatasource } from '../Datasource';
  */
 const FieldSelect: React.FC<{
   datasource: LinDBDatasource;
+  ns?: string;
   field?: string;
   label?: string;
   style?: CSSProperties;
@@ -34,6 +35,7 @@ const FieldSelect: React.FC<{
 }> = (props) => {
   const {
     datasource,
+    ns,
     label,
     style,
     field = 'fields',
@@ -54,7 +56,7 @@ const FieldSelect: React.FC<{
       labelPosition={labelPosition}
       reloadKeys={[metricField, namespaceField]}
       loader={async (_prefix?: string) => {
-        const values = await datasource.getFields(namespace, metricName);
+        const values = await datasource.getFields(ns || namespace, metricName);
         const optionList: any[] = [];
         (values || []).map((item: any) => {
           optionList.push({ value: item.name, label: `${item.name}(${item.type})`, showTick: false });
