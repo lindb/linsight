@@ -34,9 +34,10 @@ type Datasource struct {
 	// ord id + name => unique key
 	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_datasource_org_name,unique"`
 
-	UID    string         `json:"uid" gorm:"column:uid;index:u_idx_datasource_uid,unique"`
-	Name   string         `json:"name" gorm:"column:name;index:u_idx_datasource_org_name,unique"`
-	Type   DatasourceType `json:"type" gorm:"column:type"`
-	URL    string         `json:"url" gorm:"column:url"`
-	Config datatypes.JSON `json:"config" gorm:"column:config"`
+	UID       string         `json:"uid" gorm:"column:uid;index:u_idx_datasource_uid,unique"`
+	Name      string         `json:"name" gorm:"column:name;index:u_idx_datasource_org_name,unique"`
+	Type      DatasourceType `json:"type" gorm:"column:type"`
+	URL       string         `json:"url" gorm:"column:url"`
+	Config    datatypes.JSON `json:"config" gorm:"column:config"`
+	IsDefault bool           `json:"isDefault" gorm:"column:is_default"`
 }

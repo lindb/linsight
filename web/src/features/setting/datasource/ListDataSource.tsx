@@ -15,12 +15,12 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useContext } from 'react';
-import { Button, Divider, Input, List, Typography } from '@douyinfe/semi-ui';
+import React, { useContext, useState } from 'react';
+import { Button, Divider, Input, List, Tag, Typography } from '@douyinfe/semi-ui';
 import { IconSearchStroked, IconPlusStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
 import { DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
-import { isEmpty } from 'lodash-es';
+import { isEmpty, filter, includes } from 'lodash-es';
 import { createSearchParams, useNavigate } from 'react-router-dom';
 import { Icon, StatusTip } from '@src/components';
 import { useRequest } from '@src/hooks';
@@ -32,11 +32,18 @@ const { Title, Text } = Typography;
 const ListDataSource: React.FC = () => {
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
+  const [search, setSearch] = useState('');
   const { result, loading, error, refetch } = useRequest(['list_datasources'], () => DatasourceSrv.fetchDatasources());
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <Input prefix={<IconSearchStroked />} placeholder="Filter datasources" />
+        <Input
+          prefix={<IconSearchStroked />}
+          placeholder="Filter datasources(name/url/type)"
+          onChange={(v: string) => {
+            setSearch(v);
+          }}
+        />
         <Button icon={<IconPlusStroked />} onClick={() => navigate('/setting/datasource/new')}>
           New
         </Button>
@@ -44,7 +51,13 @@ const ListDataSource: React.FC = () => {
       <List
         size="small"
         bordered
-        dataSource={result}
+        dataSource={
+          isEmpty(search)
+            ? result
+            : filter(result, (ds: DatasourceSetting) => {
+                return includes(ds.name, search) || includes(ds.url, search) || includes(ds.type, search);
+              })
+        }
         emptyContent={<StatusTip isLoading={loading} isEmpty={isEmpty(result)} error={error} />}
         renderItem={(ds: DatasourceSetting) => {
           const item = DatasourceRepositoryInst.get(ds.type);
@@ -95,6 +108,12 @@ const ListDataSource: React.FC = () => {
                     <Text>{item?.Name}</Text>
                     <Divider layout="vertical" style={{ margin: '0 8px' }} />
                     <Text>{ds.url}</Text>
+                    {ds.isDefault && (
+                      <>
+                        <Divider layout="vertical" style={{ margin: '0 8px' }} />
+                        <Tag color="orange">Default</Tag>
+                      </>
+                    )}
                   </div>
                 </div>
               }

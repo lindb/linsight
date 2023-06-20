@@ -48,6 +48,9 @@ func TestDatasourceService_CreateDatasource(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
 	srv := NewDatasourceService(mockDB)
 	cases := []struct {
 		name    string
@@ -55,8 +58,18 @@ func TestDatasourceService_CreateDatasource(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name: "clean default datasource failure",
+			prepare: func() {
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
 			name: "create data source failure",
 			prepare: func() {
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any()).Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -64,6 +77,8 @@ func TestDatasourceService_CreateDatasource(t *testing.T) {
 		{
 			name: "create data source successfully",
 			prepare: func() {
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any()).Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -74,7 +89,9 @@ func TestDatasourceService_CreateDatasource(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.CreateDatasource(ctx, &model.Datasource{})
+			_, err := srv.CreateDatasource(ctx, &model.Datasource{
+				IsDefault: true,
+			})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -87,6 +104,9 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
 	srv := NewDatasourceService(mockDB)
 	cases := []struct {
 		name    string
@@ -101,10 +121,11 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "update data source failure",
+			name: "clean default datasource failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
@@ -112,7 +133,19 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 			name: "update data source failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update data source successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -122,7 +155,7 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.UpdateDatasource(ctx, &model.Datasource{UID: "1234"})
+			err := srv.UpdateDatasource(ctx, &model.Datasource{UID: "1234", IsDefault: true})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

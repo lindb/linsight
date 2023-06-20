@@ -138,7 +138,8 @@ const EditDataSource: React.FC = () => {
             setSubmitting(false);
           }
         }}>
-        <Form.Input label="Name" field="name" rules={[{ required: true, message: 'Name is required' }]} />
+        <Form.Input field="name" label="Name" rules={[{ required: true, message: 'Name is required' }]} />
+        <Form.Switch field="isDefault" label="Default" />
         <Form.Select
           label="Type"
           field="type"
