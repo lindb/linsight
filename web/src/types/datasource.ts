@@ -55,6 +55,7 @@ export interface DatasourceSetting {
   type: string;
   category: DatasourceCategory;
   url: string;
+  isDefault: boolean;
 }
 
 export interface QueryEditorProps {

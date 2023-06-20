@@ -783,3 +783,24 @@ func TestUserSerivce_SwitchOrg(t *testing.T) {
 		})
 	}
 }
+
+func TestUserService_GetUserByName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+
+	srv := NewUserService(mockDB, nil)
+	t.Run("get user failure", func(t *testing.T) {
+		mockDB.EXPECT().Get(gomock.Any(), "user_name=? or email=?", "1234", "1234").Return(fmt.Errorf("err"))
+		user, err := srv.GetUserByName(ctx, "1234")
+		assert.Nil(t, user)
+		assert.Error(t, err)
+	})
+	t.Run("get user successfully", func(t *testing.T) {
+		mockDB.EXPECT().Get(gomock.Any(), "user_name=? or email=?", "1234", "1234").Return(nil)
+		user, err := srv.GetUserByName(ctx, "1234")
+		assert.NotNil(t, user)
+		assert.NoError(t, err)
+	})
+}

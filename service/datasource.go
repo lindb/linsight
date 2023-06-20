@@ -57,13 +57,20 @@ func NewDatasourceService(db dbpkg.DB) DatasourceService {
 // CreateDatasource creates a data source, if success returns uid of data source.
 func (srv *datasourceService) CreateDatasource(ctx context.Context, datasource *model.Datasource) (uid string, err error) {
 	datasource.UID = uuid.GenerateShortUUID()
-	user := util.GetUser(ctx)
-	datasource.OrgID = user.Org.ID
-	userID := user.User.ID
-	datasource.CreatedBy = userID
-	datasource.UpdatedBy = userID
+	err = srv.db.Transaction(func(tx dbpkg.DB) error {
+		user := util.GetUser(ctx)
+		if err0 := srv.cleanDefaultDatasource(tx, user.Org.ID, datasource); err0 != nil {
+			return err0
+		}
 
-	if err := srv.db.Create(&datasource); err != nil {
+		datasource.OrgID = user.Org.ID
+		userID := user.User.ID
+		datasource.CreatedBy = userID
+		datasource.UpdatedBy = userID
+
+		return tx.Create(&datasource)
+	})
+	if err != nil {
 		return "", err
 	}
 	return datasource.UID, nil
@@ -75,17 +82,30 @@ func (srv *datasourceService) UpdateDatasource(ctx context.Context, datasource *
 	if err != nil {
 		return err
 	}
-	user := util.GetUser(ctx)
-	userID := user.User.ID
-	ds.UpdatedBy = userID
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		user := util.GetUser(ctx)
+		userID := user.User.ID
+		ds.UpdatedBy = userID
 
-	// update datasource
-	ds.URL = datasource.URL
-	ds.Config = datasource.Config
-	if err := srv.db.Update(&ds, "uid=? and org_id=?", datasource.UID, user.Org.ID); err != nil {
-		return err
-	}
-	return nil
+		if err := srv.cleanDefaultDatasource(tx, user.Org.ID, datasource); err != nil {
+			return err
+		}
+
+		// update datasource
+		ds.URL = datasource.URL
+		ds.Config = datasource.Config
+		if err := tx.Updates(&model.Datasource{},
+			map[string]any{
+				"name":       datasource.Name,
+				"is_default": datasource.IsDefault,
+				"url":        datasource.URL,
+				"config":     datasource.Config,
+				"updated_by": userID,
+			}, "uid=? and org_id=?", datasource.UID, user.Org.ID); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // DeleteDatasourceByUID deletes data source by uid from current org.
@@ -113,4 +133,13 @@ func (srv *datasourceService) GetDatasourceByUID(ctx context.Context, uid string
 		return nil, err
 	}
 	return &rs, nil
+}
+
+// cleanDefaultDatasource cleans default datasource if exist when set new default datasource.
+func (srv *datasourceService) cleanDefaultDatasource(tx dbpkg.DB, orgID int64, datasource *model.Datasource) error {
+	if datasource.IsDefault {
+		// update old default datasource
+		return tx.UpdateSingle(&model.Datasource{}, "is_default", false, "org_id=?", orgID)
+	}
+	return nil
 }

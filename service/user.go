@@ -138,7 +138,6 @@ func (srv *userService) GetSignedUser(ctx context.Context, userID int64) (*model
 // GetUserByName returns user by given username or email.
 func (srv *userService) GetUserByName(ctx context.Context, nameOrEmail string) (*model.User, error) {
 	user := &model.User{}
-	// TODO: do tolower?
 	if err := srv.db.Get(&user, "user_name=? or email=?", nameOrEmail, nameOrEmail); err != nil {
 		return nil, err
 	}

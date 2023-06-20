@@ -172,7 +172,7 @@ func (srv *teamService) AddTeamMembers(ctx context.Context, teamUID string, memb
 				return err
 			}
 			// check member if exist
-			exist, err := srv.db.Exist(&model.TeamMember{},
+			exist, err := tx.Exist(&model.TeamMember{},
 				"org_id=? and team_id=? and user_id=?", team.OrgID, team.ID, user.ID)
 			if err != nil {
 				return err
