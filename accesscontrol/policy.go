@@ -26,14 +26,10 @@ const (
 )
 
 const (
-	Org                 ResourceType = "org"
-	User                ResourceType = "user"
-	Team                ResourceType = "team"
-	Nav                 ResourceType = "nav"
-	Datasource          ResourceType = "datasource"
-	DatasourceDataQuery ResourceType = "datasource_data_query"
-	Dashboard           ResourceType = "dashboard"
-	Chart               ResourceType = "chart"
+	LinAccessResource    ResourceType = "LinAccessResource"
+	AdminAccessResource  ResourceType = "AdminAccessResource"
+	EditorAccessResource ResourceType = "EditorAccessResource"
+	ViewerAccessResource ResourceType = "ViewerAccessResource"
 )
 
 func (r ResourceType) String() string {
@@ -73,20 +69,13 @@ func (pb *PolicyBuilder) Build() []Policy {
 
 func BuildPolicyDefinitions() []Policy {
 	return NewPlicyBuilder().
-		AddPolicy(RoleLin, Org, Write).
-		AddPolicy(RoleLin, Org, Read).
-		AddPolicy(RoleAdmin, Team, Write).
-		AddPolicy(RoleAdmin, Team, Read).
-		AddPolicy(RoleAdmin, Nav, Write).
-		AddPolicy(RoleAdmin, Nav, Read).
-		AddPolicy(RoleAdmin, User, Write).
-		AddPolicy(RoleAdmin, User, Read).
-		AddPolicy(RoleAdmin, Datasource, Write).
-		AddPolicy(RoleViewer, Datasource, Read).
-		AddPolicy(RoleViewer, DatasourceDataQuery, Read).
-		AddPolicy(RoleViewer, Dashboard, Write).
-		AddPolicy(RoleViewer, Dashboard, Read).
-		AddPolicy(RoleViewer, Chart, Write).
-		AddPolicy(RoleViewer, Chart, Read).
+		AddPolicy(RoleLin, LinAccessResource, Write).
+		AddPolicy(RoleLin, LinAccessResource, Read).
+		AddPolicy(RoleAdmin, AdminAccessResource, Write).
+		AddPolicy(RoleAdmin, AdminAccessResource, Read).
+		AddPolicy(RoleEditor, EditorAccessResource, Write).
+		AddPolicy(RoleEditor, EditorAccessResource, Read).
+		AddPolicy(RoleViewer, ViewerAccessResource, Write).
+		AddPolicy(RoleViewer, ViewerAccessResource, Read).
 		Build()
 }

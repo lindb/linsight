@@ -112,6 +112,12 @@ type ChangeUserPassword struct {
 	NewPassword string `json:"newPassword" binding:"required"`
 }
 
+// ResetUserPassword represents reset user password params.
+type ResetUserPassword struct {
+	UserUID  string `json:"userUid" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
 // SearchUserRequest represents search user request params.
 type SearchUserRequest struct {
 	PagingParam

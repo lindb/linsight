@@ -75,103 +75,113 @@ func (r *Router) RegisterRouters() {
 	router.GET("/boot", middleware.Authenticate(r.deps), r.bootAPI.Boot)
 
 	router.GET("/orgs",
-		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Read, r.orgAPI.SearchOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.orgAPI.SearchOrg)...)
 	router.POST("/orgs",
-		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.CreateOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.orgAPI.CreateOrg)...)
 	router.PUT("/orgs",
-		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.UpdateOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.orgAPI.UpdateOrg)...)
 	router.DELETE("/orgs/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Write, r.orgAPI.DeleteOrgByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.orgAPI.DeleteOrgByUID)...)
 	router.GET("/orgs/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Org, accesscontrol.Read, r.orgAPI.GetOrgByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.orgAPI.GetOrgByUID)...)
 
 	router.GET("/org/teams",
-		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.teamAPI.SearchTeams)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.teamAPI.SearchTeams)...)
 	router.GET("/org/teams/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.teamAPI.GetTeamByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.teamAPI.GetTeamByUID)...)
 	router.POST("/org/teams",
-		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.CreateTeam)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.CreateTeam)...)
 	router.PUT("/org/teams",
-		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.UpdateTeam)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.UpdateTeam)...)
 	router.DELETE("/org/teams/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Write, r.teamAPI.DeleteTeamByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.DeleteTeamByUID)...)
+	router.POST("/org/teams/:uid/members",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.AddTeamMembers)...)
+	router.PUT("/org/teams/:uid/members",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.UpdateTeamMember)...)
+	router.GET("/org/teams/:uid/members",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.teamAPI.GetTeamMembers)...)
+	router.PUT("/org/teams/:uid/members/remove",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.teamAPI.RemoveTeamMember)...)
+
+	router.GET("/org/users",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.orgAPI.GetUserListForSignedOrg)...)
 
 	router.GET("/user/orgs",
-		middleware.Authorize(r.deps, accesscontrol.Team, accesscontrol.Read, r.orgAPI.GetOrgListForSignedUser)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.orgAPI.GetOrgListForSignedUser)...)
 
 	router.GET("/org/nav",
-		middleware.Authorize(r.deps, accesscontrol.Nav, accesscontrol.Read, r.navAPI.GetNav)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.navAPI.GetNav)...)
 	router.PUT("/org/nav",
-		middleware.Authorize(r.deps, accesscontrol.Nav, accesscontrol.Write, r.navAPI.UpdateNav)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.navAPI.UpdateNav)...)
 
 	router.POST("/users",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.CreateUser)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.userAPI.CreateUser)...)
 	router.PUT("/users",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.UpdateUser)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.userAPI.UpdateUser)...)
 	router.GET("/users",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.SearchUser)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.userAPI.SearchUser)...)
 	router.GET("/users/:uid",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.GetUserByUID)...)
-	router.GET("/users/:uid/orgs",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Read, r.userAPI.GetOrgListByUserUID)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.userAPI.GetUserByUID)...)
+	router.GET("/users/:uid/orgs", middleware.Authenticate(r.deps), r.userAPI.GetOrgListByUserUID)
 	router.POST("/users/:uid/orgs",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.AddOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.userAPI.AddOrg)...)
 	router.PUT("/users/:uid/orgs",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.UpdateOrg)...)
-	router.PUT("/user/orgs/switch/:orgUid",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.SwitchOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.userAPI.UpdateOrg)...)
+	router.PUT("/user/orgs/switch/:orgUid", middleware.Authenticate(r.deps), r.userAPI.SwitchOrg)
 	router.DELETE("/users/:uid/orgs/:orgUid",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.RemoveOrg)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.userAPI.RemoveOrg)...)
 	router.PUT("/users/:uid/disable",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.DisableUserByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.userAPI.DisableUserByUID)...)
 	router.PUT("/users/:uid/enable",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.EnableUserByUID)...)
-	router.GET("/user/preference",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.GetPreference)...)
-	router.PUT("/user/preference",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.SavePreference)...)
-	router.PUT("/user/password/change",
-		middleware.Authorize(r.deps, accesscontrol.User, accesscontrol.Write, r.userAPI.ChangePassword)...)
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.userAPI.EnableUserByUID)...)
+	// preference
+	router.GET("/user/preference", middleware.Authenticate(r.deps), r.userAPI.GetPreference)
+	router.PUT("/user/preference", middleware.Authenticate(r.deps), r.userAPI.SavePreference)
+	// password
+	router.PUT("/user/password/change", middleware.Authenticate(r.deps), r.userAPI.ChangePassword)
+	router.PUT("/user/password/reset",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.userAPI.ResetPassword)...)
 
 	router.POST("/datasource",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.datasourceAPI.CreateDatasource)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.datasourceAPI.CreateDatasource)...)
 	router.PUT("/datasource",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.datasourceAPI.UpdateDatasource)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.datasourceAPI.UpdateDatasource)...)
 	router.DELETE("/datasources/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Write, r.datasourceAPI.DeleteDatasourceByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.datasourceAPI.DeleteDatasourceByUID)...)
 	router.GET("/datasources",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Read, r.datasourceAPI.GetDatasources)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceAPI.GetDatasources)...)
 	router.GET("/datasources/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Datasource, accesscontrol.Read, r.datasourceAPI.GetDatasourceByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceAPI.GetDatasourceByUID)...)
 
 	// dashboard api
 	router.POST("/dashboards",
-		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.CreateDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.dashboardAPI.CreateDashboard)...)
 	router.PUT("/dashboards",
-		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.UpdateDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.dashboardAPI.UpdateDashboard)...)
 	router.DELETE("/dashboards/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.DeleteDashboardByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.dashboardAPI.DeleteDashboardByUID)...)
 	router.GET("/dashboards",
-		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Read, r.dashboardAPI.SearchDashboards)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.dashboardAPI.SearchDashboards)...)
 	router.GET("/dashboards/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Read, r.dashboardAPI.GetDashboardByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.dashboardAPI.GetDashboardByUID)...)
 	router.PUT("/dashboards/:uid/star",
-		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.StarDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.dashboardAPI.StarDashboard)...)
 	router.DELETE("/dashboards/:uid/star",
-		middleware.Authorize(r.deps, accesscontrol.Dashboard, accesscontrol.Write, r.dashboardAPI.UnstarDashboard)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.dashboardAPI.UnstarDashboard)...)
 
 	// chart repo api
 	router.POST("/charts",
-		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.CreateChart)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.chartAPI.CreateChart)...)
 	router.PUT("/charts",
-		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.UpdateChart)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.chartAPI.UpdateChart)...)
 	router.DELETE("/charts/:uid",
-		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Write, r.chartAPI.DeleteChartByUID)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.chartAPI.DeleteChartByUID)...)
 	router.GET("/charts",
-		middleware.Authorize(r.deps, accesscontrol.Chart, accesscontrol.Read, r.chartAPI.SearchCharts)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.SearchCharts)...)
 
 	router.PUT("/data/query",
-		middleware.Authorize(r.deps, accesscontrol.DatasourceDataQuery, accesscontrol.Read, r.datasourceQueryAPI.DataQuery)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceQueryAPI.DataQuery)...)
 	router.PUT("/metadata/query",
-		middleware.Authorize(r.deps, accesscontrol.DatasourceDataQuery, accesscontrol.Read, r.datasourceQueryAPI.MetadataQuery)...)
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceQueryAPI.MetadataQuery)...)
 }

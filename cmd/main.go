@@ -118,7 +118,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		Config:          cfg,
 		OrgSrv:          orgSrv,
 		UserSrv:         userSrv,
-		TeamSrv:         service.NewTeamService(db),
+		TeamSrv:         service.NewTeamService(db, userSrv),
 		NavSrv:          service.NewNavService(db),
 		AuthorizeSrv:    authorizeSrv,
 		AuthenticateSrv: service.NewAuthenticateService(userSrv, db),

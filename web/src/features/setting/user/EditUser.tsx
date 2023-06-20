@@ -26,12 +26,14 @@ import { get } from 'lodash-es';
 import { User } from '@src/types';
 import { ApiKit } from '@src/utils';
 import OrgList from './OrgList';
+import ResetPassword from './ResetPassword';
 const { Meta } = Card;
 const { Title, Text } = Typography;
 
 const EditUser: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [resetPassword, setResetPassword] = useState(false);
   const [searchParams] = useSearchParams();
   const uid = `${searchParams.get('uid')}`;
   const { loading, result, refetch } = useRequest(['get_user', uid], () => {
@@ -102,6 +104,9 @@ const EditUser: React.FC = () => {
                 <Button type="primary" icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
                   Save
                 </Button>
+                <Button type="tertiary" onClick={() => setResetPassword(true)} icon={<Icon icon="password" />}>
+                  Reset Password
+                </Button>
                 <Button
                   type="tertiary"
                   loading={submitting}
@@ -165,6 +170,7 @@ const EditUser: React.FC = () => {
           }>
           Are you sure you want to disable this user?
         </Modal>
+        {resetPassword && <ResetPassword userUid={uid} visible={resetPassword} setVisible={setResetPassword} />}
       </Card>
     </>
   );

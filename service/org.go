@@ -47,6 +47,8 @@ type OrgService interface {
 	SearchOrg(ctx context.Context, req *model.SearchOrgRequest) ([]model.Org, int64, error)
 	// GetOrgListForSignedUser returns all org for current signed user can manage.
 	GetOrgListForSignedUser(ctx context.Context) ([]model.Org, error)
+	// GetUserListForSignedOrg returns the users for current signed org, filter(user name/name/email).
+	GetUserListForSignedOrg(ctx context.Context, prefix string) ([]model.OrgUserInfo, error)
 }
 
 // orgService implements OrgService interface.
@@ -161,6 +163,26 @@ func (srv *orgService) GetOrgListForSignedUser(ctx context.Context) (rs []model.
 	findParams := []any{strings.Join(conditions, " and ")}
 	findParams = append(findParams, params...)
 	if err := srv.db.Find(&rs, findParams...); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+// GetUserListForSignedOrg returns the users for current signed org, filter(user name/name/email).
+func (srv *orgService) GetUserListForSignedOrg(ctx context.Context, prefix string) (rs []model.OrgUserInfo, err error) {
+	signedUser := util.GetUser(ctx)
+	params := []any{signedUser.Org.ID}
+	sql := `
+	select 
+		u.uid as user_uid,u.name as name,u.user_name as user_name,u.email as email 
+	from users u,org_users ou 
+		where u.id=ou.user_id and ou.org_id=?`
+	if prefix != "" {
+		sql += " and (u.name like ? or u.user_name like ? or u.email like ?)"
+		params = append(params, prefix+"%", prefix+"%", prefix+"%")
+	}
+	err = srv.db.ExecRaw(&rs, sql, params...)
+	if err != nil {
 		return nil, err
 	}
 	return rs, nil

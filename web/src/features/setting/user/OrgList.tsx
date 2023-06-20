@@ -59,11 +59,14 @@ const OrgList: React.FC<{ userUid: string }> = (props) => {
                 render: (_text: string, r: UserOrg, _index: number) => {
                   return (
                     <Select
-                      defaultValue={r.role}
+                      value={r.role}
                       optionList={RoleList}
                       onChange={(value: any) => {
                         r.role = value;
-                        UserSrv.updateUserOrg(userUid, r)
+                        UserSrv.updateUserOrg(userUid, {
+                          ...r,
+                          role:value,
+                        })
                           .then(() => {
                             refetch();
                             Notification.success('Role changed!');

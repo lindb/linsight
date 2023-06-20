@@ -187,7 +187,6 @@ func TestUserAPI_ChangePassword(t *testing.T) {
 				userSrv.EXPECT().ChangePassword(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
-				fmt.Println(resp)
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
@@ -820,6 +819,70 @@ func TestUserAPI_SwitchOrg(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
 			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/users/orgs/4321", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestUserAPI_ResetPassword(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	userSrv := service.NewMockUserService(ctrl)
+	r := gin.New()
+	api := NewUserAPI(&deps.API{
+		UserSrv: userSrv,
+	})
+	r.PUT("/user/password/reset", api.ResetPassword)
+	body := encoding.JSONMarshal(&model.ResetUserPassword{
+		UserUID:  "1234",
+		Password: "admin",
+	})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "cannot get params",
+			body: http.NoBody,
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "reset password failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().ResetPassword(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "reset password successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				userSrv.EXPECT().ResetPassword(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/user/password/reset", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {

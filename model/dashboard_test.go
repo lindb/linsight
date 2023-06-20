@@ -20,6 +20,7 @@ package model
 import (
 	"testing"
 
+	"github.com/lindb/common/pkg/encoding"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/datatypes"
 )
@@ -32,4 +33,32 @@ func TestDashboard_ReadMeta(t *testing.T) {
 	assert.Equal(t, "John", dashboard.Title)
 	assert.Equal(t, "desc", dashboard.Desc)
 	assert.Equal(t, "UID", dashboard.UID)
+}
+
+func TestDashboard_PermissionType_String(t *testing.T) {
+	assert.Equal(t, "Member", PermissionMember.String())
+	assert.Equal(t, "Admin", PermissionAdmin.String())
+	assert.Equal(t, "Unknown", PermissionUnknown.String())
+	assert.Equal(t, "Unknown", PermissionType(9999).String())
+}
+
+func TestDashboard_Permission_JSOM(t *testing.T) {
+	defer func() {
+		jsonUnmarshalFn = encoding.JSONUnmarshal
+	}()
+	data, err := PermissionMember.MarshalJSON()
+	assert.NoError(t, err)
+	assert.Equal(t, []byte(`"Member"`), data)
+
+	p := PermissionAdmin
+	err = (&p).UnmarshalJSON(data)
+	assert.NoError(t, err)
+	assert.Equal(t, PermissionMember, p)
+
+	err = (&p).UnmarshalJSON([]byte("abc"))
+	assert.Error(t, err)
+
+	err = (&p).UnmarshalJSON([]byte(`"abc"`))
+	assert.NoError(t, err)
+	assert.Equal(t, PermissionUnknown, p)
 }

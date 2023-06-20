@@ -48,6 +48,7 @@ const TeamList: React.FC = () => {
             params.current = { name: value };
             searchTeam();
           }}
+          showClear
           onEnterPress={() => searchTeam()}
         />
         <Button
@@ -75,7 +76,7 @@ const TeamList: React.FC = () => {
                     link
                     onClick={() => {
                       navigate({
-                        pathname: '/setting/org/teams/edit/setting',
+                        pathname: '/setting/org/teams/edit/members',
                         search: `${createSearchParams({
                           uid: `${r.uid}`,
                         })}`,

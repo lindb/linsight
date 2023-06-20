@@ -33,7 +33,7 @@ func TestTeamService_SearchTeams(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewTeamService(mockDB)
+	srv := NewTeamService(mockDB, nil)
 
 	cases := []struct {
 		name    string
@@ -101,7 +101,7 @@ func TestTeamService_CreateTeam(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewTeamService(mockDB)
+	srv := NewTeamService(mockDB, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -140,7 +140,7 @@ func TestTeamService_UpdateTeam(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewTeamService(mockDB)
+	srv := NewTeamService(mockDB, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -192,7 +192,7 @@ func TestTeamService_DeleteTeamByUID(t *testing.T) {
 		return fn(mockDB)
 	}).AnyTimes()
 
-	srv := NewTeamService(mockDB)
+	srv := NewTeamService(mockDB, nil)
 	t.Run("delete successfully", func(t *testing.T) {
 		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 		err := srv.DeleteTeamByUID(ctx, "1234")
@@ -206,11 +206,296 @@ func TestTeamService_GetTeamByUID(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := NewTeamService(mockDB)
+	srv := NewTeamService(mockDB, nil)
 	t.Run("get team successfully", func(t *testing.T) {
 		mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 		team, err := srv.GetTeamByUID(ctx, "1234")
 		assert.NotNil(t, team)
 		assert.NoError(t, err)
 	})
+}
+
+func TestTeamService_AddTeamMembers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+
+	userSrv := NewMockUserService(ctrl)
+	srv := NewTeamService(mockDB, userSrv)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get team failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "chece exist failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
+				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(false, fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "member exist",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
+				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(true, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "create failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
+				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(false, nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "create ok",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
+				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(false, nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.AddTeamMembers(ctx, "team", &model.AddTeamMember{UserUIDs: []string{"1234"}})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestTeamService_RemoveTeamMembers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+
+	userSrv := NewMockUserService(ctrl)
+	srv := NewTeamService(mockDB, userSrv)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get team failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "remove failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "remove ok",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.RemoveTeamMember(ctx, "team", &model.RemoveTeamMember{UserUIDs: []string{"1234"}})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestTeamService_UpdateTeamMember(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+
+	userSrv := NewMockUserService(ctrl)
+	srv := NewTeamService(mockDB, userSrv)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get team failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "get user failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update member",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				userSrv.EXPECT().GetUserByUID(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.UpdateTeamMember(ctx, "team", &model.UpdateTeamMember{})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestTeamService_GetTeamMembers(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+
+	userSrv := NewMockUserService(ctrl)
+	srv := NewTeamService(mockDB, userSrv)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get team failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "count failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "no data",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "find data failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "find data failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			_, _, err := srv.GetTeamMembers(ctx, "team", &model.SearchTeamMemberRequest{
+				User:        "user",
+				Permissions: []model.PermissionType{model.PermissionAdmin},
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 10,
+				},
+			})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
 }

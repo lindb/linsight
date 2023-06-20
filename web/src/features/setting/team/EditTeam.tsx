@@ -26,6 +26,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { get } from 'lodash-es';
 import { ApiKit } from '@src/utils';
 import { useRequest } from '@src/hooks';
+import MemberList from './MemberList';
 const { Meta } = Card;
 const { Title, Text } = Typography;
 
@@ -37,15 +38,17 @@ const EditTeam: React.FC = () => {
   const location = useLocation();
   const formApi = useRef<any>();
   const [submitting, setSubmitting] = useState(false);
-  const { loading, result } = useRequest(['get_team', teamUID], () => TeamSrv.GetTeamByUID(teamUID));
+  const { loading, result } = useRequest(['get_team', teamUID], () => TeamSrv.getTeamByUID(teamUID));
   const gotoTeamListPage = () => {
     navigate({ pathname: '/setting/org/teams' });
   };
+
   useEffect(() => {
     if (result) {
       formApi.current.setValues(result);
     }
   }, [result]);
+
   const renderContent = () => {
     if (loading) {
       return (
@@ -55,7 +58,18 @@ const EditTeam: React.FC = () => {
       );
     }
     return (
-      <Tabs defaultActiveKey={location.pathname}>
+      <Tabs
+        defaultActiveKey={location.pathname}
+        tabPaneMotion={false}
+        onChange={(activeKey: string) => {
+          navigate({ pathname: activeKey, search: searchParams.toString() });
+        }}>
+        <TabPane
+          itemKey="/setting/org/teams/edit/members"
+          tab="Members"
+          icon={<Icon icon="team" style={{ marginRight: 8 }} />}>
+          <MemberList teamUid={teamUID}/>
+        </TabPane>
         <TabPane itemKey="/setting/org/teams/edit/setting" tab="Setting" icon={<IconCandlestickChartStroked />}>
           <Form
             className="linsight-form setting-form"

@@ -16,7 +16,16 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { SearchTeam, Team, TeamResult } from '@src/types';
+import {
+  AddTeamMembers,
+  RemoveTeamMembers,
+  SearchTeam,
+  SearchTeamMember,
+  Team,
+  TeamMemberResult,
+  TeamResult,
+  UpdateTeamMember,
+} from '@src/types';
 import { ApiKit } from '@src/utils';
 
 const createTeam = (team: Team): Promise<string> => {
@@ -35,8 +44,24 @@ const fetchTeams = (params: SearchTeam): Promise<TeamResult[]> => {
   return ApiKit.GET<TeamResult[]>(ApiPath.Team, params);
 };
 
-const GetTeamByUID = (teamUID: string): Promise<Team> => {
+const getTeamByUID = (teamUID: string): Promise<Team> => {
   return ApiKit.GET<Team>(`${ApiPath.Team}/${teamUID}`);
+};
+
+const getTeamMembers = (teamUID: string, params: SearchTeamMember): Promise<TeamMemberResult> => {
+  return ApiKit.GET<TeamMemberResult>(`${ApiPath.Team}/${teamUID}/members`, params);
+};
+
+const addTeamMembers = (teamUID: string, params: AddTeamMembers): Promise<string> => {
+  return ApiKit.POST<string>(`${ApiPath.Team}/${teamUID}/members`, params);
+};
+
+const removeTeamMembers = (teamUID: string, params: RemoveTeamMembers): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.Team}/${teamUID}/members/remove`, params);
+};
+
+const updateTeamMemeber = (teamUID: string, params: UpdateTeamMember): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.Team}/${teamUID}/members`, params);
 };
 
 export default {
@@ -44,5 +69,9 @@ export default {
   updateTeam,
   deleteTeam,
   fetchTeams,
-  GetTeamByUID,
+  getTeamByUID,
+  getTeamMembers,
+  addTeamMembers,
+  updateTeamMemeber,
+  removeTeamMembers,
 };

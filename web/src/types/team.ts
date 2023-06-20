@@ -29,3 +29,34 @@ export interface Team {
 export interface SearchTeam {
   name?: string;
 }
+
+export interface TeamMemberResult {
+  members?: TeamMember[];
+  total?: number;
+}
+
+export interface TeamMember {
+  userUid: string;
+  userName: string;
+  name: string;
+  permission: string;
+}
+
+export interface SearchTeamMember {
+  user?: string;
+  permissions?: string[];
+}
+
+export interface AddTeamMembers {
+  userUids: string[];
+  permission: string;
+}
+
+export interface UpdateTeamMember {
+  userUid: string;
+  permission: string;
+}
+
+export interface RemoveTeamMembers {
+  userUids: string[];
+}

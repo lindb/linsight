@@ -17,25 +17,20 @@
 
 package model
 
-// Org represents organization information.
-type Org struct {
-	BaseModel
+import (
+	"testing"
 
-	UID  string `json:"uid" gorm:"column:uid;index:u_idx_org_uid,unique"`
-	Name string `json:"name" gorm:"column:name;index:u_idx_org_name,unique"`
+	"github.com/lindb/common/pkg/encoding"
+	"github.com/stretchr/testify/assert"
+)
 
-	// TODO: add info?
-}
-
-// SearchOrgRequest represents search organization request params.
-type SearchOrgRequest struct {
-	PagingParam
-	Name string `form:"name" json:"name"`
-}
-
-type OrgUserInfo struct {
-	UserUID  string `json:"userUid"`
-	UserName string `json:"userName"`
-	Name     string `json:"name"`
-	Email    string `json:"email"`
+func TestTeam_Member(t *testing.T) {
+	a := SearchTeamMemberRequest{
+		User:        "user",
+		Permissions: []PermissionType{PermissionAdmin, PermissionMember},
+	}
+	req := &SearchTeamMemberRequest{}
+	err := encoding.JSONUnmarshal(encoding.JSONMarshal(&a), req)
+	assert.NoError(t, err)
+	assert.Equal(t, []PermissionType{PermissionAdmin, PermissionMember}, req.Permissions)
 }

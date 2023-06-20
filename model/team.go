@@ -34,3 +34,46 @@ type SearchTeamRequest struct {
 	PagingParam
 	Name string `form:"name" json:"name"`
 }
+
+// TeamMember represents the team's member inforamtion.
+type TeamMember struct {
+	BaseModel
+
+	OrgID  int64 `json:"-" gorm:"column:org_id;index:u_idx_team_member,unique"`
+	TeamID int64 `json:"-" gorm:"column:team_id;index:u_idx_team_member,unique"`
+	UserID int64 `json:"-" gorm:"column:user_id;index:u_idx_team_member,unique"`
+
+	Permission PermissionType `json:"-" gorm:"permission"`
+}
+
+// AddTeamMember represents add new team member params.
+type AddTeamMember struct {
+	UserUIDs   []string       `json:"userUids" binding:"required"`
+	Permission PermissionType `json:"permission" binding:"required"`
+}
+
+// UpdateTeamMember represents update team member params.
+type UpdateTeamMember struct {
+	UserUID    string         `json:"userUid" binding:"required"`
+	Permission PermissionType `json:"permission" binding:"required"`
+}
+
+// RemoveTeamMember represents remove team member params.
+type RemoveTeamMember struct {
+	UserUIDs []string `json:"userUids" binding:"required"`
+}
+
+// TeamMemberInfo represents team member info.
+type TeamMemberInfo struct {
+	UserUID    string         `json:"userUid"`
+	Name       string         `json:"name"`
+	UserName   string         `json:"userName"`
+	Permission PermissionType `json:"permission"`
+}
+
+// SearchTeamMemberRequest represents search team member request params.
+type SearchTeamMemberRequest struct {
+	PagingParam
+	User        string           `form:"user" json:"user"`
+	Permissions []PermissionType `form:"permissions" json:"permissions" binding:"required"`
+}

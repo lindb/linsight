@@ -80,3 +80,8 @@ export interface QuickSelectItem {
   title: string;
   value: string;
 }
+
+export const PermissionList = [
+  { label: 'Admin', value: 'Admin', showTick: false },
+  { label: 'Member', value: 'Member', showTick: false },
+];

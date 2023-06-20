@@ -117,3 +117,14 @@ func (api *OrgAPI) GetOrgListForSignedUser(c *gin.Context) {
 	}
 	httppkg.OK(c, orgs)
 }
+
+// GetUserListForSignedOrg returns the users for current signed org, filter(user name/name/email).
+func (api *OrgAPI) GetUserListForSignedOrg(c *gin.Context) {
+	prefix := c.Query("prefix")
+	users, err := api.deps.OrgSrv.GetUserListForSignedOrg(c.Request.Context(), prefix)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, users)
+}
