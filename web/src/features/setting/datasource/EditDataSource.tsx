@@ -15,27 +15,29 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isEmpty, get } from 'lodash-es';
-import { Button, Select, Card, Typography, Form, Space, useFormApi, Tag } from '@douyinfe/semi-ui';
+import { Button, Select, Card, Typography, Form, Space, Tag } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
 import { DatasourcePlugin, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, Notification } from '@src/components';
-import { ApiKit } from '@src/utils';
+import { ApiKit, ObjectKit } from '@src/utils';
 import { useRequest } from '@src/hooks';
 import { DatasourceStore } from '@src/stores';
 import DeleteDatasourceButton from './components/DeleteDatasourceButton';
 import { PlatformContext } from '@src/contexts';
+import './datasource.scss';
 
 const { Text, Title } = Typography;
 
-const DatasourceSettingForm: React.FC<{ datasource?: DatasourceSetting; SettingEditor: React.ComponentType }> = (
-  props
-) => {
-  const { SettingEditor, datasource } = props;
-  const formApi = useFormApi();
+const DatasourceSettingForm: React.FC<{
+  formApi: any;
+  datasource?: DatasourceSetting;
+  SettingEditor: React.ComponentType;
+}> = (props) => {
+  const { SettingEditor, datasource, formApi } = props;
   useEffect(() => {
     if (datasource) {
       formApi.setValues(datasource);
@@ -62,7 +64,7 @@ const EditDataSource: React.FC = () => {
     }
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (datasource) {
       setType(datasource.type);
     }
@@ -75,7 +77,7 @@ const EditDataSource: React.FC = () => {
     }
     const SettingEditor = plugin?.components?.SettingEditor;
     if (SettingEditor) {
-      return <DatasourceSettingForm datasource={datasource} SettingEditor={SettingEditor} />;
+      return <DatasourceSettingForm formApi={formApi.current} datasource={datasource} SettingEditor={SettingEditor} />;
     }
     return null;
   };
@@ -110,16 +112,19 @@ const EditDataSource: React.FC = () => {
         />
       }>
       <Form
+        className="linsight-form datasource-form"
         labelPosition="left"
         labelAlign="right"
         getFormApi={(api: any) => (formApi.current = api)}
         labelWidth={150}
+        allowEmpty
         disabled={submitting}
         onSubmit={async (values: any) => {
           try {
             setSubmitting(true);
             if (uid) {
               values.uid = uid;
+              ObjectKit.merge(datasource, values);
               await DatasourceSrv.updateDatasource(values);
             } else {
               const uid = await DatasourceSrv.createDatasource(values);

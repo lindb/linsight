@@ -21,7 +21,7 @@ import React from 'react';
 export const SettingEditor: React.FC = () => {
   return (
     <>
-      <Form.Section text="HTTP">
+      <Form.Section text="Setting">
         <Form.Input
           field="url"
           label="URL"
@@ -33,6 +33,10 @@ export const SettingEditor: React.FC = () => {
           label="Database"
           rules={[{ required: true, message: 'Database is required' }]}
         />
+        <Form.InputGroup style={{ display: 'flex', gap: 4 }} label={{ text: 'Namespace', align: 'right' }}>
+          <Form.Input field="config.namespace" noLabel style={{ width: 340 }} placeholder="Namespace" />
+          <Form.Input field="config.alias" noLabel style={{ flex: 1 }} placeholder="Namespace alias" />
+        </Form.InputGroup>
       </Form.Section>
     </>
   );
