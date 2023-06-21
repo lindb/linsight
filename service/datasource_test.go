@@ -110,11 +110,13 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 	srv := NewDatasourceService(mockDB)
 	cases := []struct {
 		name    string
+		ds      *model.Datasource
 		prepare func()
 		wantErr bool
 	}{
 		{
 			name: "get data source failure",
+			ds:   &model.Datasource{UID: "1234", IsDefault: true},
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
 			},
@@ -122,6 +124,7 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 		},
 		{
 			name: "clean default datasource failure",
+			ds:   &model.Datasource{UID: "1234", IsDefault: true},
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
@@ -131,6 +134,7 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 		},
 		{
 			name: "update data source failure",
+			ds:   &model.Datasource{UID: "1234", IsDefault: true},
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
@@ -141,10 +145,20 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 		},
 		{
 			name: "update data source successfully",
+			ds:   &model.Datasource{UID: "1234", IsDefault: true},
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "update data source successfully, not default",
+			ds:   &model.Datasource{UID: "1234"},
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 			},
 			wantErr: false,
@@ -155,7 +169,7 @@ func TestDatasourceService_UpdateDatasource(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.UpdateDatasource(ctx, &model.Datasource{UID: "1234", IsDefault: true})
+			err := srv.UpdateDatasource(ctx, tt.ds)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

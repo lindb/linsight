@@ -17,8 +17,8 @@ under the License.
 */
 import { Button, Form, Tooltip, Typography } from '@douyinfe/semi-ui';
 import { IconChevronDown, IconChevronRight, IconHelpCircleStroked } from '@douyinfe/semi-icons';
-import { Query, QueryEditorProps } from '@src/types';
-import React, { MutableRefObject, useContext, useRef, useState } from 'react';
+import { Query, QueryEditorProps, Tracker } from '@src/types';
+import React, { MutableRefObject, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { get, isEmpty } from 'lodash-es';
 import { LinDBDatasource } from './Datasource';
 import { QueryEditContext } from '@src/contexts';
@@ -27,7 +27,6 @@ import TagKeySelect from './components/TagKeySelect';
 import FieldSelect from './components/FieldSelect';
 import WhereConditonSelect from './components/WhereEditor';
 import './query-edit.scss';
-import { ObjectKit } from '@src/utils';
 import NamespaceSelect from './components/NamespaceSelect';
 
 const { Text } = Typography;
@@ -111,22 +110,42 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
   const { target, modifyTarget } = useContext(QueryEditContext);
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
   const namespace = get(datasource, 'setting.config.namespace', '');
+  const requestTracker = useRef() as MutableRefObject<Tracker<object>>;
+  const formApi = useRef() as MutableRefObject<any>;
+
+  const getInitRequest = useCallback(() => {
+    return get(target, 'request', {});
+  }, [target]);
+
+  useMemo(() => {
+    requestTracker.current = new Tracker(getInitRequest());
+  }, [getInitRequest]);
+
+  useEffect(() => {
+    formApi.current.setValues(getInitRequest());
+  }, [datasource, getInitRequest]);
 
   return (
     <>
       <Form
+        getFormApi={(api: any) => {
+          formApi.current = api;
+        }}
         allowEmpty
         className="lindb-query-editor"
         layout="horizontal"
-        initValues={get(target, 'request', {})}
+        initValues={getInitRequest()}
         onSubmit={(values: any) => {
-          const newValues = ObjectKit.cleanEmptyProperties(values);
+          if (!requestTracker.current.isChanged(values)) {
+            return;
+          }
+          requestTracker.current.setNewVal(values);
           if (!isEmpty(namespace)) {
             // use namespace from datasource setting
-            newValues.namespace = namespace;
+            values.namespace = namespace;
           }
           // change query edit context's values
-          modifyTarget({ request: newValues } as Query);
+          modifyTarget({ request: values } as Query);
         }}>
         {({ formApi }) => (
           <>

@@ -27,7 +27,7 @@ export class LinDBDatasource extends DatasourceAPI {
   }
 
   rewriteQuery(query: Query, variables: {}, dataset: DataSetType): Query | null {
-    if (!query.request) {
+    if (!query.request || isEmpty(query.request.metric) || isEmpty(query.request.fields)) {
       return null;
     }
     if (!isEmpty(query.request.where)) {
@@ -111,7 +111,6 @@ export class LinDBDatasource extends DatasourceAPI {
   }
 
   async metaQuery(req: any, prefix?: string): Promise<string[]> {
-    console.log('req metadata', toJS(req));
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
       request: req,
@@ -123,7 +122,6 @@ export class LinDBDatasource extends DatasourceAPI {
   }
 
   query(req: any, range?: TimeRange) {
-    console.log(req, 'xxxxxx');
     return DataQuerySrv.dataQuery({
       range: range,
       queries: [

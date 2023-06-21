@@ -55,6 +55,7 @@ const FieldSelect: React.FC<{
       placeholder="Please select fields"
       labelPosition={labelPosition}
       reloadKeys={[metricField, namespaceField]}
+      resetValue={[]}
       loader={async (_prefix?: string) => {
         const values = await datasource.getFields(ns || namespace, metricName);
         const optionList: any[] = [];

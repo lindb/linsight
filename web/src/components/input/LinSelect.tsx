@@ -15,12 +15,13 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { MutableRefObject, useEffect, useRef } from 'react';
+import React, { MutableRefObject, useEffect, useMemo, useRef } from 'react';
 import { Form, useFormApi, useFormState } from '@douyinfe/semi-ui';
-import { isEmpty, isEqual, upperFirst, debounce, pick } from 'lodash-es';
+import { isEmpty, upperFirst, debounce, pick } from 'lodash-es';
 import { useRequest } from '@src/hooks';
 import { ApiKit } from '@src/utils';
 import { Notification } from '@src/components';
+import { Tracker } from '@src/types';
 
 const RELOAD_TIME = 5 * 60 * 1000;
 
@@ -43,13 +44,13 @@ const LinSelect: React.FC<{
   loader?: (input?: string) => any;
   reloadKeys?: string[];
   rules?: any[];
-  clearKeys?: string[];
+  resetValue?: any;
   outerBottomSlot?: React.ReactNode;
   onFinished?: () => void;
 }> = (props) => {
   const {
     field,
-    cascade,
+    resetValue,
     multiple,
     showClear = true,
     filter = true,
@@ -70,8 +71,17 @@ const LinSelect: React.FC<{
   const formValues = formState.values;
   const dropdownVisible = useRef(false) as MutableRefObject<boolean>;
   const searchInput = useRef('') as MutableRefObject<string>;
-  const previousValuesOfReloadKeys = useRef(pick(formValues, reloadKeys || [])) as MutableRefObject<any>;
+  const reloadValues = pick(formValues, reloadKeys || []);
+  const reloadTracker = useRef() as MutableRefObject<Tracker<any>>;
   const lastLoad = useRef(new Date().getTime()) as MutableRefObject<number>;
+
+  /**
+   * initialize value
+   */
+  useMemo(() => {
+    reloadTracker.current = new Tracker(reloadValues);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isEnable = (): boolean => {
     return true;
@@ -92,14 +102,13 @@ const LinSelect: React.FC<{
 
   useEffect(() => {
     if (!isEmpty(reloadKeys)) {
-      const valuesOfReloadKeys = pick(formValues, reloadKeys || []);
-      if (!isEqual(previousValuesOfReloadKeys.current, valuesOfReloadKeys)) {
-        previousValuesOfReloadKeys.current = valuesOfReloadKeys;
-        formApi.setValue(field, '');
+      if (reloadTracker.current.isChanged(reloadValues)) {
+        reloadTracker.current.setNewVal(reloadValues);
+        formApi.setValue(field, resetValue || '');
         refetch();
       }
     }
-  }, [refetch, reloadKeys, formValues, field, formApi]);
+  }, [refetch, reloadValues, field, formApi, resetValue, reloadKeys]);
 
   // lazy remote search when user input.
   const search = debounce(refetch, 200);

@@ -17,7 +17,7 @@ under the License.
 */
 import { makeAutoObservable, toJS } from 'mobx';
 import { DatasourceInstance, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
-import { find } from 'lodash-es';
+import { find, get } from 'lodash-es';
 import { DatasourceSrv } from '@src/services';
 
 class DatasourceStore {
@@ -55,6 +55,15 @@ class DatasourceStore {
       }
     });
     this.datasources = rs;
+  }
+
+  getDefaultDatasource(): DatasourceInstance | null {
+    const defaultDS = find(this.datasources, { setting: { isDefault: true } });
+    if (defaultDS) {
+      return defaultDS;
+    }
+    // if no default datasource, return first datasource if exist
+    return get(this.datasources, '[0]', null);
   }
 
   async syncDatasources() {
