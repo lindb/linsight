@@ -158,7 +158,7 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
             )}
             <MetricNameSelect ns={namespace} datasource={api} style={{ minWidth: 240 }} />
             <FieldSelect ns={namespace} datasource={api} style={{ minWidth: 240 }} />
-            <WhereConditonSelect ns={namespace} datasource={api} style={{ minWidth: 270 }} />
+            <WhereConditonSelect ns={namespace} datasource={api} />
             <TagKeySelect
               ns={namespace}
               field="groupBy"

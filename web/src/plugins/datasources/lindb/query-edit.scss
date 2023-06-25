@@ -21,6 +21,25 @@ under the License.
   .semi-form-field {
     padding-right: 0;
   }
+
+  .operator {
+    .semi-select-selection {
+      margin-left: 0;
+    }
+
+    .semi-select-arrow-empty {
+      display: none;
+    }
+  }
+
+  .where {
+    .current-condition {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+  }
 }
 
 .tag-item {

@@ -49,6 +49,7 @@ import { useRequest } from '@src/hooks';
 import { VariableContextProvider } from '@src/contexts';
 import NotFoundImg from '@src/images/4042.svg';
 import DashboardSearchModal from './components/DashboardSearchModal';
+import { toJS } from 'mobx';
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -324,7 +325,7 @@ const Dashboard: React.FC = () => {
   return (
     <>
       <DashboardSearchModal ref={searchRef} />
-      <VariableContextProvider variables={DashboardStore.getVariables()}>
+      <VariableContextProvider variables={toJS(DashboardStore.getVariables())}>
         <Layout>
           <Header className="linsight-feature-header linsight-dashboard">
             <div className="title">

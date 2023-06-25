@@ -81,7 +81,14 @@ func (b *DataQueryBuilder) Namespace(namespace string) *DataQueryBuilder {
 
 // Where sets where conditions.
 func (b *DataQueryBuilder) Where(where ...Expr) *DataQueryBuilder {
-	b.where = append(b.where, where...)
+	fmt.Println(where)
+	for _, e := range where {
+		if e.Key == "" || e.Op == "" {
+			// ignore key/op empty
+			continue
+		}
+		b.where = append(b.where, e)
+	}
 	return b
 }
 

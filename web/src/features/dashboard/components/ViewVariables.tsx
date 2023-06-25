@@ -16,16 +16,13 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Card, Form, useFormApi } from '@douyinfe/semi-ui';
-import { DashboardStore } from '@src/stores';
-import React, { MutableRefObject, useEffect, useRef } from 'react';
-import { get, set, isEmpty, map, isArray } from 'lodash-es';
-import { observer } from 'mobx-react-lite';
+import React, { MutableRefObject, useContext, useEffect, useRef } from 'react';
+import { get, isEmpty, map, isArray } from 'lodash-es';
 import { Variable, VariableHideType, VariableType } from '@src/types';
 import './variables.scss';
 import { useSearchParams } from 'react-router-dom';
 import { useVariable } from '@src/hooks';
-import { VariableKit } from '@src/utils';
-import { toJS } from 'mobx';
+import { VariableContext } from '@src/contexts';
 
 /*
  * Constant variable based on setting.
@@ -55,7 +52,6 @@ const QueryVariable: React.FC<{ variable: Variable }> = (props) => {
   const { variable } = props;
   const { result, loading } = useVariable(variable, '');
   const formApi = useFormApi();
-  const isMulti = VariableKit.isMulti(variable);
   const dropdownVisible = useRef(false) as MutableRefObject<boolean>;
 
   return (
@@ -63,19 +59,19 @@ const QueryVariable: React.FC<{ variable: Variable }> = (props) => {
       showClear
       key={variable.name}
       noLabel={variable.hide === VariableHideType.OnlyValue}
-      multiple={isMulti}
+      multiple={variable.multi}
       label={variable.label}
       field={variable.name}
       loading={loading}
       onClear={() => formApi.submitForm()}
       onChange={(_value) => {
-        if (!isMulti || !dropdownVisible.current) {
+        if (!variable.multi || !dropdownVisible.current) {
           formApi.submitForm();
         }
       }}
       onDropdownVisibleChange={(val) => {
         dropdownVisible.current = val;
-        if (!val && isMulti) {
+        if (!val && variable.multi) {
           formApi.submitForm();
         }
       }}
@@ -91,26 +87,17 @@ const QueryVariable: React.FC<{ variable: Variable }> = (props) => {
  */
 const ViewVariables: React.FC<{ className?: string }> = (props) => {
   const { className } = props;
+  const { variables, definitions } = useContext(VariableContext);
   const [searchParams, setSearchParams] = useSearchParams();
-  const variables: Variable[] = DashboardStore.getVariables();
   const formApi = useRef<any>();
   useEffect(() => {
-    if (isEmpty(variables) || !formApi.current) {
+    if (isEmpty(definitions) || !formApi.current) {
       return;
     }
-    const values = {};
-    toJS(variables).forEach((variable: Variable) => {
-      const val = get(variable, 'current.value');
-      if (!isEmpty(val)) {
-        set(values, variable.name, val);
-      }
-    });
-    if (!isEmpty(values)) {
-      formApi.current.setValues(values);
-    }
-  }, [variables, formApi]);
+    formApi.current.setValues(variables);
+  }, [definitions, variables, formApi]);
 
-  if (isEmpty(variables)) {
+  if (isEmpty(definitions)) {
     return null;
   }
 
@@ -123,14 +110,14 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
         getFormApi={(api: any) => (formApi.current = api)}
         onSubmit={(values: any) => {
           // set variables to url params
-          variables.forEach((variable: Variable) => {
+          definitions.forEach((variable: Variable) => {
             const name = variable.name;
             const val = get(values, name);
             // first deleve old value
             searchParams.delete(name);
             if (!isEmpty(val)) {
               // if has selected, set new value
-              if (VariableKit.isMulti(variable) && isArray(val)) {
+              if (variable.multi && isArray(val)) {
                 val.forEach((v: string) => searchParams.append(name, v));
               } else {
                 searchParams.set(name, val);
@@ -139,7 +126,7 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
           });
           setSearchParams(searchParams);
         }}>
-        {variables.map((item: Variable, index: number) => {
+        {definitions.map((item: Variable, index: number) => {
           if (item.hide === VariableHideType.Hide) {
             return null;
           }
@@ -153,4 +140,4 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
   );
 };
 
-export default observer(ViewVariables);
+export default ViewVariables;

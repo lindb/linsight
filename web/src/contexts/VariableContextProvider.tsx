@@ -22,6 +22,7 @@ import { isEmpty, set } from 'lodash-es';
 
 export const VariableContext = createContext({
   variables: {},
+  definitions: [] as Variable[],
   from: '',
   to: '',
   refreshTime: 0,
@@ -34,7 +35,11 @@ const getValues = (variables: Variable[], searchParams: URLSearchParams): object
   variables.forEach((variable: Variable) => {
     if (searchParams.has(variable.name)) {
       // FIXME: add multi/all logic
-      set(newValues, variable.name, searchParams.get(variable.name));
+      if (variable.multi) {
+        set(newValues, variable.name, searchParams.getAll(variable.name));
+      } else {
+        set(newValues, variable.name, searchParams.get(variable.name));
+      }
     }
   });
   return newValues;
@@ -72,7 +77,16 @@ export const VariableContextProvider: React.FC<{ variables: Variable[]; children
   };
 
   return (
-    <VariableContext.Provider value={{ variables: valuesOfVariable, from, to, refreshTime, refresh, refreshInterval }}>
+    <VariableContext.Provider
+      value={{
+        definitions: variables || [],
+        variables: valuesOfVariable,
+        from,
+        to,
+        refreshTime,
+        refresh,
+        refreshInterval,
+      }}>
       {children}
     </VariableContext.Provider>
   );

@@ -184,7 +184,7 @@ class DashboardStore {
   }
 
   getVariables(): Variable[] {
-    return get(this.dashboard, 'templating.list', []) as Variable[];
+    return toJS(get(this.dashboard, 'templating.list', []) as Variable[]);
   }
 
   addVariable(variable: any) {

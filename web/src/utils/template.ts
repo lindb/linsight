@@ -18,7 +18,11 @@ under the License.
 import { get, trim } from 'lodash-es';
 
 const template = (tmpl: string, params?: object): string => {
-  return tmpl.replace(/\$\{\s*(\w+)\s*\}/g, (_, key) => get(params, trim(key), ''));
+  const matches = tmpl.match(/\$\{\s*(\w+)\s*\}/);
+  if (matches) {
+    return get(params, trim(matches[1]), '');
+  }
+  return tmpl;
 };
 
 export default { template };

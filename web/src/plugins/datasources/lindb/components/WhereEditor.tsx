@@ -16,148 +16,176 @@ specific language governing permissions and limitations
 under the License.
 */
 import {
-  Divider,
-  Row,
-  Col,
   useFieldState,
-  Dropdown,
-  Form,
-  Input,
-  List,
-  Tag,
   useFormApi,
-  Typography,
   useFormState,
+  Button,
+  Select,
+  Radio,
+  Popover,
+  Col,
+  Row,
+  Typography,
 } from '@douyinfe/semi-ui';
-import { IconSearchStroked } from '@douyinfe/semi-icons';
-import { StatusTip } from '@src/components';
+import { IconPlusStroked, IconCrossStroked, IconHelpCircleStroked } from '@douyinfe/semi-icons';
 import { useRequest } from '@src/hooks';
-import {
-  isEmpty,
-  has,
-  get,
-  set,
-  pick,
-  pickBy,
-  transform,
-  isArray,
-  indexOf,
-  join,
-  cloneDeep,
-  pull,
-  unset,
-  findIndex,
-} from 'lodash-es';
-import React, { CSSProperties, MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isEmpty, pick, isArray, find, remove, startsWith, filter, includes } from 'lodash-es';
+import React, { MutableRefObject, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { LinDBDatasource } from '../Datasource';
 import { ConditionExpr, Operator } from '../types';
-import classNames from 'classnames';
 import { Tracker } from '@src/types';
-
+import { VariableContext } from '@src/contexts';
 const { Text } = Typography;
 
 const TagValueSelect: React.FC<{
   datasource: LinDBDatasource;
   namespace: string;
   metric: string;
-  tagKey: string;
-  where: object;
-  onTagValueAdd: (tagValue: string) => void;
-  onTagValueRemove: (tagValue: string) => void;
+  condition: ConditionExpr;
+  onConditionChange: (condition: ConditionExpr) => void;
 }> = (props) => {
-  const { datasource, namespace, metric, tagKey, where, onTagValueAdd, onTagValueRemove } = props;
-  const {
-    result: tagValues,
-    error,
-    loading,
-  } = useRequest(
-    ['load_tag_values_for_where', namespace, metric, tagKey],
-    async () => {
-      return await datasource.getTagValues(namespace, metric, `${tagKey}`);
-    },
-    { enabled: !isEmpty(metric) && !isEmpty(tagKey) }
-  );
-
-  const getSelectedValue = useCallback(() => {
-    const selectedValues = get(where, `${tagKey}.value`);
-    if (isArray(selectedValues)) {
-      return selectedValues;
+  const { datasource, namespace, metric, condition, onConditionChange } = props;
+  const { definitions } = useContext(VariableContext);
+  const [tagValues, setTagValues] = useState<string[]>([]);
+  const [input, setInput] = useState('');
+  const fetchTagValues = useCallback(async () => {
+    if (startsWith(input, '$')) {
+      setTagValues(
+        (definitions || []).map((d: any) => {
+          return `\${${d.name}}`;
+        })
+      );
+      return;
     }
-    return [selectedValues];
-  }, [tagKey, where]);
-
-  const [selected, setSelected] = useState(() => {
-    return getSelectedValue();
-  });
+    const tagValues = await datasource.getTagValues(namespace, metric, condition.key);
+    setTagValues(tagValues);
+  }, [condition, datasource, definitions, namespace, metric, input]);
 
   useEffect(() => {
-    setSelected(getSelectedValue());
-  }, [getSelectedValue]);
+    fetchTagValues();
+  }, [input, fetchTagValues]);
 
   return (
-    <List
-      size="small"
-      dataSource={tagValues}
-      emptyContent={<StatusTip isLoading={loading} error={error} />}
-      header={<Input prefix={<IconSearchStroked />} />}
-      renderItem={(item) => (
-        <List.Item
-          className={classNames('tag-item', {
-            active: indexOf(selected, item) >= 0,
-          })}
-          onClick={() => {
-            if (indexOf(selected, item) >= 0) {
-              // do unselect
-              setSelected([...pull(selected, item)]);
-              onTagValueRemove(item);
-            } else {
-              // do select
-              const newSelected = [...selected];
-              newSelected.push(item);
-              setSelected(newSelected);
-              onTagValueAdd(item);
-            }
-          }}>
-          {item}
-        </List.Item>
-      )}
-    />
+    <Select
+      placeholder="Tag value"
+      style={{ minWidth: 100 }}
+      multiple={condition.operator === Operator.In}
+      filter
+      remote
+      allowCreate
+      onFocus={() => {
+        fetchTagValues();
+      }}
+      onChange={(values: any) => {
+        condition.value = values;
+        onConditionChange(condition);
+      }}
+      onCreate={(op: any) => {
+        op.showTick = false;
+      }}
+      onSearch={(v: string) => {
+        setInput(v);
+      }}
+      defaultValue={condition.value}>
+      {(tagValues || []).map((tagValue: string) => {
+        return (
+          <Select.Option value={tagValue} showTick={false} key={tagValue}>
+            {tagValue}
+          </Select.Option>
+        );
+      })}
+    </Select>
   );
 };
 
-const TagKeySelect: React.FC<{
+const ConditionInput: React.FC<{
   datasource: LinDBDatasource;
+  condition: ConditionExpr;
   namespace: string;
   metric: string;
-  currentTagKey: string;
-  onChangeTagKey: (tagKey: string) => void;
+  tagKeys: string[];
+  onConditionChange: (condition: ConditionExpr) => void;
+  onConditionRemove: (condition: ConditionExpr) => void;
 }> = (props) => {
-  const { datasource, namespace, metric, currentTagKey, onChangeTagKey } = props;
-  const {
-    result: tagKeys,
-    error,
-    loading,
-  } = useRequest(
-    ['load_tag_keys_for_where', namespace, metric],
-    async () => {
-      return await datasource.getTagKeys(namespace, metric);
-    },
-    { enabled: !isEmpty(metric) }
-  );
+  const { datasource, namespace, tagKeys, metric, condition, onConditionChange, onConditionRemove } = props;
   return (
-    <List
-      size="small"
-      dataSource={tagKeys}
-      header={<Input prefix={<IconSearchStroked />} />}
-      emptyContent={<StatusTip isLoading={loading} error={error} />}
-      renderItem={(item) => (
-        <List.Item
-          className={classNames('tag-item', { active: currentTagKey === item })}
-          onClick={() => onChangeTagKey(item)}>
-          {item}
-        </List.Item>
-      )}
-    />
+    <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
+      <Select
+        placeholder="Tag key"
+        defaultValue={condition.key}
+        onChange={(v: any) => {
+          condition.key = v;
+          onConditionChange(condition);
+        }}>
+        {(tagKeys || []).map((tagKey: string) => {
+          return (
+            <Select.Option value={tagKey} showTick={false} key={tagKey}>
+              {tagKey}
+            </Select.Option>
+          );
+        })}
+      </Select>
+      <Select
+        className="operator"
+        showArrow={false}
+        defaultValue={condition.operator || Operator.Eq}
+        optionList={[
+          { label: Operator.Eq, value: Operator.Eq, showTick: false },
+          { label: Operator.In, value: Operator.In, showTick: false },
+          { label: Operator.Like, value: Operator.Like, showTick: false },
+        ]}
+        onChange={(v: any) => {
+          condition.operator = v;
+          if (v === Operator.In) {
+            condition.value = [condition.value as string];
+          } else if (isArray(condition.value)) {
+            condition.value = condition.value[0];
+          }
+          onConditionChange(condition);
+        }}
+      />
+      <TagValueSelect
+        condition={condition}
+        datasource={datasource}
+        namespace={namespace}
+        metric={metric}
+        onConditionChange={onConditionChange}
+      />
+      <div
+        style={{
+          backgroundColor: 'var(--semi-color-fill-0)',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+        }}>
+        <Popover
+          showArrow
+          content={
+            <div>
+              <Text size="small">Optional: </Text>
+              <Text size="small" type="tertiary">
+                If the tag value is not selected, then ignore this condition
+              </Text>
+            </div>
+          }>
+          <Radio
+            mode="advanced"
+            checked={condition.optional}
+            onChange={() => {
+              condition.optional = !condition.optional;
+              onConditionChange(condition);
+            }}
+          />
+        </Popover>
+      </div>
+      <Button
+        icon={<IconCrossStroked />}
+        type="danger"
+        onClick={() => {
+          onConditionRemove(condition);
+        }}
+      />
+    </div>
   );
 };
 
@@ -166,27 +194,27 @@ const WhereConditonSelect: React.FC<{
   ns?: string;
   metricField?: string;
   namespaceField?: string;
-  style?: CSSProperties;
 }> = (props) => {
-  const { datasource, ns, metricField = 'metric', namespaceField = 'namespace', style } = props;
-  const [visible, setVisible] = useState(false);
-  const [currentTagKey, setCurrentTagKey] = useState('');
+  const { datasource, ns, metricField = 'metric', namespaceField = 'namespace' } = props;
   const { value: metricName } = useFieldState(metricField);
   const { value: namespace } = useFieldState(namespaceField);
   const formApi = useFormApi();
   const formState = useFormState();
   const formValues = formState.values;
-  const [where, setWhere] = useState<Record<string, ConditionExpr>>(() => {
-    const result = {};
-    const initWhere = formApi.getValue('where');
-    if (isEmpty(initWhere)) {
-      return result;
-    }
-    initWhere.forEach((item: ConditionExpr) => set(result, item.key, item));
-    return result;
+  const [conditions, setConditions] = useState<ConditionExpr[]>(() => {
+    return formApi.getValue('where') || ([{}] as ConditionExpr[]);
   });
+
   const namespaceAndMetric = pick(formValues, [metricField, namespaceField]);
   const reloadKeysTracker = useRef() as MutableRefObject<Tracker<any>>;
+  const [tagKeys, setTagKeys] = useState<string[]>([]);
+  const { result } = useRequest(
+    ['load_tag_keys_for_where', namespace, metricName],
+    async () => {
+      return await datasource.getTagKeys(namespace, metricName);
+    },
+    { enabled: !isEmpty(metricName) }
+  );
 
   /**
    * initialize value
@@ -196,190 +224,119 @@ const WhereConditonSelect: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // just init
 
-  const setWhereConditions = useCallback(() => {
-    const conditions: ConditionExpr[] = [];
-    transform(
-      where,
-      (_result, value: ConditionExpr, _key) => {
-        conditions.push(value);
-      },
-      {}
+  useEffect(() => {
+    formApi.setValue(
+      'where',
+      filter(conditions, (c: ConditionExpr) => {
+        return !isEmpty(c.value);
+      })
     );
-    formApi.setValue('where', conditions);
     formApi.submitForm();
-  }, [formApi, where]);
+  }, [conditions, formApi]);
 
   useEffect(() => {
-    setWhereConditions();
-  }, [visible, setWhereConditions]);
+    const selectedKey = (conditions || []).map((c: ConditionExpr) => c.key);
+    setTagKeys(filter(result as string[], (key: string) => !includes(selectedKey, key)));
+  }, [result, conditions]);
 
   useEffect(() => {
     if (reloadKeysTracker.current.isChanged(namespaceAndMetric)) {
       reloadKeysTracker.current.setNewVal(namespaceAndMetric);
-      setWhere({});
-      setCurrentTagKey('');
+      setConditions([{} as ConditionExpr]);
       formApi.setValue('where', []);
     }
   }, [namespaceAndMetric, formApi]);
 
-  const pickWhereConditions = (values: any[]) => {
-    const finalWhere = pickBy(where, (_value: ConditionExpr, key: string) => {
-      return findIndex(values, { key: key }) >= 0;
-    });
-    setWhere(finalWhere);
-    setWhereConditions();
-  };
-
-  const conditionToString = (condition: ConditionExpr): string => {
-    if (condition.operator === Operator.In) {
-      return `${condition.key} ${condition.operator} (${join(condition.value, ',')})`;
-    }
-    return `${condition.key} ${condition.operator} ${condition.value}`;
-  };
-
-  const renderCurrentCondition = () => {
-    const condition = get(where, currentTagKey, {}) as ConditionExpr;
-    if (isEmpty(condition.value)) {
-      return null;
-    }
-    return (
-      <>
-        <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-          Current:
-        </Text>
-        <Text size="small">{conditionToString(condition)}</Text>
-        <Divider style={{ marginBottom: 8, marginTop: 8 }} />
-      </>
-    );
-  };
-
   return (
-    <Dropdown
-      trigger="custom"
-      visible={visible}
-      onEscKeyDown={() => setVisible(false)}
-      onClickOutSide={() => setVisible(false)}
-      render={
-        <div style={{ padding: 8 }}>
-          {renderCurrentCondition()}
-          <Row gutter={8}>
-            <Col
-              span={12}
-              style={{
-                borderRight: '1px solid var(--semi-color-border)',
-              }}>
-              <TagKeySelect
-                currentTagKey={currentTagKey}
-                datasource={datasource}
-                namespace={ns || namespace}
-                metric={metricName}
-                onChangeTagKey={(tagKey: string) => {
-                  setCurrentTagKey(tagKey);
-                }}
-              />
-            </Col>
-            <Col span={12}>
-              <TagValueSelect
-                datasource={datasource}
-                namespace={ns || namespace}
-                metric={metricName}
-                tagKey={currentTagKey}
-                where={where}
-                onTagValueAdd={(tagValue: string) => {
-                  const tagKey = currentTagKey;
-                  if (!has(where, tagKey)) {
-                    set(where, tagKey, { key: tagKey, operator: Operator.Eq, value: tagValue });
-                  } else {
-                    // FIXME: add other op
-                    const value: any = get(where, `${tagKey}.value`);
-                    if (isArray(value)) {
-                      value.push(tagValue);
-                    } else {
-                      set(where, tagKey, { key: tagKey, operator: Operator.In, value: [value, tagValue] });
-                    }
-                  }
-                  setWhere(cloneDeep(where));
-                }}
-                onTagValueRemove={(tagValue: string) => {
-                  const tagKey = currentTagKey;
-                  const value: any = get(where, `${tagKey}.value`);
-                  if (isArray(value)) {
-                    pull(value, tagValue);
-                    if (isEmpty(value)) {
-                      unset(where, tagKey);
-                    }
-                  } else {
-                    unset(where, tagKey);
-                  }
-                  setWhere(cloneDeep(where));
-                }}
-              />
-            </Col>
-          </Row>
-          <div style={{ margin: 8, minWidth: 280 }}>
-            <Divider style={{ marginBottom: 8 }} />
-            <Row>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  wildcard:
-                </Text>
-                <Text size="small">host:inst*</Text>
-              </Col>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  exclusion:
-                </Text>
-                <Text size="small">not host:a</Text>
-              </Col>
-            </Row>
-            <Row>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  in:
-                </Text>
-                <Text size="small">host in (a,b)</Text>
-              </Col>
-              <Col span={12}>
-                <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
-                  union:
-                </Text>
-                <Text size="small">host:a OR host:b</Text>
-              </Col>
-            </Row>
-          </div>
+    <div style={{ display: 'inline-flex', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <div
+          className="semi-select-inset-label"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0px 12px',
+            marginRight: 0,
+            gap: 2,
+            height: '100%',
+            backgroundColor: 'var(--semi-color-fill-0)',
+          }}>
+          <span>Where</span>
+          <Popover
+            showArrow
+            content={
+              <div style={{ width: 300 }}>
+                <Row>
+                  <Col span={12}>
+                    <Text size="small" type="tertiary" style={{ marginRight: 2 }}>
+                      wildcard:
+                    </Text>
+                    <Text size="small">host:inst*</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text size="small" type="tertiary" style={{ marginRight: 2 }}>
+                      exclusion:
+                    </Text>
+                    <Text size="small">not host:a</Text>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col span={12}>
+                    <Text size="small" type="tertiary" style={{ marginRight: 2 }}>
+                      in:
+                    </Text>
+                    <Text size="small">host in (a,b)</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text size="small" type="tertiary" style={{ marginRight: 2 }}>
+                      union:
+                    </Text>
+                    <Text size="small">host:a OR host:b</Text>
+                  </Col>
+                </Row>
+              </div>
+            }>
+            <IconHelpCircleStroked style={{ cursor: 'pointer' }} />
+          </Popover>
         </div>
-      }>
-      <Form.TagInput
-        field="where"
-        labelPosition="inset"
-        placeholder="Input where conditions"
-        style={style}
-        onFocus={() => setVisible(true)}
-        showClear
-        onChange={(values: any[]) => {
-          pickWhereConditions(values);
-        }}
-        renderTagItem={(value: any, _index: number, onClose) => {
-          if (isEmpty(value.key) || isEmpty(value.operator) || isEmpty(value.value)) {
-            return null;
-          }
-          return (
-            <Tag
-              key={value.key}
-              closable
-              color="white"
-              size="large"
-              onClose={onClose}
-              onClick={() => {
-                setCurrentTagKey(value.key);
-                setVisible(true);
-              }}>
-              {conditionToString(value)}
-            </Tag>
-          );
-        }}
-      />
-    </Dropdown>
+        {conditions.map((condition: ConditionExpr, index: number) => (
+          <ConditionInput
+            key={`${condition.key}-${index}`}
+            tagKeys={tagKeys}
+            condition={condition}
+            datasource={datasource}
+            namespace={ns || namespace}
+            metric={metricName}
+            onConditionChange={(condition: ConditionExpr) => {
+              // set default op
+              condition.operator = condition.operator || Operator.Eq;
+              setConditions([...conditions]);
+            }}
+            onConditionRemove={(condition: ConditionExpr) => {
+              remove(conditions, (expr: ConditionExpr) => {
+                return condition.key === expr.key;
+              });
+              setConditions([...conditions]);
+            }}
+          />
+        ))}
+        <Button
+          icon={<IconPlusStroked />}
+          type="tertiary"
+          onClick={() => {
+            if (
+              !isEmpty(tagKeys) &&
+              !find(conditions, (c: ConditionExpr) => {
+                return isEmpty(c.key);
+              })
+            ) {
+              conditions.push({} as ConditionExpr);
+              setConditions([...conditions]);
+            }
+          }}
+        />
+      </div>
+    </div>
   );
 };
 
