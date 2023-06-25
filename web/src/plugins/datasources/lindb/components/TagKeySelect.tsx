@@ -57,6 +57,7 @@ const TagKeySelect: React.FC<{
       placeholder={placeholder}
       labelPosition={labelPosition}
       reloadKeys={[metricField, namespaceField]}
+      resetValue={[]}
       loader={async (_prefix?: string) => {
         const values = await datasource.getTagKeys(ns || namespace, metricName);
         const optionList: any[] = [];

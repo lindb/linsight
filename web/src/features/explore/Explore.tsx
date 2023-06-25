@@ -37,12 +37,12 @@ const DefaultPanel = {
 };
 
 const ExploreContent: React.FC = () => {
-  const { datasources } = DatasourceStore;
+  const defaultDatasource = DatasourceStore.getDefaultDatasource();
   const { panel, modifyPanel } = useContext(PanelEditContext);
   const [searchParams, setSearchParams] = useSearchParams();
   const addToChartBtn = useRef<any>();
   const getDatasource = () => {
-    const datasourceUID = get(panel, 'datasource.uid', get(datasources, '[0].setting.uid'));
+    const datasourceUID = get(panel, 'datasource.uid', get(defaultDatasource, 'setting.uid'));
     return DatasourceStore.getDatasource(`${datasourceUID}`);
   };
   const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
@@ -51,6 +51,8 @@ const ExploreContent: React.FC = () => {
   const panelTracker = useRef<Tracker<PanelSetting>>() as MutableRefObject<Tracker<PanelSetting>>;
 
   useMemo(() => {
+    const datasource = getDatasource();
+    panel.datasource = { uid: get(datasource, 'setting.uid', '') };
     panelTracker.current = new Tracker(panel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // just init
@@ -106,6 +108,7 @@ const ExploreContent: React.FC = () => {
 
 const Explore: React.FC = () => {
   const [searchParams] = useSearchParams();
+
   const getOptions = (key: string) => {
     const options = `${searchParams.get(key)}`;
     if (!options || isEmpty(options)) {
@@ -131,6 +134,7 @@ const Explore: React.FC = () => {
     }
     return DefaultPanel;
   };
+
   return (
     <PanelEditContextProvider initPanel={getOptions('left')}>
       <ExploreContent />

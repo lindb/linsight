@@ -27,15 +27,32 @@ import {
   Tag,
   useFormApi,
   Typography,
+  useFormState,
 } from '@douyinfe/semi-ui';
 import { IconSearchStroked } from '@douyinfe/semi-icons';
 import { StatusTip } from '@src/components';
 import { useRequest } from '@src/hooks';
-import { isEmpty, has, get, set, pick, transform, isArray, indexOf, join } from 'lodash-es';
-import React, { CSSProperties, useCallback, useEffect, useState } from 'react';
+import {
+  isEmpty,
+  has,
+  get,
+  set,
+  pick,
+  pickBy,
+  transform,
+  isArray,
+  indexOf,
+  join,
+  cloneDeep,
+  pull,
+  unset,
+  findIndex,
+} from 'lodash-es';
+import React, { CSSProperties, MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LinDBDatasource } from '../Datasource';
 import { ConditionExpr, Operator } from '../types';
 import classNames from 'classnames';
+import { Tracker } from '@src/types';
 
 const { Text } = Typography;
 
@@ -45,8 +62,10 @@ const TagValueSelect: React.FC<{
   metric: string;
   tagKey: string;
   where: object;
+  onTagValueAdd: (tagValue: string) => void;
+  onTagValueRemove: (tagValue: string) => void;
 }> = (props) => {
-  const { datasource, namespace, metric, tagKey, where } = props;
+  const { datasource, namespace, metric, tagKey, where, onTagValueAdd, onTagValueRemove } = props;
   const {
     result: tagValues,
     error,
@@ -88,23 +107,15 @@ const TagValueSelect: React.FC<{
           })}
           onClick={() => {
             if (indexOf(selected, item) >= 0) {
-              // tag value selcted.
-              return;
-            }
-            const newSelected = [...selected];
-            newSelected.push(item);
-            setSelected(newSelected);
-
-            if (!has(where, tagKey)) {
-              set(where, tagKey, { key: tagKey, operator: Operator.Eq, value: item });
+              // do unselect
+              setSelected([...pull(selected, item)]);
+              onTagValueRemove(item);
             } else {
-              // FIXME: add other op
-              const value: any = get(where, `${tagKey}.value`);
-              if (isArray(value)) {
-                value.push(item);
-              } else {
-                set(where, tagKey, { key: tagKey, operator: Operator.In, value: [value, item] });
-              }
+              // do select
+              const newSelected = [...selected];
+              newSelected.push(item);
+              setSelected(newSelected);
+              onTagValueAdd(item);
             }
           }}>
           {item}
@@ -163,6 +174,8 @@ const WhereConditonSelect: React.FC<{
   const { value: metricName } = useFieldState(metricField);
   const { value: namespace } = useFieldState(namespaceField);
   const formApi = useFormApi();
+  const formState = useFormState();
+  const formValues = formState.values;
   const [where, setWhere] = useState<Record<string, ConditionExpr>>(() => {
     const result = {};
     const initWhere = formApi.getValue('where');
@@ -172,6 +185,16 @@ const WhereConditonSelect: React.FC<{
     initWhere.forEach((item: ConditionExpr) => set(result, item.key, item));
     return result;
   });
+  const namespaceAndMetric = pick(formValues, [metricField, namespaceField]);
+  const reloadKeysTracker = useRef() as MutableRefObject<Tracker<any>>;
+
+  /**
+   * initialize value
+   */
+  useMemo(() => {
+    reloadKeysTracker.current = new Tracker(namespaceAndMetric);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // just init
 
   const setWhereConditions = useCallback(() => {
     const conditions: ConditionExpr[] = [];
@@ -190,8 +213,19 @@ const WhereConditonSelect: React.FC<{
     setWhereConditions();
   }, [visible, setWhereConditions]);
 
-  const pickWhereConditions = (values: string[]) => {
-    const finalWhere = pick(where, values);
+  useEffect(() => {
+    if (reloadKeysTracker.current.isChanged(namespaceAndMetric)) {
+      reloadKeysTracker.current.setNewVal(namespaceAndMetric);
+      setWhere({});
+      setCurrentTagKey('');
+      formApi.setValue('where', []);
+    }
+  }, [namespaceAndMetric, formApi]);
+
+  const pickWhereConditions = (values: any[]) => {
+    const finalWhere = pickBy(where, (_value: ConditionExpr, key: string) => {
+      return findIndex(values, { key: key }) >= 0;
+    });
     setWhere(finalWhere);
     setWhereConditions();
   };
@@ -204,10 +238,10 @@ const WhereConditonSelect: React.FC<{
   };
 
   const renderCurrentCondition = () => {
-    if (isEmpty(currentTagKey)) {
+    const condition = get(where, currentTagKey, {}) as ConditionExpr;
+    if (isEmpty(condition.value)) {
       return null;
     }
-    const condition = get(where, currentTagKey, {}) as ConditionExpr;
     return (
       <>
         <Text size="small" type="quaternary" style={{ marginRight: 2 }}>
@@ -251,6 +285,34 @@ const WhereConditonSelect: React.FC<{
                 metric={metricName}
                 tagKey={currentTagKey}
                 where={where}
+                onTagValueAdd={(tagValue: string) => {
+                  const tagKey = currentTagKey;
+                  if (!has(where, tagKey)) {
+                    set(where, tagKey, { key: tagKey, operator: Operator.Eq, value: tagValue });
+                  } else {
+                    // FIXME: add other op
+                    const value: any = get(where, `${tagKey}.value`);
+                    if (isArray(value)) {
+                      value.push(tagValue);
+                    } else {
+                      set(where, tagKey, { key: tagKey, operator: Operator.In, value: [value, tagValue] });
+                    }
+                  }
+                  setWhere(cloneDeep(where));
+                }}
+                onTagValueRemove={(tagValue: string) => {
+                  const tagKey = currentTagKey;
+                  const value: any = get(where, `${tagKey}.value`);
+                  if (isArray(value)) {
+                    pull(value, tagValue);
+                    if (isEmpty(value)) {
+                      unset(where, tagKey);
+                    }
+                  } else {
+                    unset(where, tagKey);
+                  }
+                  setWhere(cloneDeep(where));
+                }}
               />
             </Col>
           </Row>
@@ -294,15 +356,24 @@ const WhereConditonSelect: React.FC<{
         style={style}
         onFocus={() => setVisible(true)}
         showClear
-        onChange={(values: string[]) => {
+        onChange={(values: any[]) => {
           pickWhereConditions(values);
         }}
-        renderTagItem={(value: any, index: number, onClose) => {
+        renderTagItem={(value: any, _index: number, onClose) => {
           if (isEmpty(value.key) || isEmpty(value.operator) || isEmpty(value.value)) {
             return null;
           }
           return (
-            <Tag key={index} closable color="white" size="large" onClose={onClose}>
+            <Tag
+              key={value.key}
+              closable
+              color="white"
+              size="large"
+              onClose={onClose}
+              onClick={() => {
+                setCurrentTagKey(value.key);
+                setVisible(true);
+              }}>
               {conditionToString(value)}
             </Tag>
           );

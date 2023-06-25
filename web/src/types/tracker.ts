@@ -24,6 +24,10 @@ class Tracker<T> {
     this.val = cloneDeep(initVal);
   }
 
+  getVal(): T {
+    return this.val;
+  }
+
   setNewVal(newVal: T) {
     this.val = cloneDeep(newVal);
   }

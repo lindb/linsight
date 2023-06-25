@@ -29,6 +29,10 @@ import { PlatformContext } from '@src/contexts';
 
 const { Title, Text } = Typography;
 
+const getExploreDatasourceParams = (ds: DatasourceSetting) => {
+  return createSearchParams({ left: JSON.stringify({ datasource: { uid: ds.uid } }) });
+};
+
 const ListDataSource: React.FC = () => {
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
@@ -40,6 +44,7 @@ const ListDataSource: React.FC = () => {
         <Input
           prefix={<IconSearchStroked />}
           placeholder="Filter datasources(name/url/type)"
+          showClear
           onChange={(v: string) => {
             setSearch(v);
           }}
@@ -79,7 +84,7 @@ const ListDataSource: React.FC = () => {
                     type="tertiary"
                     icon={<Icon icon="explore" />}
                     onClick={() => {
-                      navigate('/explore');
+                      navigate({ pathname: '/explore', search: `${getExploreDatasourceParams(ds)}` });
                     }}>
                     Explore
                   </Button>
