@@ -20,15 +20,12 @@ import { DatasourceStore } from '@src/stores';
 import { Variable, VariableHideType } from '@src/types';
 import { useRequest } from './use.request';
 import { isEmpty } from 'lodash-es';
-import { toJS } from 'mobx';
 
 export const useVariable = (variable: Variable | undefined, prefix?: string) => {
   const query = variable?.query;
-  console.log('variable....', toJS(variable), toJS(query), variable?.hide !== VariableHideType.Hide && !isEmpty(query));
   const { result, loading, refetch, error } = useRequest(
     ['search_metric_metadata', query],
     async () => {
-      console.log('xxxxx........');
       if (isEmpty(query)) {
         return [];
       }

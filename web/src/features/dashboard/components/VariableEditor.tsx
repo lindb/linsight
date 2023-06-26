@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React from 'react';
+import React, { useRef } from 'react';
 import { Button, Form, Radio } from '@douyinfe/semi-ui';
 import { IconTick, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { DatasourceRepositoryInst, VariableHideType, VariableType, OptionType } from '@src/types';
@@ -29,6 +29,8 @@ const VariableEditor: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const index = `${searchParams.get('edit')}`;
   const variable = DashboardStore.getVariableByIndex(index);
+  const apply = useRef(false);
+  const formApi = useRef<any>(null);
 
   const gotoList = () => {
     searchParams.delete('edit');
@@ -40,7 +42,6 @@ const VariableEditor: React.FC = () => {
   const QueryEditor = (props: { formState: any }) => {
     const { formState } = props;
     const datasource = DatasourceStore.getDatasource(get(formState, 'values.query.datasource.uid', ''));
-    console.log('xxxx....', datasource, formState);
     if (!datasource) {
       return null;
     }
@@ -82,10 +83,16 @@ const VariableEditor: React.FC = () => {
       labelPosition="top"
       extraTextPosition="middle"
       initValues={variable}
+      getFormApi={(api: any) => {
+        formApi.current = api;
+      }}
       onSubmit={(values: any) => {
-        console.log('apply submit', values);
-        DashboardStore.updateVariable(index, values);
-        gotoList();
+        if (apply.current) {
+          // add apply button check, variable plugin editor may submit form
+          console.log('apply submit', values);
+          DashboardStore.updateVariable(index, values);
+          gotoList();
+        }
       }}>
       {({ formState }) => (
         <>
@@ -138,7 +145,13 @@ const VariableEditor: React.FC = () => {
                 }}>
                 Back
               </Button>
-              <Button type="primary" icon={<IconTick />} htmlType="submit">
+              <Button
+                type="primary"
+                icon={<IconTick />}
+                onClick={() => {
+                  apply.current = true;
+                  formApi.current.submitForm();
+                }}>
                 Apply
               </Button>
             </div>

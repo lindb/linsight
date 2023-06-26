@@ -18,12 +18,12 @@ under the License.
 export enum Operator {
   Eq = '=',
   In = 'in',
-  GtEq = '>=',
-  LtEq = '<=',
+  Like = 'like',
 }
 
 export interface ConditionExpr {
   key: string;
   operator: Operator;
-  value: string;
+  value: string | string[];
+  optional: boolean;
 }

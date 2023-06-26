@@ -15,15 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { OptionType, Variable } from '@src/types';
-import { indexOf, set } from 'lodash-es';
-
-/*
- * Variable if need multi select
- */
-const isMulti = (variable: Variable): boolean => {
-  return indexOf(variable.optionType, OptionType.Multi) >= 0;
-};
+import { Variable } from '@src/types';
+import { set } from 'lodash-es';
 
 /*
  * Set variable values from search params.
@@ -31,7 +24,7 @@ const isMulti = (variable: Variable): boolean => {
 const setVariableValues = (searchParams: URLSearchParams, variables: Variable[]) => {
   (variables || []).forEach((variable: Variable) => {
     if (searchParams.has(variable.name)) {
-      if (isMulti(variable)) {
+      if (variable.multi) {
         set(variable, 'current.value', searchParams.getAll(variable.name));
       } else {
         set(variable, 'current.value', searchParams.get(variable.name));
@@ -42,5 +35,4 @@ const setVariableValues = (searchParams: URLSearchParams, variables: Variable[])
 
 export default {
   setVariableValues,
-  isMulti,
 };

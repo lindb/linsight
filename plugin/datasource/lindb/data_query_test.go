@@ -35,4 +35,15 @@ func TestDataQuery_buildSQL(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' "+
 		"WHERE time >= from AND time <= '2022-04-03 02:34:33' GROUP BY host,region,time()", sql)
+
+	sql, err = buildDataQuerySQL(&DataQueryRequest{
+		Stats:   true,
+		Where:   []Expr{{}},
+		Metric:  "system.host.cpu",
+		Fields:  []string{"load", "usage"},
+		GroupBy: []string{"host", "region"},
+	}, model.TimeRange{From: "from", To: "2022-04-03 02:34:33"})
+	assert.NoError(t, err)
+	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' "+
+		"WHERE time >= from AND time <= '2022-04-03 02:34:33' GROUP BY host,region,time()", sql)
 }

@@ -18,8 +18,7 @@ under the License.
 import { DataQuerySrv } from '@src/services';
 import { DataSetType, DatasourceAPI, DatasourceSetting, Query, TimeRange } from '@src/types';
 import { TemplateKit } from '@src/utils';
-import { isEmpty, isString } from 'lodash-es';
-import { toJS } from 'mobx';
+import { isArray, isEmpty, isString } from 'lodash-es';
 
 export class LinDBDatasource extends DatasourceAPI {
   constructor(setting: DatasourceSetting) {
@@ -31,12 +30,31 @@ export class LinDBDatasource extends DatasourceAPI {
       return null;
     }
     if (!isEmpty(query.request.where)) {
-      query.request.where = query.request.where.map((w: any) => {
+      const where: any[] = [];
+      query.request.where.forEach((w: any) => {
         if (isString(w.value)) {
           w.value = TemplateKit.template(w.value, variables);
+        } else if (isArray(w.value)) {
+          const newValues: string[] = [];
+          w.value.forEach((v: string) => {
+            const newVal = TemplateKit.template(v, variables);
+            if (isEmpty(newVal)) {
+              return;
+            } else if (isArray(newVal)) {
+              newValues.push(...newVal);
+            } else {
+              newValues.push(newVal);
+            }
+          });
+          w.value = newValues;
         }
-        return w;
+        if (isEmpty(w.value) && w.optional) {
+          // ignore empty condition, if it is optional
+          return;
+        }
+        where.push(w);
       });
+      query.request.where = where;
     }
     if (dataset !== DataSetType.TimeSeries) {
       query.request.stats = true;
