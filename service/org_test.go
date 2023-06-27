@@ -123,17 +123,8 @@ func TestOrgService_CreateOrg(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create nav successfully",
-			prepare: func() {
-				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
-				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
-			},
-			wantErr: true,
-		},
-		{
 			name: "create org successfully",
 			prepare: func() {
-				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -224,6 +215,27 @@ func TestOrgService_GetOrgByUID(t *testing.T) {
 		org, err := srv.GetOrgByUID(ctx, "1234")
 		assert.NotNil(t, org)
 		assert.NoError(t, err)
+	})
+}
+
+func TestOrgService_GetOrgByName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+
+	srv := NewOrgService(mockDB)
+	t.Run("get org successfully", func(t *testing.T) {
+		mockDB.EXPECT().Get(gomock.Any(), "name=?", "1234").Return(nil)
+		org, err := srv.GetOrgByName(ctx, "1234")
+		assert.NotNil(t, org)
+		assert.NoError(t, err)
+	})
+	t.Run("get org failure", func(t *testing.T) {
+		mockDB.EXPECT().Get(gomock.Any(), "name=?", "1234").Return(fmt.Errorf("err"))
+		org, err := srv.GetOrgByName(ctx, "1234")
+		assert.Nil(t, org)
+		assert.Error(t, err)
 	})
 }
 

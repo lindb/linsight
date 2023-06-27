@@ -38,13 +38,13 @@ func TestBootAPI_Boot(t *testing.T) {
 	defer ctrl.Finish()
 
 	datasourceSrv := service.NewMockDatasourceService(ctrl)
-	navSrv := service.NewMockNavService(ctrl)
+	cmpSrv := service.NewMockComponentService(ctrl)
 	userSrv := service.NewMockUserService(ctrl)
 	r := gin.New()
 
 	api := NewBootAPI(&deps.API{
 		DatasourceSrv: datasourceSrv,
-		NavSrv:        navSrv,
+		CmpSrv:        cmpSrv,
 		UserSrv:       userSrv,
 	})
 	r.GET("/boot", api.Boot)
@@ -80,7 +80,7 @@ func TestBootAPI_Boot(t *testing.T) {
 			prepare: func() {
 				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, fmt.Errorf("err"))
-				navSrv.EXPECT().GetNavByOrgID(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
+				cmpSrv.EXPECT().GetComponentTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
 		},
 		{
@@ -101,7 +101,7 @@ func TestBootAPI_Boot(t *testing.T) {
 			prepare: func() {
 				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, nil)
-				navSrv.EXPECT().GetNavByOrgID(gomock.Any(), gomock.Any()).Return(&model.Nav{}, nil)
+				cmpSrv.EXPECT().GetComponentTreeByCurrentOrg(gomock.Any()).Return(model.Components{}, nil)
 			},
 		},
 		{

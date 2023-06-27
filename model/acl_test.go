@@ -17,10 +17,20 @@
 
 package model
 
-// BootData represents Linsight boot data.
-type BootData struct {
-	Home        string       `json:"home,omitempty"`
-	User        SignedUser   `json:"user"`
-	NavTree     Components   `json:"navTree,omitempty"`
-	Datasources []Datasource `json:"datasources,omitempty"`
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/lindb/linsight/accesscontrol"
+)
+
+func Test_ResourceACLParam_ToParams(t *testing.T) {
+	assert.Equal(t, []any{"Admin", "123", "Dashboard", "abc", "write"}, (&ResourceACLParam{
+		Role:     accesscontrol.RoleAdmin,
+		OrgID:    123,
+		Category: accesscontrol.Dashboard,
+		Resource: "abc",
+		Action:   accesscontrol.Write,
+	}).ToParams())
 }

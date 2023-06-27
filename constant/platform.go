@@ -15,16 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package model
+package constant
 
-import "gorm.io/datatypes"
-
-// Nav represents the navigation config information.
-type Nav struct {
-	BaseModel
-	// current selected org.
-	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_nav_org_id,unique"`
-
-	Config        datatypes.JSON `json:"config" gorm:"column:config"`
-	DefaultConfig datatypes.JSON `json:"defaultConfig" gorm:"column:default_config"`
-}
+const (
+	// AdminOrgName represents super admin orgs.
+	AdminOrgName = "Admin Org"
+)

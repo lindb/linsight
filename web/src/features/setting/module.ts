@@ -16,9 +16,12 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Feature, FeatureRepositoryInst } from '@src/types';
-import EditUser from '@src/features/setting/user/EditUser';
-import SettingHome from './index';
+import { Datasource, Component, Org, Team, User } from '.';
 
-FeatureRepositoryInst.register(new Feature('/setting/user/edit', EditUser)).register(
-  new Feature('/setting/*', SettingHome)
-);
+FeatureRepositoryInst.register(
+  new Feature('/setting/datasources/*', 'Datasource Setting', 'Datasource setting', Datasource)
+)
+  .register(new Feature('/setting/users/*', 'User Setting', 'User setting', User))
+  .register(new Feature('/setting/org/teams/*', 'Team Setting', 'Team setting', Team))
+  .register(new Feature('/setting/orgs/*', 'Org Setting', 'Organization setting', Org))
+  .register(new Feature('/setting/components/*', 'Component Setting', 'Component setting', Component));

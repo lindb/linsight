@@ -112,6 +112,11 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		panic(err)
 	}
 	orgSrv := service.NewOrgService(db)
+	cmpSrv := service.NewComponentService(db, orgSrv, authorizeSrv)
+	// initialize supported component
+	if err := cmpSrv.Initialize(); err != nil {
+		panic(err)
+	}
 	userSrv := service.NewUserService(db, orgSrv)
 	starSrv := service.NewStarService(db)
 	return &deps.API{
@@ -119,7 +124,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		OrgSrv:          orgSrv,
 		UserSrv:         userSrv,
 		TeamSrv:         service.NewTeamService(db, userSrv),
-		NavSrv:          service.NewNavService(db),
+		CmpSrv:          cmpSrv,
 		AuthorizeSrv:    authorizeSrv,
 		AuthenticateSrv: service.NewAuthenticateService(userSrv, db),
 		DatasourceSrv:   service.NewDatasourceService(db),

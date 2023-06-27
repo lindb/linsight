@@ -34,9 +34,9 @@ type Router struct {
 
 	loginAPI           *api.LoginAPI
 	bootAPI            *api.BootAPI
+	cmpAPI             *api.ComponentAPI
 	orgAPI             *api.OrgAPI
 	teamAPI            *api.TeamAPI
-	navAPI             *api.NavAPI
 	userAPI            *api.UserAPI
 	datasourceAPI      *api.DatasourceAPI
 	datasourceQueryAPI *api.DatasourceQueryAPI
@@ -52,10 +52,10 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		deps:               deps,
 		loginAPI:           api.NewLoginAPI(deps),
 		bootAPI:            api.NewBootAPI(deps),
+		cmpAPI:             api.NewComponentAPI(deps),
 		orgAPI:             api.NewOrgAPI(deps),
 		userAPI:            api.NewUserAPI(deps),
 		teamAPI:            api.NewTeamAPI(deps),
-		navAPI:             api.NewNavAPI(deps),
 		datasourceAPI:      api.NewDatasourceAPI(deps),
 		datasourceQueryAPI: api.NewDatasourceQueryAPI(deps),
 
@@ -73,6 +73,17 @@ func (r *Router) RegisterRouters() {
 	router.POST("/login", r.loginAPI.Login)
 	router.GET("/logout", middleware.Authenticate(r.deps), r.loginAPI.Logout)
 	router.GET("/boot", middleware.Authenticate(r.deps), r.bootAPI.Boot)
+
+	router.GET("/components",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.cmpAPI.LoadComponentTree)...)
+	router.POST("/components",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.CreateComponent)...)
+	router.PUT("/components",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.UpdateComponent)...)
+	router.PUT("/components/sort",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.SortComponents)...)
+	router.DELETE("/components/:uid",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.DeleteComponentByUID)...)
 
 	router.GET("/orgs",
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.orgAPI.SearchOrg)...)
@@ -109,11 +120,6 @@ func (r *Router) RegisterRouters() {
 
 	router.GET("/user/orgs",
 		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.orgAPI.GetOrgListForSignedUser)...)
-
-	router.GET("/org/nav",
-		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.navAPI.GetNav)...)
-	router.PUT("/org/nav",
-		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.navAPI.UpdateNav)...)
 
 	router.POST("/users",
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.userAPI.CreateUser)...)

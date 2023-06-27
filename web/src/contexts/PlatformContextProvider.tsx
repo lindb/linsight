@@ -28,7 +28,7 @@ import { useNavigate } from 'react-router-dom';
  * Global root context
  */
 export const PlatformContext = React.createContext({
-  boot: {} as any,
+  boot: {} as Bootdata,
   theme: ThemeType.Default,
   collapsed: false,
   toggleTheme: () => {},

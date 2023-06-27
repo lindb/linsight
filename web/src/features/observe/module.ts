@@ -18,4 +18,4 @@ under the License.
 import { Feature, FeatureRepositoryInst } from '@src/types';
 import DynamicDashboard from './DynamicDashboard';
 
-FeatureRepositoryInst.register(new Feature('/observe/*', DynamicDashboard));
+FeatureRepositoryInst.register(new Feature('/observe/*', 'Dynamic Dashboard', 'Dynamic dashboard', DynamicDashboard));

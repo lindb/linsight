@@ -18,4 +18,4 @@ under the License.
 import { Feature, FeatureRepositoryInst } from '@src/types';
 import User from './User';
 
-FeatureRepositoryInst.register(new Feature('/user/*', User));
+FeatureRepositoryInst.register(new Feature('/user/*', 'User Profile', 'User profile', User));

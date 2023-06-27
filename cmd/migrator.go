@@ -21,10 +21,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"gorm.io/datatypes"
 
-	"github.com/lindb/linsight"
 	"github.com/lindb/linsight/accesscontrol"
+	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
@@ -73,10 +72,12 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.Chart{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Team{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.TeamMember{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Component{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.OrgComponent{}))
 	org := dbpkg.NewMigration(&model.Org{})
 	org.AddInitRecord(
-		&model.Org{Name: "Admin Org", UID: uuid.GenerateShortUUID()},
-		&model.Org{Name: "Admin Org"},
+		&model.Org{Name: constant.AdminOrgName, UID: uuid.GenerateShortUUID()},
+		&model.Org{Name: constant.AdminOrgName},
 	)
 	migrator.AddMigration(org)
 
@@ -88,14 +89,6 @@ func runMigration(_ *cobra.Command, _ []string) error {
 		&model.User{UserName: "admin"},
 	)
 	migrator.AddMigration(user)
-	nav := dbpkg.NewMigration(&model.Nav{})
-	nav.AddInitRecord(&model.Nav{
-		BaseModel:     model.BaseModel{},
-		OrgID:         1,
-		Config:        datatypes.JSON(linsight.DefaultNav),
-		DefaultConfig: datatypes.JSON(linsight.DefaultNav),
-	}, &model.Nav{OrgID: 1})
-	migrator.AddMigration(nav)
 	if err = migrator.Run(); err != nil {
 		panic(err)
 	}

@@ -15,23 +15,47 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useContext } from 'react';
+import React, { useCallback, useContext, useMemo, useRef } from 'react';
 import { Layout } from '@douyinfe/semi-ui';
 import { ErrorPage, FeatureMenu, Footer } from '@src/components';
 import { PlatformContext } from '@src/contexts';
-import { Feature, FeatureRepositoryInst } from '@src/types';
+import { FeatureRepositoryInst, NavItem } from '@src/types';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import Explore from './features/explore/Explore';
+import User from './features/user/User';
 
 const Content: React.FC = React.memo(() => {
-  const features = FeatureRepositoryInst.getFeatures();
   const { boot } = useContext(PlatformContext);
+  const routes = useRef<any[]>([]);
+  const addRoutes = useCallback((items: NavItem[]) => {
+    items.forEach((item: NavItem) => {
+      if (item.path && item.component) {
+        const feature = FeatureRepositoryInst.getFeature(item.component);
+        if (!feature) {
+          return;
+        }
+        const Component = feature.component;
+        routes.current.push(
+          <Route key={item.label} path={feature.key} element={<Component />} errorElement={<ErrorPage />} />
+        );
+      }
+      if (item.children) {
+        addRoutes(item.children);
+      }
+    });
+  }, []);
+
+  useMemo(() => {
+    addRoutes(boot.navTree || []);
+  }, [boot, addRoutes]);
+
   return (
     <Routes>
-      {features.map((feature: Feature) => {
-        const Component = feature.Component;
-        return <Route key={feature.Route} path={feature.Route} element={<Component />} errorElement={<ErrorPage />} />;
-      })}
-      <Route path="*" element={<Navigate to={boot.home || '/explore'} />} errorElement={<ErrorPage />} />
+      {[...routes.current]}
+      <Route path="/user/*" element={<User />} errorElement={<ErrorPage />} />
+      {/* put /explore route to fix if routes is empty infinite loop*/}
+      <Route path="/explore" element={<Explore />} errorElement={<ErrorPage />} />
+      <Route path="/*" element={<Navigate to={boot.home || '/explore'} />} errorElement={<ErrorPage />} />
     </Routes>
   );
 });

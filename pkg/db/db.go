@@ -42,7 +42,7 @@ type DB interface {
 	Create(obj any) error
 	// Update updates record by given conditions.
 	Update(obj any, where ...any) error
-	// Updates update attributes, values can be map/struct.
+	// Updates update attributes, values can be map/struct(select all fields include empty value fields).
 	Updates(obj, values any, where ...any) error
 	// UpdateSingle updates record with single column value.
 	UpdateSingle(obj any, col string, value any, where ...any) error
@@ -157,7 +157,7 @@ func (db *db) Updates(obj, value any, where ...any) error {
 	if len(where) > 0 {
 		m = m.Where(where[0], where[1:]...)
 	}
-	return m.Updates(value).Error
+	return m.Select("*").Updates(value).Error
 }
 
 // UpdateSingle updates record with single column value.

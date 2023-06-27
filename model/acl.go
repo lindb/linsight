@@ -17,24 +17,22 @@
 
 package model
 
-type Product struct {
-	BaseModel
+import (
+	"fmt"
 
-	ProductCode string `json:"productCode" gorm:"column:product_code;index:u_idx_prod_code,unique"`
-	ProductName string `json:"productName" gorm:"column:product_name"`
-	Path        string `json:"path,omitempty" gorm:"column:path"`
-	Icon        string `json:"icon,omitempty" gorm:"column:icon"`
+	"github.com/lindb/linsight/accesscontrol"
+)
 
-	Features []Feature `json:"features,omitempty"`
+// ResourceACLParam represents resource abac params.
+type ResourceACLParam struct {
+	Role     accesscontrol.RoleType
+	OrgID    int64
+	Category accesscontrol.ResourceCategory
+	Resource string
+	Action   accesscontrol.ActionType
 }
 
-type Feature struct {
-	BaseModel
-
-	ProductID int64 `json:"_" gorm:"column:product_id"`
-
-	FeatureCode string `json:"featureCode" gorm:"column:feature_code;index:u_idx_feature_code,unique"`
-	FeatureName string `json:"featureName" gorm:"column:feature_name"`
-	Path        string `json:"path,omitempty" gorm:"column:path"`
-	Icon        string `json:"icon,omitempty" gorm:"column:icon"`
+// ToParams returns casbin params.
+func (p *ResourceACLParam) ToParams() []any {
+	return []any{p.Role.String(), fmt.Sprintf("%d", p.OrgID), p.Category.String(), p.Resource, p.Action.String()}
 }
