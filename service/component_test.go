@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 
+	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
@@ -216,7 +217,7 @@ func TestComponentService_UpdateComponent(t *testing.T) {
 	srv := NewComponentService(mockDB, nil, nil)
 
 	cmp := &model.Component{UID: "1234"}
-	mockDB.EXPECT().Updates(gomock.Any(), cmp, "uid=?", "1234").Return(fmt.Errorf("err"))
+	mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
 	err := srv.UpdateComponent(ctx, cmp)
 	assert.Error(t, err)
 }
@@ -408,6 +409,197 @@ func TestComponentService_GetComponentTreeByCurrentOrg(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
 			_, err := srv.GetComponentTreeByCurrentOrg(ctx)
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestComponentService_GetOrgComponents(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	authorizeSrv := NewMockAuthorizeService(ctrl)
+	srv := NewComponentService(mockDB, nil, authorizeSrv)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get org. cmps failure",
+			prepare: func() {
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), "123").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "get org's cmps successfully",
+			prepare: func() {
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), "123").Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			_, err := srv.GetOrgComponents(ctx, "123")
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	authorizeSrv := NewMockAuthorizeService(ctrl)
+	srv := NewComponentService(mockDB, nil, authorizeSrv)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get cmp failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update role for org's cmp failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
+					accesscontrol.RoleAdmin, gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update role for org's cmp successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
+					accesscontrol.RoleAdmin, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.UpdateRolesOfOrgComponent(ctx,
+				[]model.OrgComponentInfo{{ComponentUID: "123", Role: accesscontrol.RoleAdmin}})
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestComponentService_SaveOrgComponents(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	authorizeSrv := NewMockAuthorizeService(ctrl)
+	orgSrv := NewMockOrgService(ctrl)
+	srv := NewComponentService(mockDB, orgSrv, authorizeSrv)
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get org failure",
+			prepare: func() {
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(nil, fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "delete org cmps failure",
+			prepare: func() {
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "get cmp failure",
+			prepare: func() {
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "create org cmp failure",
+			prepare: func() {
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "remove acl failure",
+			prepare: func() {
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Component).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "add acl failure",
+			prepare: func() {
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Component).Return(nil)
+				authorizeSrv.EXPECT().AddResourcePolicy(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "save org's cmp successfully",
+			prepare: func() {
+				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
+				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Component).Return(nil)
+				authorizeSrv.EXPECT().AddResourcePolicy(gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.SaveOrgComponents(ctx, "123", []model.OrgComponentInfo{{ComponentUID: "123", Role: accesscontrol.RoleAdmin}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

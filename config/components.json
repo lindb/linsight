@@ -35,7 +35,7 @@
             "path":"/charts",
 			"component":"/charts",
             "icon":"repo",
-            "role":"Editor"
+            "role":"Viewer"
          }
       ]
    },

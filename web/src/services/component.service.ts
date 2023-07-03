@@ -16,11 +16,19 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { Component } from '@src/types';
+import { Component, OrgComponent } from '@src/types';
 import { ApiKit } from '@src/utils';
 
 const getComponentTree = (): Promise<Component[]> => {
   return ApiKit.GET<Component[]>(ApiPath.Component);
+};
+
+const saveOrgComponents = (orgUID: string, cmps: OrgComponent[]): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.Org}/${orgUID}${ApiPath.Component}`, cmps);
+};
+
+const getOrgComponents = (orgUID: string): Promise<OrgComponent[]> => {
+  return ApiKit.GET<OrgComponent[]>(`${ApiPath.Org}/${orgUID}${ApiPath.Component}`);
 };
 
 const createComponent = (cmp: Component): Promise<string> => {
@@ -41,6 +49,8 @@ const sortComponents = (cmps: Component[]): Promise<string> => {
 
 export default {
   getComponentTree,
+  saveOrgComponents,
+  getOrgComponents,
   createComponent,
   updateComponent,
   deleteComponentByUID,

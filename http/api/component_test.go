@@ -32,6 +32,7 @@ import (
 
 	"github.com/lindb/common/pkg/encoding"
 
+	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/service"
@@ -314,6 +315,228 @@ func TestComponentAPI_DeleteComponentByUID(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
 			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/components/1234", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestComponentAPI_SaveOrgComponents(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cmpSrv := service.NewMockComponentService(ctrl)
+	r := gin.New()
+	api := NewComponentAPI(&deps.API{
+		CmpSrv: cmpSrv,
+	})
+	r.PUT("/components/:uid", api.SaveOrgComponents)
+	body := encoding.JSONMarshal([]model.OrgComponentInfo{{Role: accesscontrol.RoleAdmin}})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name:    "bind params failure",
+			body:    bytes.NewBuffer([]byte("xx")),
+			prepare: func() {},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "save org cmp failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				cmpSrv.EXPECT().SaveOrgComponents(gomock.Any(), "1234", gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "save org cmp successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				cmpSrv.EXPECT().SaveOrgComponents(gomock.Any(), "1234", gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/components/1234", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestComponentAPI_UpdateRolesOrgComponents(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cmpSrv := service.NewMockComponentService(ctrl)
+	r := gin.New()
+	api := NewComponentAPI(&deps.API{
+		CmpSrv: cmpSrv,
+	})
+	r.PUT("/components", api.UpdateRolesOfOrgComponent)
+	body := encoding.JSONMarshal([]model.OrgComponentInfo{{Role: accesscontrol.RoleAdmin}})
+
+	cases := []struct {
+		name    string
+		body    io.Reader
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name:    "bind params failure",
+			body:    bytes.NewBuffer([]byte("xx")),
+			prepare: func() {},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update role for org cmp failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				cmpSrv.EXPECT().UpdateRolesOfOrgComponent(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "update role for org cmp successfully",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				cmpSrv.EXPECT().UpdateRolesOfOrgComponent(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/components", tt.body)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestComponentAPI_GetComponentTreeByCurrentOrg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cmpSrv := service.NewMockComponentService(ctrl)
+	r := gin.New()
+	api := NewComponentAPI(&deps.API{
+		CmpSrv: cmpSrv,
+	})
+	r.GET("/components", api.GetComponentTreeByCurrentOrg)
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "get org cmp failure",
+			prepare: func() {
+				cmpSrv.EXPECT().GetComponentTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "get org cmp successfully",
+			prepare: func() {
+				cmpSrv.EXPECT().GetComponentTreeByCurrentOrg(gomock.Any()).Return(nil, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/components", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
+
+func TestComponentAPI_GetOrgComponents(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	cmpSrv := service.NewMockComponentService(ctrl)
+	r := gin.New()
+	api := NewComponentAPI(&deps.API{
+		CmpSrv: cmpSrv,
+	})
+	r.GET("/components/:uid", api.GetOrgComponents)
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "get org cmp failure",
+			prepare: func() {
+				cmpSrv.EXPECT().GetOrgComponents(gomock.Any(), "123").Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "get org cmp successfully",
+			prepare: func() {
+				cmpSrv.EXPECT().GetOrgComponents(gomock.Any(), "123").Return(nil, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/components/123", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {

@@ -93,6 +93,6 @@ type OrgComponent struct {
 
 // OrgComponentInfo represents component basic info for organization.
 type OrgComponentInfo struct {
-	UID  string                 `json:"uid"`
-	Role accesscontrol.RoleType `json:"role"`
+	ComponentUID string                 `json:"componentUid"`
+	Role         accesscontrol.RoleType `json:"role" binding:"required"`
 }

@@ -103,3 +103,52 @@ func (api *ComponentAPI) SortComponents(c *gin.Context) {
 	}
 	httppkg.OK(c, "Components sorted")
 }
+
+// SaveOrgComponents creates or removes components for org's components.
+func (api *ComponentAPI) SaveOrgComponents(c *gin.Context) {
+	var cmps []model.OrgComponentInfo
+	if err := c.ShouldBind(&cmps); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	err := api.deps.CmpSrv.SaveOrgComponents(c.Request.Context(), c.Param(constant.UID), cmps)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Org components saved")
+}
+
+// UpdateRolesOfOrgComponent updates roles for current org.
+func (api *ComponentAPI) UpdateRolesOfOrgComponent(c *gin.Context) {
+	var cmps []model.OrgComponentInfo
+	if err := c.ShouldBind(&cmps); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	err := api.deps.CmpSrv.UpdateRolesOfOrgComponent(c.Request.Context(), cmps)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Org component's roels updated")
+}
+
+// GetComponentTreeByCurrentOrg returns component tree that current user can access of current org.
+func (api *ComponentAPI) GetComponentTreeByCurrentOrg(c *gin.Context) {
+	cmps, err := api.deps.CmpSrv.GetComponentTreeByCurrentOrg(c.Request.Context())
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, cmps)
+}
+
+func (api *ComponentAPI) GetOrgComponents(c *gin.Context) {
+	cmps, err := api.deps.CmpSrv.GetOrgComponents(c.Request.Context(), c.Param(constant.UID))
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, cmps)
+}
