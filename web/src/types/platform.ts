@@ -22,9 +22,19 @@ import { Chart } from 'chart.js';
 export interface Bootdata {
   home?: string; // home page
   user: User;
-  navTree: any;
+  navTree: Component[];
   datasources: DatasourceSetting[];
   preference?: Preference;
+}
+
+export interface Component {
+  uid: string;
+  label: string;
+  path: string;
+  icon: string;
+  role: string;
+  component: string;
+  children: Component[];
 }
 
 export enum MouseEventType {

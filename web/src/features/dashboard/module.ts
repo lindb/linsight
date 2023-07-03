@@ -20,6 +20,6 @@ import ListDashboard from '@src/features/dashboard/ListDashboard';
 import Dashboard from '@src/features/dashboard/Dashboard';
 import '@src/features/dashboard/dashboard.scss';
 
-FeatureRepositoryInst.register(new Feature('/dashboards', ListDashboard)).register(
-  new Feature('/dashboard/*', Dashboard)
-);
+FeatureRepositoryInst.register(
+  new Feature('/dashboards', 'List Dashboard', 'Manager all dashboards', ListDashboard)
+).register(new Feature('/dashboard/*', 'View/Edit Dashboard', 'View and setting dasbharod', Dashboard));

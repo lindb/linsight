@@ -21,9 +21,6 @@ import (
 	"context"
 	"strings"
 
-	"gorm.io/datatypes"
-
-	"github.com/lindb/linsight"
 	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
@@ -43,6 +40,8 @@ type OrgService interface {
 	DeleteOrgByUID(ctx context.Context, uid string) error
 	// GetOrgByUID returns the organization by given uid.
 	GetOrgByUID(ctx context.Context, uid string) (*model.Org, error)
+	// GetOrgByName returns the organization by given name.
+	GetOrgByName(ctx context.Context, name string) (*model.Org, error)
 	// SearchOrg searches the organization by given params.
 	SearchOrg(ctx context.Context, req *model.SearchOrgRequest) ([]model.Org, int64, error)
 	// GetOrgListForSignedUser returns all org for current signed user can manage.
@@ -74,15 +73,8 @@ func (srv *orgService) CreateOrg(ctx context.Context, org *model.Org) (string, e
 		if err := tx.Create(org); err != nil {
 			return err
 		}
-		// add nav tree for new org
-		nav := &model.Nav{
-			OrgID:         org.ID,
-			Config:        datatypes.JSON(linsight.DefaultNav),
-			DefaultConfig: datatypes.JSON(linsight.DefaultNav),
-		}
-		nav.CreatedBy = signedUser.User.ID
-		nav.UpdatedBy = signedUser.User.ID
-		return tx.Create(nav)
+		// FIXME: add default cmps
+		return nil
 	})
 	if err != nil {
 		return "", err
@@ -112,6 +104,15 @@ func (srv *orgService) DeleteOrgByUID(ctx context.Context, uid string) error {
 func (srv *orgService) GetOrgByUID(ctx context.Context, uid string) (*model.Org, error) {
 	org := &model.Org{}
 	if err := srv.db.Get(org, "uid=?", uid); err != nil {
+		return nil, err
+	}
+	return org, nil
+}
+
+// GetOrgByUID returns the organization by given uid.
+func (srv *orgService) GetOrgByName(ctx context.Context, name string) (*model.Org, error) {
+	org := &model.Org{}
+	if err := srv.db.Get(org, "name=?", name); err != nil {
 		return nil, err
 	}
 	return org, nil

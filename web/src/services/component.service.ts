@@ -16,18 +16,33 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { Nav } from '@src/types';
+import { Component } from '@src/types';
 import { ApiKit } from '@src/utils';
 
-const updateNav = (nav: Nav): Promise<string> => {
-  return ApiKit.PUT<string>(ApiPath.Nav, nav);
+const getComponentTree = (): Promise<Component[]> => {
+  return ApiKit.GET<Component[]>(ApiPath.Component);
 };
 
-const getNav = (): Promise<Nav> => {
-  return ApiKit.GET<Nav>(ApiPath.Nav);
+const createComponent = (cmp: Component): Promise<string> => {
+  return ApiKit.POST<string>(ApiPath.Component, cmp);
+};
+
+const updateComponent = (cmp: Component): Promise<string> => {
+  return ApiKit.PUT<string>(ApiPath.Component, cmp);
+};
+
+const deleteComponentByUID = (uid: string): Promise<string> => {
+  return ApiKit.DELETE<string>(`${ApiPath.Component}/${uid}`);
+};
+
+const sortComponents = (cmps: Component[]): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.Component}/sort`, cmps);
 };
 
 export default {
-  updateNav,
-  getNav,
+  getComponentTree,
+  createComponent,
+  updateComponent,
+  deleteComponentByUID,
+  sortComponents,
 };

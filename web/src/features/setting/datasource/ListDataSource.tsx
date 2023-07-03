@@ -49,7 +49,7 @@ const ListDataSource: React.FC = () => {
             setSearch(v);
           }}
         />
-        <Button icon={<IconPlusStroked />} onClick={() => navigate('/setting/datasource/new')}>
+        <Button icon={<IconPlusStroked />} onClick={() => navigate('/setting/datasources/new')}>
           New
         </Button>
       </div>
@@ -102,7 +102,7 @@ const ListDataSource: React.FC = () => {
                   style={{ cursor: 'pointer', width: '100%' }}
                   onClick={() =>
                     navigate({
-                      pathname: '/setting/datasource/edit',
+                      pathname: '/setting/datasources/edit',
                       search: `${createSearchParams({
                         uid: ds.uid,
                       })}`,

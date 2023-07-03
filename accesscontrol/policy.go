@@ -19,6 +19,12 @@ package accesscontrol
 
 type ActionType string
 type ResourceType string
+type ResourceCategory string
+
+const (
+	Dashboard ResourceCategory = "Dashboard"
+	Component ResourceCategory = "Component"
+)
 
 const (
 	Read  ActionType = "read"
@@ -31,6 +37,10 @@ const (
 	EditorAccessResource ResourceType = "EditorAccessResource"
 	ViewerAccessResource ResourceType = "ViewerAccessResource"
 )
+
+func (c ResourceCategory) String() string {
+	return string(c)
+}
 
 func (r ResourceType) String() string {
 	return string(r)

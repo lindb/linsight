@@ -27,19 +27,50 @@ import EditOrg from './org/EditOrg';
 import NewUser from './user/NewUser';
 import EditUser from './user/EditUser';
 
-const SettingHome: React.FC = () => {
+export const Datasource: React.FC = () => {
   return (
     <Routes>
-      <Route path="/users/new" element={<NewUser />} errorElement={<ErrorPage />} />
-      <Route path="/users/edit" element={<EditUser />} errorElement={<ErrorPage />} />
-      <Route path="/org/teams/edit/*" element={<EditTeam />} errorElement={<ErrorPage />} />
-      <Route path="/org/teams/new" element={<NewTeam />} errorElement={<ErrorPage />} />
-      <Route path="/datasource/new" element={<EditDataSource />} errorElement={<ErrorPage />} />
-      <Route path="/datasource/edit" element={<EditDataSource />} errorElement={<ErrorPage />} />
-      <Route path="/orgs/new" element={<NewOrg />} errorElement={<ErrorPage />} />
-      <Route path="/orgs/edit" element={<EditOrg />} errorElement={<ErrorPage />} />
+      <Route path="/new" element={<EditDataSource />} errorElement={<ErrorPage />} />
+      <Route path="/edit" element={<EditDataSource />} errorElement={<ErrorPage />} />
       <Route path="/*" element={<Setting />} errorElement={<ErrorPage />} />
     </Routes>
   );
 };
-export default SettingHome;
+
+export const User: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/new" element={<NewUser />} errorElement={<ErrorPage />} />
+      <Route path="/edit" element={<EditUser />} errorElement={<ErrorPage />} />
+      <Route path="/*" element={<Setting />} errorElement={<ErrorPage />} />
+    </Routes>
+  );
+};
+
+export const Team: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/edit/*" element={<EditTeam />} errorElement={<ErrorPage />} />
+      <Route path="/new" element={<NewTeam />} errorElement={<ErrorPage />} />
+      <Route path="/*" element={<Setting />} errorElement={<ErrorPage />} />
+    </Routes>
+  );
+};
+
+export const Org: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/new" element={<NewOrg />} errorElement={<ErrorPage />} />
+      <Route path="/edit" element={<EditOrg />} errorElement={<ErrorPage />} />
+      <Route path="/*" element={<Setting />} errorElement={<ErrorPage />} />
+    </Routes>
+  );
+};
+
+export const Component: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/*" element={<Setting />} errorElement={<ErrorPage />} />
+    </Routes>
+  );
+};

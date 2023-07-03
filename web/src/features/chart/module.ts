@@ -18,4 +18,4 @@ under the License.
 import { Feature, FeatureRepositoryInst } from '@src/types';
 import ListChart from '@src/features/chart/index';
 
-FeatureRepositoryInst.register(new Feature('/charts', ListChart));
+FeatureRepositoryInst.register(new Feature('/charts', 'List Chart', 'Manager all charts', ListChart));

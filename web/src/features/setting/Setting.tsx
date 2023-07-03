@@ -42,8 +42,8 @@ import { Icon } from '@src/components';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ListDataSource from './datasource/ListDataSource';
 import OrgList from './org/OrgList';
-import MenuSetting from './menu/MenuSetting';
 import UserList from './user/UserList';
+import ComponentSetting from './component/ComponentSetting';
 const { Meta } = Card;
 const { Text, Title } = Typography;
 
@@ -70,7 +70,17 @@ const Setting: React.FC = () => {
         />
       }>
       <Tabs
-        activeKey={location.pathname}
+        activeKey={
+          [
+            '/setting/datasources',
+            '/setting/users',
+            '/setting/org/teams',
+            '/setting/orgs',
+            '/setting/components',
+          ].indexOf(location.pathname) >= 0
+            ? location.pathname
+            : '/setting/datasources'
+        }
         tabPaneMotion={false}
         lazyRender
         onChange={(activeKey: string) => {
@@ -91,8 +101,8 @@ const Setting: React.FC = () => {
         <TabPane itemKey="/setting/orgs" tab="Organization" icon={<Icon icon="org" style={{ marginRight: 8 }} />}>
           <OrgList />
         </TabPane>
-        <TabPane itemKey="/setting/menu" tab="Menu" icon={<Icon icon="menu" style={{ marginRight: 8 }} />}>
-          <MenuSetting />
+        <TabPane itemKey="/setting/components" tab="Component" icon={<Icon icon="menu" style={{ marginRight: 8 }} />}>
+          <ComponentSetting />
         </TabPane>
       </Tabs>
     </Card>

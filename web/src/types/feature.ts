@@ -18,19 +18,16 @@ under the License.
 import { ComponentType } from 'react';
 
 export class Feature {
-  darkLogo?: ComponentType;
-  lightLogo?: ComponentType;
+  key: string;
+  label: string;
+  desc: string;
+  component: ComponentType;
 
-  constructor(public Route: string, public Component: ComponentType) {}
-
-  setDarkLogo(dark: ComponentType): Feature {
-    this.darkLogo = dark;
-    return this;
-  }
-
-  setLightLogo(light: ComponentType): Feature {
-    this.lightLogo = light;
-    return this;
+  constructor(key: string, label: string, desc: string, component: ComponentType) {
+    this.key = key;
+    this.label = label;
+    this.desc = desc;
+    this.component = component;
   }
 }
 
@@ -39,13 +36,13 @@ class FeatureRepository {
   private features: Feature[] = [];
 
   public register(feature: Feature): FeatureRepository {
-    this.featureMap.set(feature.Route, feature);
+    this.featureMap.set(feature.key, feature);
     this.features.push(feature);
     return this;
   }
 
-  public getFeature(path: string): Feature | undefined {
-    return this.featureMap.get(path);
+  public getFeature(key: string): Feature | undefined {
+    return this.featureMap.get(key);
   }
 
   public getFeatures(): Feature[] {

@@ -15,26 +15,25 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Col, Empty, Form, Row, Select, Tag, Tree, Typography } from '@douyinfe/semi-ui';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Col, Divider, Empty, Form, Row, Select, Tag, Tree, Typography } from '@douyinfe/semi-ui';
 import {
   IconSaveStroked,
   IconPlusStroked,
   IconPlusCircleStroked,
   IconDeleteStroked,
-  IconTick,
+  IconRefresh,
 } from '@douyinfe/semi-icons';
-import { get, isEmpty, set, merge, has, remove, cloneDeep, sortBy, findIndex } from 'lodash-es';
+import { get, isEmpty, remove, sortBy, findIndex } from 'lodash-es';
 import { Icon, Notification } from '@src/components';
-import './menu.scss';
-import * as IconFontsStyles from '@src/styles/icon-fonts/fonts.scss';
+import './component.scss';
+import * as IconFontsStyles from '@src/styles/icon-fonts/fonts.scss?inline';
 import { useRequest } from '@src/hooks';
-import { NavSrv } from '@src/services';
-import { v4 as uuidv4 } from 'uuid';
-import { PlatformContext } from '@src/contexts';
-import { ApiKit, ObjectKit } from '@src/utils';
+import { ComponentSrv } from '@src/services';
+import { ApiKit } from '@src/utils';
 import FormSlot from '@douyinfe/semi-ui/lib/es/form/slot';
 import EmptyImg from '@src/images/empty.svg';
+import { Component, Feature, FeatureRepositoryInst, RoleList } from '@src/types';
 
 const { Text } = Typography;
 
@@ -50,10 +49,9 @@ const getSupportIconFonts = (): any[] => {
   return sortBy(rs);
 };
 
-const MenuSetting: React.FC = () => {
-  const { sync } = useContext(PlatformContext);
-  const { result: navTree } = useRequest(['get_nav'], () => {
-    return NavSrv.getNav();
+const ComponentSetting: React.FC = () => {
+  const { result: navTree, refetch } = useRequest(['load_component_tree'], () => {
+    return ComponentSrv.getComponentTree();
   });
   const iconOptions = useRef<string[]>([]);
   const [treeData, setTreeData] = useState<any[]>([]);
@@ -62,25 +60,19 @@ const MenuSetting: React.FC = () => {
   const tree = useRef<Map<string, any>>(new Map());
   const [currentParent, setCurrentParent] = useState<any>();
   const [editing, setEditing] = useState(false);
+  const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
 
   useMemo(() => {
     iconOptions.current = getSupportIconFonts();
   }, []);
 
-  const buildTree = useCallback((navTree: any, parent: any): any[] => {
-    return navTree.map((nav: any) => {
-      // if node has not '_key', set it
-      if (!has(nav, '_key')) {
-        const key = uuidv4();
-        set(nav, '_key', key);
-      }
-      const key = get(nav, '_key');
-      tree.current.set(key, nav);
+  const buildTree = useCallback((navTree: Component[], parent: Component | null): any[] => {
+    return navTree.map((nav: Component) => {
       const item = {
         label: nav.label,
-        key: key,
-        _key: key,
-        value: key,
+        uid: nav.uid,
+        key: nav.uid,
+        value: nav.uid,
         icon: <Icon icon={nav.icon} style={{ marginRight: 8 }} />,
         raw: nav,
         parent: parent,
@@ -92,12 +84,12 @@ const MenuSetting: React.FC = () => {
 
   const rebuildTree = () => {
     tree.current.clear();
-    setTreeData(buildTree(navTree?.config || [], null));
+    setTreeData(buildTree(navTree || [], null));
   };
 
   useEffect(() => {
     tree.current.clear();
-    setTreeData(buildTree(navTree?.config || [], null));
+    setTreeData(buildTree(navTree || [], null));
   }, [navTree, buildTree]);
 
   const onDrop = (info: any) => {
@@ -107,19 +99,24 @@ const MenuSetting: React.FC = () => {
 
     // 1. remove from source list
     const dragParent = dragNode.parent;
-    const sourceList = dragParent ? dragParent.children : navTree.config;
+    const sourceList = dragParent ? dragParent.children : navTree;
+    console.error(sourceList, dragNode);
     remove(sourceList, (o: any) => {
       // raw item raw using '_key'
-      return get(o, '_key') === get(dragNode, '_key');
+      return get(o, 'uid') === get(dragNode, 'uid');
     });
+    var targetList = [];
     // 2. put into target list
     if (!dropToGap) {
       // if drop over other node, add this target node.
+      dragNode.raw.parentUID = node.raw.uid;
       node.raw.children = node.raw.children || [];
+      targetList = node.row.children;
       node.raw.children.push(dragNode.raw);
     } else {
-      const targetList = node.parent ? node.parent.children : navTree.config;
-      const dropNodeIdx = findIndex(targetList, { _key: node._key });
+      dragNode.raw.parentUID = node.parent ? node.parent.uid : '';
+      targetList = node.parent ? node.parent.children : navTree;
+      const dropNodeIdx = findIndex(targetList, { uid: node.uid });
       if (dropPosition === -1) {
         // insert to top
         targetList.splice(dropNodeIdx, 0, dragNode.raw);
@@ -129,11 +126,19 @@ const MenuSetting: React.FC = () => {
       }
     }
     rebuildTree();
+    ComponentSrv.sortComponents(targetList)
+      .then(() => {
+        refetch();
+        Notification.success('Component save successfully!');
+      })
+      .catch((err) => {
+        Notification.error(ApiKit.getErrorMsg(err));
+      });
   };
 
   const addNewMenu = (target: any) => {
     setCurrentParent(target);
-    formApi.current.setValues({}, { isOverride: true });
+    formApi.current.setValues({ parentUid: target ? target.uid : '' }, { isOverride: true });
   };
 
   return (
@@ -145,43 +150,25 @@ const MenuSetting: React.FC = () => {
             type="tertiary"
             onClick={() => {
               setEditing(true);
-              addNewMenu({ node: null, children: navTree.config });
+              addNewMenu(null);
             }}>
             Add
           </Button>
           <Button
-            icon={<IconSaveStroked />}
-            loading={submitting}
-            onClick={async () => {
-              try {
-                setSubmitting(true);
-                await NavSrv.updateNav(ObjectKit.removeUnderscoreProperties(navTree));
-                sync();
-                Notification.success('Menu save successfully!');
-              } catch (err) {
-                Notification.error(ApiKit.getErrorMsg(err));
-              } finally {
-                setSubmitting(false);
-              }
-            }}>
-            Save
-          </Button>
-          <Button
-            type="secondary"
-            icon={<Icon icon="reset-setting" />}
+            icon={<IconRefresh />}
+            type="tertiary"
             onClick={() => {
-              // need clone default config, avoid modify default config
-              navTree.config = cloneDeep(navTree.defaultConfig);
-              rebuildTree();
-            }}>
-            Default
-          </Button>
+              refetch();
+            }}
+          />
         </div>
+        <Divider />
         <Tree
           style={{ marginRight: 4 }}
           motion={false}
           draggable
-          // expandedKeys={expand}
+          onExpand={(keys: string[]) => setExpandedKeys(keys)}
+          expandedKeys={expandedKeys}
           onDrop={onDrop}
           treeData={treeData}
           renderLabel={(label: any, item: any) => (
@@ -191,7 +178,7 @@ const MenuSetting: React.FC = () => {
                 style={{ flex: 1 }}
                 onClick={() => {
                   setEditing(true);
-                  setCurrentParent(null);
+                  setCurrentParent(item.parent);
                   formApi.current.setValues(item.raw, { isOverride: true });
                 }}>
                 {label}
@@ -204,8 +191,7 @@ const MenuSetting: React.FC = () => {
                   size="small"
                   onClick={() => {
                     setEditing(true);
-                    item.raw.children = item.raw.children || [];
-                    addNewMenu({ node: item.raw, children: item.raw.children });
+                    addNewMenu(item.raw);
                   }}
                 />
                 <Button
@@ -213,15 +199,18 @@ const MenuSetting: React.FC = () => {
                   icon={<IconDeleteStroked />}
                   theme="borderless"
                   size="small"
-                  onClick={() => {
-                    const parent = item.parent;
-                    // if no parent, is root node
-                    const items = parent ? parent.children : navTree?.config;
-                    remove(items, (o: any) => {
-                      // raw item raw using '_key', tree item using 'key'
-                      return get(o, '_key') === get(item, '_key');
-                    });
-                    rebuildTree();
+                  onClick={async () => {
+                    try {
+                      await ComponentSrv.deleteComponentByUID(item.uid);
+                      if (item.uid === formApi.current.getValue('uid')) {
+                        // if delete current edit cmp, need clear edit flag
+                        setEditing(false);
+                      }
+                      refetch();
+                      Notification.success('Component deleted!');
+                    } catch (err) {
+                      Notification.error(ApiKit.getErrorMsg(err));
+                    }
                   }}
                 />
               </div>
@@ -247,28 +236,65 @@ const MenuSetting: React.FC = () => {
           labelAlign="right"
           labelWidth={120}
           allowEmpty
-          onSubmit={(values: object) => {
-            const item = tree.current.get(get(values, '_key', ''));
-            if (item) {
-              merge(item, values);
-            } else {
-              set(values, '_key', uuidv4());
-              currentParent.children.push(values);
-              tree.current.set(get(values, '_key', ''), values);
-              formApi.current.setValues(values, { isOverride: true });
+          onSubmit={async (values: Component) => {
+            try {
+              setSubmitting(true);
+              if (values.uid) {
+                await ComponentSrv.updateComponent(values);
+              } else {
+                const uid = await ComponentSrv.createComponent(values);
+                values.uid = uid;
+                formApi.current.setValues(values, { isOverride: true });
+              }
+              refetch();
+              Notification.success('Component save successfully!');
+            } catch (err) {
+              Notification.error(ApiKit.getErrorMsg(err));
+            } finally {
+              setSubmitting(false);
             }
-            rebuildTree();
           }}
           getFormApi={(api: any) => {
             formApi.current = api;
           }}>
-          {currentParent && (
-            <FormSlot label="Parent">
-              <Tag size="large">{currentParent.node ? currentParent.node.label : 'Root'}</Tag>
-            </FormSlot>
-          )}
+          <FormSlot label="Parent">
+            <Tag size="large">{currentParent ? currentParent.label : 'Root'}</Tag>
+          </FormSlot>
           <Form.Input field="label" label="Label" rules={[{ required: true, message: 'Label is required' }]} />
+          <Form.Select
+            label="Role"
+            field="role"
+            optionList={RoleList}
+            rules={[{ required: true, message: 'Label is required' }]}
+          />
           <Form.Input field="path" label="Path" />
+          <Form.Select
+            label="Component"
+            field="component"
+            renderSelectedItem={(n: Record<string, any>) => {
+              const feature = FeatureRepositoryInst.getFeature(`${n.value}`);
+              if (!feature) {
+                return null;
+              }
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Text>{feature.label}</Text>
+                </div>
+              );
+            }}>
+            {FeatureRepositoryInst.getFeatures().map((feature: Feature) => {
+              return (
+                <Select.Option key={feature.key} value={feature.key} showTick={false}>
+                  <div style={{ marginLeft: 8 }}>
+                    <div>
+                      <Text strong>{feature.label}</Text>
+                    </div>
+                    <Text size="small">{feature.desc}</Text>
+                  </div>
+                </Select.Option>
+              );
+            })}
+          </Form.Select>
           <Form.Select
             filter
             field="icon"
@@ -294,11 +320,12 @@ const MenuSetting: React.FC = () => {
           </Form.Select>
           <Form.Slot>
             <Button
-              icon={<IconTick />}
+              icon={<IconSaveStroked />}
+              loading={submitting}
               onClick={() => {
                 formApi.current.submitForm();
               }}>
-              Apply
+              Save
             </Button>
           </Form.Slot>
         </Form>
@@ -307,4 +334,4 @@ const MenuSetting: React.FC = () => {
   );
 };
 
-export default MenuSetting;
+export default ComponentSetting;

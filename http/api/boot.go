@@ -64,11 +64,11 @@ func (api *BootAPI) Boot(c *gin.Context) {
 		} else {
 			boot.Datasources = datasources
 		}
-		nav, err := api.deps.NavSrv.GetNavByOrgID(c.Request.Context(), signedUser.Org.ID)
+		nav, err := api.deps.CmpSrv.GetComponentTreeByCurrentOrg(c.Request.Context())
 		if err != nil {
 			api.logger.Error("get nav tree for current org fail", logger.Error(err))
 		} else {
-			boot.NavTree = nav.Config
+			boot.NavTree = nav
 		}
 	}
 

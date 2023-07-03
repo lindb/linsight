@@ -29,7 +29,7 @@ type API struct {
 	OrgSrv  service.OrgService
 	UserSrv service.UserService
 	TeamSrv service.TeamService
-	NavSrv  service.NavService
+	CmpSrv  service.ComponentService
 
 	DatasourceSrv   service.DatasourceService
 	AuthenticateSrv service.AuthenticateService

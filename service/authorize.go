@@ -24,81 +24,162 @@ import (
 	"github.com/casbin/casbin/v2/model"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 
+	"github.com/lindb/common/pkg/logger"
+
 	"github.com/lindb/linsight"
 	"github.com/lindb/linsight/accesscontrol"
+	modelpkg "github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 )
 
+//go:generate mockgen -source=./authorize.go -destination=./authorize_mock.go -package=service
+
+//go:generate mockgen -destination=.//casbin/enforcer_mock.go -package=casbin github.com/casbin/casbin/v2 IEnforcer
+
+// for testing
+var (
+	newAdapterByDBWithCustomTableFn = gormadapter.NewAdapterByDBWithCustomTable
+	newModelFromStringFn            = model.NewModelFromString
+	newEnforcerFn                   = casbin.NewEnforcer
+)
+
+// AuthorizeService represents user authorize service interface.
 type AuthorizeService interface {
+	// Initialize initializes access control policies.
 	Initialize() error
+	// CanAccess checks api if can access for user role.
 	CanAccess(
 		role accesscontrol.RoleType,
 		resource accesscontrol.ResourceType,
 		action accesscontrol.ActionType,
 	) bool
+	AddResourcePolicy(aclParam *modelpkg.ResourceACLParam) error
+	RemoveResourcePoliciesByCategory(orgID int64, category accesscontrol.ResourceCategory) error
+	CheckResourceACL(aclParam *modelpkg.ResourceACLParam) bool
+	CheckResourcesACL(aclParams []modelpkg.ResourceACLParam) ([]bool, error)
 }
 
+// authorizeService implements AuthorizeService interface.
 type authorizeService struct {
 	db       dbpkg.DB
-	enforcer casbin.IEnforcer
+	api      casbin.IEnforcer
+	resource casbin.IEnforcer
+
+	logger logger.Logger
 }
 
+// NewAuthorizeService creates an AuthorizeService instance.
 func NewAuthorizeService(db dbpkg.DB) AuthorizeService {
-	adapter, err := gormadapter.NewAdapterByDB(db.RawDB())
-	if err != nil {
-		panic(fmt.Sprintf("failed to create canbin grom adapter: %v", err))
-	}
-	m, err := model.NewModelFromString(linsight.RBACModel)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create casbin model: %v", err))
-	}
-	// Load model configuration file and policy store adapter
-	enforcer, err := casbin.NewEnforcer(m, adapter)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create casbin enforcer: %v", err))
-	}
 	return &authorizeService{
 		db:       db,
-		enforcer: enforcer,
+		api:      createModel(linsight.RBACAPI, "api_rules", db),
+		resource: createModel(linsight.ABACResource, "resource_rules", db),
+		logger:   logger.GetLogger("Service", "Authorize"),
 	}
 }
 
+// Initialize initializes access control policies.
 func (srv *authorizeService) Initialize() error {
 	// initialize roles
-	roles := accesscontrol.BuildRoleDefinitions()
-	for _, role := range roles {
-		if hasPolicy := srv.enforcer.HasGroupingPolicy(role.RoleType.String(), role.Extends.String()); !hasPolicy {
-			_, err := srv.enforcer.AddGroupingPolicy(role.RoleType.String(), role.Extends.String())
-			if err != nil {
-				return err
-			}
-		}
+	if err := srv.addGroupingPolicy(srv.api); err != nil {
+		return err
 	}
-	// initialize policies
+	if err := srv.addGroupingPolicy(srv.resource); err != nil {
+		return err
+	}
+	// initialize api acl policies
 	policies := accesscontrol.BuildPolicyDefinitions()
 	for _, policy := range policies {
 		// add policy
-		if hasPolicy := srv.enforcer.HasPolicy(policy.RoleType.String(), policy.Resource.String(), policy.Action.String()); !hasPolicy {
-			_, err := srv.enforcer.AddPolicy(policy.RoleType.String(), policy.Resource.String(), policy.Action.String())
+		if hasPolicy := srv.api.HasPolicy(policy.RoleType.String(), policy.Resource.String(), policy.Action.String()); !hasPolicy {
+			_, err := srv.api.AddPolicy(policy.RoleType.String(), policy.Resource.String(), policy.Action.String())
 			if err != nil {
 				return err
 			}
 		}
 	}
-
 	return nil
 }
 
+// CanAccess checks api if can access for user role.
 func (srv *authorizeService) CanAccess(
 	role accesscontrol.RoleType,
 	resource accesscontrol.ResourceType,
 	action accesscontrol.ActionType,
 ) bool {
-	ok, err := srv.enforcer.Enforce(role.String(), resource.String(), action.String())
+	ok, err := srv.api.Enforce(role.String(), resource.String(), action.String())
 	if err != nil {
-		// FIXME: add err log
-		fmt.Println(err)
+		srv.logger.Error("check api acl failure", logger.Any("role", role),
+			logger.Any("resource", resource), logger.Any("action", action), logger.Error(err))
 		return false
 	}
 	return ok
+}
+
+func (srv *authorizeService) AddResourcePolicy(aclParam *modelpkg.ResourceACLParam) error {
+	params := aclParam.ToParams()
+	// add policy
+	if hasPolicy := srv.resource.HasPolicy(params...); !hasPolicy {
+		_, err := srv.resource.AddPolicy(params...)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (srv *authorizeService) RemoveResourcePoliciesByCategory(orgID int64, category accesscontrol.ResourceCategory) error {
+	_, err := srv.resource.RemoveFilteredNamedPolicy("p", 1, fmt.Sprintf("%d", orgID), category.String())
+	return err
+}
+
+func (srv *authorizeService) CheckResourceACL(aclParam *modelpkg.ResourceACLParam) bool {
+	params := aclParam.ToParams()
+	ok, err := srv.resource.Enforce(params...)
+	if err != nil {
+		srv.logger.Error("check resource acl failure", logger.Any("params", params), logger.Error(err))
+		return false
+	}
+	return ok
+}
+
+func (srv *authorizeService) CheckResourcesACL(aclParams []modelpkg.ResourceACLParam) ([]bool, error) {
+	var batch [][]any
+	for _, p := range aclParams {
+		batch = append(batch, (&p).ToParams())
+	}
+	return srv.resource.BatchEnforce(batch)
+}
+
+// addGroupingPolicy adds casbin grouping policies.
+func (srv *authorizeService) addGroupingPolicy(enforcer casbin.IEnforcer) error {
+	// initialize roles
+	roles := accesscontrol.BuildRoleDefinitions()
+	for _, role := range roles {
+		if hasPolicy := enforcer.HasGroupingPolicy(role.RoleType.String(), role.Extends.String()); !hasPolicy {
+			_, err := enforcer.AddGroupingPolicy(role.RoleType.String(), role.Extends.String())
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// createModel creates casbin policy model.
+func createModel(modelStr, table string, db dbpkg.DB) casbin.IEnforcer {
+	adapter, err := newAdapterByDBWithCustomTableFn(db.RawDB(), nil, table)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create canbin grom adapter: %v", err))
+	}
+	m, err := newModelFromStringFn(modelStr)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create casbin model: %v", err))
+	}
+	// load model configuration file and policy store adapter
+	api, err := newEnforcerFn(m, adapter)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create casbin enforcer: %v", err))
+	}
+	return api
 }
