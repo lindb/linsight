@@ -58,6 +58,12 @@ type ComponentService interface {
 
 	// GetComponentTreeByCurrentOrg returns component tree that current user can access of current org.
 	GetComponentTreeByCurrentOrg(ctx context.Context) (model.Components, error)
+	// GetOrgComponents returns component list for org.
+	GetOrgComponents(ctx context.Context, orgUID string) ([]model.OrgComponentInfo, error)
+	// SaveOrgComponents creates or removes components for org's components.
+	SaveOrgComponents(ctx context.Context, orgUID string, cmps []model.OrgComponentInfo) error
+	// UpdateRolesOfOrgComponent updates roles for current org.
+	UpdateRolesOfOrgComponent(ctx context.Context, cmps []model.OrgComponentInfo) error
 }
 
 // componentService implements ComponentService interface.
@@ -102,8 +108,15 @@ func (srv *componentService) LoadComponentTree(ctx context.Context) (model.Compo
 // UpdateComponent updates component.
 func (srv *componentService) UpdateComponent(ctx context.Context, cmp *model.Component) error {
 	user := util.GetUser(ctx)
-	cmp.UpdatedBy = user.User.ID
-	return srv.db.Updates(&model.Component{}, cmp, "uid=?", cmp.UID)
+	return srv.db.Updates(&model.Component{}, map[string]any{
+		"label":      cmp.Label,
+		"path":       cmp.Path,
+		"icon":       cmp.Icon,
+		"role":       cmp.Role,
+		"component":  cmp.Component,
+		"parent_uid": cmp.ParentUID,
+		"updated_by": user.User.ID,
+	}, "uid=?", cmp.UID)
 }
 
 // CreateComponent creates a new component.
@@ -162,8 +175,8 @@ func (srv *componentService) SortComponents(ctx context.Context, cmps model.Comp
 func (srv *componentService) GetComponentTreeByCurrentOrg(ctx context.Context) (model.Components, error) {
 	var cmps model.Components
 	user := util.GetUser(ctx)
-	sql := `select 
-		c.uid,c.label,c.path,c.icon,c.component,c.parent_uid,oc.role 
+	sql := `select  
+		c.uid,c.label,c.path,c.icon,c.component,c.parent_uid,oc.role,c.'order' 
 	from components c, org_components oc where c.id=oc.component_id and oc.org_id=?
 	`
 	if err := srv.db.ExecRaw(&cmps, sql, user.Org.ID); err != nil {
@@ -191,6 +204,94 @@ func (srv *componentService) GetComponentTreeByCurrentOrg(ctx context.Context) (
 		}
 	}
 	return accessCmps.ToTree(), nil
+}
+
+// GetOrgComponents returns component list for org.
+func (srv *componentService) GetOrgComponents(ctx context.Context, orgUID string) ([]model.OrgComponentInfo, error) {
+	var cmps []model.OrgComponentInfo
+	sql := `select 
+		c.uid as component_uid,oc.role 
+	from components c, org_components oc,orgs o 
+	where c.component <> '' and c.id=oc.component_id and oc.org_id=o.id and o.uid=?
+	`
+	if err := srv.db.ExecRaw(&cmps, sql, orgUID); err != nil {
+		return nil, err
+	}
+	return cmps, nil
+}
+
+// SaveOrgComponents creates or removes components for org's components.
+func (srv *componentService) SaveOrgComponents(ctx context.Context, orgUID string, cmps []model.OrgComponentInfo) error {
+	user := util.GetUser(ctx)
+	org, err := srv.orgSrv.GetOrgByUID(ctx, orgUID)
+	if err != nil {
+		return err
+	}
+	var acl []model.ResourceACLParam
+	if err := srv.db.Transaction(func(tx dbpkg.DB) error {
+		// remove components
+		if err := tx.Delete(&model.OrgComponent{}, "org_id=?", org.ID); err != nil {
+			return err
+		}
+		// create components
+		for _, cmp := range cmps {
+			cmpFromDB := &model.Component{}
+			if err := tx.Get(cmpFromDB, "uid=?", cmp.ComponentUID); err != nil {
+				return err
+			}
+			if err := tx.Create(&model.OrgComponent{
+				OrgID:       org.ID,
+				ComponentID: cmpFromDB.ID,
+				Role:        cmp.Role,
+				BaseModel: model.BaseModel{
+					CreatedBy: user.User.ID,
+					UpdatedBy: user.User.ID,
+				},
+			}); err != nil {
+				return err
+			}
+			acl = append(acl, model.ResourceACLParam{
+				Role:     cmpFromDB.Role,
+				OrgID:    org.ID,
+				Category: accesscontrol.Component,
+				Resource: cmpFromDB.UID,
+				Action:   accesscontrol.Write,
+			})
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	// remove old acl
+	if err := srv.authorizeSrv.RemoveResourcePoliciesByCategory(org.ID, accesscontrol.Component); err != nil {
+		return err
+	}
+	// add new acl
+	for _, aclParam := range acl {
+		if err := srv.authorizeSrv.AddResourcePolicy(&aclParam); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// UpdateRolesOfOrgComponent updates roles for current org.
+func (srv *componentService) UpdateRolesOfOrgComponent(ctx context.Context, cmps []model.OrgComponentInfo) error {
+	user := util.GetUser(ctx)
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		for _, cmp := range cmps {
+			cmpFromDB := &model.Component{}
+			if err := tx.Get(cmpFromDB, "uid=?", cmp.ComponentUID); err != nil {
+				return err
+			}
+			if err := tx.UpdateSingle(&model.OrgComponent{},
+				"role", cmp.Role,
+				"org_id and component_id=?", user.Org.ID, cmpFromDB.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // saveComponentTree saves component tree.

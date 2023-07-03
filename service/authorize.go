@@ -53,9 +53,13 @@ type AuthorizeService interface {
 		resource accesscontrol.ResourceType,
 		action accesscontrol.ActionType,
 	) bool
+	// AddResourcePolicy adds resource level acl policy.
 	AddResourcePolicy(aclParam *modelpkg.ResourceACLParam) error
+	// RemoveResourcePoliciesByCategory removes resource level acl policies by category.
 	RemoveResourcePoliciesByCategory(orgID int64, category accesscontrol.ResourceCategory) error
+	// CheckResourceACL checks resource if can be accesed by given param.
 	CheckResourceACL(aclParam *modelpkg.ResourceACLParam) bool
+	// CheckResourcesACL checks resource list if can be accesed by given params.
 	CheckResourcesACL(aclParams []modelpkg.ResourceACLParam) ([]bool, error)
 }
 
@@ -116,6 +120,7 @@ func (srv *authorizeService) CanAccess(
 	return ok
 }
 
+// AddResourcePolicy adds resource level acl policy.
 func (srv *authorizeService) AddResourcePolicy(aclParam *modelpkg.ResourceACLParam) error {
 	params := aclParam.ToParams()
 	// add policy
@@ -128,11 +133,13 @@ func (srv *authorizeService) AddResourcePolicy(aclParam *modelpkg.ResourceACLPar
 	return nil
 }
 
+// RemoveResourcePoliciesByCategory removes resource level acl policies by category.
 func (srv *authorizeService) RemoveResourcePoliciesByCategory(orgID int64, category accesscontrol.ResourceCategory) error {
 	_, err := srv.resource.RemoveFilteredNamedPolicy("p", 1, fmt.Sprintf("%d", orgID), category.String())
 	return err
 }
 
+// CheckResourceACL checks resource if can be accesed by given param.
 func (srv *authorizeService) CheckResourceACL(aclParam *modelpkg.ResourceACLParam) bool {
 	params := aclParam.ToParams()
 	ok, err := srv.resource.Enforce(params...)
@@ -143,6 +150,7 @@ func (srv *authorizeService) CheckResourceACL(aclParam *modelpkg.ResourceACLPara
 	return ok
 }
 
+// CheckResourcesACL checks resource list if can be accesed by given params.
 func (srv *authorizeService) CheckResourcesACL(aclParams []modelpkg.ResourceACLParam) ([]bool, error) {
 	var batch [][]any
 	for _, p := range aclParams {

@@ -84,6 +84,15 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.SortComponents)...)
 	router.DELETE("/components/:uid",
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.DeleteComponentByUID)...)
+	router.PUT("/orgs/:uid/components",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.SaveOrgComponents)...)
+	router.GET("/orgs/:uid/components",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.cmpAPI.GetOrgComponents)...)
+
+	router.GET("/orgs/components",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.cmpAPI.GetComponentTreeByCurrentOrg)...)
+	router.PUT("/orgs/components/roles",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.cmpAPI.UpdateRolesOfOrgComponent)...)
 
 	router.GET("/orgs",
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.orgAPI.SearchOrg)...)

@@ -25,6 +25,10 @@ import (
 	"github.com/lindb/linsight/http/deps"
 )
 
+func init() {
+	gin.SetMode(gin.ReleaseMode)
+}
+
 func TestRouter_RegisterRouters(t *testing.T) {
 	r := NewRouter(gin.New(), &deps.API{})
 	r.RegisterRouters()

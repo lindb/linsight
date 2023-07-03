@@ -31,6 +31,7 @@ import (
 	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/accesscontrol"
+	modelpkg "github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
 	casbinmock "github.com/lindb/linsight/service/casbin"
 )
@@ -170,5 +171,108 @@ func TestAuthorizeService_CanAccess(t *testing.T) {
 		enforcer.EXPECT().Enforce("Admin", "AdminAccessResource", "write").Return(true, nil)
 		ok := srv.CanAccess(accesscontrol.RoleAdmin, accesscontrol.AdminAccessResource, accesscontrol.Write)
 		assert.True(t, ok)
+	})
+}
+
+func TestAuthorizeService_CheckResourceACL(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	enforcer := casbinmock.NewMockIEnforcer(ctrl)
+	srv := &authorizeService{
+		resource: enforcer,
+		logger:   logger.GetLogger("Service", "AuthTest"),
+	}
+	t.Run("check failure", func(t *testing.T) {
+		enforcer.EXPECT().Enforce("Admin", "123", "Component", "abc", "write").Return(false, fmt.Errorf("err"))
+		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
+			Role:     accesscontrol.RoleAdmin,
+			OrgID:    123,
+			Category: accesscontrol.Component,
+			Resource: "abc",
+			Action:   accesscontrol.Write,
+		})
+		assert.False(t, ok)
+	})
+	t.Run("can access", func(t *testing.T) {
+		enforcer.EXPECT().Enforce("Admin", "123", "Component", "abc", "write").Return(true, nil)
+		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
+			Role:     accesscontrol.RoleAdmin,
+			OrgID:    123,
+			Category: accesscontrol.Component,
+			Resource: "abc",
+			Action:   accesscontrol.Write,
+		})
+		assert.True(t, ok)
+	})
+}
+
+func TestAuthorizeService_CheckResourcesACL(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	enforcer := casbinmock.NewMockIEnforcer(ctrl)
+	srv := &authorizeService{
+		resource: enforcer,
+		logger:   logger.GetLogger("Service", "AuthTest"),
+	}
+	enforcer.EXPECT().BatchEnforce(gomock.Any()).Return(nil, fmt.Errorf("err"))
+	ok, err := srv.CheckResourcesACL([]modelpkg.ResourceACLParam{{
+		Role:     accesscontrol.RoleAdmin,
+		OrgID:    123,
+		Category: accesscontrol.Component,
+		Resource: "abc",
+		Action:   accesscontrol.Write,
+	}})
+	assert.Nil(t, ok)
+	assert.Error(t, err)
+}
+
+func TestAuthorizeService_RemoveResourcesACL(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	enforcer := casbinmock.NewMockIEnforcer(ctrl)
+	srv := &authorizeService{
+		resource: enforcer,
+		logger:   logger.GetLogger("Service", "AuthTest"),
+	}
+	enforcer.EXPECT().RemoveFilteredNamedPolicy("p", 1, "123", accesscontrol.Component.String()).Return(false, fmt.Errorf("err"))
+	err := srv.RemoveResourcePoliciesByCategory(123, accesscontrol.Component)
+	assert.Error(t, err)
+}
+
+func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	enforcer := casbinmock.NewMockIEnforcer(ctrl)
+	srv := &authorizeService{
+		resource: enforcer,
+		logger:   logger.GetLogger("Service", "AuthTest"),
+	}
+	t.Run("add failure", func(t *testing.T) {
+		enforcer.EXPECT().HasPolicy("Admin", "123", "Component", "abc", "write").Return(false)
+		enforcer.EXPECT().AddPolicy("Admin", "123", "Component", "abc", "write").Return(false, fmt.Errorf("err"))
+		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
+			Role:     accesscontrol.RoleAdmin,
+			OrgID:    123,
+			Category: accesscontrol.Component,
+			Resource: "abc",
+			Action:   accesscontrol.Write,
+		})
+		assert.Error(t, err)
+	})
+	t.Run("add ok", func(t *testing.T) {
+		enforcer.EXPECT().HasPolicy("Admin", "123", "Component", "abc", "write").Return(false)
+		enforcer.EXPECT().AddPolicy("Admin", "123", "Component", "abc", "write").Return(false, nil)
+		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
+			Role:     accesscontrol.RoleAdmin,
+			OrgID:    123,
+			Category: accesscontrol.Component,
+			Resource: "abc",
+			Action:   accesscontrol.Write,
+		})
+		assert.NoError(t, err)
 	})
 }

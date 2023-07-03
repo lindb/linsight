@@ -24,6 +24,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { get } from 'lodash-es';
 import { ApiKit } from '@src/utils';
 import { useRequest } from '@src/hooks';
+import OrgComponent from './OrgComponent';
 const { Meta } = Card;
 const { Title } = Typography;
 
@@ -105,6 +106,7 @@ const EditOrg: React.FC = () => {
         />
       }>
       {renderContent()}
+      <OrgComponent orgUid={orgUID} />
     </Card>
   );
 };

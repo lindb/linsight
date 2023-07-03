@@ -37,6 +37,11 @@ export interface Component {
   children: Component[];
 }
 
+export interface OrgComponent {
+  componentUid: string;
+  role: string;
+}
+
 export enum MouseEventType {
   Move = 'move',
   Out = 'out',
