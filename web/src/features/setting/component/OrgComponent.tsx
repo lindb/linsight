@@ -97,12 +97,12 @@ const OrgComponent: React.FC = () => {
       <Col span={14} className="menu-form">
         {!editing && (
           <Empty
-            title="Oops! No edit menu"
+            title="Oops! No edit component"
             style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 50 }}
             image={<img src={EmptyImg} style={{ width: 150, height: 150 }} />}
             darkModeImage={<img src={EmptyImg} style={{ width: 150, height: 150 }} />}
             layout="horizontal"
-            description="Please select edit menu"
+            description="Please select edit component"
           />
         )}
 

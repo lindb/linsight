@@ -54,7 +54,7 @@ const TeamList: React.FC = () => {
         <Button
           icon={<IconPlusStroked />}
           onClick={() => {
-            navigate({ pathname: '/setting/org/teams/new' });
+            navigate({ pathname: '/setting/orgs/teams/new' });
           }}>
           New Team
         </Button>
@@ -76,7 +76,7 @@ const TeamList: React.FC = () => {
                     link
                     onClick={() => {
                       navigate({
-                        pathname: '/setting/org/teams/edit/members',
+                        pathname: '/setting/orgs/teams/edit/members',
                         search: `${createSearchParams({
                           uid: `${r.uid}`,
                         })}`,
