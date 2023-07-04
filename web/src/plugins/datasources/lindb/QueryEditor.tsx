@@ -19,7 +19,7 @@ import { Button, Form, Tooltip, Typography } from '@douyinfe/semi-ui';
 import { IconChevronDown, IconChevronRight, IconHelpCircleStroked } from '@douyinfe/semi-icons';
 import { Query, QueryEditorProps, Tracker } from '@src/types';
 import React, { MutableRefObject, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { get, isEmpty } from 'lodash-es';
+import { get, isEmpty, unset } from 'lodash-es';
 import { LinDBDatasource } from './Datasource';
 import { QueryEditContext } from '@src/contexts';
 import MetricNameSelect from './components/MetricNameSelect';
@@ -69,6 +69,8 @@ const OptionsEditor: React.FC = () => {
           getFormApi={(api: any) => (formApi.current = api)}
           initValues={target}
           onSubmit={(values: any) => {
+            // remove request, only update options
+            unset(values, 'request');
             setValues(values);
             modifyTarget(values);
           }}
