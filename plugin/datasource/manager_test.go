@@ -15,24 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package plugin
+package datasource
 
 import (
-	"context"
-	"encoding/json"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/lindb/linsight/model"
 )
 
-//go:generate mockgen -source=./datasource.go -destination=./datasource_mock.go -package=plugin
+func TestManager_GetPlugin(t *testing.T) {
+	mgr := NewDatasourceManager()
+	plugin, err := mgr.GetPlugin(&model.Datasource{})
+	assert.Error(t, err)
+	assert.Nil(t, plugin)
 
-// NewDatasourcePlugin represents new datasource plugin instance function.
-type NewDatasourcePlugin func(url string, cfg json.RawMessage) (DatasourcePlugin, error)
-
-// DatasourcePlugin represents datasource plugin.
-type DatasourcePlugin interface {
-	// DataQuery queries data.
-	DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error)
-	// MetadataQuery queries metadata.
-	MetadataQuery(ctx context.Context, req *model.Query) (any, error)
+	plugin, err = mgr.GetPlugin(&model.Datasource{
+		Type: model.LinDBDatasource,
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, plugin)
 }

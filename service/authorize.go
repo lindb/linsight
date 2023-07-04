@@ -34,7 +34,7 @@ import (
 
 //go:generate mockgen -source=./authorize.go -destination=./authorize_mock.go -package=service
 
-//go:generate mockgen -destination=.//casbin/enforcer_mock.go -package=casbin github.com/casbin/casbin/v2 IEnforcer
+//go:generate mockgen -destination=./casbin/enforcer_mock.go -package=casbin github.com/casbin/casbin/v2 IEnforcer
 
 // for testing
 var (

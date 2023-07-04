@@ -241,6 +241,22 @@ func TestDashboardAPI_GetDashboardByUID(t *testing.T) {
 			},
 		},
 		{
+			name: "unmarshal dashboard failure",
+			prepare: func() {
+				var dashboard datatypes.JSON
+				_ = encoding.JSONUnmarshal([]byte("{}"), &dashboard)
+				dashboardSrv.EXPECT().GetDashboardByUID(gomock.Any(), "1234").Return(&model.Dashboard{
+					Config: dashboard,
+				}, nil)
+				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
+					return fmt.Errorf("err")
+				}
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
 			name: "get dashboard successfully",
 			prepare: func() {
 				var dashboard datatypes.JSON
@@ -257,6 +273,9 @@ func TestDashboardAPI_GetDashboardByUID(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
+			defer func() {
+				jsonUnmarshalFn = encoding.JSONUnmarshal
+			}()
 			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/dashboard/1234", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()

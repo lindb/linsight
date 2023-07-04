@@ -77,9 +77,17 @@ func (b *MetadataQueryBuilder) ToSQL() (sql string, err error) {
 	switch b.queryType {
 	case Namespace:
 		sqlBuf.WriteString("SHOW NAMESPACES")
+		if b.prefix != "" {
+			sqlBuf.WriteString(" WHERE namespace = ")
+			fmt.Fprintf(sqlBuf, "'%s'", b.prefix)
+		}
 	case Metric:
 		sqlBuf.WriteString("SHOW METRICS")
 		b.buildNamespace(sqlBuf)
+		if b.prefix != "" {
+			sqlBuf.WriteString(" WHERE metric = ")
+			fmt.Fprintf(sqlBuf, "'%s'", b.prefix)
+		}
 	case Field:
 		sqlBuf.WriteString("SHOW FIELDS")
 		sqlBuf.WriteString(" FROM ")
@@ -97,10 +105,17 @@ func (b *MetadataQueryBuilder) ToSQL() (sql string, err error) {
 		b.buildNamespace(sqlBuf)
 		sqlBuf.WriteString(" WITH KEY =")
 		fmt.Fprintf(sqlBuf, " '%s'", b.tagKey)
+		if b.prefix != "" {
+			sqlBuf.WriteString(" WHERE ")
+			fmt.Fprintf(sqlBuf, "'%s'", b.tagKey)
+			sqlBuf.WriteString(" like ")
+			fmt.Fprintf(sqlBuf, "'%s*'", b.prefix)
+		}
 	}
 	return sqlBuf.String(), nil
 }
 
+// buildNamespace builds namespace condition.
 func (b *MetadataQueryBuilder) buildNamespace(sqlBuf *bytes.Buffer) {
 	if len(b.namespace) > 0 {
 		sqlBuf.WriteString(" ON ")

@@ -18,8 +18,6 @@
 package api
 
 import (
-	"fmt"
-
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 
@@ -29,6 +27,11 @@ import (
 	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
+)
+
+// for testing
+var (
+	jsonUnmarshalFn = encoding.JSONUnmarshal
 )
 
 // DashboardAPI represents dashboard related api handlers.
@@ -101,9 +104,7 @@ func (api *DashboardAPI) GetDashboardByUID(c *gin.Context) {
 		return
 	}
 	var dashboardMap map[string]any
-	if err := encoding.JSONUnmarshal(dashboard.Config, &dashboardMap); err != nil {
-		fmt.Println(dashboard.Config)
-		fmt.Println(err)
+	if err := jsonUnmarshalFn(dashboard.Config, &dashboardMap); err != nil {
 		httppkg.Error(c, err)
 		return
 	}

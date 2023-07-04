@@ -43,7 +43,6 @@ func buildDataQuerySQL(req *DataQueryRequest, timeRange model.TimeRange) (string
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(sql)
 	return sql, nil
 }
 
@@ -81,7 +80,6 @@ func (b *DataQueryBuilder) Namespace(namespace string) *DataQueryBuilder {
 
 // Where sets where conditions.
 func (b *DataQueryBuilder) Where(where ...Expr) *DataQueryBuilder {
-	fmt.Println(where)
 	for _, e := range where {
 		if e.Key == "" || e.Op == "" {
 			// ignore key/op empty

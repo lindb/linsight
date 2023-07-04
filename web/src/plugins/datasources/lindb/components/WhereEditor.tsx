@@ -29,7 +29,7 @@ import {
 } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconCrossStroked, IconHelpCircleStroked } from '@douyinfe/semi-icons';
 import { useRequest } from '@src/hooks';
-import { isEmpty, pick, isArray, find, remove, startsWith, filter, includes } from 'lodash-es';
+import { isEmpty, pick, isArray, find, remove, startsWith, filter, includes, debounce } from 'lodash-es';
 import React, { MutableRefObject, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { LinDBDatasource } from '../Datasource';
 import { ConditionExpr, Operator } from '../types';
@@ -57,13 +57,15 @@ const TagValueSelect: React.FC<{
       );
       return;
     }
-    const tagValues = await datasource.getTagValues(namespace, metric, condition.key);
+    const tagValues = await datasource.getTagValues(namespace, metric, condition.key, input);
     setTagValues(tagValues);
   }, [condition, datasource, definitions, namespace, metric, input]);
 
   useEffect(() => {
     fetchTagValues();
   }, [input, fetchTagValues]);
+
+  const search = debounce(setInput, 200);
 
   return (
     <Select
@@ -84,7 +86,7 @@ const TagValueSelect: React.FC<{
         op.showTick = false;
       }}
       onSearch={(v: string) => {
-        setInput(v);
+        search(v);
       }}
       defaultValue={condition.value}>
       {(tagValues || []).map((tagValue: string) => {

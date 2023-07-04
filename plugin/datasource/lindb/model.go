@@ -93,7 +93,7 @@ func (e Expr) String() string {
 		}
 		value = strings.Join(values, ",")
 	default:
-		value = fmt.Sprintf("'%v'", v)
+		value = fmt.Sprintf("%v", v)
 	}
 	if e.Op == In {
 		fmt.Fprintf(buf, "( %s )", value)

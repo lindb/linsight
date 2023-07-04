@@ -15,24 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package plugin
+package lindb
 
 import (
-	"context"
-	"encoding/json"
+	"testing"
 
-	"github.com/lindb/linsight/model"
+	"github.com/stretchr/testify/assert"
 )
 
-//go:generate mockgen -source=./datasource.go -destination=./datasource_mock.go -package=plugin
-
-// NewDatasourcePlugin represents new datasource plugin instance function.
-type NewDatasourcePlugin func(url string, cfg json.RawMessage) (DatasourcePlugin, error)
-
-// DatasourcePlugin represents datasource plugin.
-type DatasourcePlugin interface {
-	// DataQuery queries data.
-	DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error)
-	// MetadataQuery queries metadata.
-	MetadataQuery(ctx context.Context, req *model.Query) (any, error)
+func TestExpr_String(t *testing.T) {
+	assert.Equal(t, "key = 'value'", Expr{Key: "key", Op: Eq, Value: "value"}.String())
+	assert.Equal(t, "key = '123'", Expr{Key: "key", Op: Eq, Value: 123}.String())
+	assert.Equal(t, "key = value", Expr{Key: "key", Op: Eq, Value: "value", raw: true}.String())
+	assert.Equal(t, "key in ( '123','abc' )", Expr{Key: "key", Op: In, Value: []any{"123", "abc"}}.String())
 }
