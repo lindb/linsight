@@ -39,7 +39,7 @@ const NamespaceSelect: React.FC<{
       field={field}
       placeholder="Please select namespace"
       labelPosition={labelPosition}
-      resetValues={{ metric: '', fields: null, where: null, groupBy: null }}
+      resetValue={{ metric: '', fields: null, where: null, groupBy: null }}
       loader={async (prefix?: string) => {
         const values = await datasource.fetchNamespaces(prefix);
         const optionList: any[] = [];

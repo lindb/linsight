@@ -26,23 +26,30 @@ import (
 	"github.com/lindb/linsight/plugin/datasource/lindb"
 )
 
+//go:generate mockgen -source=./manager.go -destination=./manager_mock.go -package=datasource
+
 var datasourceClients = make(map[string]plugin.NewDatasourcePlugin)
 
 func init() {
 	datasourceClients[model.LinDBDatasource] = lindb.NewClient
 }
 
+// Manager represents datasouce plugin manager.
 type Manager interface {
+	// GetPlugin returns datasource plugin by type.
 	GetPlugin(datasouce *model.Datasource) (plugin.DatasourcePlugin, error)
 }
 
+// manager implements Manager interface.
 type manager struct {
 }
 
+// NewDatasourceManager creates datasource Manager instance.
 func NewDatasourceManager() Manager {
 	return &manager{}
 }
 
+// GetPlugin returns datasource plugin by type.
 func (mgr *manager) GetPlugin(datasource *model.Datasource) (plugin.DatasourcePlugin, error) {
 	newCliFn, ok := datasourceClients[datasource.Type]
 	if !ok {

@@ -25,19 +25,22 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
+// DatasourceQueryAPI represents data source query related api handlers.
 type DatasourceQueryAPI struct {
 	deps *apideps.API
 }
 
+// NewDatasourceQueryAPI creates a DatasourceQueryAPI instance.
 func NewDatasourceQueryAPI(deps *apideps.API) *DatasourceQueryAPI {
 	return &DatasourceQueryAPI{
 		deps: deps,
 	}
 }
 
+// DataQuery queries data.
 func (api *DatasourceQueryAPI) DataQuery(c *gin.Context) {
 	req := &model.QueryRequest{}
-	err := c.ShouldBind(&req)
+	err := c.ShouldBind(req)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
@@ -61,15 +64,16 @@ func (api *DatasourceQueryAPI) DataQuery(c *gin.Context) {
 			httppkg.Error(c, err)
 			return
 		}
-		// TODO: add refID maybe empty?
+		// TODO: add refID maybe empty,go?
 		rs[query.RefID] = resp
 	}
 	httppkg.OK(c, rs)
 }
 
+// MetadataQuery queries metadata.
 func (api *DatasourceQueryAPI) MetadataQuery(c *gin.Context) {
 	req := &model.Query{}
-	err := c.ShouldBind(&req)
+	err := c.ShouldBind(req)
 	if err != nil {
 		httppkg.Error(c, err)
 		return

@@ -50,7 +50,6 @@ const DatasourceSelectForm: React.FC<{
         previousValue.current = value;
         const ds = DatasourceStore.getDatasource(value);
         if (ds) {
-          console.error('xxxxxxxxxxx.......');
           onChange(ds);
         }
       }}>

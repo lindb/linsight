@@ -27,13 +27,14 @@ import (
 
 func TestDataQuery_buildSQL(t *testing.T) {
 	sql, err := buildDataQuerySQL(&DataQueryRequest{
-		Stats:   true,
-		Metric:  "system.host.cpu",
-		Fields:  []string{"load", "usage"},
-		GroupBy: []string{"host", "region"},
+		Stats:     true,
+		Metric:    "system.host.cpu",
+		Namespace: "ns",
+		Fields:    []string{"load", "usage"},
+		GroupBy:   []string{"host", "region"},
 	}, model.TimeRange{From: "from", To: "2022-04-03 02:34:33"})
 	assert.NoError(t, err)
-	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' "+
+	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' ON 'ns' "+
 		"WHERE time >= from AND time <= '2022-04-03 02:34:33' GROUP BY host,region,time()", sql)
 
 	sql, err = buildDataQuerySQL(&DataQueryRequest{
@@ -46,4 +47,26 @@ func TestDataQuery_buildSQL(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' "+
 		"WHERE time >= from AND time <= '2022-04-03 02:34:33' GROUP BY host,region,time()", sql)
+
+	sql, err = buildDataQuerySQL(&DataQueryRequest{
+		Where:  []Expr{{Key: "key", Op: Eq, Value: "value"}},
+		Metric: "system.host.cpu",
+		Fields: []string{"load", "usage"},
+	}, model.TimeRange{})
+	assert.NoError(t, err)
+	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' WHERE key = 'value'", sql)
+}
+
+func TestDataQuery_buildSQL_Failure(t *testing.T) {
+	sql, err := buildDataQuerySQL(&DataQueryRequest{
+		Metric: "system.host.cpu",
+	}, model.TimeRange{From: "from", To: "2022-04-03 02:34:33"})
+	assert.Error(t, err)
+	assert.Empty(t, sql)
+
+	sql, err = buildDataQuerySQL(&DataQueryRequest{
+		Fields: []string{"load", "usage"},
+	}, model.TimeRange{From: "from", To: "2022-04-03 02:34:33"})
+	assert.Error(t, err)
+	assert.Empty(t, sql)
 }
