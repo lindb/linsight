@@ -60,7 +60,7 @@ func (api *LoginAPI) Login(c *gin.Context) {
 
 	// FIXME: need modify/config
 	cookieCfg := api.deps.Config.Cookie
-	c.SetCookie(cookieCfg.Name, token.Token, int(cookieCfg.MaxAge.Duration().Seconds()), "", "", true, true)
+	c.SetCookie(cookieCfg.Name, token.Token, int(cookieCfg.MaxAge.Duration().Seconds()), "/", "", false, true)
 	http.OK(c, "Signed in!")
 }
 
@@ -73,6 +73,6 @@ func (api *LoginAPI) Logout(c *gin.Context) {
 		http.Error(c, err)
 		return
 	}
-	c.SetCookie(cookieName, token, -1, "", "", false, true)
+	c.SetCookie(cookieName, token, -1, "/", "", false, true)
 	http.OK(c, "Logout!")
 }
