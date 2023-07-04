@@ -25,5 +25,5 @@ export interface ConditionExpr {
   key: string;
   operator: Operator;
   value: string | string[];
-  optional: boolean;
+  optional?: boolean;
 }

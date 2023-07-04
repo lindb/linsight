@@ -19,6 +19,7 @@ import { DataQuerySrv } from '@src/services';
 import { DataSetType, DatasourceAPI, DatasourceSetting, Query, TimeRange } from '@src/types';
 import { TemplateKit } from '@src/utils';
 import { isArray, isEmpty, isString } from 'lodash-es';
+import { ConditionExpr, Operator } from './types';
 
 export class LinDBDatasource extends DatasourceAPI {
   constructor(setting: DatasourceSetting) {
@@ -65,9 +66,16 @@ export class LinDBDatasource extends DatasourceAPI {
   }
 
   async fetchMetricNames(namespace: string, prefix?: string): Promise<string[]> {
+    const req: any = {
+      type: 'metric',
+      namespace: namespace,
+    };
+    if (!isEmpty(prefix)) {
+      req.where = [{ key: 'metric', operator: Operator.Eq, value: prefix }];
+    }
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'metric', prefix: prefix, namespace: namespace },
+      request: req,
     });
     if (rs) {
       return rs.values;
@@ -76,9 +84,15 @@ export class LinDBDatasource extends DatasourceAPI {
   }
 
   async fetchNamespaces(prefix?: string): Promise<string[]> {
+    const req: any = {
+      type: 'namespace',
+    };
+    if (!isEmpty(prefix)) {
+      req.where = [{ key: 'namespace', operator: Operator.Eq, value: prefix }];
+    }
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'namespace', prefix: prefix },
+      request: req,
     });
     if (rs) {
       return rs.values;
@@ -114,13 +128,29 @@ export class LinDBDatasource extends DatasourceAPI {
     return [];
   }
 
-  async getTagValues(namespace: string, metric: string, tagKey: string, prefix?: string): Promise<string[]> {
+  async getTagValues(
+    namespace: string,
+    metric: string,
+    tagKey: string,
+    conditions: ConditionExpr[] = [],
+    prefix?: string
+  ): Promise<string[]> {
     if (isEmpty(metric) || isEmpty(tagKey)) {
       return [];
     }
+    const req: any = {
+      type: 'tagValue',
+      namespace: namespace,
+      metric: metric,
+      tagKey: tagKey,
+      where: conditions,
+    };
+    if (!isEmpty(prefix)) {
+      conditions.push({ key: tagKey, operator: Operator.Like, value: `${prefix}*` });
+    }
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
-      request: { type: 'tagValue', namespace: namespace, metric: metric, tagKey: tagKey, prefix: prefix },
+      request: req,
     });
     if (rs) {
       return rs.values;

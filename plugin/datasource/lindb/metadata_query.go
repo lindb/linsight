@@ -24,7 +24,7 @@ import (
 
 // buildMetadataQuerySQL returns metadata LinDB query language.
 func buildMetadataQuerySQL(req *MetadataQueryRequest) (string, error) {
-	return NewBuilder(req.Type).Namespace(req.Namespace).Metric(req.Metric).TagKey(req.TagKey).Prefix(req.Prefix).ToSQL()
+	return NewBuilder(req.Type).Namespace(req.Namespace).Metric(req.Metric).TagKey(req.TagKey).Where(req.Where...).ToSQL()
 }
 
 // MetadataQueryBuilder represents LinDB query language builder.
@@ -33,7 +33,8 @@ type MetadataQueryBuilder struct {
 	namespace string
 	metric    string
 	tagKey    string
-	prefix    string
+
+	where []Expr
 }
 
 func NewBuilder(queryType MetadataType) *MetadataQueryBuilder {
@@ -54,9 +55,15 @@ func (b *MetadataQueryBuilder) Namespace(namespace string) *MetadataQueryBuilder
 	return b
 }
 
-// Prefix sets search prefix.
-func (b *MetadataQueryBuilder) Prefix(prefix string) *MetadataQueryBuilder {
-	b.prefix = prefix
+// Where sets where conditions.
+func (b *MetadataQueryBuilder) Where(where ...Expr) *MetadataQueryBuilder {
+	for _, e := range where {
+		if e.Key == "" || e.Op == "" {
+			// ignore key/op empty
+			continue
+		}
+		b.where = append(b.where, e)
+	}
 	return b
 }
 
@@ -77,17 +84,9 @@ func (b *MetadataQueryBuilder) ToSQL() (sql string, err error) {
 	switch b.queryType {
 	case Namespace:
 		sqlBuf.WriteString("SHOW NAMESPACES")
-		if b.prefix != "" {
-			sqlBuf.WriteString(" WHERE namespace = ")
-			fmt.Fprintf(sqlBuf, "'%s'", b.prefix)
-		}
 	case Metric:
 		sqlBuf.WriteString("SHOW METRICS")
 		b.buildNamespace(sqlBuf)
-		if b.prefix != "" {
-			sqlBuf.WriteString(" WHERE metric = ")
-			fmt.Fprintf(sqlBuf, "'%s'", b.prefix)
-		}
 	case Field:
 		sqlBuf.WriteString("SHOW FIELDS")
 		sqlBuf.WriteString(" FROM ")
@@ -105,12 +104,10 @@ func (b *MetadataQueryBuilder) ToSQL() (sql string, err error) {
 		b.buildNamespace(sqlBuf)
 		sqlBuf.WriteString(" WITH KEY =")
 		fmt.Fprintf(sqlBuf, " '%s'", b.tagKey)
-		if b.prefix != "" {
-			sqlBuf.WriteString(" WHERE ")
-			fmt.Fprintf(sqlBuf, "'%s'", b.tagKey)
-			sqlBuf.WriteString(" like ")
-			fmt.Fprintf(sqlBuf, "'%s*'", b.prefix)
-		}
+	}
+	if len(b.where) > 0 {
+		sqlBuf.WriteString(" WHERE ")
+		sqlBuf.WriteString(b.joinWhere(" AND "))
 	}
 	return sqlBuf.String(), nil
 }
@@ -121,4 +118,19 @@ func (b *MetadataQueryBuilder) buildNamespace(sqlBuf *bytes.Buffer) {
 		sqlBuf.WriteString(" ON ")
 		fmt.Fprintf(sqlBuf, "'%s'", b.namespace)
 	}
+}
+
+// joinWhere builds where conditions.
+func (b *MetadataQueryBuilder) joinWhere(sep string) string {
+	if len(b.where) == 1 {
+		return b.where[0].String()
+	}
+
+	buffer := &bytes.Buffer{}
+	fmt.Fprintf(buffer, "%s", b.where[0].String())
+	for i := 1; i < len(b.where); i++ {
+		buffer.WriteString(sep)
+		fmt.Fprintf(buffer, "%s", b.where[i].String())
+	}
+	return buffer.String()
 }
