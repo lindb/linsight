@@ -25,7 +25,7 @@
             "uid":"newdatabase",
             "label":"New Dashboard",
             "path":"/dashboard/new",
-			"component":"/dashboards/*",
+			"component":"/dashboard/*",
             "icon":"dashboard-add",
             "role":"Editor"
          },

@@ -20,9 +20,13 @@ import { DatasourceStore } from '@src/stores';
 import { Variable, VariableHideType } from '@src/types';
 import { useRequest } from './use.request';
 import { isEmpty } from 'lodash-es';
+import { DataQuerySrv } from '@src/services';
+import { VariableContext } from '@src/contexts';
+import { useContext } from 'react';
 
 export const useVariable = (variable: Variable | undefined, prefix?: string) => {
   const query = variable?.query;
+  const { variables } = useContext(VariableContext);
   const { result, loading, refetch, error } = useRequest(
     ['search_metric_metadata', query],
     async () => {
@@ -32,10 +36,17 @@ export const useVariable = (variable: Variable | undefined, prefix?: string) => 
       // get datasource by uid
       const ds = DatasourceStore.getDatasource(query.datasource.uid);
       if (!ds) {
-        return;
+        return [];
       }
-      // query metadata
-      return ds.api.metaQuery(query.request, prefix);
+      const q = ds.api.rewriteMetaQuery(query, variables, prefix);
+      if (!q) {
+        return [];
+      }
+      const rs = await DataQuerySrv.metadataQuery(q);
+      if (rs) {
+        return rs.values;
+      }
+      return [];
     },
     {
       enabled: variable?.hide !== VariableHideType.Hide && !isEmpty(query),

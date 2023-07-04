@@ -122,13 +122,14 @@ abstract class DatasourceAPI {
   }
 
   /**
-   * Rewrite query request, if request invalid return nulll.
+   * Rewrite query request, if request invalid return null.
    */
   abstract rewriteQuery(query: Query, variables: {}, dataset: DataSetType): Query | null;
 
-  abstract query(req: any, range?: TimeRange): any;
-
-  abstract metaQuery(req: any, prefix?: string): Promise<string[]>;
+  /**
+   * Rewrite metadata query request, if request invalid return null.
+   */
+  abstract rewriteMetaQuery(query: Query, variables: {}, prefix?: string): Query | null;
 
   abstract test(): any;
 }
