@@ -67,10 +67,10 @@ func TestMetadata_TagValue(t *testing.T) {
 		Type:   TagValue,
 		Metric: "cpu",
 		TagKey: "ip",
-		Where:  []Expr{{Key: "ip", Op: Like, Value: "1.1.*"}},
+		Where:  []Expr{{Key: "ip", Op: Like, Value: "1.1.*"}, {}, {Key: "region", Op: Eq, Value: "bj"}},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW TAG VALUES FROM 'cpu' WITH KEY = 'ip' WHERE ip like '1.1.*'", sql)
+	assert.Equal(t, "SHOW TAG VALUES FROM 'cpu' WITH KEY = 'ip' WHERE ip like '1.1.*' AND region = 'bj'", sql)
 
 	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: TagValue, Metric: "cpu", TagKey: "ip", Namespace: "ns"})
 	assert.NoError(t, err)
