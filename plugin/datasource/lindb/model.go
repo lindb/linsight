@@ -43,6 +43,7 @@ var (
 	In            = "in"
 	GtEq          = ">="
 	LtEq          = "<="
+	Like          = "like"
 )
 
 // DatasourceConfig represents datasource config for LinDB.
@@ -63,10 +64,10 @@ type DataQueryRequest struct {
 // MetadataQueryRequest represents metadata query request for LinDB.
 type MetadataQueryRequest struct {
 	Type      MetadataType `json:"type"`
-	Prefix    string       `json:"prefix"`
 	Namespace string       `json:"namespace"`
 	Metric    string       `json:"metric"`
 	TagKey    string       `json:"tagKey"`
+	Where     []Expr       `json:"where"`
 }
 
 // Expr represents where condition express.

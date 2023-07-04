@@ -22,12 +22,16 @@ import (
 	"encoding/hex"
 )
 
+var (
+	randFn = rand.Read
+)
+
 const alphanum = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 // source: https://github.com/gogits/gogs/blob/9ee80e3e5426821f03a4e99fad34418f5c736413/modules/base/tool.go#L58
 func GetRandomString(n int, alphabets ...byte) (string, error) {
 	var bytes = make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
+	if _, err := randFn(bytes); err != nil {
 		return "", err
 	}
 
@@ -40,9 +44,10 @@ func GetRandomString(n int, alphabets ...byte) (string, error) {
 	}
 	return string(bytes), nil
 }
+
 func RandomHex(n int) (string, error) {
 	bytes := make([]byte, n)
-	if _, err := rand.Read(bytes); err != nil {
+	if _, err := randFn(bytes); err != nil {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil

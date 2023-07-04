@@ -27,13 +27,13 @@ func TestMetadata_Namespace(t *testing.T) {
 	sql, err := buildMetadataQuerySQL(&MetadataQueryRequest{})
 	assert.Error(t, err)
 	assert.Empty(t, sql)
-	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: Namespace, Prefix: "ns"})
+	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: Namespace, Where: []Expr{{Key: "namespace", Op: Eq, Value: "ns"}}})
 	assert.NoError(t, err)
 	assert.Equal(t, "SHOW NAMESPACES WHERE namespace = 'ns'", sql)
 }
 
 func TestMetadata_Metric(t *testing.T) {
-	sql, err := buildMetadataQuerySQL(&MetadataQueryRequest{Type: Metric, Prefix: "m"})
+	sql, err := buildMetadataQuerySQL(&MetadataQueryRequest{Type: Metric, Where: []Expr{{Key: "metric", Op: Eq, Value: "m"}}})
 	assert.NoError(t, err)
 	assert.Equal(t, "SHOW METRICS WHERE metric = 'm'", sql)
 
@@ -63,9 +63,14 @@ func TestMetadata_TagKey(t *testing.T) {
 }
 
 func TestMetadata_TagValue(t *testing.T) {
-	sql, err := buildMetadataQuerySQL(&MetadataQueryRequest{Type: TagValue, Metric: "cpu", TagKey: "ip", Prefix: "1.1."})
+	sql, err := buildMetadataQuerySQL(&MetadataQueryRequest{
+		Type:   TagValue,
+		Metric: "cpu",
+		TagKey: "ip",
+		Where:  []Expr{{Key: "ip", Op: Like, Value: "1.1.*"}},
+	})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW TAG VALUES FROM 'cpu' WITH KEY = 'ip' WHERE 'ip' like '1.1.*'", sql)
+	assert.Equal(t, "SHOW TAG VALUES FROM 'cpu' WITH KEY = 'ip' WHERE ip like '1.1.*'", sql)
 
 	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: TagValue, Metric: "cpu", TagKey: "ip", Namespace: "ns"})
 	assert.NoError(t, err)

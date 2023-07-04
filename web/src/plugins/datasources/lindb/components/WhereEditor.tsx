@@ -42,9 +42,10 @@ const TagValueSelect: React.FC<{
   namespace: string;
   metric: string;
   condition: ConditionExpr;
+  conditions: ConditionExpr[];
   onConditionChange: (condition: ConditionExpr) => void;
 }> = (props) => {
-  const { datasource, namespace, metric, condition, onConditionChange } = props;
+  const { datasource, namespace, metric, condition, conditions, onConditionChange } = props;
   const { definitions } = useContext(VariableContext);
   const [tagValues, setTagValues] = useState<string[]>([]);
   const [input, setInput] = useState('');
@@ -57,9 +58,12 @@ const TagValueSelect: React.FC<{
       );
       return;
     }
-    const tagValues = await datasource.getTagValues(namespace, metric, condition.key, input);
+    const where = filter(conditions, (o: ConditionExpr) => {
+      return o.key !== condition.key && !isEmpty(o.value);
+    });
+    const tagValues = await datasource.getTagValues(namespace, metric, condition.key, where, input);
     setTagValues(tagValues);
-  }, [condition, datasource, definitions, namespace, metric, input]);
+  }, [condition, conditions, datasource, definitions, namespace, metric, input]);
 
   useEffect(() => {
     fetchTagValues();
@@ -75,6 +79,7 @@ const TagValueSelect: React.FC<{
       filter
       remote
       allowCreate
+      showClear
       onFocus={() => {
         fetchTagValues();
       }}
@@ -103,13 +108,14 @@ const TagValueSelect: React.FC<{
 const ConditionInput: React.FC<{
   datasource: LinDBDatasource;
   condition: ConditionExpr;
+  conditions: ConditionExpr[];
   namespace: string;
   metric: string;
   tagKeys: string[];
   onConditionChange: (condition: ConditionExpr) => void;
   onConditionRemove: (condition: ConditionExpr) => void;
 }> = (props) => {
-  const { datasource, namespace, tagKeys, metric, condition, onConditionChange, onConditionRemove } = props;
+  const { datasource, namespace, tagKeys, metric, condition, conditions, onConditionChange, onConditionRemove } = props;
   return (
     <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
       <Select
@@ -147,6 +153,7 @@ const ConditionInput: React.FC<{
         }}
       />
       <TagValueSelect
+        conditions={conditions}
         condition={condition}
         datasource={datasource}
         namespace={namespace}
@@ -306,6 +313,7 @@ const WhereConditonSelect: React.FC<{
             key={`${condition.key}-${index}`}
             tagKeys={tagKeys}
             condition={condition}
+            conditions={conditions}
             datasource={datasource}
             namespace={ns || namespace}
             metric={metricName}
