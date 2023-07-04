@@ -201,17 +201,18 @@ const ConditionInput: React.FC<{
 const WhereConditonSelect: React.FC<{
   datasource: LinDBDatasource;
   ns?: string;
+  field?: string;
   metricField?: string;
   namespaceField?: string;
 }> = (props) => {
-  const { datasource, ns, metricField = 'metric', namespaceField = 'namespace' } = props;
+  const { datasource, ns, field = 'where', metricField = 'metric', namespaceField = 'namespace' } = props;
   const { value: metricName } = useFieldState(metricField);
   const { value: namespace } = useFieldState(namespaceField);
   const formApi = useFormApi();
   const formState = useFormState();
   const formValues = formState.values;
   const [conditions, setConditions] = useState<ConditionExpr[]>(() => {
-    return formApi.getValue('where') || ([{}] as ConditionExpr[]);
+    return formApi.getValue(field) || ([{}] as ConditionExpr[]);
   });
 
   const namespaceAndMetric = pick(formValues, [metricField, namespaceField]);
@@ -235,13 +236,13 @@ const WhereConditonSelect: React.FC<{
 
   useEffect(() => {
     formApi.setValue(
-      'where',
+      field,
       filter(conditions, (c: ConditionExpr) => {
         return !isEmpty(c.value);
       })
     );
     formApi.submitForm();
-  }, [conditions, formApi]);
+  }, [conditions, formApi, field]);
 
   useEffect(() => {
     const selectedKey = (conditions || []).map((c: ConditionExpr) => c.key);
@@ -252,9 +253,9 @@ const WhereConditonSelect: React.FC<{
     if (reloadKeysTracker.current.isChanged(namespaceAndMetric)) {
       reloadKeysTracker.current.setNewVal(namespaceAndMetric);
       setConditions([{} as ConditionExpr]);
-      formApi.setValue('where', []);
+      formApi.setValue(field, []);
     }
-  }, [namespaceAndMetric, formApi]);
+  }, [namespaceAndMetric, formApi, field]);
 
   return (
     <div style={{ display: 'inline-flex', width: '100%' }}>

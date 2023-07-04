@@ -22,6 +22,7 @@ import MetricNameSelect from './components/MetricNameSelect';
 import TagKeySelect from './components/TagKeySelect';
 import { LinDBDatasource } from './Datasource';
 import { get } from 'lodash-es';
+import WhereConditonSelect from './components/WhereEditor';
 
 const VariableEditor: React.FC<VariableEditorProps> = (props) => {
   const { variable, datasource } = props;
@@ -54,8 +55,9 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
             field="query.request.tagKey"
             metricField="query.request.metric"
             datasource={api}
-            style={{ width: 300 }}
+            style={{ width: 300, marginBottom: 4 }}
           />
+          <WhereConditonSelect field="query.request.where" datasource={api} metricField="query.request.metric" />
         </>
       )}
     </>

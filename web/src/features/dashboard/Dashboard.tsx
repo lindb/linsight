@@ -383,6 +383,7 @@ const Dashboard: React.FC = () => {
               <Route path="/setting" element={<Setting />} errorElement={<ErrorPage />} />
               <Route path="/panel/edit" element={<PanelEditor />} errorElement={<ErrorPage />} />
               <Route path="/panel/view" element={<ViewPanel />} errorElement={<ErrorPage />} />
+              <Route path="/new" element={<View />} errorElement={<ErrorPage />} />
               <Route path="/" element={<View />} errorElement={<ErrorPage />} />
             </Routes>
           </Content>

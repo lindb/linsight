@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { DataQuerySrv } from '@src/services';
-import { DataSetType, DatasourceAPI, DatasourceSetting, Query, TimeRange } from '@src/types';
+import { DataSetType, DatasourceAPI, DatasourceSetting, Query } from '@src/types';
 import { TemplateKit } from '@src/utils';
 import { isArray, isEmpty, isString } from 'lodash-es';
 import { ConditionExpr, Operator } from './types';
@@ -61,6 +61,40 @@ export class LinDBDatasource extends DatasourceAPI {
       query.request.stats = true;
     } else {
       query.request.stats = false;
+    }
+    return query;
+  }
+
+  rewriteMetaQuery(query: Query, variables: {}): Query | null {
+    if (!query.request || isEmpty(query.request.type)) {
+      return null;
+    }
+    if (!isEmpty(query.request.where)) {
+      const where: any[] = [];
+      query.request.where.forEach((w: any) => {
+        if (isString(w.value)) {
+          w.value = TemplateKit.template(w.value, variables);
+        } else if (isArray(w.value)) {
+          const newValues: string[] = [];
+          w.value.forEach((v: string) => {
+            const newVal = TemplateKit.template(v, variables);
+            if (isEmpty(newVal)) {
+              return;
+            } else if (isArray(newVal)) {
+              newValues.push(...newVal);
+            } else {
+              newValues.push(newVal);
+            }
+          });
+          w.value = newValues;
+        }
+        if (isEmpty(w.value) && w.optional) {
+          // ignore empty condition, if it is optional
+          return;
+        }
+        where.push(w);
+      });
+      query.request.where = where;
     }
     return query;
   }
@@ -167,18 +201,6 @@ export class LinDBDatasource extends DatasourceAPI {
       return rs.values;
     }
     return [];
-  }
-
-  query(req: any, range?: TimeRange) {
-    return DataQuerySrv.dataQuery({
-      range: range,
-      queries: [
-        {
-          datasource: { uid: this.setting.uid },
-          request: req,
-        },
-      ],
-    });
   }
 
   test() {
