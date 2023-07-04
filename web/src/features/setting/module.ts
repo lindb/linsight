@@ -22,6 +22,7 @@ FeatureRepositoryInst.register(
   new Feature('/setting/datasources/*', 'Datasource Setting', 'Datasource setting', Datasource)
 )
   .register(new Feature('/setting/users/*', 'User Setting', 'User setting', User))
-  .register(new Feature('/setting/org/teams/*', 'Team Setting', 'Team setting', Team))
+  .register(new Feature('/setting/orgs/teams/*', 'Team Setting', 'Team setting', Team))
   .register(new Feature('/setting/orgs/*', 'Org Setting', 'Organization setting', Org))
-  .register(new Feature('/setting/components/*', 'Component Setting', 'Component setting', Component));
+  .register(new Feature('/setting/components/*', 'Component Setting', 'Component setting', Component))
+  .register(new Feature('/setting/orgs/components/*', 'Org. Component Setting', 'Org. component setting', Component));

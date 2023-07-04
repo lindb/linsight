@@ -40,7 +40,7 @@ const EditTeam: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const { loading, result } = useRequest(['get_team', teamUID], () => TeamSrv.getTeamByUID(teamUID));
   const gotoTeamListPage = () => {
-    navigate({ pathname: '/setting/org/teams' });
+    navigate({ pathname: '/setting/orgs/teams' });
   };
 
   useEffect(() => {
@@ -65,12 +65,12 @@ const EditTeam: React.FC = () => {
           navigate({ pathname: activeKey, search: searchParams.toString() });
         }}>
         <TabPane
-          itemKey="/setting/org/teams/edit/members"
+          itemKey="/setting/orgs/teams/edit/members"
           tab="Members"
           icon={<Icon icon="team" style={{ marginRight: 8 }} />}>
-          <MemberList teamUid={teamUID}/>
+          <MemberList teamUid={teamUID} />
         </TabPane>
-        <TabPane itemKey="/setting/org/teams/edit/setting" tab="Setting" icon={<IconCandlestickChartStroked />}>
+        <TabPane itemKey="/setting/orgs/teams/edit/setting" tab="Setting" icon={<IconCandlestickChartStroked />}>
           <Form
             className="linsight-form setting-form"
             getFormApi={(api: any) => (formApi.current = api)}

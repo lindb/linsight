@@ -1,6 +1,6 @@
 [
    {
-      "uid":"rmEUmR94k",
+      "uid":"explore",
       "label":"Explore",
       "path":"/explore",
       "icon":"explore",
@@ -8,13 +8,13 @@
       "role":"Viewer"
    },
    {
-      "uid":"eiP8ig94k",
+      "uid":"dashboard",
       "label":"Dashboard",
       "icon":"dashboard",
       "role":"Viewer",
       "children":[
          {
-            "uid":"gWE8mgrVk",
+            "uid":"dashboardlist",
             "label":"Dashboard List",
             "path":"/dashboards",
             "icon":"list",
@@ -22,7 +22,7 @@
             "role":"Viewer"
          },
          {
-            "uid":"gWEUmRrVkz",
+            "uid":"newdatabase",
             "label":"New Dashboard",
             "path":"/dashboard/new",
 			"component":"/dashboards/*",
@@ -30,7 +30,7 @@
             "role":"Editor"
          },
          {
-            "uid":"gZPUmg94zm",
+            "uid":"charts",
             "label":"Chart Repository",
             "path":"/charts",
 			"component":"/charts",
@@ -40,14 +40,14 @@
       ]
    },
    {
-      "uid":"zZE8iRr4k",
+      "uid":"setting",
       "label":"Setting",
       "path":"/setting",
       "icon":"setting",
       "role":"Admin",
       "children":[
          {
-            "uid":"iZP8mRr4z",
+            "uid":"datasource",
             "label":"Datasource",
             "path":"/setting/datasources",
             "component":"/setting/datasources/*",
@@ -55,34 +55,42 @@
             "role":"Admin"
          },
          {
-            "uid":"mWP8igrVkz",
+            "uid":"user",
             "label":"User",
-            "path":"/setting/org/users",
+            "path":"/setting/users",
             "component":"/setting/users/*",
             "icon":"user",
-            "role":"Admin"
+            "role":"Lin"
          },
          {
-            "uid":"WWEUmg9Vk",
+            "uid":"team",
             "label":"Team",
-            "path":"/setting/org/teams",
-            "component":"/setting/org/teams/*",
+            "path":"/setting/orgs/teams",
+            "component":"/setting/orgs/teams/*",
             "icon":"team",
             "role":"Admin"
          },
          {
-            "uid":"WWP8mRrVkz",
+            "uid":"organization",
             "label":"Organization",
             "path":"/setting/orgs",
             "component":"/setting/orgs/*",
             "icon":"org",
-            "role":"Admin"
+            "role":"Lin"
          },
          {
-            "uid":"ttP8mRrVkz",
+            "uid":"component",
             "label":"Component",
             "path":"/setting/components",
             "component":"/setting/components/*",
+            "icon":"menu",
+            "role":"Lin"
+         },
+         {
+            "uid":"orgcomponent",
+            "label":"Org. Component",
+            "path":"/setting/orgs/components",
+            "component":"/setting/orgs/components/*",
             "icon":"menu",
             "role":"Admin"
          }

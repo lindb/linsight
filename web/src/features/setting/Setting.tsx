@@ -34,7 +34,7 @@ under the License.
 */
 import { Card, Typography, Tag, Tabs, TabPane } from '@douyinfe/semi-ui';
 import { IconSettingStroked } from '@douyinfe/semi-icons';
-import React, { useContext } from 'react';
+import React, { MutableRefObject, useContext, useMemo, useRef } from 'react';
 import { PlatformContext } from '@src/contexts';
 import { get } from 'lodash-es';
 import TeamList from './team/TeamList';
@@ -45,13 +45,56 @@ import OrgList from './org/OrgList';
 import UserList from './user/UserList';
 import ComponentSetting from './component/ComponentSetting';
 import OrgComponent from './component/OrgComponent';
+import { Component } from '@src/types';
 const { Meta } = Card;
 const { Text, Title } = Typography;
+
+const Settings = [
+  {
+    path: '/setting/datasources',
+    cmp: <ListDataSource />,
+  },
+  {
+    path: '/setting/users',
+    cmp: <UserList />,
+  },
+  {
+    path: '/setting/orgs/teams',
+    cmp: <TeamList />,
+  },
+  {
+    path: '/setting/orgs',
+    cmp: <OrgList />,
+  },
+  {
+    path: '/setting/components',
+    cmp: <ComponentSetting />,
+  },
+  {
+    path: '/setting/orgs/components',
+    cmp: <OrgComponent />,
+  },
+];
 
 const Setting: React.FC = () => {
   const { boot } = useContext(PlatformContext);
   const location = useLocation();
   const navigate = useNavigate();
+  const nav = useRef() as MutableRefObject<Map<string, Component>>;
+
+  useMemo(() => {
+    nav.current = new Map();
+    const buildTree = (navTree: Component[]) => {
+      (navTree || []).forEach((item: Component) => {
+        nav.current.set(item.path, item);
+        if (item.children) {
+          buildTree(item.children);
+        }
+      });
+    };
+    buildTree(boot.navTree);
+  }, [boot]);
+
   return (
     <Card
       className="setting-page"
@@ -71,47 +114,27 @@ const Setting: React.FC = () => {
         />
       }>
       <Tabs
-        activeKey={
-          [
-            '/setting/datasources',
-            '/setting/users',
-            '/setting/org/teams',
-            '/setting/orgs',
-            '/setting/components',
-            '/setting/orgs/components',
-          ].indexOf(location.pathname) >= 0
-            ? location.pathname
-            : '/setting/datasources'
-        }
+        activeKey={location.pathname}
         tabPaneMotion={false}
         lazyRender
         onChange={(activeKey: string) => {
           navigate({ pathname: activeKey });
         }}>
-        <TabPane
-          itemKey="/setting/datasources"
-          tab="Datasource"
-          icon={<Icon icon="datasource" style={{ marginRight: 8 }} />}>
-          <ListDataSource />
-        </TabPane>
-        <TabPane itemKey="/setting/users" tab="User" icon={<Icon icon="user" style={{ marginRight: 8 }} />}>
-          <UserList />
-        </TabPane>
-        <TabPane itemKey="/setting/org/teams" tab="Team" icon={<Icon icon="team" style={{ marginRight: 8 }} />}>
-          <TeamList />
-        </TabPane>
-        <TabPane itemKey="/setting/orgs" tab="Organization" icon={<Icon icon="org" style={{ marginRight: 8 }} />}>
-          <OrgList />
-        </TabPane>
-        <TabPane itemKey="/setting/components" tab="Component" icon={<Icon icon="menu" style={{ marginRight: 8 }} />}>
-          <ComponentSetting />
-        </TabPane>
-        <TabPane
-          itemKey="/setting/orgs/components"
-          tab="Org. Component"
-          icon={<Icon icon="menu" style={{ marginRight: 8 }} />}>
-          <OrgComponent />
-        </TabPane>
+        {Settings.map((setting: any) => {
+          const navItem = nav.current.get(setting.path);
+          if (!navItem) {
+            return null;
+          }
+          return (
+            <TabPane
+              key={setting.path}
+              itemKey={setting.path}
+              tab={navItem.label}
+              icon={<Icon icon={navItem.icon} style={{ marginRight: 8 }} />}>
+              {setting.cmp}
+            </TabPane>
+          );
+        })}
       </Tabs>
     </Card>
   );
