@@ -33,4 +33,12 @@ func Test_ResourceACLParam_ToParams(t *testing.T) {
 		Resource: "abc",
 		Action:   accesscontrol.Write,
 	}).ToParams())
+
+	assert.Equal(t, []string{"Admin", "123", "Dashboard", "abc", "write"}, (&ResourceACLParam{
+		Role:     accesscontrol.RoleAdmin,
+		OrgID:    123,
+		Category: accesscontrol.Dashboard,
+		Resource: "abc",
+		Action:   accesscontrol.Write,
+	}).ToStringParams())
 }

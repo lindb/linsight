@@ -36,3 +36,8 @@ type ResourceACLParam struct {
 func (p *ResourceACLParam) ToParams() []any {
 	return []any{p.Role.String(), fmt.Sprintf("%d", p.OrgID), p.Category.String(), p.Resource, p.Action.String()}
 }
+
+// ToStringParams returns casbin params.
+func (p *ResourceACLParam) ToStringParams() []string {
+	return []string{p.Role.String(), fmt.Sprintf("%d", p.OrgID), p.Category.String(), p.Resource, p.Action.String()}
+}

@@ -44,6 +44,7 @@ import ListDataSource from './datasource/ListDataSource';
 import OrgList from './org/OrgList';
 import UserList from './user/UserList';
 import ComponentSetting from './component/ComponentSetting';
+import OrgComponent from './component/OrgComponent';
 const { Meta } = Card;
 const { Text, Title } = Typography;
 
@@ -77,6 +78,7 @@ const Setting: React.FC = () => {
             '/setting/org/teams',
             '/setting/orgs',
             '/setting/components',
+            '/setting/orgs/components',
           ].indexOf(location.pathname) >= 0
             ? location.pathname
             : '/setting/datasources'
@@ -103,6 +105,12 @@ const Setting: React.FC = () => {
         </TabPane>
         <TabPane itemKey="/setting/components" tab="Component" icon={<Icon icon="menu" style={{ marginRight: 8 }} />}>
           <ComponentSetting />
+        </TabPane>
+        <TabPane
+          itemKey="/setting/orgs/components"
+          tab="Org. Component"
+          icon={<Icon icon="menu" style={{ marginRight: 8 }} />}>
+          <OrgComponent />
         </TabPane>
       </Tabs>
     </Card>

@@ -482,7 +482,19 @@ func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+					accesscontrol.RoleAdmin, "org_id=? and component_id=?", int64(12),
+					gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update acl role failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
+				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
+					accesscontrol.RoleAdmin, "org_id=? and component_id=?", int64(12),
+					gomock.Any()).Return(nil)
+				authorizeSrv.EXPECT().UpdateResourceRole(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
@@ -491,7 +503,9 @@ func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+					accesscontrol.RoleAdmin, "org_id=? and component_id=?", int64(12),
+					gomock.Any()).Return(nil)
+				authorizeSrv.EXPECT().UpdateResourceRole(gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},

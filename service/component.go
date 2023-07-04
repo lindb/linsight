@@ -278,7 +278,7 @@ func (srv *componentService) SaveOrgComponents(ctx context.Context, orgUID strin
 // UpdateRolesOfOrgComponent updates roles for current org.
 func (srv *componentService) UpdateRolesOfOrgComponent(ctx context.Context, cmps []model.OrgComponentInfo) error {
 	user := util.GetUser(ctx)
-	return srv.db.Transaction(func(tx dbpkg.DB) error {
+	if err := srv.db.Transaction(func(tx dbpkg.DB) error {
 		for _, cmp := range cmps {
 			cmpFromDB := &model.Component{}
 			if err := tx.Get(cmpFromDB, "uid=?", cmp.ComponentUID); err != nil {
@@ -286,12 +286,27 @@ func (srv *componentService) UpdateRolesOfOrgComponent(ctx context.Context, cmps
 			}
 			if err := tx.UpdateSingle(&model.OrgComponent{},
 				"role", cmp.Role,
-				"org_id and component_id=?", user.Org.ID, cmpFromDB.ID); err != nil {
+				"org_id=? and component_id=?", user.Org.ID, cmpFromDB.ID); err != nil {
 				return err
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	// update acl role
+	for _, cmp := range cmps {
+		if err := srv.authorizeSrv.UpdateResourceRole(&model.ResourceACLParam{
+			Role:     cmp.Role,
+			OrgID:    user.Org.ID,
+			Category: accesscontrol.Component,
+			Resource: cmp.ComponentUID,
+			Action:   accesscontrol.Write,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // saveComponentTree saves component tree.

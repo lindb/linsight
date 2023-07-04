@@ -31,7 +31,6 @@ import * as IconFontsStyles from '@src/styles/icon-fonts/fonts.scss?inline';
 import { useRequest } from '@src/hooks';
 import { ComponentSrv } from '@src/services';
 import { ApiKit } from '@src/utils';
-import FormSlot from '@douyinfe/semi-ui/lib/es/form/slot';
 import EmptyImg from '@src/images/empty.svg';
 import { Component, Feature, FeatureRepositoryInst, RoleList } from '@src/types';
 
@@ -257,9 +256,9 @@ const ComponentSetting: React.FC = () => {
           getFormApi={(api: any) => {
             formApi.current = api;
           }}>
-          <FormSlot label="Parent">
+          <Form.Slot label="Parent">
             <Tag size="large">{currentParent ? currentParent.label : 'Root'}</Tag>
-          </FormSlot>
+          </Form.Slot>
           <Form.Input field="label" label="Label" rules={[{ required: true, message: 'Label is required' }]} />
           <Form.Select
             label="Role"
