@@ -31,6 +31,14 @@ const getOrgComponents = (orgUID: string): Promise<OrgComponent[]> => {
   return ApiKit.GET<OrgComponent[]>(`${ApiPath.Org}/${orgUID}${ApiPath.Component}`);
 };
 
+const getOrgComponentTree = (): Promise<Component[]> => {
+  return ApiKit.GET<Component[]>(`${ApiPath.Org}/${ApiPath.Component}`);
+};
+
+const updateRoleOfOrgComponent = (cmps: OrgComponent[]): Promise<string> => {
+  return ApiKit.PUT<string>(`${ApiPath.Org}/${ApiPath.Component}/roles`, cmps);
+};
+
 const createComponent = (cmp: Component): Promise<string> => {
   return ApiKit.POST<string>(ApiPath.Component, cmp);
 };
@@ -49,6 +57,8 @@ const sortComponents = (cmps: Component[]): Promise<string> => {
 
 export default {
   getComponentTree,
+  getOrgComponentTree,
+  updateRoleOfOrgComponent,
   saveOrgComponents,
   getOrgComponents,
   createComponent,

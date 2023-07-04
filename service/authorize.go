@@ -57,6 +57,8 @@ type AuthorizeService interface {
 	AddResourcePolicy(aclParam *modelpkg.ResourceACLParam) error
 	// RemoveResourcePoliciesByCategory removes resource level acl policies by category.
 	RemoveResourcePoliciesByCategory(orgID int64, category accesscontrol.ResourceCategory) error
+	// UpdateResourceRole updates the acl role for resource.
+	UpdateResourceRole(alcParam *modelpkg.ResourceACLParam) error
 	// CheckResourceACL checks resource if can be accesed by given param.
 	CheckResourceACL(aclParam *modelpkg.ResourceACLParam) bool
 	// CheckResourcesACL checks resource list if can be accesed by given params.
@@ -136,6 +138,14 @@ func (srv *authorizeService) AddResourcePolicy(aclParam *modelpkg.ResourceACLPar
 // RemoveResourcePoliciesByCategory removes resource level acl policies by category.
 func (srv *authorizeService) RemoveResourcePoliciesByCategory(orgID int64, category accesscontrol.ResourceCategory) error {
 	_, err := srv.resource.RemoveFilteredNamedPolicy("p", 1, fmt.Sprintf("%d", orgID), category.String())
+	return err
+}
+
+// UpdateResourceRole updates the acl role for resource.
+func (srv *authorizeService) UpdateResourceRole(alcParam *modelpkg.ResourceACLParam) error {
+	_, err := srv.resource.UpdateFilteredPolicies(
+		[][]string{alcParam.ToStringParams()},
+		1, fmt.Sprintf("%d", alcParam.OrgID), alcParam.Category.String(), alcParam.Resource, alcParam.Action.String())
 	return err
 }
 

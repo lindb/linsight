@@ -76,7 +76,7 @@ type Component struct {
 	Role  accesscontrol.RoleType `json:"role" gorm:"column:role"`
 	Order int                    `json:"order" gorm:"column:order"`
 
-	ParentUID string       `json:"parentUID" gorm:"column:parent_uid"`
+	ParentUID string       `json:"parentUID,omitempty" gorm:"column:parent_uid"`
 	Children  []*Component `json:"children,omitempty" gorm:"-"`
 }
 

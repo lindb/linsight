@@ -276,3 +276,25 @@ func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestAuthorizeService_UpdateResourcesRole(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	enforcer := casbinmock.NewMockIEnforcer(ctrl)
+	srv := &authorizeService{
+		resource: enforcer,
+		logger:   logger.GetLogger("Service", "AuthTest"),
+	}
+	enforcer.EXPECT().UpdateFilteredPolicies(
+		[][]string{{"Admin", "123", "Component", "abc", "write"}},
+		1, "123", accesscontrol.Component.String(), "abc", "write").Return(false, fmt.Errorf("err"))
+	err := srv.UpdateResourceRole(&modelpkg.ResourceACLParam{
+		OrgID:    123,
+		Category: accesscontrol.Component,
+		Role:     accesscontrol.RoleAdmin,
+		Resource: "abc",
+		Action:   accesscontrol.Write,
+	})
+	assert.Error(t, err)
+}
