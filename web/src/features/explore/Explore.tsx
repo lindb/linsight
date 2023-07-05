@@ -78,6 +78,7 @@ const ExploreContent: React.FC = () => {
             noLabel
             value={datasource?.setting.uid}
             style={{ width: 200 }}
+            includeMixed
             onChange={(instance: DatasourceInstance) => {
               modifyPanel({ datasource: { uid: instance.setting.uid } });
             }}

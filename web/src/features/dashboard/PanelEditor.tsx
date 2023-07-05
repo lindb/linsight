@@ -17,13 +17,11 @@ under the License.
 */
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
-import { IconBellStroked } from '@douyinfe/semi-icons';
 import SplitPane from 'react-split-pane';
 import { PanelSetting as PanelOptions } from '@src/types';
 import { DatasourceSelectForm, Notification, Panel, QueryEditor } from '@src/components';
 import { get } from 'lodash-es';
 import { DashboardStore, DatasourceStore } from '@src/stores';
-import { toJS } from 'mobx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
 import ViewVariables from './components/ViewVariables';
@@ -35,11 +33,17 @@ const Split: any = SplitPane;
 const DefaultOptionsEditorSize = 350;
 
 const MetricSetting: React.FC = () => {
-  const { datasources } = DatasourceStore;
-  const { modifyPanel } = useContext(PanelEditContext);
+  const { modifyPanel, panel } = useContext(PanelEditContext);
   const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
-    return toJS(get(datasources, '[0]'));
+    const datasourceUID = get(panel, 'datasource.uid', get(DatasourceStore.getDefaultDatasource(), 'setting.uid'));
+    return DatasourceStore.getDatasource(`${datasourceUID}`);
   });
+
+  useEffect(() => {
+    modifyPanel({
+      datasource: { uid: get(datasource, 'setting.uid', ''), type: get(datasource, 'setting.type', '') },
+    });
+  }, [datasource, modifyPanel]);
 
   return (
     <div>
@@ -47,9 +51,9 @@ const MetricSetting: React.FC = () => {
         noLabel
         value={get(datasource, 'setting.uid')}
         style={{ width: 200 }}
+        includeMixed
         onChange={(instance: DatasourceInstance) => {
           setDatasource(instance);
-          modifyPanel({ datasource: { uid: get(datasource, 'setting.uid', '') } });
         }}
       />
       {datasource && <QueryEditor datasource={datasource} />}
@@ -96,14 +100,6 @@ const Editor: React.FC<{ initSize: number }> = (props) => {
               itemKey="1">
               <MemoMetricSetting />
             </TabPane>
-            <TabPane
-              tab={
-                <span>
-                  <IconBellStroked />
-                  Alert
-                </span>
-              }
-              itemKey="2"></TabPane>
           </Tabs>
         </Card>
       </Split>
@@ -134,7 +130,7 @@ const EditPanel: React.FC = () => {
     }
     if (panel.type == VisualizationAddPanelType) {
       // if panel is init add widget panel, set init panel title and type
-      DashboardStore.updatePanelConfig(panel, { title: 'Panel title', type: DefaultVisualizationType });
+      DashboardStore.updatePanelConfig(panel, { title: 'Panel title', type: DefaultVisualizationType, targets: [{}] });
     }
     setPanel(panel);
   }, [navigate, searchParams]);

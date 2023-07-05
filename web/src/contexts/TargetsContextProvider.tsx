@@ -87,7 +87,7 @@ export const TargetsContextProvider: React.FC<{
     refIds.current = new Set<string>();
     activeRefIds.current = new Set<string>();
     targetsTracker.current = new Tracker(targetsAfterCheck);
-    targetsTracker.current.setNewVal(targetsAfterCheck);
+    setTargets(targetsAfterCheck);
     (targetsAfterCheck || []).forEach((q: Query) => {
       const refId = `${q.refId}`;
       activeRefIds.current.add(refId);

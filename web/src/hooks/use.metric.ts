@@ -15,6 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { MixedDatasource } from '@src/constants';
 import { VariableContext } from '@src/contexts';
 import { DataQuerySrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
@@ -37,6 +38,10 @@ const getDataQuery = (
     let datasourceUID = get(q.datasource, 'uid');
     if (isEmpty(datasourceUID)) {
       datasourceUID = `${defaultDatasourceUID}`;
+    }
+    if (datasourceUID === MixedDatasource) {
+      // ignore mixed datasource
+      return;
     }
     const ds = DatasourceStore.getDatasource(datasourceUID);
     if (!ds) {

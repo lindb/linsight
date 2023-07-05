@@ -38,8 +38,10 @@ export const QueryEditContextProvider: React.FC<{
   const { initTarget = {} as Query, children, onTargetChange } = props;
   const [target, setTarget] = useState(initTarget);
   const targetTracker = useRef() as MutableRefObject<Tracker<Query>>;
+
   useMemo(() => {
     targetTracker.current = new Tracker(initTarget);
+    setTarget(initTarget);
   }, [initTarget]);
 
   const modifyTarget = (newTarget: Query) => {

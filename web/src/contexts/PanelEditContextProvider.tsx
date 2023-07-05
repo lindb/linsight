@@ -16,10 +16,11 @@ specific language governing permissions and limitations
 under the License.
 */
 import React, { createContext, MutableRefObject, useMemo, useRef, useState } from 'react';
-import { PanelSetting, Tracker } from '@src/types';
+import { PanelSetting, Query, Tracker } from '@src/types';
 import { ObjectKit } from '@src/utils';
 import { DashboardStore } from '@src/stores';
-import { cloneDeep } from 'lodash-es';
+import { cloneDeep, get } from 'lodash-es';
+import { MixedDatasource } from '@src/constants';
 
 /*
  * Context for panel editor
@@ -38,6 +39,7 @@ export const PanelEditContextProvider: React.FC<{ initPanel: PanelSetting; child
   const panelTracker = useRef() as MutableRefObject<Tracker<PanelSetting>>;
   useMemo(() => {
     panelTracker.current = new Tracker(initPanel);
+    setPanel(initPanel);
   }, [initPanel]);
   /*
    * Modify panel options
@@ -45,7 +47,16 @@ export const PanelEditContextProvider: React.FC<{ initPanel: PanelSetting; child
   const modifyPanel = (cfg: PanelSetting) => {
     const newPanel = cloneDeep(ObjectKit.merge(panel || {}, ObjectKit.removeUnderscoreProperties(cfg)));
     if (panelTracker.current.isChanged(newPanel)) {
-      console.error('change panel data.......');
+      const panelDatasourceUID = get(newPanel, 'datasource.uid');
+      if (panelDatasourceUID !== MixedDatasource) {
+        // if panel's datasource not mixed, need update all targets' datasource
+        (newPanel.targets || []).forEach((target: Query) => {
+          target.datasource = { uid: panelDatasourceUID, type: get(newPanel, 'datasource.type') };
+        });
+      }
+
+      console.error('change panel data.......', newPanel);
+
       panelTracker.current.setNewVal(newPanel);
       // NOTE: need modify dashboard's panel to trigger panel options modify event
       // because clone create new object, modify dashboard panel ref

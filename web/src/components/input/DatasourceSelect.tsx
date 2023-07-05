@@ -23,6 +23,8 @@ import { DatasourceInstance } from '@src/types';
 import { PlatformContext } from '@src/contexts';
 import { useNavigate } from 'react-router-dom';
 import { RuleItem } from '@douyinfe/semi-ui/lib/es/form';
+import Icon from '../common/Icon';
+import { MixedDatasource } from '@src/constants';
 
 const { Text } = Typography;
 
@@ -30,12 +32,13 @@ const DatasourceSelect: React.FC<{
   field?: string;
   label?: string;
   noLabel?: boolean;
+  includeMixed?: boolean;
   labelPosition?: 'top' | 'left' | 'inset';
   rules?: RuleItem[];
   style?: React.CSSProperties;
 }> = (props) => {
-  const { label, field, rules, labelPosition, noLabel, style } = props;
-  const { datasources } = DatasourceStore;
+  const { label, field, includeMixed, rules, labelPosition, noLabel, style } = props;
+  const datasources = DatasourceStore.getDatasources(includeMixed);
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
 
@@ -66,7 +69,11 @@ const DatasourceSelect: React.FC<{
         }
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <img src={`${ds.plugin.getLogo(theme)}`} width={24} />
+            {n.value === MixedDatasource ? (
+              <Icon icon="mixed" style={{ fontSize: 22 }} />
+            ) : (
+              <img src={`${ds.plugin.getLogo(theme)}`} width={24} />
+            )}
             <Text>{ds.setting.name}</Text>
           </div>
         );
@@ -75,7 +82,11 @@ const DatasourceSelect: React.FC<{
         const setting = ds.setting;
         return (
           <Select.Option key={setting.uid} value={setting.uid} showTick={false}>
-            <img src={`${ds.plugin.getLogo(theme)}`} width={24} />
+            {setting.uid === MixedDatasource ? (
+              <Icon icon="mixed" style={{ fontSize: 22 }} />
+            ) : (
+              <img src={`${ds.plugin.getLogo(theme)}`} width={24} />
+            )}
             <div style={{ marginLeft: 8 }}>
               <Text>{setting.name}</Text>
             </div>

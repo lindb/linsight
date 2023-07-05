@@ -28,7 +28,6 @@ import {
 import { PanelEditContext, QueryEditContextProvider, TargetsContext, TargetsContextProvider } from '@src/contexts';
 import { DatasourceInstance, Query } from '@src/types';
 import { cloneDeep, get, isEmpty } from 'lodash-es';
-import { observer } from 'mobx-react-lite';
 import Icon from '../common/Icon';
 import './query.editor.scss';
 import {
@@ -42,11 +41,14 @@ import {
 } from 'react-beautiful-dnd';
 import classNames from 'classnames';
 import { DNDKit } from '@src/utils';
+import DatasourceSelectForm from '../input/DatasourceSelectForm';
+import { MixedDatasource } from '@src/constants';
+import { DatasourceStore } from '@src/stores';
 
 const { Text } = Typography;
 
-const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) => {
-  const { datasource } = props;
+const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+  const { datasource: defaultDatasource /*default datasource*/ } = props;
   const {
     targets,
     activeIds,
@@ -57,13 +59,17 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
     deleteTarget,
     updateTargetConfig,
   } = useContext(TargetsContext);
-  const plugin = datasource.plugin;
-  const QueryEditor = plugin.getQueryEditor();
 
   return (
     <Collapse activeKey={activeIds} expandIconPosition="left" clickHeaderToExpand={false}>
       {targets.map((target: Query, index: number) => {
         const refId = `${target.refId}`;
+        const datasourceUID = get(target, 'datasource.uid', get(defaultDatasource, 'setting.uid'));
+        const datasource = DatasourceStore.getDatasource(`${datasourceUID}`);
+        if (!datasource) {
+          return null;
+        }
+        const QueryEditor = datasource.plugin.getQueryEditor();
         return (
           <Draggable key={refId} draggableId={refId} index={index}>
             {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => {
@@ -79,21 +85,33 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                     itemKey={refId}
                     header={
                       <div className="query-item">
-                        <div
-                          className="query-desc"
-                          onClick={() => {
-                            toggleActiveRefId(refId);
-                          }}>
+                        <div className="query-desc">
                           <Button
                             icon={isActive(refId) ? <IconChevronDown /> : <IconChevronRight />}
                             size="small"
                             theme="borderless"
                             type="tertiary"
+                            onClick={() => {
+                              toggleActiveRefId(refId);
+                            }}
                           />
                           <Text type="tertiary">{refId}</Text>
-                          <Text type="tertiary" size="small">
-                            ({datasource.setting.name})
-                          </Text>
+                          {defaultDatasource.setting.uid === MixedDatasource ? (
+                            <DatasourceSelectForm
+                              noLabel
+                              value={datasourceUID}
+                              style={{ width: 200 }}
+                              onChange={(instance: DatasourceInstance) => {
+                                updateTargetConfig(index, {
+                                  datasource: { uid: instance.setting.uid, type: instance.setting.type },
+                                } as any);
+                              }}
+                            />
+                          ) : (
+                            <Text type="tertiary" size="small">
+                              ({defaultDatasource.setting.name})
+                            </Text>
+                          )}
                           {target.hide && (
                             <Tag size="small" color="orange">
                               Disabled
@@ -139,7 +157,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
                       onTargetChange={(newTarget: Query) => {
                         updateTargetConfig(index, newTarget);
                       }}>
-                      <QueryEditor datasource={datasource} />
+                      <QueryEditor datasource={datasource || defaultDatasource} />
                     </QueryEditContextProvider>
                   </Collapse.Panel>
                 </div>
@@ -150,7 +168,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = observer((props) =
       })}
     </Collapse>
   );
-});
+};
 
 const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   const { datasource } = props;
@@ -204,8 +222,13 @@ const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
         style={{ marginTop: 12 }}
         icon={<IconPlusStroked />}
         onClick={() => {
+          let ds = datasource;
+          // if panel's datasource type is mixed, need select default datasource
+          if (ds.setting.uid === MixedDatasource) {
+            ds = DatasourceStore.getDefaultDatasource() as any;
+          }
           addTarget({
-            datasource: { uid: datasource.setting.uid, type: datasource.setting.type },
+            datasource: { uid: ds.setting.uid, type: ds.setting.type },
           } as Query);
         }}>
         Query
@@ -216,14 +239,7 @@ const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
 
 const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   const { datasource } = props;
-  const plugin = datasource.plugin;
   const { panel, modifyPanel } = useContext(PanelEditContext);
-
-  const QueryEditor = plugin.components.QueryEditor;
-  if (!QueryEditor) {
-    return <></>;
-  }
-
   return (
     <TargetsContextProvider
       initTargets={get(panel, 'targets', [])}
