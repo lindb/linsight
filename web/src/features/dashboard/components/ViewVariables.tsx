@@ -25,23 +25,49 @@ import { useVariable } from '@src/hooks';
 import { VariableContext } from '@src/contexts';
 import { DatasourceStore } from '@src/stores';
 
-/*
- * Constant variable based on setting.
- */
-const ConstantVariable: React.FC<{ variable: Variable }> = (props) => {
-  const { variable } = props;
+const VariableSelect: React.FC<{ variable: Variable; options: any[]; loading?: boolean }> = (props) => {
+  const { variable, options = [], loading } = props;
+  const formApi = useFormApi();
+  const dropdownVisible = useRef(false) as MutableRefObject<boolean>;
 
   return (
     <Form.Select
       showClear
+      loading={loading}
       key={variable.name}
+      multiple={variable.multi}
       noLabel={variable.hide === VariableHideType.OnlyValue}
       label={variable.label}
       field={variable.name}
-      optionList={[
-        { value: 'value1', label: 'value1' }, //FIXME: impl it
-        { value: 'value2', label: 'value2' },
-      ]}
+      optionList={options}
+      onClear={() => formApi.submitForm()}
+      onChange={(_value) => {
+        if (!variable.multi || !dropdownVisible.current) {
+          formApi.submitForm();
+        }
+      }}
+      onDropdownVisibleChange={(val) => {
+        dropdownVisible.current = val;
+        if (!val && variable.multi) {
+          formApi.submitForm();
+        }
+      }}
+    />
+  );
+};
+
+/*
+ * Custom variable based on setting.
+ */
+const CustomVariable: React.FC<{ variable: Variable }> = (props) => {
+  const { variable } = props;
+
+  return (
+    <VariableSelect
+      variable={variable}
+      options={(variable.options || []).map((opt: any) => {
+        return { label: opt.text, value: opt.value, showTick: false };
+      })}
     />
   );
 };
@@ -55,7 +81,6 @@ const QueryVariable: React.FC<{ variable: Variable; relatedVarNames: string[] }>
   const { result, loading, refetch } = useVariable(variable, '');
   const formApi = useFormApi();
   const reloadValues = pick(variables, relatedVarNames || []);
-  const dropdownVisible = useRef(false) as MutableRefObject<boolean>;
   const reloadTracker = useRef() as MutableRefObject<Tracker<any>>;
 
   /**
@@ -100,29 +125,12 @@ const QueryVariable: React.FC<{ variable: Variable; relatedVarNames: string[] }>
   }, [result, formApi, variable, loading]);
 
   return (
-    <Form.Select
-      showClear
-      key={variable.name}
-      noLabel={variable.hide === VariableHideType.OnlyValue}
-      multiple={variable.multi}
-      label={variable.label}
-      field={variable.name}
-      loading={loading}
-      onClear={() => formApi.submitForm()}
-      onChange={(_value) => {
-        if (!variable.multi || !dropdownVisible.current) {
-          formApi.submitForm();
-        }
-      }}
-      onDropdownVisibleChange={(val) => {
-        dropdownVisible.current = val;
-        if (!val && variable.multi) {
-          formApi.submitForm();
-        }
-      }}
-      optionList={map(result, (r: string) => {
+    <VariableSelect
+      variable={variable}
+      options={map(result, (r: string) => {
         return { value: r, label: r, showTick: false };
       })}
+      loading={loading}
     />
   );
 };
@@ -191,10 +199,12 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
           if (item.hide === VariableHideType.Hide) {
             return null;
           }
-          if (item.type === VariableType.Query) {
-            return <QueryVariable variable={item} key={item.name} relatedVarNames={findVariableNames(item)} />;
+          switch (item.type) {
+            case VariableType.Query:
+              return <QueryVariable variable={item} key={item.name} relatedVarNames={findVariableNames(item)} />;
+            case VariableType.Custom:
+              return <CustomVariable variable={item} key={item.name} />;
           }
-          return <ConstantVariable variable={item} key={item.name} />;
         })}
       </Form>
     </Card>
