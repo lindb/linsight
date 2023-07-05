@@ -132,6 +132,13 @@ abstract class DatasourceAPI {
   abstract rewriteMetaQuery(query: Query, variables: {}, prefix?: string): Query | null;
 
   abstract test(): any;
+
+  /**
+   * Find variable names from where conditions.
+   */
+  findVariableNames(_query: Query): string[] {
+    return [];
+  }
 }
 
 class DatasourceRepository {

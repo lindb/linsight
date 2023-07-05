@@ -18,7 +18,7 @@ under the License.
 import { DataQuerySrv } from '@src/services';
 import { DataSetType, DatasourceAPI, DatasourceSetting, Query } from '@src/types';
 import { TemplateKit } from '@src/utils';
-import { isArray, isEmpty, isString } from 'lodash-es';
+import { isArray, isEmpty, isString, compact } from 'lodash-es';
 import { ConditionExpr, Operator } from './types';
 
 export class LinDBDatasource extends DatasourceAPI {
@@ -47,6 +47,24 @@ export class LinDBDatasource extends DatasourceAPI {
     }
     this.rewriteWhereCondition(query, variables);
     return query;
+  }
+  findVariableNames(query: Query): string[] {
+    if (isEmpty(query.request.where)) {
+      return [];
+    }
+    const names: string[] = [];
+    query.request.where.forEach((w: any) => {
+      if (isString(w.value)) {
+        const name = TemplateKit.findTemplateName(w.value);
+        names.push(name);
+      } else if (isArray(w.value)) {
+        w.value.forEach((v: string) => {
+          const name = TemplateKit.findTemplateName(v);
+          names.push(name);
+        });
+      }
+    });
+    return compact(names);
   }
 
   rewriteWhereCondition(query: Query, variables: {}) {

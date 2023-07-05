@@ -19,7 +19,7 @@ under the License.
 import { DatasourceStore } from '@src/stores';
 import { Variable, VariableHideType } from '@src/types';
 import { useRequest } from './use.request';
-import { isEmpty } from 'lodash-es';
+import { cloneDeep, isEmpty } from 'lodash-es';
 import { DataQuerySrv } from '@src/services';
 import { VariableContext } from '@src/contexts';
 import { useContext } from 'react';
@@ -38,7 +38,8 @@ export const useVariable = (variable: Variable | undefined, prefix?: string) => 
       if (!ds) {
         return [];
       }
-      const q = ds.api.rewriteMetaQuery(query, variables, prefix);
+      // NOTE: need clone new query, because rewrite query will modify it
+      const q = ds.api.rewriteMetaQuery(cloneDeep(query), variables, prefix);
       if (!q) {
         return [];
       }
