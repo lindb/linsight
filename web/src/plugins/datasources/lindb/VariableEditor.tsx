@@ -21,12 +21,14 @@ import { VariableEditorProps } from '@src/types';
 import MetricNameSelect from './components/MetricNameSelect';
 import TagKeySelect from './components/TagKeySelect';
 import { LinDBDatasource } from './Datasource';
-import { get } from 'lodash-es';
+import { compact, get, isEmpty } from 'lodash-es';
 import WhereConditonSelect from './components/WhereEditor';
+import NamespaceSelect from './components/NamespaceSelect';
 
 const VariableEditor: React.FC<VariableEditorProps> = (props) => {
   const { variable, datasource } = props;
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
+  const namespace = get(datasource, 'setting.config.namespace', '');
   return (
     <>
       <Form.Select
@@ -34,12 +36,22 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
         label="Value type"
         style={{ width: 300 }}
         rules={[{ required: true, message: 'Value type is required.' }]}
-        optionList={[
-          { value: 'namespace', label: 'Namespace' },
-          { value: 'metric', label: 'Metric' },
-          { value: 'tagValue', label: 'Tag Value' },
-        ]}
+        optionList={compact([
+          isEmpty(namespace) && { value: 'namespace', label: 'Namespace', showTick: false },
+          { value: 'metric', label: 'Metric', showTick: false },
+          { value: 'tagValue', label: 'Tag Value', showTick: false },
+        ])}
       />
+      {(get(variable, 'query.request.type') === 'metric' || get(variable, 'query.request.type') === 'tagValue') &&
+        isEmpty(namespace) && (
+          <NamespaceSelect
+            labelPosition="top"
+            field="query.request.namespace"
+            label={get(datasource, 'setting.config.alias', 'Namespace')}
+            datasource={api}
+            style={{ minWidth: 300 }}
+          />
+        )}
       {get(variable, 'query.request.type') === 'tagValue' && (
         <>
           <MetricNameSelect
@@ -47,6 +59,7 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
             label="Metric"
             field="query.request.metric"
             datasource={api}
+            ns={namespace}
             style={{ width: 300 }}
           />
           <TagKeySelect
@@ -54,10 +67,16 @@ const VariableEditor: React.FC<VariableEditorProps> = (props) => {
             label="Tag key"
             field="query.request.tagKey"
             metricField="query.request.metric"
+            ns={namespace}
             datasource={api}
             style={{ width: 300, marginBottom: 4 }}
           />
-          <WhereConditonSelect field="query.request.where" datasource={api} metricField="query.request.metric" />
+          <WhereConditonSelect
+            field="query.request.where"
+            ns={namespace}
+            datasource={api}
+            metricField="query.request.metric"
+          />
         </>
       )}
     </>
