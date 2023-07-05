@@ -15,9 +15,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Card, Form, useFormApi } from '@douyinfe/semi-ui';
-import React, { MutableRefObject, useContext, useEffect, useMemo, useRef } from 'react';
-import { get, isEmpty, map, isArray, pick, includes, remove } from 'lodash-es';
+import { Card, Form, Input, useFormApi } from '@douyinfe/semi-ui';
+import { IconSearchStroked } from '@douyinfe/semi-icons';
+import React, { MutableRefObject, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { get, isEmpty, map, isArray, pick, includes, remove, debounce } from 'lodash-es';
 import { Tracker, Variable, VariableHideType, VariableType } from '@src/types';
 import './variables.scss';
 import { useSearchParams } from 'react-router-dom';
@@ -25,13 +26,21 @@ import { useVariable } from '@src/hooks';
 import { VariableContext } from '@src/contexts';
 import { DatasourceStore } from '@src/stores';
 
-const VariableSelect: React.FC<{ variable: Variable; options: any[]; loading?: boolean }> = (props) => {
-  const { variable, options = [], loading } = props;
+const VariableSelect: React.FC<{
+  variable: Variable;
+  options: any[];
+  loading?: boolean;
+  remote?: boolean;
+  onSearch?: (v: string) => void;
+}> = (props) => {
+  const { variable, options = [], loading, remote = false, onSearch } = props;
   const formApi = useFormApi();
   const dropdownVisible = useRef(false) as MutableRefObject<boolean>;
+  const selectRef = useRef<any>();
 
   return (
     <Form.Select
+      ref={selectRef}
       showClear
       loading={loading}
       key={variable.name}
@@ -39,11 +48,27 @@ const VariableSelect: React.FC<{ variable: Variable; options: any[]; loading?: b
       noLabel={variable.hide === VariableHideType.OnlyValue}
       label={variable.label}
       field={variable.name}
+      remote={remote}
+      filter
       optionList={options}
       onClear={() => formApi.submitForm()}
+      innerTopSlot={
+        <Input
+          style={{ margin: 4, width: 'calc(100% - 8px)' }}
+          suffix={<IconSearchStroked />}
+          onChange={(value: string) => {
+            selectRef.current.search(value);
+          }}
+        />
+      }
       onChange={(_value) => {
         if (!variable.multi || !dropdownVisible.current) {
           formApi.submitForm();
+        }
+      }}
+      onSearch={(v: string) => {
+        if (onSearch) {
+          onSearch(v);
         }
       }}
       onDropdownVisibleChange={(val) => {
@@ -78,10 +103,12 @@ const CustomVariable: React.FC<{ variable: Variable }> = (props) => {
 const QueryVariable: React.FC<{ variable: Variable; relatedVarNames: string[] }> = (props) => {
   const { variable, relatedVarNames } = props;
   const { variables } = useContext(VariableContext);
-  const { result, loading, refetch } = useVariable(variable, '');
+  const [input, setInput] = useState('');
+  const { result, loading, refetch } = useVariable(variable, input);
   const formApi = useFormApi();
   const reloadValues = pick(variables, relatedVarNames || []);
   const reloadTracker = useRef() as MutableRefObject<Tracker<any>>;
+  const search = debounce(setInput, 200);
 
   /**
    * initialize value
@@ -106,6 +133,10 @@ const QueryVariable: React.FC<{ variable: Variable; relatedVarNames: string[] }>
   useEffect(() => {
     if (!loading) {
       const currentValue = formApi.getValue(variable.name);
+      if (isEmpty(currentValue)) {
+        return;
+      }
+      // check if need clean current selected value
       if (variable.multi) {
         // remove value that not contain select values.
         const removed = remove(currentValue, (v: string) => {
@@ -127,10 +158,12 @@ const QueryVariable: React.FC<{ variable: Variable; relatedVarNames: string[] }>
   return (
     <VariableSelect
       variable={variable}
+      onSearch={search}
       options={map(result, (r: string) => {
         return { value: r, label: r, showTick: false };
       })}
       loading={loading}
+      remote={true}
     />
   );
 };
@@ -176,7 +209,6 @@ const ViewVariables: React.FC<{ className?: string }> = (props) => {
         className="lin-variables"
         getFormApi={(api: any) => (formApi.current = api)}
         onSubmit={(values: any) => {
-          console.error('xxx.... submit');
           // set variables to url params
           definitions.forEach((variable: Variable) => {
             const name = variable.name;

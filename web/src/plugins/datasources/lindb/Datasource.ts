@@ -41,13 +41,24 @@ export class LinDBDatasource extends DatasourceAPI {
     return query;
   }
 
-  rewriteMetaQuery(query: Query, variables: {}): Query | null {
+  rewriteMetaQuery(query: Query, variables: {}, prefix?: string): Query | null {
     if (!query.request || isEmpty(query.request.type)) {
       return null;
     }
     this.rewriteWhereCondition(query, variables);
+    if (!isEmpty(prefix)) {
+      const type = query.request.type;
+      if (type === 'tagValue') {
+        query.request.where.push({ key: query.request.tagKey, operator: Operator.Like, value: `${prefix}*` });
+      } else {
+        query.request.where = [
+          { key: type === 'namespace' ? 'namespace' : 'metric', operator: Operator.Eq, value: prefix },
+        ];
+      }
+    }
     return query;
   }
+
   findVariableNames(query: Query): string[] {
     if (isEmpty(query.request.where)) {
       return [];
