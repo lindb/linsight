@@ -193,7 +193,7 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
           }}
         />
         {!searchOnly && (
-          <Button icon={<IconPlusStroked />} onClick={() => navigate('/dashboard')}>
+          <Button icon={<IconPlusStroked />} onClick={() => navigate('/dashboard/new')}>
             New
           </Button>
         )}
