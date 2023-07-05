@@ -95,7 +95,7 @@ const DashboardStar = observer(() => {
 });
 
 const SaveDashboard: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const dashboardId = searchParams.get('d');
   const [visible, setVisible] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -148,15 +148,14 @@ const SaveDashboard: React.FC = () => {
         VariableKit.setVariableValues(searchParams, DashboardStore.getVariables());
       }
       const success = await DashboardStore.saveDashboard();
-      if (success && !dashboardId) {
-        // if create dashboard successfully, need set uid to url params
-        searchParams.set('d', `${DashboardStore.dashboard.uid}`);
-        setSearchParams(searchParams);
-      }
-      setVisible(false);
       if (!isEmpty(nextPath.current)) {
         navigate(nextPath.current);
+      } else if (success && !dashboardId) {
+        // if create dashboard successfully, need set uid to url params
+        searchParams.set('d', `${DashboardStore.dashboard.uid}`);
+        navigate({ pathname: '/dashboard', search: searchParams.toString() });
       }
+      setVisible(false);
     } finally {
       setSubmitting(false);
     }
@@ -350,19 +349,21 @@ const Dashboard: React.FC = () => {
                     searchParams.delete('tab');
                     searchParams.delete('edit');
                     navigate({
-                      pathname: '/dashboard',
+                      pathname: isEmpty(dashboardId) ? '/dashboard/new' : '/dashboard',
                       search: searchParams.toString(),
                     });
                   }}
                 />
               )}
-              <Button
-                type="tertiary"
-                icon={<Icon icon="panel-add" />}
-                onClick={() => {
-                  DashboardStore.addPanel(DashboardStore.createPanelConfig());
-                }}
-              />
+              {!endsWith(location.pathname, '/panel/edit') && (
+                <Button
+                  type="tertiary"
+                  icon={<Icon icon="panel-add" />}
+                  onClick={() => {
+                    DashboardStore.addPanel(DashboardStore.createPanelConfig());
+                  }}
+                />
+              )}
               <SaveDashboard />
               <Button
                 type="tertiary"
