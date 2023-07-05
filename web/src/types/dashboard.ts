@@ -31,6 +31,7 @@ export interface Variable {
   multi?: boolean;
   name: string;
   query?: Query;
+  options?: any;
   type: VariableType;
 }
 
@@ -61,7 +62,7 @@ export enum VariableHideType {
 }
 
 export enum VariableType {
-  Constant = 'constant',
+  Custom = 'custom',
   Query = 'query',
 }
 

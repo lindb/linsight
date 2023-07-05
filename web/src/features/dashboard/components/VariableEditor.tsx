@@ -24,6 +24,7 @@ import { useSearchParams } from 'react-router-dom';
 import { DashboardStore, DatasourceStore } from '@src/stores';
 import { observer } from 'mobx-react-lite';
 import { get } from 'lodash-es';
+import CustomEditor from './common/CustomEditor';
 
 const VariableEditor: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -61,20 +62,24 @@ const VariableEditor: React.FC = () => {
    */
   const QueryVaribleEditor = (props: { formState: any }) => {
     const { formState } = props;
-    if (get(formState, 'values.type') !== VariableType.Query) {
-      return null;
+    const queryType = get(formState, 'values.type');
+    switch (queryType) {
+      case VariableType.Query:
+        return (
+          <>
+            <DatasourceSelect
+              rules={[{ required: true, message: 'Datasource is required.' }]}
+              label="Data source"
+              style={{ width: 300 }}
+              field="query.datasource.uid"
+            />
+            <QueryEditor formState={formState} />
+          </>
+        );
+      case VariableType.Custom:
+        return <CustomEditor />;
     }
-    return (
-      <>
-        <DatasourceSelect
-          rules={[{ required: true, message: 'Datasource is required.' }]}
-          label="Data source"
-          style={{ width: 300 }}
-          field="query.datasource.uid"
-        />
-        <QueryEditor formState={formState} />
-      </>
-    );
+    return null;
   };
 
   return (
@@ -89,7 +94,6 @@ const VariableEditor: React.FC = () => {
       onSubmit={(values: any) => {
         if (apply.current) {
           // add apply button check, variable plugin editor may submit form
-          console.log('apply submit', values);
           DashboardStore.updateVariable(index, values);
           gotoList();
         }
@@ -114,8 +118,8 @@ const VariableEditor: React.FC = () => {
             style={{ width: 300 }}
             rules={[{ required: true, message: 'Type is required.' }]}
             optionList={[
-              { value: VariableType.Query, label: 'Query' },
-              { value: VariableType.Constant, label: 'Constant' },
+              { value: VariableType.Query, label: 'Query', showTick: false },
+              { value: VariableType.Custom, label: 'Custom', showTick: false },
             ]}
           />
           <QueryVaribleEditor formState={formState} />
