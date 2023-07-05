@@ -28,7 +28,7 @@ export const useVariable = (variable: Variable | undefined, prefix?: string) => 
   const query = variable?.query;
   const { variables } = useContext(VariableContext);
   const { result, loading, refetch, error } = useRequest(
-    ['search_metric_metadata', query],
+    ['search_metric_metadata', query, prefix],
     async () => {
       if (isEmpty(query)) {
         return [];
