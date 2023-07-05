@@ -78,6 +78,6 @@
     "stylelint-plugin-license-header": "^1.0.3",
     "stylelint-prettier": "^3.0.0",
     "typescript": "^4.4.2",
-    "vite": "^4.1.4"
+    "vite": "^4.1.5"
   }
 }

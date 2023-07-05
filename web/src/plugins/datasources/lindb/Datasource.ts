@@ -30,33 +30,9 @@ export class LinDBDatasource extends DatasourceAPI {
     if (!query.request || isEmpty(query.request.metric) || isEmpty(query.request.fields)) {
       return null;
     }
-    if (!isEmpty(query.request.where)) {
-      const where: any[] = [];
-      query.request.where.forEach((w: any) => {
-        if (isString(w.value)) {
-          w.value = TemplateKit.template(w.value, variables);
-        } else if (isArray(w.value)) {
-          const newValues: string[] = [];
-          w.value.forEach((v: string) => {
-            const newVal = TemplateKit.template(v, variables);
-            if (isEmpty(newVal)) {
-              return;
-            } else if (isArray(newVal)) {
-              newValues.push(...newVal);
-            } else {
-              newValues.push(newVal);
-            }
-          });
-          w.value = newValues;
-        }
-        if (isEmpty(w.value) && w.optional) {
-          // ignore empty condition, if it is optional
-          return;
-        }
-        where.push(w);
-      });
-      query.request.where = where;
-    }
+
+    this.rewriteWhereCondition(query, variables);
+
     if (dataset !== DataSetType.TimeSeries) {
       query.request.stats = true;
     } else {
@@ -69,6 +45,11 @@ export class LinDBDatasource extends DatasourceAPI {
     if (!query.request || isEmpty(query.request.type)) {
       return null;
     }
+    this.rewriteWhereCondition(query, variables);
+    return query;
+  }
+
+  rewriteWhereCondition(query: Query, variables: {}) {
     if (!isEmpty(query.request.where)) {
       const where: any[] = [];
       query.request.where.forEach((w: any) => {
@@ -96,7 +77,6 @@ export class LinDBDatasource extends DatasourceAPI {
       });
       query.request.where = where;
     }
-    return query;
   }
 
   async fetchMetricNames(namespace: string, prefix?: string): Promise<string[]> {
@@ -182,17 +162,6 @@ export class LinDBDatasource extends DatasourceAPI {
     if (!isEmpty(prefix)) {
       conditions.push({ key: tagKey, operator: Operator.Like, value: `${prefix}*` });
     }
-    const rs = await DataQuerySrv.metadataQuery({
-      datasource: { uid: this.setting.uid },
-      request: req,
-    });
-    if (rs) {
-      return rs.values;
-    }
-    return [];
-  }
-
-  async metaQuery(req: any, prefix?: string): Promise<string[]> {
     const rs = await DataQuerySrv.metadataQuery({
       datasource: { uid: this.setting.uid },
       request: req,
