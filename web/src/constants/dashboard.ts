@@ -50,3 +50,5 @@ export const QuickSelectList: QuickSelectItem[] = [
   { title: 'Last 15 days', value: 'now()-15d' },
   { title: 'Last 30 days', value: 'now()-30d' },
 ];
+
+export const MixedDatasource = '-- Mixed --';

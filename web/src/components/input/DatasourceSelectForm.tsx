@@ -26,10 +26,11 @@ const DatasourceSelectForm: React.FC<{
   label?: string;
   noLabel?: boolean;
   labelPosition?: 'top' | 'left' | 'inset';
+  includeMixed?: boolean;
   style?: React.CSSProperties;
   onChange?: (instance: DatasourceInstance) => void;
 }> = (props) => {
-  const { value, label, labelPosition, noLabel, style, onChange } = props;
+  const { value, label, labelPosition, noLabel, includeMixed, style, onChange } = props;
   const previousValue = useRef() as MutableRefObject<string>;
 
   useMemo(() => {
@@ -53,7 +54,13 @@ const DatasourceSelectForm: React.FC<{
           onChange(ds);
         }
       }}>
-      <DatasourceSelect labelPosition={labelPosition} label={label} noLabel={noLabel} style={style} />
+      <DatasourceSelect
+        labelPosition={labelPosition}
+        label={label}
+        noLabel={noLabel}
+        style={style}
+        includeMixed={includeMixed}
+      />
     </Form>
   );
 };

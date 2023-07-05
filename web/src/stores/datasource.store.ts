@@ -17,8 +17,9 @@ under the License.
 */
 import { makeAutoObservable, toJS } from 'mobx';
 import { DatasourceInstance, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
-import { find, get } from 'lodash-es';
+import { filter, find, get } from 'lodash-es';
 import { DatasourceSrv } from '@src/services';
+import { MixedDatasource } from '@src/constants';
 
 class DatasourceStore {
   datasources: DatasourceInstance[] = [];
@@ -42,6 +43,15 @@ class DatasourceStore {
     return null;
   }
 
+  getDatasources(includeMixed?: boolean): DatasourceInstance[] {
+    return filter(this.datasources, (d: DatasourceInstance) => {
+      if (includeMixed) {
+        return true;
+      }
+      return d.setting.uid !== MixedDatasource;
+    });
+  }
+
   setDatasources(settings: DatasourceSetting[]) {
     const rs: DatasourceInstance[] = [];
     (settings || []).forEach((setting: DatasourceSetting) => {
@@ -54,6 +64,13 @@ class DatasourceStore {
         });
       }
     });
+    rs.push({
+      setting: {
+        uid: MixedDatasource,
+        name: MixedDatasource,
+        type: 'mixed',
+      },
+    } as any);
     this.datasources = rs;
   }
 

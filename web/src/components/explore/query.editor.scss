@@ -19,6 +19,7 @@ under the License.
   .semi-collapse-header {
     background-color: var(--semi-color-fill-0);
     margin: 4px 0;
+    cursor: unset;
   }
 
   .semi-collapse-item {
@@ -48,6 +49,11 @@ under the License.
       display: flex;
       align-items: center;
       gap: 12px;
+
+      .semi-form-field {
+        padding-top: 0;
+        padding-bottom: 0;
+      }
     }
 
     .actions {
