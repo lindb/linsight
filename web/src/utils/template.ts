@@ -25,4 +25,12 @@ const template = (tmpl: string, params?: object): string => {
   return tmpl;
 };
 
-export default { template };
+const findTemplateName = (tmpl: string): string => {
+  const matches = tmpl.match(/\$\{\s*(\w+)\s*\}/);
+  if (matches) {
+    return matches[1];
+  }
+  return '';
+};
+
+export default { template, findTemplateName };
