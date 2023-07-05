@@ -208,7 +208,9 @@ class DashboardStore {
   }
 
   deleteVariable(index: string) {
-    pullAt(this.getVariables(), parseInt(index));
+    const variables = this.getVariables();
+    pullAt(variables, parseInt(index));
+    set(this.dashboard, `templating.list`, variables);
   }
 
   getVariableByIndex(index: string): Variable {
