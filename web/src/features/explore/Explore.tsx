@@ -94,7 +94,7 @@ const ExploreContent: React.FC = () => {
               p.title = 'Panel title';
               return [
                 {
-                  config: p,
+                  model: p,
                 },
               ];
             }}

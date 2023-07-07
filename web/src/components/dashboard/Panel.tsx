@@ -35,16 +35,17 @@ import React, {
   MutableRefObject,
   useMemo,
 } from 'react';
-import { Icon, LazyLoad, SimpleStatusTip } from '@src/components';
+import { Icon, LazyLoad, SimpleStatusTip, Notification } from '@src/components';
 import { PlatformContext } from '@src/contexts';
-import { useMetric } from '@src/hooks';
+import { useMetric, useRequest } from '@src/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import classNames from 'classnames';
-import { get, isEmpty, pick, cloneDeep, isArray } from 'lodash-es';
-import { DataSetKit, ObjectKit } from '@src/utils';
+import { get, isEmpty, pick, cloneDeep, isArray, omit, has } from 'lodash-es';
+import { ApiKit, DataSetKit, ObjectKit } from '@src/utils';
 import './panel.scss';
 import { PanelVisualizationOptions } from '@src/constants';
+import { ChartSrv } from '@src/services';
 
 const { Text } = Typography;
 
@@ -122,6 +123,20 @@ const PanelHeader = forwardRef(
                   }}>
                   Explore
                 </Dropdown.Item>
+                {!has(panel, 'libraryPanel.uid') && (
+                  <Dropdown.Item
+                    icon={<Icon icon="repo" />}
+                    onClick={async () => {
+                      try {
+                        await ChartSrv.createChart(omit(panel, ['id', 'gridPos']));
+                        Notification.success('Save chart successfully');
+                      } catch (err) {
+                        Notification.error(ApiKit.getErrorMsg(err));
+                      }
+                    }}>
+                    Save as chart
+                  </Dropdown.Item>
+                )}
                 <Dropdown.Divider />
                 {!isStatic && (
                   <Dropdown.Item
@@ -197,7 +212,7 @@ const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationP
   return <Visualization datasets={getDatasets()} theme={theme} panel={panelCfg} />;
 };
 
-const Panel: React.FC<{
+const ViewPanel: React.FC<{
   panel: PanelSetting;
   shortcutKey?: boolean;
   isStatic?: boolean;
@@ -212,6 +227,7 @@ const Panel: React.FC<{
   const header = useRef<any>();
   const container = useRef<any>();
   const { loading, error, result } = useMetric(panel?.targets || [], datasetType, get(panel, 'datasource.uid', ''));
+
   const [datasets, setDatasets] = useState<any>(result);
   useEffect(() => {
     if (!loading) {
@@ -305,8 +321,8 @@ const Panel: React.FC<{
 
   return (
     <div
+      style={{ height: '100%' }}
       ref={container}
-      className="panel"
       onMouseEnter={() => {
         if (shortcutKey) {
           window.addEventListener('keydown', handleKeyDown);
@@ -318,15 +334,57 @@ const Panel: React.FC<{
         }
         toggleHeaderMenu(false);
       }}>
-      <LazyLoad>
-        <Card
-          className={panelCls}
-          header={
-            <PanelHeader ref={header} panel={panel} isStatic={isStatic} isLoading={loading} error={error} menu={menu} />
-          }>
-          {renderContent()}
-        </Card>
-      </LazyLoad>
+      <Card
+        className={panelCls}
+        header={
+          <PanelHeader ref={header} panel={panel} isStatic={isStatic} isLoading={loading} error={error} menu={menu} />
+        }>
+        {renderContent()}
+      </Card>
+    </div>
+  );
+};
+
+const ViewChartPanel: React.FC<{
+  panel: PanelSetting;
+  shortcutKey?: boolean;
+  isStatic?: boolean;
+  className?: string;
+  menu?: boolean;
+}> = (props) => {
+  const { panel } = props;
+  const chartUID = get(panel, 'libraryPanel.uid', '');
+  const { result, loading } = useRequest(['load_chart_by_uid', chartUID], () => {
+    return ChartSrv.getChart(chartUID);
+  });
+
+  if (loading) {
+    // TODO: add loading msg??
+    return null;
+  }
+
+  return <ViewPanel panel={ObjectKit.merge(omit(result.model, ['id', 'gridPos']), panel)} {...omit(props, 'panel')} />;
+};
+
+const Panel: React.FC<{
+  panel: PanelSetting;
+  shortcutKey?: boolean;
+  isStatic?: boolean;
+  className?: string;
+  menu?: boolean;
+}> = (props) => {
+  const { panel } = props;
+  const renderContent = () => {
+    const chartUID = get(panel, 'libraryPanel.uid', '');
+    if (isEmpty(chartUID)) {
+      return <ViewPanel {...props} />;
+    }
+    return <ViewChartPanel {...props} />;
+  };
+
+  return (
+    <div className="panel">
+      <LazyLoad>{renderContent()}</LazyLoad>
     </div>
   );
 };

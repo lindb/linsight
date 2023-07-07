@@ -17,25 +17,19 @@
 
 package model
 
-import (
-	"testing"
+type LinkKind int
 
-	"github.com/stretchr/testify/assert"
-	"gorm.io/datatypes"
+const (
+	DashboardLink LinkKind = iota + 1
 )
 
-func TestChart_ReadMeta(t *testing.T) {
-	chart := &Chart{
-		Model: datatypes.JSON(`{"title": "John", "description": "desc"}`),
-	}
-	chart.ReadMeta()
-	assert.Equal(t, "John", chart.Title)
-	assert.Equal(t, "desc", chart.Desc)
-	assert.Empty(t, chart.UID)
+// Link represents a connected for two elements.
+type Link struct {
+	BaseModel
 
-	chart = &Chart{
-		Model: datatypes.JSON(`{"uid": "John", "description": "desc"}`),
-	}
-	chart.ReadMeta()
-	assert.Equal(t, "John", chart.UID)
+	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_link,unique"`
+
+	SourceUID string   `gorm:"column:source_uid;index:u_idx_link,unique"`
+	TargetUID string   `gorm:"column:target_uid;index:u_idx_link,unique"`
+	Kind      LinkKind `gorm:"column:kind;index:u_idx_link,unique"`
 }

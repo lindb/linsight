@@ -70,6 +70,7 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.Preference{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Dashboard{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Chart{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Link{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Team{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.TeamMember{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Component{}))

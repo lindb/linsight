@@ -255,10 +255,15 @@ class DashboardStore {
         } else {
           charts.forEach((chart: Chart, index: number) => {
             const panelId = this.assignPanelId();
-            const p = chart.config as PanelSetting;
-            p.id = panelId;
-            p.gridPos = { w: 12, h: 8, x: 12 * (index % 2), y: 0, i: `${panelId}` };
-            panels.push(p);
+            panels.push({
+              id: panelId,
+              title: chart.title,
+              gridPos: { w: 12, h: 8, x: 12 * (index % 2), y: 0, i: `${panelId}` },
+              libraryPanel: {
+                name: chart.title,
+                uid: chart.uid,
+              },
+            });
           });
         }
         this.dashboard.panels = panels;

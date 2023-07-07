@@ -26,7 +26,7 @@ import { ApiKit } from '@src/utils';
 import React, { useContext, useState } from 'react';
 import { createSearchParams, useNavigate } from 'react-router-dom';
 import { get, unset } from 'lodash-es';
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> = (props) => {
   const { chart, setVisible } = props;
@@ -45,8 +45,8 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <div style={{ flex: 1 }}>
-          <div>{chart.title}</div>
-          <Text type="tertiary">{chart.desc}</Text>
+          <Title heading={5}>{chart.title}</Title>
+          <Text type="tertiary">{chart.description || 'N/A'}</Text>
         </div>
         <DatasourceSelectForm
           noLabel
@@ -62,7 +62,7 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
           type="primary"
           loading={submitting}
           onClick={async () => {
-            chart.config = panel;
+            chart.model = panel;
             setSubmitting(true);
             try {
               await ChartSrv.updateChart(chart);
@@ -102,13 +102,14 @@ const ChartDetailModal: React.FC<{ chart: Chart; visible: boolean; setVisible: (
   return (
     <SideSheet
       className="chart-detail"
+      headerStyle={{ padding: 0 }}
       size="large"
       closeOnEsc
       motion={false}
       closable={false}
       visible={visible}
       onCancel={() => setVisible(false)}>
-      <PanelEditContextProvider initPanel={(chart.config || {}) as PanelSetting}>
+      <PanelEditContextProvider initPanel={(chart.model || {}) as PanelSetting}>
         <ChartDetail chart={chart} setVisible={setVisible} />
       </PanelEditContextProvider>
     </SideSheet>

@@ -35,9 +35,14 @@ const deleteChart = (uid: string): Promise<string> => {
   return ApiKit.DELETE<string>(`${ApiPath.Chart}/${uid}`);
 };
 
+const getChart = (uid: string): Promise<Chart> => {
+  return ApiKit.GET<Chart>(`${ApiPath.Chart}/${uid}`);
+};
+
 export default {
   searchCharts,
   createChart,
   updateChart,
   deleteChart,
+  getChart,
 };

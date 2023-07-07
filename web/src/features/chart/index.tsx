@@ -157,9 +157,9 @@ const ListChart: React.FC = () => {
                     },
                     {
                       title: 'Description',
-                      key: 'desc',
+                      key: 'description',
                       align: 'left',
-                      dataIndex: 'desc',
+                      dataIndex: 'description',
                     },
                     {
                       key: 'action',

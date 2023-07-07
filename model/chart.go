@@ -30,17 +30,17 @@ type Chart struct {
 
 	UID     string `json:"uid" gorm:"column:uid;index:u_idx_chart_uid,unique"`
 	Title   string `json:"title" gorm:"column:title;index:u_idx_chart_org_title,unique"`
-	Desc    string `json:"desc" gorm:"column:desc"`
+	Desc    string `json:"description" gorm:"column:desc"`
 	Version int    `json:"version" gorm:"column:version"`
 
-	Config datatypes.JSON `json:"config" gorm:"column:config"`
+	Model datatypes.JSON `json:"model" gorm:"column:model"`
 
 	IsStarred bool `json:"isStarred" gorm:"-"`
 }
 
 // ReadMeta reads metadata from config json.
 func (c *Chart) ReadMeta() {
-	json := c.Config.String()
+	json := c.Model.String()
 	c.UID = gjson.Get(json, "uid").String()
 	c.Title = gjson.Get(json, "title").String()
 	c.Desc = gjson.Get(json, "description").String()

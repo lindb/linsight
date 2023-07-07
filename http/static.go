@@ -18,23 +18,31 @@
 package http
 
 import (
-	"fmt"
 	"io/fs"
 	"net/http"
 	"path"
 
 	"github.com/gin-gonic/gin"
 	httpcommon "github.com/lindb/common/pkg/http"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight"
 	"github.com/lindb/linsight/constant"
 	httppkg "github.com/lindb/linsight/pkg/http"
+	"github.com/lindb/linsight/pkg/util"
 )
+
+// for testing
+var (
+	fsSubFn = fs.Sub
+)
+
+var httpLogger = logger.GetLogger("HTTP", "Static")
 
 // handleStatic handles static resource request.
 func handleStatic(e *gin.Engine) {
 	// server static file
-	staticFS, err := fs.Sub(linsight.StaticFS, "web/static")
+	staticFS, err := fsSubFn(linsight.StaticFS, "web/static")
 	if err != nil {
 		panic(err)
 	} else {
@@ -49,21 +57,21 @@ func handleStatic(e *gin.Engine) {
 				}
 				if httppkg.IsLoginPage(c) {
 					// check if use already signed
-					_, isSigned := c.Get(constant.LinSightSigned)
-					if isSigned {
+					signedUser := util.GetUser(c.Request.Context())
+					if signedUser != nil {
 						httpcommon.Redirect(c, constant.HomePage)
 						c.Abort()
 						return
 					}
 				}
-				file, err := httpFS.Open(path.Join(urlPrefix, c.Request.URL.Path))
+				filePath := path.Join(urlPrefix, c.Request.URL.Path)
+				file, err := httpFS.Open(filePath)
 				if err == nil {
 					_ = file.Close()
 					fileserver.ServeHTTP(c.Writer, c.Request)
 					c.Abort()
 				} else {
-					// FIXME: add log
-					fmt.Println(err)
+					httpLogger.Error("static resource not found", logger.String("resource", filePath), logger.Error(err))
 				}
 			}
 		}

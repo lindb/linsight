@@ -39,6 +39,10 @@ type ChartService interface {
 	UpdateChart(ctx context.Context, chart *model.Chart) error
 	// DeleteChartByUID deletes the chart by uid.
 	DeleteChartByUID(ctx context.Context, uid string) error
+	// GetChartByUID returns the chart by uid.
+	GetChartByUID(ctx context.Context, uid string) (*model.Chart, error)
+	// LinkChartsToDashboard links charts to specific dashboard.
+	LinkChartsToDashboard(ctx context.Context, dashboard *model.Dashboard) error
 }
 
 // chartService implements ChartService interface.
@@ -70,7 +74,7 @@ func (srv *chartService) CreateChart(ctx context.Context, chart *model.Chart) (s
 
 // UpdateChart updates the chart by uid.
 func (srv *chartService) UpdateChart(ctx context.Context, chart *model.Chart) error {
-	chartFromDB, err := srv.getChartByUID(ctx, chart.UID)
+	chartFromDB, err := srv.GetChartByUID(ctx, chart.UID)
 	if err != nil {
 		return err
 	}
@@ -78,7 +82,7 @@ func (srv *chartService) UpdateChart(ctx context.Context, chart *model.Chart) er
 	// update chart
 	chartFromDB.Title = chart.Title
 	chartFromDB.Desc = chart.Desc
-	chartFromDB.Config = chart.Config
+	chartFromDB.Model = chart.Model
 	chartFromDB.UpdatedBy = user.User.ID
 	return srv.db.Update(chartFromDB, "uid=? and org_id=?", chart.UID, user.Org.ID)
 }
@@ -130,12 +134,47 @@ func (srv *chartService) DeleteChartByUID(ctx context.Context, uid string) error
 	})
 }
 
-// getChartByUID returns the chart by uid.
-func (srv *chartService) getChartByUID(ctx context.Context, uid string) (*model.Chart, error) {
+// GetChartByUID returns the chart by uid.
+func (srv *chartService) GetChartByUID(ctx context.Context, uid string) (*model.Chart, error) {
 	rs := &model.Chart{}
 	signedUser := util.GetUser(ctx)
 	if err := srv.db.Get(rs, "uid=? and org_id=?", uid, signedUser.Org.ID); err != nil {
 		return nil, err
 	}
 	return rs, nil
+}
+
+// LinkChartsToDashboard links charts to specific dashboard.
+func (srv *chartService) LinkChartsToDashboard(ctx context.Context, dashboard *model.Dashboard) error {
+	chartUIDs, err := dashboard.GetCharts()
+	if err != nil {
+		return err
+	}
+	signedUser := util.GetUser(ctx)
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		dashboardUID := dashboard.UID
+		// 1. delete current chart links
+		if err := tx.Delete(&model.Link{},
+			"org_id=? and kind=? and target_uid=?",
+			signedUser.Org.ID, model.DashboardLink, dashboardUID); err != nil {
+			return err
+		}
+		// 2. add new links
+		for _, chartUID := range chartUIDs {
+			// create new link
+			if err := tx.Create(&model.Link{
+				OrgID:     signedUser.Org.ID,
+				SourceUID: chartUID,
+				TargetUID: dashboardUID,
+				Kind:      model.DashboardLink,
+				BaseModel: model.BaseModel{
+					CreatedBy: signedUser.User.ID,
+					UpdatedBy: signedUser.User.ID,
+				},
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
