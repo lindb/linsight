@@ -41,7 +41,7 @@ const ViewPanel: React.FC = () => {
   }
   return (
     <div className="linsight-feature" style={{ height: '90vh' }}>
-      <Panel panel={panel} />
+      <Panel panel={panel} menu />
     </div>
   );
 };
