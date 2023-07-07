@@ -54,11 +54,12 @@ const PanelHeader = forwardRef(
       panel: PanelSetting;
       isStatic?: boolean;
       isLoading: boolean;
+      menu?: boolean;
       error: any;
     },
     ref
   ) => {
-    const { panel, isLoading, error, isStatic } = props;
+    const { panel, isLoading, error, isStatic, menu } = props;
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [menuVisible, setMenuVisible] = useState(false);
@@ -86,53 +87,55 @@ const PanelHeader = forwardRef(
           )}
         </div>
         <SimpleStatusTip isLoading={isLoading} error={error} />
-        <Dropdown
-          render={
-            <Dropdown.Menu>
-              <Dropdown.Item
-                icon={<Icon icon="eye" />}
-                onClick={() => {
-                  searchParams.set('panel', `${panel.id}`);
-                  navigate({ pathname: '/dashboard/panel/view', search: searchParams.toString() });
-                }}>
-                View
-              </Dropdown.Item>
-              {!isStatic && (
+        {menu && (
+          <Dropdown
+            render={
+              <Dropdown.Menu>
                 <Dropdown.Item
-                  icon={<IconEdit2Stroked />}
+                  icon={<Icon icon="eye" />}
                   onClick={() => {
                     searchParams.set('panel', `${panel.id}`);
-                    navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
+                    navigate({ pathname: '/dashboard/panel/view', search: searchParams.toString() });
                   }}>
-                  Edit
+                  View
                 </Dropdown.Item>
-              )}
-              {!isStatic && (
-                <Dropdown.Item icon={<IconCopyStroked />} onClick={() => DashboardStore.clonePanel(panel)}>
-                  Clone
-                </Dropdown.Item>
-              )}
-              <Dropdown.Item
-                icon={<Icon icon="explore" />}
-                onClick={() => {
-                  searchParams.set('left', JSON.stringify(pick(panel, ['datasource', 'targets'])));
-                  navigate({ pathname: '/explore', search: searchParams.toString() });
-                }}>
-                Explore
-              </Dropdown.Item>
-              <Dropdown.Divider />
-              {!isStatic && (
+                {!isStatic && (
+                  <Dropdown.Item
+                    icon={<IconEdit2Stroked />}
+                    onClick={() => {
+                      searchParams.set('panel', `${panel.id}`);
+                      navigate({ pathname: '/dashboard/panel/edit', search: searchParams.toString() });
+                    }}>
+                    Edit
+                  </Dropdown.Item>
+                )}
+                {!isStatic && (
+                  <Dropdown.Item icon={<IconCopyStroked />} onClick={() => DashboardStore.clonePanel(panel)}>
+                    Clone
+                  </Dropdown.Item>
+                )}
                 <Dropdown.Item
-                  icon={<IconDeleteStroked />}
-                  type="danger"
-                  onClick={() => DashboardStore.deletePanel(panel)}>
-                  Remove
+                  icon={<Icon icon="explore" />}
+                  onClick={() => {
+                    searchParams.set('left', JSON.stringify(pick(panel, ['datasource', 'targets'])));
+                    navigate({ pathname: '/explore', search: searchParams.toString() });
+                  }}>
+                  Explore
                 </Dropdown.Item>
-              )}
-            </Dropdown.Menu>
-          }>
-          <IconMenu className="btn" style={{ display: menuVisible ? 'block' : 'none' }} />
-        </Dropdown>
+                <Dropdown.Divider />
+                {!isStatic && (
+                  <Dropdown.Item
+                    icon={<IconDeleteStroked />}
+                    type="danger"
+                    onClick={() => DashboardStore.deletePanel(panel)}>
+                    Remove
+                  </Dropdown.Item>
+                )}
+              </Dropdown.Menu>
+            }>
+            <IconMenu className="btn" style={{ display: menuVisible ? 'block' : 'none' }} />
+          </Dropdown>
+        )}
       </div>
     );
   }
@@ -194,10 +197,14 @@ const PanelVisualization: React.FC<{ panel: PanelSetting; plugin: VisualizationP
   return <Visualization datasets={getDatasets()} theme={theme} panel={panelCfg} />;
 };
 
-const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: boolean; className?: string }> = (
-  props
-) => {
-  const { panel, shortcutKey, isStatic, className } = props;
+const Panel: React.FC<{
+  panel: PanelSetting;
+  shortcutKey?: boolean;
+  isStatic?: boolean;
+  className?: string;
+  menu?: boolean;
+}> = (props) => {
+  const { panel, shortcutKey, isStatic, className, menu } = props;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
@@ -314,7 +321,9 @@ const Panel: React.FC<{ panel: PanelSetting; shortcutKey?: boolean; isStatic?: b
       <LazyLoad>
         <Card
           className={panelCls}
-          header={<PanelHeader ref={header} panel={panel} isStatic={isStatic} isLoading={loading} error={error} />}>
+          header={
+            <PanelHeader ref={header} panel={panel} isStatic={isStatic} isLoading={loading} error={error} menu={menu} />
+          }>
           {renderContent()}
         </Card>
       </LazyLoad>
