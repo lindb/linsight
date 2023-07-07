@@ -192,6 +192,8 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.chartAPI.UpdateChart)...)
 	router.DELETE("/charts/:uid",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.chartAPI.DeleteChartByUID)...)
+	router.GET("/charts/:uid",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.GetChartByUID)...)
 	router.GET("/charts",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.SearchCharts)...)
 

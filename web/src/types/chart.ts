@@ -20,9 +20,9 @@ import { PanelSetting } from '@src/types';
 export interface Chart {
   uid?: string;
   title?: string;
-  desc?: string;
+  description?: string;
+  model?: PanelSetting;
   isStarred?: boolean;
-  config?: PanelSetting;
   variables?: any[];
 }
 

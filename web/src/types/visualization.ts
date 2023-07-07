@@ -67,6 +67,7 @@ export interface PanelSetting {
   fieldConfig?: Record<string, FieldConfig>;
   panels?: PanelSetting[];
   gridPos?: GridPos;
+  libraryPanel?: { name?: string; uid?: string };
 }
 
 export interface FieldConfig<VOptions = any> {

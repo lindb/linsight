@@ -30,6 +30,11 @@ import (
 	"github.com/lindb/linsight/config"
 )
 
+// for testing.
+var (
+	listenFn = net.Listen
+)
+
 // Server represents http server based on gin.
 type Server struct {
 	engine *gin.Engine
@@ -75,7 +80,7 @@ func (s *Server) initialize() {
 // Run runs http server.
 func (s *Server) Run() error {
 	s.server.Handler = s.engine
-	listen, err := net.Listen("tcp", s.addr)
+	listen, err := listenFn("tcp", s.addr)
 	if err != nil {
 		return err
 	}

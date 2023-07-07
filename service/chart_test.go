@@ -23,6 +23,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/datatypes"
 
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
@@ -201,13 +202,12 @@ func TestChartService_DeleteChartByUID(t *testing.T) {
 	})
 }
 
-func TestChartService_getChartByUID(t *testing.T) {
+func TestChartService_GetChartByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srvINF := NewChartService(mockDB)
-	srv := srvINF.(*chartService)
+	srv := NewChartService(mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -233,7 +233,85 @@ func TestChartService_getChartByUID(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.getChartByUID(ctx, "1234")
+			_, err := srv.GetChartByUID(ctx, "1234")
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestChartService_LinkChartsToDashboard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	srv := NewChartService(mockDB)
+	cases := []struct {
+		name      string
+		dashboard *model.Dashboard
+		prepare   func()
+		wantErr   bool
+	}{
+		{
+			name: "get chart ids from dashboard failure",
+			dashboard: &model.Dashboard{
+				Config: datatypes.JSON(`{"panels":[{"libraryPanel":{}}]}`),
+			},
+			prepare: func() {},
+			wantErr: true,
+		},
+		{
+			name: "delete old links failure",
+			dashboard: &model.Dashboard{
+				UID:    "123",
+				Config: datatypes.JSON(`{"panels":[{"libraryPanel":{"uid":"abc"}}]}`),
+			},
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"org_id=? and kind=? and target_uid=?",
+					int64(12), model.DashboardLink, "123").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "create links failure",
+			dashboard: &model.Dashboard{
+				UID:    "123",
+				Config: datatypes.JSON(`{"panels":[{"libraryPanel":{"uid":"abc"}}]}`),
+			},
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"org_id=? and kind=? and target_uid=?",
+					int64(12), model.DashboardLink, "123").Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "create links successfully",
+			dashboard: &model.Dashboard{
+				UID:    "123",
+				Config: datatypes.JSON(`{"panels":[{"libraryPanel":{"uid":"abc"}}]}`),
+			},
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"org_id=? and kind=? and target_uid=?",
+					int64(12), model.DashboardLink, "123").Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.LinkChartsToDashboard(ctx, tt.dashboard)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

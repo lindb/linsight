@@ -15,27 +15,34 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package model
+package http
 
 import (
+	"fmt"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gorm.io/datatypes"
+
+	"github.com/lindb/linsight/config"
 )
 
-func TestChart_ReadMeta(t *testing.T) {
-	chart := &Chart{
-		Model: datatypes.JSON(`{"title": "John", "description": "desc"}`),
+func TestHTTPServce(t *testing.T) {
+	defer func() {
+		listenFn = net.Listen
+	}()
+	s := NewServer(&config.HTTP{Port: 19200})
+	assert.NotNil(t, s.GetEngine())
+	listenFn = func(_, _ string) (net.Listener, error) {
+		return nil, fmt.Errorf("err")
 	}
-	chart.ReadMeta()
-	assert.Equal(t, "John", chart.Title)
-	assert.Equal(t, "desc", chart.Desc)
-	assert.Empty(t, chart.UID)
+	assert.Error(t, s.Run())
 
-	chart = &Chart{
-		Model: datatypes.JSON(`{"uid": "John", "description": "desc"}`),
+	listenFn = func(_, _ string) (net.Listener, error) {
+		return nil, nil
 	}
-	chart.ReadMeta()
-	assert.Equal(t, "John", chart.UID)
+	assert.Panics(t, func() {
+		_ = s.Run()
+		assert.True(t, false)
+	})
 }

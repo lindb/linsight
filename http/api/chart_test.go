@@ -273,3 +273,53 @@ func TestChartAPI_DeleteChartByUID(t *testing.T) {
 		})
 	}
 }
+
+func TestChartAPI_GetChartByUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	chartSrv := service.NewMockChartService(ctrl)
+	r := gin.New()
+	api := NewChartAPI(&deps.API{
+		ChartSrv: chartSrv,
+	})
+	r.GET("/chart/:uid", api.GetChartByUID)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "get chart failure",
+			prepare: func() {
+				chartSrv.EXPECT().GetChartByUID(gomock.Any(), "1234").Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "get chart successfully",
+			prepare: func() {
+				chartSrv.EXPECT().GetChartByUID(gomock.Any(), "1234").Return(&model.Chart{}, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/chart/1234", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}

@@ -17,11 +17,9 @@ under the License.
 */
 import { Button, Input, Modal, Radio, RadioGroup, Select, Typography } from '@douyinfe/semi-ui';
 import { IconGridStroked, IconSearchStroked } from '@douyinfe/semi-icons';
-import React, { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { DashboardSrv } from '@src/services';
+import React, { useRef, useState } from 'react';
 import { ChartPendingAddStore } from '@src/stores';
-import { Chart, PanelSetting } from '@src/types';
+import { Chart } from '@src/types';
 import { useNavigate } from 'react-router-dom';
 const { Title, Text } = Typography;
 
@@ -83,7 +81,7 @@ const AddToDashboard: React.FC<{
                   ChartPendingAddStore.dashboadTitle = title.current;
                 }
                 setVisible(false);
-                navigate({ pathname: '/dashboard' });
+                navigate({ pathname: '/dashboard/new' });
               }}>
               Open Dashboard
             </Button>

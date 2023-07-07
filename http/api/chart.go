@@ -41,14 +41,14 @@ func NewChartAPI(deps *depspkg.API) *ChartAPI {
 }
 
 // CreateChart creates a new chart.
-func (api *ChartAPI) CreateChart(c *gin.Context) { //nolint:dupl
+func (api *ChartAPI) CreateChart(c *gin.Context) {
 	var chartJSON datatypes.JSON
 	if err := c.ShouldBind(&chartJSON); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	chart := &model.Chart{
-		Config: chartJSON,
+		Model: chartJSON,
 	}
 	chart.ReadMeta()
 	ctx := c.Request.Context()
@@ -68,7 +68,7 @@ func (api *ChartAPI) UpdateChart(c *gin.Context) {
 		return
 	}
 	chart := &model.Chart{
-		Config: chartJSON,
+		Model: chartJSON,
 	}
 	chart.ReadMeta()
 	ctx := c.Request.Context()
@@ -106,4 +106,17 @@ func (api *ChartAPI) DeleteChartByUID(c *gin.Context) {
 		return
 	}
 	httppkg.OK(c, "Chart deleted")
+}
+
+// GetChartByUID returns chart by given uid.
+func (api *ChartAPI) GetChartByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	chart, err := api.deps.ChartSrv.GetChartByUID(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, gin.H{
+		"model": chart.Model,
+	})
 }

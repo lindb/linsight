@@ -50,10 +50,11 @@ const AddToCharts = forwardRef((_props: {}, ref) => {
       setSubmitting(false);
     }
   };
+
   return (
     <>
       <Button type="tertiary" onClick={() => setVisible(true)} icon={<Icon icon="repo" />}>
-        Add to chart
+        Save as chart
       </Button>
       <Modal
         size="medium"

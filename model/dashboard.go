@@ -19,6 +19,7 @@ package model
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/lindb/common/pkg/encoding"
@@ -84,7 +85,7 @@ type Dashboard struct {
 
 	UID     string `json:"uid" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
 	Title   string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
-	Desc    string `json:"desc" gorm:"column:desc"`
+	Desc    string `json:"description" gorm:"column:desc"`
 	Version int    `gorm:"column:version"`
 
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
@@ -99,6 +100,40 @@ func (d *Dashboard) ReadMeta() {
 	d.Title = gjson.Get(jsonData, "title").String()
 	d.Desc = gjson.Get(jsonData, "description").String()
 	d.UID = gjson.Get(jsonData, "uid").String()
+}
+
+// GetCharts returns chart uid list from dashboard config.
+func (d *Dashboard) GetCharts() (chartUIDs []string, err error) {
+	jsonData := d.Config.String()
+	panelsJSON := gjson.Get(jsonData, "panels")
+	return findCharts(&panelsJSON)
+}
+
+// findCharts finds chart uid list from panels' json.
+func findCharts(panelsJSON *gjson.Result) (chartUIDs []string, err error) {
+	if !panelsJSON.IsArray() {
+		return
+	}
+	panels := panelsJSON.Array()
+	for _, panel := range panels {
+		panelType := panel.Get("type").String()
+		if panelType == "row" {
+			panelsOfRow := panel.Get("panels")
+			chartsOfRow, err := findCharts(&panelsOfRow)
+			if err != nil {
+				return nil, err
+			}
+			chartUIDs = append(chartUIDs, chartsOfRow...)
+			continue
+		}
+
+		uid := panel.Get("libraryPanel.uid").String()
+		if uid == "" {
+			return nil, fmt.Errorf("miss chart uid")
+		}
+		chartUIDs = append(chartUIDs, uid)
+	}
+	return
 }
 
 // SearchDashboardRequest represents search dashboard request params.

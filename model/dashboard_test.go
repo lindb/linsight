@@ -62,3 +62,75 @@ func TestDashboard_Permission_JSOM(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, PermissionUnknown, p)
 }
+
+func TestDashboard_GetCharts(t *testing.T) {
+	cases := []struct {
+		name      string
+		dashboard *Dashboard
+		wantErr   bool
+		chartIDs  []string
+	}{
+		{
+			name: "panels not json array",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":"abc"}`),
+			},
+			wantErr: false,
+		},
+		{
+			name: "panels empty",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":[]}`),
+			},
+			wantErr: false,
+		},
+		{
+			name: "not chart uid",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":[{"libraryPanel":{}}]}`),
+			},
+			wantErr: true,
+		},
+		{
+			name: "get chart uid",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":[{"libraryPanel":{"uid":"abc"}}]}`),
+			},
+			wantErr:  false,
+			chartIDs: []string{"abc"},
+		},
+		{
+			name: "row panel no panels",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":[{"type":"row"}]}`),
+			},
+			wantErr: false,
+		},
+		{
+			name: "row panel miss chart id",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":[{"type":"row","panels":[{"libraryPanel":{}}]}]}`),
+			},
+			wantErr: true,
+		},
+		{
+			name: "row panel miss chart id",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":[{"type":"row","panels":[{"libraryPanel":{"uid":"abc"}}]}]}`),
+			},
+			wantErr:  false,
+			chartIDs: []string{"abc"},
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			chartIDs, err := tt.dashboard.GetCharts()
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+			assert.Equal(t, tt.chartIDs, chartIDs)
+		})
+	}
+}
