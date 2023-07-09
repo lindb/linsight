@@ -323,3 +323,53 @@ func TestChartAPI_GetChartByUID(t *testing.T) {
 		})
 	}
 }
+
+func TestChartAPI_GetDashboardsByChartsUID(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	dashboardSrv := service.NewMockDashboardService(ctrl)
+	r := gin.New()
+	api := NewChartAPI(&deps.API{
+		DashboardSrv: dashboardSrv,
+	})
+	r.GET("/chart/:uid/dashboards", api.GetDashboardsByChartUID)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "get dashboards failure",
+			prepare: func() {
+				dashboardSrv.EXPECT().GetDashboardsByChartUID(gomock.Any(), "1234").Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "get dashboards successfully",
+			prepare: func() {
+				dashboardSrv.EXPECT().GetDashboardsByChartUID(gomock.Any(), "1234").Return(nil, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/chart/1234/dashboards", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}

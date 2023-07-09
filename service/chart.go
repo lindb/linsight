@@ -32,7 +32,7 @@ import (
 // ChartService represents chart repo manager interface.
 type ChartService interface {
 	// SearchCharts searches the charts by given params.
-	SearchCharts(ctx context.Context, req *model.SearchChartRequest) (rs []model.Chart, total int64, err error)
+	SearchCharts(ctx context.Context, req *model.SearchChartRequest) (rs []model.ChartInfo, total int64, err error)
 	// CreateChart creates a chart.
 	CreateChart(ctx context.Context, chart *model.Chart) (string, error)
 	// UpdateChart updates the chart by uid.
@@ -88,27 +88,24 @@ func (srv *chartService) UpdateChart(ctx context.Context, chart *model.Chart) er
 }
 
 // SearchCharts searches the chart by given params.
-func (srv *chartService) SearchCharts(ctx context.Context, //nolint:dupl
+func (srv *chartService) SearchCharts(ctx context.Context,
 	req *model.SearchChartRequest,
-) (rs []model.Chart, total int64, err error) {
+) (rs []model.ChartInfo, total int64, err error) {
 	conditions := []string{"org_id=?"}
 	signedUser := util.GetUser(ctx)
 	params := []any{signedUser.Org.ID}
+	sql := `select c.uid,c.title,c.desc,
+		(select count(1) from links l where l.source_uid=c.uid) as dashboards  
+	from charts c where c.org_id=?`
 	if req.Title != "" {
 		conditions = append(conditions, "title like ?")
 		params = append(params, req.Title+"%")
+		sql += " title like ? "
 	}
 	if req.Ownership == model.Mine {
 		conditions = append(conditions, "created_by=?")
 		params = append(params, signedUser.User.ID)
-	}
-	offset := 0
-	limit := 20
-	if req.Offset > 0 {
-		offset = req.Offset
-	}
-	if req.Limit > 0 {
-		limit = req.Limit
+		sql += " created_by=? "
 	}
 	where := strings.Join(conditions, " and ")
 	count, err := srv.db.Count(&model.Chart{}, where, params...)
@@ -118,7 +115,17 @@ func (srv *chartService) SearchCharts(ctx context.Context, //nolint:dupl
 	if count == 0 {
 		return nil, 0, nil
 	}
-	if err := srv.db.FindForPaging(&rs, offset, limit, "id desc", where, params...); err != nil {
+	offset := 0
+	limit := 20
+	if req.Offset > 0 {
+		offset = req.Offset
+	}
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+	sql += " order by c.id desc limit ? offset ?"
+	params = append(params, limit, offset)
+	if err := srv.db.ExecRaw(&rs, sql, params...); err != nil {
 		return nil, 0, err
 	}
 	return rs, count, nil

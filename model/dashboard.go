@@ -83,15 +83,15 @@ type Dashboard struct {
 
 	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
 
-	UID     string `json:"uid" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
+	UID     string `json:"uid,omitempty" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
 	Title   string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
-	Desc    string `json:"description" gorm:"column:desc"`
-	Version int    `gorm:"column:version"`
+	Desc    string `json:"description,omitempty" gorm:"column:desc"`
+	Version int    `json:"version,omitempty" gorm:"column:version"`
 
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
 
 	// FIXME: need remove
-	IsStarred bool `json:"isStarred" gorm:"-"`
+	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
 }
 
 // ReadMeta reads dashboard metadata from json data.

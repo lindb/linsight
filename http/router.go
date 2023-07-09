@@ -196,6 +196,8 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.GetChartByUID)...)
 	router.GET("/charts",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.SearchCharts)...)
+	router.GET("/charts/:uid/dashboards",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.GetDashboardsByChartUID)...)
 
 	router.PUT("/data/query",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceQueryAPI.DataQuery)...)

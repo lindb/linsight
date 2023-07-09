@@ -120,3 +120,14 @@ func (api *ChartAPI) GetChartByUID(c *gin.Context) {
 		"model": chart.Model,
 	})
 }
+
+// GetDashboardsByChartUID returns dashboards by chart.
+func (api *ChartAPI) GetDashboardsByChartUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	dashboards, err := api.deps.DashboardSrv.GetDashboardsByChartUID(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, dashboards)
+}

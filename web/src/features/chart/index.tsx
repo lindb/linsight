@@ -42,6 +42,7 @@ import { Chart } from '@src/types';
 import './chart.scss';
 import ChartDetailModal from './ChartDetail';
 import { ApiKit } from '@src/utils';
+import ListDashboardByChart from './ListDashboardByChart';
 const { Text } = Typography;
 
 const ListChart: React.FC = () => {
@@ -50,6 +51,7 @@ const ListChart: React.FC = () => {
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
   const [visible, setVisible] = useState(false);
+  const [dashboardVisible, setDashboardVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [chartSelected, setChartSelected] = useState(false);
@@ -63,6 +65,11 @@ const ListChart: React.FC = () => {
   return (
     <>
       <ChartDetailModal visible={visible} setVisible={setVisible} chart={currentChart.current || {}} />
+      <ListDashboardByChart
+        visible={dashboardVisible}
+        setVisible={setDashboardVisible}
+        chartUid={currentChart.current?.uid || ''}
+      />
       <Card className="linsight-feature" bodyStyle={{ padding: 0 }}>
         <div style={{ margin: 16, display: 'flex', gap: 8 }}>
           <TagInput prefix={<IconSearchStroked />} placeholder="Filter charts" defaultValue={['team:monitor']} />
@@ -147,7 +154,7 @@ const ListChart: React.FC = () => {
                               link
                               onClick={() => {
                                 currentChart.current = r;
-                                setVisible(true);
+                                setDashboardVisible(true);
                               }}>
                               {r.title}
                             </Text>
@@ -160,6 +167,26 @@ const ListChart: React.FC = () => {
                       key: 'description',
                       align: 'left',
                       dataIndex: 'description',
+                    },
+                    {
+                      title: 'Dashboards',
+                      key: 'dashboards',
+                      align: 'left',
+                      dataIndex: 'dashboards',
+                      render: (_text: any, r: any, _index: any) => {
+                        return (
+                          <>
+                            <Text
+                              link
+                              onClick={() => {
+                                currentChart.current = r;
+                                setDashboardVisible(true);
+                              }}>
+                              {r.dashboards}
+                            </Text>
+                          </>
+                        );
+                      },
                     },
                     {
                       key: 'action',
