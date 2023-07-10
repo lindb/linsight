@@ -32,6 +32,7 @@ import {
   Typography,
   Dropdown,
   Modal,
+  Tag,
 } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconSearchStroked, IconHandle, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -175,16 +176,15 @@ const ListChart: React.FC = () => {
                       dataIndex: 'dashboards',
                       render: (_text: any, r: any, _index: any) => {
                         return (
-                          <>
-                            <Text
-                              link
-                              onClick={() => {
-                                currentChart.current = r;
-                                setDashboardVisible(true);
-                              }}>
-                              {r.dashboards}
-                            </Text>
-                          </>
+                          <Tag
+                            style={{ cursor: 'pointer' }}
+                            size="large"
+                            onClick={() => {
+                              currentChart.current = r;
+                              setDashboardVisible(true);
+                            }}>
+                            {r.dashboards}
+                          </Tag>
                         );
                       },
                     },

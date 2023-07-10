@@ -42,9 +42,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import classNames from 'classnames';
 import { get, isEmpty, pick, cloneDeep, isArray, omit, has } from 'lodash-es';
-import { ApiKit, DataSetKit, ObjectKit } from '@src/utils';
+import { ApiKit, ChartKit, DataSetKit, ObjectKit } from '@src/utils';
 import './panel.scss';
-import { PanelVisualizationOptions } from '@src/constants';
+import { ChartPropsKey, PanelVisualizationOptions } from '@src/constants';
 import { ChartSrv } from '@src/services';
 
 const { Text } = Typography;
@@ -123,7 +123,7 @@ const PanelHeader = forwardRef(
                   }}>
                   Explore
                 </Dropdown.Item>
-                {!has(panel, 'libraryPanel.uid') && (
+                {!has(panel, ChartPropsKey) && (
                   <Dropdown.Item
                     icon={<Icon icon="repo" />}
                     onClick={async () => {
@@ -353,7 +353,7 @@ const ViewChartPanel: React.FC<{
   menu?: boolean;
 }> = (props) => {
   const { panel } = props;
-  const chartUID = get(panel, 'libraryPanel.uid', '');
+  const chartUID = get(panel, ChartPropsKey, '');
   const { result, loading } = useRequest(['load_chart_by_uid', chartUID], () => {
     return ChartSrv.getChart(chartUID);
   });
@@ -363,7 +363,7 @@ const ViewChartPanel: React.FC<{
     return null;
   }
 
-  return <ViewPanel panel={ObjectKit.merge(omit(result.model, ['id', 'gridPos']), panel)} {...omit(props, 'panel')} />;
+  return <ViewPanel panel={ObjectKit.merge(ChartKit.getChartConfig(result), panel)} {...omit(props, 'panel')} />;
 };
 
 const Panel: React.FC<{
@@ -375,7 +375,7 @@ const Panel: React.FC<{
 }> = (props) => {
   const { panel } = props;
   const renderContent = () => {
-    const chartUID = get(panel, 'libraryPanel.uid', '');
+    const chartUID = get(panel, ChartPropsKey, '');
     if (isEmpty(chartUID)) {
       return <ViewPanel {...props} />;
     }

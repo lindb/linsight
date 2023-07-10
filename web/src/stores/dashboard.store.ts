@@ -16,7 +16,14 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Notification } from '@src/components';
-import { DefaultColumns, PanelGridPos, RowPanelType, VisualizationAddPanelType } from '@src/constants';
+import {
+  ChartPropsKey,
+  DefaultColumns,
+  PanelGridPos,
+  PanelPropsForChart,
+  RowPanelType,
+  VisualizationAddPanelType,
+} from '@src/constants';
 import { DashboardSrv } from '@src/services';
 import { Dashboard, GridPos, PanelSetting, Variable, Tracker, Chart } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
@@ -288,9 +295,14 @@ class DashboardStore {
       const dashboard = ObjectKit.removeUnderscoreProperties(toJS(this.dashboard));
       this.sortPanels();
       const panels = get(dashboard, 'panels', []);
-      this.forEachAllPanels(panels, (panel: PanelSetting) => {
+      this.forEachAllPanels(panels, (panel: PanelSetting): PanelSetting => {
         // only keep x/y/w/h for grid
         panel.gridPos = pick(panel.gridPos, PanelGridPos) as any;
+        if (has(panel, ChartPropsKey)) {
+          // if chart link, just keep(title,desc,grid,chart)
+          panel = pick(panel, PanelPropsForChart);
+        }
+        return panel;
       });
       // FIXME: remove unused field
       if (isEmpty(this.dashboard.uid)) {
@@ -312,12 +324,12 @@ class DashboardStore {
   /**
    * include panels of row
    */
-  private forEachAllPanels(panels: PanelSetting[], handle: (panel: PanelSetting) => void) {
+  private forEachAllPanels(panels: PanelSetting[], handle: (panel: PanelSetting) => PanelSetting) {
     if (isEmpty(panels)) {
       return;
     }
-    panels.forEach((panel: PanelSetting) => {
-      handle(panel);
+    panels.forEach((panel: PanelSetting, index: number) => {
+      panels[index] = handle(panel);
       if (panel.type === RowPanelType) {
         this.forEachAllPanels(panel.panels || [], handle);
       }
@@ -329,17 +341,19 @@ class DashboardStore {
     const panels = this.getPanels();
     // first get max panel id
     let maxPanelId = 0;
-    this.forEachAllPanels(panels, (panel: PanelSetting) => {
+    this.forEachAllPanels(panels, (panel: PanelSetting): PanelSetting => {
       maxPanelId = Math.max(maxPanelId, panel.id ?? 0);
+      return panel;
     });
     this.panelSeq = maxPanelId;
     // set panel id if not set
-    this.forEachAllPanels(panels, (panel: PanelSetting) => {
+    this.forEachAllPanels(panels, (panel: PanelSetting): PanelSetting => {
       if (!panel.id || panel.id < 0) {
         panel.id = this.assignPanelId();
       }
       // NOTE: set grid i here
       this.setPanelGridId(panel);
+      return panel;
     });
     this.dashboardTracker.setNewVal(this.dashboard);
   }

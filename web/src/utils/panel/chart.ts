@@ -15,17 +15,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ThresholdMode, Thresholds } from '@src/types';
+import { Chart } from '@src/types';
+import { omit } from 'lodash-es';
 
-export const DefaultThresholds: Thresholds = {
-  mode: ThresholdMode.Absolute,
-  steps: [
-    { value: -Infinity, color: 'green' },
-    { value: 80, color: 'red' },
-  ],
+const getChartConfig = (chart: Chart) => {
+  return omit(chart.model, ['id', 'gridPos']);
 };
-
-export const PanelGridPos = ['x', 'y', 'w', 'h'];
-export const PanelPropsForChart = ['title', 'description', 'gridPos', 'libraryPanel'];
-export const ChartPropsKey = 'libraryPanel.uid';
-export const PanelVisualizationOptions = ['options', 'fieldConfig'];
+export default { getChartConfig };
