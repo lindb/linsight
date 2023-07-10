@@ -35,6 +35,7 @@ type Router struct {
 	loginAPI           *api.LoginAPI
 	bootAPI            *api.BootAPI
 	cmpAPI             *api.ComponentAPI
+	integrationAPI     *api.IntegerationAPI
 	orgAPI             *api.OrgAPI
 	teamAPI            *api.TeamAPI
 	userAPI            *api.UserAPI
@@ -53,6 +54,7 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		loginAPI:           api.NewLoginAPI(deps),
 		bootAPI:            api.NewBootAPI(deps),
 		cmpAPI:             api.NewComponentAPI(deps),
+		integrationAPI:     api.NewIntegrationAPI(deps),
 		orgAPI:             api.NewOrgAPI(deps),
 		userAPI:            api.NewUserAPI(deps),
 		teamAPI:            api.NewTeamAPI(deps),
@@ -73,6 +75,8 @@ func (r *Router) RegisterRouters() {
 	router.POST("/login", r.loginAPI.Login)
 	router.GET("/logout", middleware.Authenticate(r.deps), r.loginAPI.Logout)
 	router.GET("/boot", middleware.Authenticate(r.deps), r.bootAPI.Boot)
+
+	router.GET("/integrations", middleware.Authenticate(r.deps), r.integrationAPI.GetIntegrations)
 
 	router.GET("/components",
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.cmpAPI.LoadComponentTree)...)

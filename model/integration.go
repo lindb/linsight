@@ -15,29 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package model
 
-import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
-)
+// Integration represents all integrations for observability of your application or infrastructure.
+type Integration struct {
+	BaseModel
 
-type API struct {
-	Config *config.Server
-
-	OrgSrv         service.OrgService
-	UserSrv        service.UserService
-	TeamSrv        service.TeamService
-	CmpSrv         service.ComponentService
-	IntegrationSrv service.IntegrationService
-
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+	UID      string `json:"uid" gorm:"column:uid;index:u_idx_integrations_uid,unique"`
+	Category string `json:"category" gorm:"column:category"`
+	Title    string `json:"title" gorm:"column:title;index:u_idx_integrations_title,unique"`
+	Desc     string `json:"desc" gorm:"column:desc"`
+	Icon     string `json:"icon" gorm:"column:icon"`
+	DocURL   string `json:"docUrl" gorm:"column:doc_url"`
 }

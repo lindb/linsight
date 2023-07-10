@@ -15,15 +15,22 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useEffect, useRef } from 'react';
-import { Tabs, TabPane, Card, Form } from '@douyinfe/semi-ui';
+import React, { useContext, useEffect, useRef } from 'react';
+import { Tabs, TabPane, Card, Form, Typography, Select } from '@douyinfe/semi-ui';
 import { DashboardStore } from '@src/stores';
 import Variables from './components/Variables';
 import { observer } from 'mobx-react-lite';
 import { useSearchParams } from 'react-router-dom';
+import { PlatformContext } from '@src/contexts';
+import { Integration } from '@src/types';
+import { Icon } from '@src/components';
+import { find, isEmpty } from 'lodash-es';
+
+const { Text } = Typography;
 
 const GeneralForm: React.FC = observer(() => {
   const { dashboard } = DashboardStore;
+  const { boot } = useContext(PlatformContext);
   const formApi = useRef<any>();
 
   useEffect(() => {
@@ -40,6 +47,40 @@ const GeneralForm: React.FC = observer(() => {
       onValueChange={(values: any) => DashboardStore.updateDashboardProps(values)}>
       <Form.Input label="Title" field="title" />
       <Form.TextArea label="Description" field="desc" />
+      <Form.Select
+        style={{ width: 300 }}
+        label="Integration"
+        field="integration"
+        filter={(input: string, option: any) => {
+          if (isEmpty(input)) {
+            return true;
+          }
+          return option.title.toUpperCase().includes(input.toUpperCase());
+        }}
+        showClear
+        renderSelectedItem={(n: Record<string, any>) => {
+          const integration = find(boot.integrations, { uid: n.value });
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Icon icon={`${integration?.icon}`} style={{ fontSize: 20 }} />
+              <Text>{integration?.title}</Text>
+            </div>
+          );
+        }}>
+        {(boot.integrations || []).map((integration: Integration) => {
+          return (
+            <Select.Option
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              key={integration.uid}
+              value={integration.uid}
+              title={integration.title}
+              showTick={false}>
+              <Icon icon={integration.icon} style={{ fontSize: 20 }} />
+              <Text>{integration.title}</Text>
+            </Select.Option>
+          );
+        })}
+      </Form.Select>
     </Form>
   );
 });

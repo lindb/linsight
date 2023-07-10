@@ -48,14 +48,16 @@ type HTTP struct {
 }
 
 type Server struct {
-	Database *Database       `envPrefix:"LINSIGHT_DATABASE_" toml:"database"`
-	HTTP     *HTTP           `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
-	Cookie   *Cookie         `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
-	Logger   *logger.Setting `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
+	Migration bool            `envPrefix:"LINSIGHT_MIGRATION" toml:"migration"`
+	Database  *Database       `envPrefix:"LINSIGHT_DATABASE_" toml:"database"`
+	HTTP      *HTTP           `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
+	Cookie    *Cookie         `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
+	Logger    *logger.Setting `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
 }
 
 func NewDefaultServer() *Server {
 	return &Server{
+		Migration: true,
 		Database: &Database{
 			Type:  "sqlite",
 			DSN:   "linsight.db",

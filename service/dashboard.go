@@ -91,6 +91,7 @@ func (srv *dashboardService) UpdateDashboard(ctx context.Context, dashboard *mod
 	dashboardFromDB.Title = dashboard.Title
 	dashboardFromDB.Desc = dashboard.Desc
 	dashboardFromDB.Config = dashboard.Config
+	dashboardFromDB.Integration = dashboard.Integration
 	dashboardFromDB.UpdatedBy = userID
 	return srv.db.Update(dashboardFromDB, "uid=? and org_id=?", dashboard.UID, user.Org.ID)
 }
@@ -174,7 +175,8 @@ func (srv *dashboardService) UnstarDashboard(ctx context.Context, uid string) er
 
 // GetDashboardsByChartUID returns dashboards by chart.
 func (srv *dashboardService) GetDashboardsByChartUID(ctx context.Context, chartUID string) (rs []model.Dashboard, err error) {
-	sql := `select d.uid,d.title,d.desc from dashboards d,links l where d.uid=l.target_uid and d.org_id=? and l.source_uid=?`
+	sql := `select d.uid,d.title,d.desc,d.integration 
+	from dashboards d,links l where d.uid=l.target_uid and d.org_id=? and l.source_uid=?`
 	signedUser := util.GetUser(ctx)
 	if err := srv.db.ExecRaw(&rs, sql, signedUser.Org.ID, chartUID); err != nil {
 		return nil, err

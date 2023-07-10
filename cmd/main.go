@@ -88,6 +88,13 @@ func runServer(_ *cobra.Command, _ []string) error {
 		panic(err)
 	}
 
+	if cfg.Migration {
+		// if auto migration enabled, need do data migration
+		if err := runMigration(nil, nil); err != nil {
+			panic(err)
+		}
+	}
+
 	return run(ctx, func() {
 		db, err := dbpkg.NewDB(cfg.Database)
 		if err != nil {
@@ -117,6 +124,11 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	if err := cmpSrv.Initialize(); err != nil {
 		panic(err)
 	}
+	integrationSrv := service.NewIntegrationService(db)
+	// initialize supported integration
+	if err := integrationSrv.Initialize(); err != nil {
+		panic(err)
+	}
 	userSrv := service.NewUserService(db, orgSrv)
 	starSrv := service.NewStarService(db)
 	return &deps.API{
@@ -125,6 +137,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		UserSrv:         userSrv,
 		TeamSrv:         service.NewTeamService(db, userSrv),
 		CmpSrv:          cmpSrv,
+		IntegrationSrv:  integrationSrv,
 		AuthorizeSrv:    authorizeSrv,
 		AuthenticateSrv: service.NewAuthenticateService(userSrv, db),
 		DatasourceSrv:   service.NewDatasourceService(db),

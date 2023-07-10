@@ -39,6 +39,7 @@ export interface Dashboard {
   uid?: string;
   title?: string;
   description?: string;
+  integration?: string;
   isStarred?: boolean;
   panels?: PanelSetting[];
   templating?: Record<string, Variable>;

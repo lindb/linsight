@@ -66,6 +66,7 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(orgUser)
 	migrator.AddMigration(dbpkg.NewMigration(&model.UserToken{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Datasource{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Integration{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Star{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Preference{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Dashboard{}))

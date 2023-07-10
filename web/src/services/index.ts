@@ -21,7 +21,6 @@ export { default as ComponentSrv } from './component.service';
 export { default as OrgSrv } from './org.service';
 export { default as PlatformSrv } from './platform.service';
 export { default as MetricSrv } from './metric.service';
-export { default as APMSrv } from './apm.service';
 export { default as AlertSrv } from './alert.service';
 export { default as DashboardSrv } from './dashboard.service';
 export { default as ChartSrv } from './chart.service';
