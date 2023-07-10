@@ -64,6 +64,8 @@ type DB interface {
 	ExecRaw(out any, query string, args ...any) error
 	// RawDB returns raw gorm db.
 	RawDB() *gorm.DB
+	// Migrator returns data migrator.
+	Migrator() gorm.Migrator
 }
 
 // db implements DB interface.
@@ -243,6 +245,11 @@ func (db *db) Transaction(fc func(tx DB) error) error {
 // RawDB returns raw gorm db.
 func (db *db) RawDB() *gorm.DB {
 	return db.gdb
+}
+
+// Migrator returns data migrator.
+func (db *db) Migrator() gorm.Migrator {
+	return db.gdb.Migrator()
 }
 
 // ExecRaw executes raw sql.

@@ -43,6 +43,8 @@ type ChartService interface {
 	GetChartByUID(ctx context.Context, uid string) (*model.Chart, error)
 	// LinkChartsToDashboard links charts to specific dashboard.
 	LinkChartsToDashboard(ctx context.Context, dashboard *model.Dashboard) error
+	// UnlinkChartFromDashboard unlinks chart from specific dashboard.
+	UnlinkChartFromDashboard(ctx context.Context, chartUID, dashboardUID string) error
 }
 
 // chartService implements ChartService interface.
@@ -184,4 +186,13 @@ func (srv *chartService) LinkChartsToDashboard(ctx context.Context, dashboard *m
 		}
 		return nil
 	})
+}
+
+// UnlinkChartFromDashboard unlinks chart from specific dashboard.
+func (srv *chartService) UnlinkChartFromDashboard(ctx context.Context, chartUID, dashboardUID string) error {
+	signedUser := util.GetUser(ctx)
+	// delete current chart links
+	return srv.db.Delete(&model.Link{},
+		"org_id=? and kind=? and source_uid=? and target_uid=?",
+		signedUser.Org.ID, model.DashboardLink, chartUID, dashboardUID)
 }

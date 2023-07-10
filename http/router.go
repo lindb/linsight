@@ -198,6 +198,8 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.SearchCharts)...)
 	router.GET("/charts/:uid/dashboards",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.GetDashboardsByChartUID)...)
+	router.DELETE("/charts/:uid/dashboards/:dashboardUID",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.UnlinkChartFromDashboard)...)
 
 	router.PUT("/data/query",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceQueryAPI.DataQuery)...)

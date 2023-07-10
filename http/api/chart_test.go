@@ -373,3 +373,53 @@ func TestChartAPI_GetDashboardsByChartsUID(t *testing.T) {
 		})
 	}
 }
+
+func TestChartAPI_UnlinkChartFromDashboard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	chartSrv := service.NewMockChartService(ctrl)
+	r := gin.New()
+	api := NewChartAPI(&deps.API{
+		ChartSrv: chartSrv,
+	})
+	r.DELETE("/charts/:uid/dashboards/:dashboardUID", api.UnlinkChartFromDashboard)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		assert  func(resp *httptest.ResponseRecorder)
+	}{
+		{
+			name: "unlink failure",
+			prepare: func() {
+				chartSrv.EXPECT().UnlinkChartFromDashboard(gomock.Any(), "1234", "abc").Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			name: "unlink successfully",
+			prepare: func() {
+				chartSrv.EXPECT().UnlinkChartFromDashboard(gomock.Any(), "1234", "abc").Return(nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+			},
+		},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(_ *testing.T) {
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/charts/1234/dashboards/abc", http.NoBody)
+			req.Header.Set("content-type", "application/json")
+			resp := httptest.NewRecorder()
+			if tt.prepare != nil {
+				tt.prepare()
+			}
+			r.ServeHTTP(resp, req)
+			tt.assert(resp)
+		})
+	}
+}
