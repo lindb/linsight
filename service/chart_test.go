@@ -101,8 +101,8 @@ func TestChartService_SerachCharts(t *testing.T) {
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "org_id=? and title like ? and created_by=?",
-					gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), 10, 20).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
@@ -111,8 +111,8 @@ func TestChartService_SerachCharts(t *testing.T) {
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "org_id=? and title like ? and created_by=?",
-					gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), 10, 20).Return(nil)
 			},
 			wantErr: false,
 		},

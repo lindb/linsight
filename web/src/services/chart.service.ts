@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { ApiPath } from '@src/constants';
-import { Chart, SearchChart, SearchChartResult } from '@src/types';
+import { Chart, Dashboard, SearchChart, SearchChartResult } from '@src/types';
 import { ApiKit } from '@src/utils';
 
 const searchCharts = (req: SearchChart): Promise<SearchChartResult> => {
@@ -39,10 +39,15 @@ const getChart = (uid: string): Promise<Chart> => {
   return ApiKit.GET<Chart>(`${ApiPath.Chart}/${uid}`);
 };
 
+const getDashboardsByChart = (uid: string): Promise<Dashboard> => {
+  return ApiKit.GET<Dashboard>(`${ApiPath.Chart}/${uid}/dashboards`);
+};
+
 export default {
   searchCharts,
   createChart,
   updateChart,
   deleteChart,
   getChart,
+  getDashboardsByChart,
 };

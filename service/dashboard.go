@@ -45,6 +45,8 @@ type DashboardService interface {
 	StarDashboard(ctx context.Context, uid string) error
 	// UnstarDashboard unstars the dashboard by uid.
 	UnstarDashboard(ctx context.Context, uid string) error
+	// GetDashboardsByChartUID returns dashboards by chart.
+	GetDashboardsByChartUID(ctx context.Context, chartUID string) (rs []model.Dashboard, err error)
 }
 
 // dashboardService implements DashboardService interface.
@@ -108,7 +110,7 @@ func (srv *dashboardService) DeleteDashboardByUID(ctx context.Context, uid strin
 }
 
 // SearchDashboards searches the dashboard by given params.
-func (srv *dashboardService) SearchDashboards(ctx context.Context, //nolint:dupl
+func (srv *dashboardService) SearchDashboards(ctx context.Context,
 	req *model.SearchDashboardRequest,
 ) (rs []model.Dashboard, total int64, err error) {
 	conditions := []string{"org_id=?"}
@@ -168,6 +170,16 @@ func (srv *dashboardService) StarDashboard(ctx context.Context, uid string) erro
 // UnstarDashboard unstars the dashboard by uid.
 func (srv *dashboardService) UnstarDashboard(ctx context.Context, uid string) error {
 	return srv.toggleStar(ctx, uid, false)
+}
+
+// GetDashboardsByChartUID returns dashboards by chart.
+func (srv *dashboardService) GetDashboardsByChartUID(ctx context.Context, chartUID string) (rs []model.Dashboard, err error) {
+	sql := `select d.uid,d.title,d.desc from dashboards d,links l where d.uid=l.target_uid and d.org_id=? and l.source_uid=?`
+	signedUser := util.GetUser(ctx)
+	if err := srv.db.ExecRaw(&rs, sql, signedUser.Org.ID, chartUID); err != nil {
+		return nil, err
+	}
+	return
 }
 
 // toggleStar toggles the dashboard star.

@@ -30,12 +30,12 @@ type Chart struct {
 
 	UID     string `json:"uid" gorm:"column:uid;index:u_idx_chart_uid,unique"`
 	Title   string `json:"title" gorm:"column:title;index:u_idx_chart_org_title,unique"`
-	Desc    string `json:"description" gorm:"column:desc"`
-	Version int    `json:"version" gorm:"column:version"`
+	Desc    string `json:"description,omitempty" gorm:"column:desc"`
+	Version int    `json:"version,omitempty" gorm:"column:version"`
 
-	Model datatypes.JSON `json:"model" gorm:"column:model"`
+	Model datatypes.JSON `json:"model,omitempty" gorm:"column:model"`
 
-	IsStarred bool `json:"isStarred" gorm:"-"`
+	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
 }
 
 // ReadMeta reads metadata from config json.
@@ -52,4 +52,12 @@ type SearchChartRequest struct {
 	Title     string    `form:"title" json:"title"`
 	Ownership Ownership `form:"ownership" json:"ownership"`
 	Tags      []string  `form:"tags" json:"tags"`
+}
+
+// ChartInfo represents chart basic information without config json.
+type ChartInfo struct {
+	UID        string `json:"uid"`
+	Title      string `json:"title"`
+	Desc       string `json:"description,omitempty"`
+	Dashboards int    `json:"dashboards"`
 }

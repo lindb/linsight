@@ -22,8 +22,8 @@ import "time"
 // BaseModel represents base model information.
 type BaseModel struct {
 	ID        int64     `json:"-" gorm:"column:id"`
-	CreatedAt time.Time `json:"createdAt" gorm:"column:created_at"`
-	UpdatedAt time.Time `json:"updatedAt" gorm:"column:updated_at"`
+	CreatedAt time.Time `json:"createdAt,omitempty" gorm:"column:created_at"`
+	UpdatedAt time.Time `json:"updatedAt,omitempty" gorm:"column:updated_at"`
 
 	CreatedBy int64 `json:"-" gorm:"column:created_by"`
 	UpdatedBy int64 `json:"-" gorm:"column:updated_by"`
