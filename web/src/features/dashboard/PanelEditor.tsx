@@ -20,14 +20,16 @@ import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
 import SplitPane from 'react-split-pane';
 import { PanelSetting as PanelOptions } from '@src/types';
 import { DatasourceSelectForm, Notification, Panel, QueryEditor } from '@src/components';
-import { get } from 'lodash-es';
+import { get, isEmpty, omit } from 'lodash-es';
 import { DashboardStore, DatasourceStore } from '@src/stores';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';
 import ViewVariables from './components/ViewVariables';
 import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 import PanelSetting from './PanelSetting';
-import { DefaultVisualizationType, VisualizationAddPanelType } from '@src/constants';
+import { ChartPropsKey, DefaultVisualizationType, VisualizationAddPanelType } from '@src/constants';
+import { ChartSrv } from '@src/services';
+import { ChartKit, ObjectKit } from '@src/utils';
 
 const Split: any = SplitPane;
 const DefaultOptionsEditorSize = 350;
@@ -120,19 +122,32 @@ const EditPanel: React.FC = () => {
   const initialized = useRef(false);
 
   useEffect(() => {
-    const panel = DashboardStore.getPanel(parseInt(`${searchParams.get('panel')}`));
-    if (!panel) {
-      // if panel not exist, forward to dashboard page.
-      Notification.error('Panel not found');
-      searchParams.delete('panel');
-      navigate({ pathname: '/dashboard', search: searchParams.toString() });
-      return;
-    }
-    if (panel.type == VisualizationAddPanelType) {
-      // if panel is init add widget panel, set init panel title and type
-      DashboardStore.updatePanelConfig(panel, { title: 'Panel title', type: DefaultVisualizationType, targets: [{}] });
-    }
-    setPanel(panel);
+    const initPanel = async () => {
+      const panel = DashboardStore.getPanel(parseInt(`${searchParams.get('panel')}`));
+      if (!panel) {
+        // if panel not exist, forward to dashboard page.
+        Notification.error('Panel not found');
+        searchParams.delete('panel');
+        navigate({ pathname: '/dashboard', search: searchParams.toString() });
+        return;
+      }
+      if (panel.type == VisualizationAddPanelType) {
+        // if panel is init add widget panel, set init panel title and type
+        DashboardStore.updatePanelConfig(panel, {
+          title: 'Panel title',
+          type: DefaultVisualizationType,
+          targets: [{}],
+        });
+      }
+      const chartUID = get(panel, ChartPropsKey, '');
+      if (isEmpty(chartUID)) {
+        setPanel(panel);
+      } else {
+        const chart = await ChartSrv.getChart(chartUID);
+        setPanel(ObjectKit.merge(ChartKit.getChartConfig(chart), panel));
+      }
+    };
+    initPanel();
   }, [navigate, searchParams]);
 
   if (!panel) {

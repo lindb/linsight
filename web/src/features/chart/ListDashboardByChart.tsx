@@ -41,7 +41,7 @@ const ListDashboardByChart: React.FC<{
     <SideSheet
       className="chart-detail"
       closeOnEsc
-      title="The following dashboards using the chart" 
+      title="The following dashboards using this chart"
       motion={false}
       closable
       visible={visible}
@@ -52,7 +52,11 @@ const ListDashboardByChart: React.FC<{
         bordered
         dataSource={result}
         renderItem={(item: Dashboard) => {
-          return <List.Item key={item.uid}><Text>{item.title}</Text></List.Item>;
+          return (
+            <List.Item key={item.uid}>
+              <Text>{item.title}</Text>
+            </List.Item>
+          );
         }}
       />
     </SideSheet>
