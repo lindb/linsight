@@ -131,3 +131,14 @@ func (api *ChartAPI) GetDashboardsByChartUID(c *gin.Context) {
 	}
 	httppkg.OK(c, dashboards)
 }
+
+// UnlinkChartFromDashboard unlinks chart from dashboard.
+func (api *ChartAPI) UnlinkChartFromDashboard(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	err := api.deps.ChartSrv.UnlinkChartFromDashboard(c.Request.Context(), uid, c.Param("dashboardUID"))
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Unlinked chart from dashboard")
+}

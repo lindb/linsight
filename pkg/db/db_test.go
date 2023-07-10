@@ -142,6 +142,7 @@ func TestDB_NewDB(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, db)
 	assert.NotNil(t, db.RawDB())
+	assert.NotNil(t, db.Migrator())
 	err = db.Close()
 	assert.NoError(t, err)
 	db, err = NewDB(&config.Database{

@@ -318,3 +318,16 @@ func TestChartService_LinkChartsToDashboard(t *testing.T) {
 		})
 	}
 }
+
+func TestChartService_UnlinkChartFromDashboard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewChartService(mockDB)
+	mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and kind=? and source_uid=? and target_uid=?",
+		int64(12), model.DashboardLink, "123", "abc",
+	).Return(nil)
+	err := srv.UnlinkChartFromDashboard(ctx, "123", "abc")
+	assert.NoError(t, err)
+}
