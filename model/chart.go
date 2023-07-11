@@ -28,10 +28,11 @@ type Chart struct {
 
 	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_chart_org_title,unique"`
 
-	UID     string `json:"uid" gorm:"column:uid;index:u_idx_chart_uid,unique"`
-	Title   string `json:"title" gorm:"column:title;index:u_idx_chart_org_title,unique"`
-	Desc    string `json:"description,omitempty" gorm:"column:desc"`
-	Version int    `json:"version,omitempty" gorm:"column:version"`
+	UID         string `json:"uid" gorm:"column:uid;index:u_idx_chart_uid,unique"`
+	Title       string `json:"title" gorm:"column:title;index:u_idx_chart_org_title,unique"`
+	Desc        string `json:"description,omitempty" gorm:"column:desc"`
+	Integration string `json:"integration" gorm:"column:integration"`
+	Version     int    `json:"version,omitempty" gorm:"column:version"`
 
 	Model datatypes.JSON `json:"model,omitempty" gorm:"column:model"`
 
@@ -44,6 +45,7 @@ func (c *Chart) ReadMeta() {
 	c.UID = gjson.Get(json, "uid").String()
 	c.Title = gjson.Get(json, "title").String()
 	c.Desc = gjson.Get(json, "description").String()
+	c.Integration = gjson.Get(json, "integration").String()
 }
 
 // SearchChartRequest represents search chart request params.

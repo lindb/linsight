@@ -1,0 +1,23 @@
+[
+	{
+      "uid":"kubernetes",
+	  "category":"Kubernetes",
+	  "title":"Kubernetes",
+	  "desc":"Kubernetes",
+      "icon":"kubernetes"
+	},
+	{
+      "uid":"go_runtime",
+	  "category":"Tracing",
+	  "title":"Go runtime",
+	  "desc":"Go runtime",
+      "icon":"go"
+	},
+	{
+      "uid":"java_runtime",
+	  "category":"Tracing",
+	  "title":"Java runtime",
+	  "desc":"Java runtime",
+      "icon":"java"
+	}
+]

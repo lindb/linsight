@@ -83,10 +83,11 @@ type Dashboard struct {
 
 	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
 
-	UID     string `json:"uid,omitempty" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
-	Title   string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
-	Desc    string `json:"description,omitempty" gorm:"column:desc"`
-	Version int    `json:"version,omitempty" gorm:"column:version"`
+	UID         string `json:"uid,omitempty" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
+	Title       string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
+	Desc        string `json:"description,omitempty" gorm:"column:desc"`
+	Integration string `json:"integration" gorm:"column:integration"`
+	Version     int    `json:"version,omitempty" gorm:"column:version"`
 
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
 
@@ -100,6 +101,7 @@ func (d *Dashboard) ReadMeta() {
 	d.Title = gjson.Get(jsonData, "title").String()
 	d.Desc = gjson.Get(jsonData, "description").String()
 	d.UID = gjson.Get(jsonData, "uid").String()
+	d.Integration = gjson.Get(jsonData, "integration").String()
 }
 
 // GetCharts returns chart uid list from dashboard config.

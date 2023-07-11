@@ -37,7 +37,7 @@ import {
   IconStarStroked,
 } from '@douyinfe/semi-icons';
 import { DashboardStore } from '@src/stores';
-import { ErrorPage, Icon, Loading, Notification, TimePicker } from '@src/components';
+import { DashboardIcon, ErrorPage, Icon, Loading, Notification, TimePicker } from '@src/components';
 import Setting from './Setting';
 import PanelEditor from './PanelEditor';
 import View from './View';
@@ -328,7 +328,7 @@ const Dashboard: React.FC = () => {
         <Layout>
           <Header className="linsight-feature-header linsight-dashboard">
             <div className="title">
-              <IconGridStroked size="large" />
+              <DashboardIcon dashboard={DashboardStore.dashboard} style={{ fontSize: 20 }} />
               <Title
                 heading={6}
                 className="name"

@@ -15,29 +15,33 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package deps
+package api
 
 import (
-	"github.com/lindb/linsight/config"
-	"github.com/lindb/linsight/plugin/datasource"
-	"github.com/lindb/linsight/service"
+	"github.com/gin-gonic/gin"
+	httppkg "github.com/lindb/common/pkg/http"
+
+	depspkg "github.com/lindb/linsight/http/deps"
 )
 
-type API struct {
-	Config *config.Server
+// IntegerationAPI represents integration information related api handlers.
+type IntegerationAPI struct {
+	deps *depspkg.API
+}
 
-	OrgSrv         service.OrgService
-	UserSrv        service.UserService
-	TeamSrv        service.TeamService
-	CmpSrv         service.ComponentService
-	IntegrationSrv service.IntegrationService
+// NewIntegrationAPI creates an IntegerationAPI instance.
+func NewIntegrationAPI(deps *depspkg.API) *IntegerationAPI {
+	return &IntegerationAPI{
+		deps: deps,
+	}
+}
 
-	DatasourceSrv   service.DatasourceService
-	AuthenticateSrv service.AuthenticateService
-	AuthorizeSrv    service.AuthorizeService
-
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
-
-	DatasourceMgr datasource.Manager
+// GetIntegrations returns all supported integrations.
+func (api *IntegerationAPI) GetIntegrations(c *gin.Context) {
+	integrations, err := api.deps.IntegrationSrv.GetIntegrations(c.Request.Context())
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, integrations)
 }

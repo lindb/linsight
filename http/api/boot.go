@@ -45,9 +45,10 @@ func NewBootAPI(deps *depspkg.API) *BootAPI {
 
 // Boot gets boot information after signed in.
 func (api *BootAPI) Boot(c *gin.Context) {
-	user := util.GetUser(c.Request.Context())
+	ctx := c.Request.Context()
+	user := util.GetUser(ctx)
 	// need read data from backend
-	signedUser, err := api.deps.UserSrv.GetSignedUser(c.Request.Context(), user.User.ID)
+	signedUser, err := api.deps.UserSrv.GetSignedUser(ctx, user.User.ID)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
@@ -58,18 +59,25 @@ func (api *BootAPI) Boot(c *gin.Context) {
 	}
 	if signedUser.Org != nil {
 		// if user belong a org, get datasource/nav for org level.
-		datasources, err := api.deps.DatasourceSrv.GetDatasources(c.Request.Context())
-		if err != nil {
-			api.logger.Error("get datasources for current org fail", logger.Error(err))
+		datasources, err0 := api.deps.DatasourceSrv.GetDatasources(ctx)
+		if err0 != nil {
+			api.logger.Error("get datasources for current org fail", logger.Error(err0))
 		} else {
 			boot.Datasources = datasources
 		}
-		nav, err := api.deps.CmpSrv.GetComponentTreeByCurrentOrg(c.Request.Context())
-		if err != nil {
-			api.logger.Error("get nav tree for current org fail", logger.Error(err))
+		nav, err0 := api.deps.CmpSrv.GetComponentTreeByCurrentOrg(ctx)
+		if err0 != nil {
+			api.logger.Error("get nav tree for current org fail", logger.Error(err0))
 		} else {
 			boot.NavTree = nav
 		}
+	}
+
+	integrations, err := api.deps.IntegrationSrv.GetIntegrations(ctx)
+	if err != nil {
+		api.logger.Error("get integrations fail", logger.Error(err))
+	} else {
+		boot.Integrations = integrations
 	}
 
 	httppkg.OK(c, boot)

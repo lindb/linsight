@@ -40,9 +40,9 @@ export { default as MetricExplore } from '@src/components/explore/MetricExplore'
 export { default as AddToCharts } from '@src/components/explore/AddToCharts';
 export { default as AddPanelWidget } from '@src/components/dashboard/AddPanelWidget';
 export { default as Panel } from '@src/components/dashboard/Panel';
+export { default as DashboardIcon } from '@src/components/dashboard/DashboardIcon';
 
 export { default as StatsList } from './StatsList';
-export { default as ServiceFilter } from './ServiceFilter';
 export { default as AddToDashboard } from './AddToDashboard';
 export { default as TraceTimeline } from './TraceTimeline';
 export { default as TraceFlame } from './TraceFlame';

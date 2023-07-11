@@ -15,13 +15,8 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { IconRepositoryInst } from '@src/types';
-import React from 'react';
-
-const Icon: React.FC<{ icon: string; style?: React.CSSProperties }> = (props) => {
-  const { icon, style } = props;
-  const iconCls = IconRepositoryInst.getIconCls(icon);
-  return <i className={iconCls ? iconCls : `linsighticon ${icon}`} style={style} />;
-};
-
-export default Icon;
+.dashboard-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

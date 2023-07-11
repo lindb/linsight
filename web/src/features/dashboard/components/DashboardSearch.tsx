@@ -45,9 +45,9 @@ import { DashboardSrv } from '@src/services';
 import React, { useEffect, useState } from 'react';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { isEmpty } from 'lodash-es';
-import { StatusTip, Notification } from '@src/components';
+import { StatusTip, Notification, DashboardIcon } from '@src/components';
 import { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
-import { SearchDashboard } from '@src/types';
+import { Dashboard, SearchDashboard } from '@src/types';
 import { ApiKit } from '@src/utils';
 const { Text } = Typography;
 
@@ -82,8 +82,8 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
         width: 40,
         align: 'center',
         dataIndex: 'status',
-        render: (_text: any, r: any, _index: any) => {
-          if (r.favorite) {
+        render: (_text: any, r: Dashboard, _index: any) => {
+          if (r.isStarred) {
             return <IconStar style={{ cursor: 'pointer' }} />;
           }
           return <IconStarStroked style={{ cursor: 'pointer' }} />;
@@ -94,23 +94,23 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
         key: 'title',
         align: 'left',
         dataIndex: 'title',
-        render: (_text: any, r: any, _index: any) => {
+        render: (_text: any, r: Dashboard, _index: any) => {
           return (
-            <>
-              {r.type && <i style={{ marginRight: 4 }} className={`devicon-${r.type}-plain colored`} />}
+            <div className="dashboard-title">
+              <DashboardIcon dashboard={r} style={{ fontSize: 16 }} />
               <Text
                 link
                 onClick={() =>
                   navigate({
                     pathname: '/dashboard',
                     search: `${createSearchParams({
-                      d: r.uid,
+                      d: `${r.uid}`,
                     })}`,
                   })
                 }>
                 {r.title}
               </Text>
-            </>
+            </div>
           );
         },
       },
@@ -142,7 +142,7 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
         width: 50,
         align: 'center',
         dataIndex: 'action',
-        render: (_text: any, r: any, _index: any) => {
+        render: (_text: any, r: Dashboard, _index: any) => {
           return (
             <Dropdown
               render={
@@ -154,7 +154,7 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
                     type="danger"
                     onClick={async () => {
                       try {
-                        await DashboardSrv.deleteDashboard(r.uid);
+                        await DashboardSrv.deleteDashboard(`${r.uid}`);
                         refetch();
                         Notification.success('Dashboard deleted!');
                       } catch (err) {

@@ -19,12 +19,23 @@ import { DatasourceSetting } from './datasource';
 import { Preference, User } from './user';
 import { Chart } from 'chart.js';
 
+import DevIcon from '~devicon/devicon.json';
+
 export interface Bootdata {
   home?: string; // home page
   user: User;
   navTree: Component[];
   datasources: DatasourceSetting[];
+  integrations: Integration[];
   preference?: Preference;
+}
+
+export interface Integration {
+  uid: string;
+  title: string;
+  desc: string;
+  icon: string;
+  docUrl: string;
 }
 
 export interface Component {
@@ -54,3 +65,30 @@ export interface MouseEvent {
   index?: any;
   chart?: Chart;
 }
+
+export interface IconItem {
+  name: string;
+}
+
+class IconRepository {
+  private icons: Map<string, IconItem> = new Map<string, IconItem>();
+  constructor() {
+    (DevIcon || []).forEach((i: any) => {
+      this.icons.set(i.name, { name: i.name });
+    });
+  }
+
+  public getIcon(name: string): IconItem | undefined {
+    return this.icons.get(name);
+  }
+
+  public getIconCls(name: string, colored: boolean = true): string {
+    const item = this.icons.get(name);
+    if (!item) {
+      return '';
+    }
+    return `devicon-${item.name}-plain${colored ? ' colored' : ''}`;
+  }
+}
+
+export const IconRepositoryInst = new IconRepository();

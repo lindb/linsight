@@ -33,3 +33,6 @@ var ABACResource string
 
 //go:embed config/components.json
 var Components string
+
+//go:embed config/integrations.json
+var Integrationss string
