@@ -26,6 +26,7 @@ import (
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
 )
 
@@ -118,4 +119,64 @@ func TestIntegrationService_GetIntegrations(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, tree)
 	})
+}
+
+func TestIntegrationService_DisconnectSource(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Delete(gomock.Any(),
+		"org_id=? and source_id=? and type=?",
+		int64(12), "123", model.DashboardConnection).Return(nil)
+	srv := NewIntegrationService(mockDB)
+	assert.Nil(t, srv.DisconnectSource(ctx, "123", model.DashboardConnection))
+}
+
+func TestIntegrationService_ConnectSource(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	srv := NewIntegrationService(mockDB)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "delete old failure",
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"org_id=? and source_id=? and type=?",
+					int64(12), "abc", model.ChartConnection).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "connect successfully",
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"org_id=? and source_id=? and type=?",
+					int64(12), "abc", model.ChartConnection).Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.ConnectSource(ctx, "123", "abc", model.ChartConnection)
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
 }

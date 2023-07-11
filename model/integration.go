@@ -17,6 +17,13 @@
 
 package model
 
+type ConnectionType int
+
+const (
+	DashboardConnection ConnectionType = iota + 1
+	ChartConnection
+)
+
 // Integration represents all integrations for observability of your application or infrastructure.
 type Integration struct {
 	BaseModel
@@ -27,4 +34,15 @@ type Integration struct {
 	Desc     string `json:"desc" gorm:"column:desc"`
 	Icon     string `json:"icon" gorm:"column:icon"`
 	DocURL   string `json:"docUrl" gorm:"column:doc_url"`
+}
+
+// IntegrationConnection represents connection between integration and source(dashboard/chart etc.).
+type IntegrationConnection struct {
+	BaseModel
+
+	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_ic,unique"`
+
+	IntegrationUID string         `json:"integrationUID" gorm:"column:integration_uid;index:u_idx_ic,unique"`
+	SourceUID      string         `json:"sourceUID" gorm:"column:source_uid;index:u_idx_ic,unique"`
+	Type           ConnectionType `json:"type" gorm:"column:type;index:u_idx_ic,unique"`
 }
