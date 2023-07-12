@@ -48,10 +48,12 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 
 	dashboardSrv := service.NewMockDashboardService(ctrl)
 	chartSrv := service.NewMockChartService(ctrl)
+	integrationSrv := service.NewMockIntegrationService(ctrl)
 	r := gin.New()
 	api := NewDashboardAPI(&deps.API{
-		DashboardSrv: dashboardSrv,
-		ChartSrv:     chartSrv,
+		DashboardSrv:   dashboardSrv,
+		ChartSrv:       chartSrv,
+		IntegrationSrv: integrationSrv,
 	})
 	r.POST("/dashboard", api.CreateDashboard)
 	body := encoding.JSONMarshal(&model.Dashboard{Title: "test"})
@@ -91,11 +93,24 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 			},
 		},
 		{
+			name: "integration failure",
+			body: bytes.NewBuffer(encoding.JSONMarshal(&model.Dashboard{Config: body})),
+			prepare: func() {
+				dashboardSrv.EXPECT().CreateDashboard(gomock.Any(), gomock.Any()).Return("1234", nil)
+				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.DashboardConnection).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
 			name: "create dashboard successfully",
 			body: bytes.NewBuffer(encoding.JSONMarshal(&model.Dashboard{Config: body})),
 			prepare: func() {
 				dashboardSrv.EXPECT().CreateDashboard(gomock.Any(), gomock.Any()).Return("1234", nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.DashboardConnection).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -124,13 +139,17 @@ func TestDashboardAPI_UpdateDashboard(t *testing.T) {
 
 	dashboardSrv := service.NewMockDashboardService(ctrl)
 	chartSrv := service.NewMockChartService(ctrl)
+	integrationSrv := service.NewMockIntegrationService(ctrl)
 	r := gin.New()
 	api := NewDashboardAPI(&deps.API{
-		DashboardSrv: dashboardSrv,
-		ChartSrv:     chartSrv,
+		DashboardSrv:   dashboardSrv,
+		ChartSrv:       chartSrv,
+		IntegrationSrv: integrationSrv,
 	})
 	r.PUT("/dashboard", api.UpdateDashboard)
-	body := encoding.JSONMarshal(&model.Dashboard{})
+	body := encoding.JSONMarshal(&model.Dashboard{
+		Integration: "abc",
+	})
 
 	cases := []struct {
 		name    string
@@ -167,11 +186,24 @@ func TestDashboardAPI_UpdateDashboard(t *testing.T) {
 			},
 		},
 		{
+			name: "integration failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				dashboardSrv.EXPECT().UpdateDashboard(gomock.Any(), gomock.Any()).Return(nil)
+				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.DashboardConnection).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
 			name: "update dashboard successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
 				dashboardSrv.EXPECT().UpdateDashboard(gomock.Any(), gomock.Any()).Return(nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.DashboardConnection).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)

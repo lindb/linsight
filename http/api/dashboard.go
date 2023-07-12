@@ -18,6 +18,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 
@@ -47,7 +49,7 @@ func NewDashboardAPI(deps *depspkg.API) *DashboardAPI {
 }
 
 // CreateDashboard creates a new dashboard.
-func (api *DashboardAPI) CreateDashboard(c *gin.Context) {
+func (api *DashboardAPI) CreateDashboard(c *gin.Context) { //nolint:dupl
 	var dashboardJSON datatypes.JSON
 	if err := c.ShouldBind(&dashboardJSON); err != nil {
 		httppkg.Error(c, err)
@@ -63,8 +65,7 @@ func (api *DashboardAPI) CreateDashboard(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
-	// try add chart links if use chart repos in dashboard config
-	if err = api.deps.ChartSrv.LinkChartsToDashboard(ctx, dashboard); err != nil {
+	if err := api.saveDashbardMeta(ctx, dashboard); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
@@ -87,8 +88,7 @@ func (api *DashboardAPI) UpdateDashboard(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
-	// try add chart links if use chart repos in dashboard config
-	if err := api.deps.ChartSrv.LinkChartsToDashboard(ctx, dashboard); err != nil {
+	if err := api.saveDashbardMeta(ctx, dashboard); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
@@ -102,6 +102,7 @@ func (api *DashboardAPI) DeleteDashboardByUID(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
+	// FIXME: delete metadata
 	httppkg.OK(c, "Dashboard deleted")
 }
 
@@ -162,4 +163,23 @@ func (api *DashboardAPI) SearchDashboards(c *gin.Context) {
 		"total":      total,
 		"dashboards": dashboards,
 	})
+}
+
+// saveDashbardMeta saves dashboard metadata after created/updated.
+func (api *DashboardAPI) saveDashbardMeta(ctx context.Context, dashboard *model.Dashboard) error {
+	// try add chart links if use chart repos in dashboard config
+	if err := api.deps.ChartSrv.LinkChartsToDashboard(ctx, dashboard); err != nil {
+		return err
+	}
+	// connect integration
+	if dashboard.Integration != "" {
+		if err := api.deps.IntegrationSrv.ConnectSource(ctx, dashboard.Integration, dashboard.UID, model.DashboardConnection); err != nil {
+			return err
+		}
+	} else {
+		if err := api.deps.IntegrationSrv.DisconnectSource(ctx, dashboard.UID, model.DashboardConnection); err != nil {
+			return err
+		}
+	}
+	return nil
 }

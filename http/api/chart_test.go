@@ -45,9 +45,11 @@ func TestChartAPI_CreateChart(t *testing.T) {
 	defer ctrl.Finish()
 
 	chartSrv := service.NewMockChartService(ctrl)
+	integrationSrv := service.NewMockIntegrationService(ctrl)
 	r := gin.New()
 	api := NewChartAPI(&deps.API{
-		ChartSrv: chartSrv,
+		ChartSrv:       chartSrv,
+		IntegrationSrv: integrationSrv,
 	})
 	r.POST("/charts", api.CreateChart)
 	body := encoding.JSONMarshal(&model.Chart{})
@@ -76,10 +78,22 @@ func TestChartAPI_CreateChart(t *testing.T) {
 			},
 		},
 		{
+			name: "integration failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				chartSrv.EXPECT().CreateChart(gomock.Any(), gomock.Any()).Return("1234", nil)
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.ChartConnection).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
 			name: "create chart successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
 				chartSrv.EXPECT().CreateChart(gomock.Any(), gomock.Any()).Return("1234", nil)
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.ChartConnection).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -168,12 +182,14 @@ func TestChartAPI_UpdateChart(t *testing.T) {
 	defer ctrl.Finish()
 
 	chartSrv := service.NewMockChartService(ctrl)
+	integrationSrv := service.NewMockIntegrationService(ctrl)
 	r := gin.New()
 	api := NewChartAPI(&deps.API{
-		ChartSrv: chartSrv,
+		ChartSrv:       chartSrv,
+		IntegrationSrv: integrationSrv,
 	})
 	r.PUT("/chart", api.UpdateChart)
-	body := encoding.JSONMarshal(&model.Chart{})
+	body := encoding.JSONMarshal(&model.Chart{Integration: "abc"})
 
 	cases := []struct {
 		name    string
@@ -199,10 +215,22 @@ func TestChartAPI_UpdateChart(t *testing.T) {
 			},
 		},
 		{
+			name: "integration failure",
+			body: bytes.NewBuffer(body),
+			prepare: func() {
+				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(nil)
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.ChartConnection).Return(fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
 			name: "update chart successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
 				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(nil)
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.ChartConnection).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)

@@ -32,6 +32,7 @@ type Chart struct {
 	Title       string `json:"title" gorm:"column:title;index:u_idx_chart_org_title,unique"`
 	Desc        string `json:"description,omitempty" gorm:"column:desc"`
 	Integration string `json:"integration" gorm:"column:integration"`
+	Type        string `json:"type" gorm:"column:type"`
 	Version     int    `json:"version,omitempty" gorm:"column:version"`
 
 	Model datatypes.JSON `json:"model,omitempty" gorm:"column:model"`
@@ -46,6 +47,7 @@ func (c *Chart) ReadMeta() {
 	c.Title = gjson.Get(json, "title").String()
 	c.Desc = gjson.Get(json, "description").String()
 	c.Integration = gjson.Get(json, "integration").String()
+	c.Type = gjson.Get(json, "type").String()
 }
 
 // SearchChartRequest represents search chart request params.

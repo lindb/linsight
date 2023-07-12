@@ -18,6 +18,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
 
@@ -41,7 +43,7 @@ func NewChartAPI(deps *depspkg.API) *ChartAPI {
 }
 
 // CreateChart creates a new chart.
-func (api *ChartAPI) CreateChart(c *gin.Context) {
+func (api *ChartAPI) CreateChart(c *gin.Context) { //nolint:dupl
 	var chartJSON datatypes.JSON
 	if err := c.ShouldBind(&chartJSON); err != nil {
 		httppkg.Error(c, err)
@@ -55,6 +57,10 @@ func (api *ChartAPI) CreateChart(c *gin.Context) {
 	uid, err := api.deps.ChartSrv.CreateChart(ctx, chart)
 	if err != nil {
 		httppkg.Error(c, err)
+		return
+	}
+	if err0 := api.saveChartMeta(ctx, chart); err0 != nil {
+		httppkg.Error(c, err0)
 		return
 	}
 	httppkg.OK(c, uid)
@@ -75,6 +81,10 @@ func (api *ChartAPI) UpdateChart(c *gin.Context) {
 	err := api.deps.ChartSrv.UpdateChart(ctx, chart)
 	if err != nil {
 		httppkg.Error(c, err)
+		return
+	}
+	if err0 := api.saveChartMeta(ctx, chart); err0 != nil {
+		httppkg.Error(c, err0)
 		return
 	}
 	httppkg.OK(c, "Chart updated")
@@ -105,6 +115,7 @@ func (api *ChartAPI) DeleteChartByUID(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
+	// FIXME: delete chart metadata
 	httppkg.OK(c, "Chart deleted")
 }
 
@@ -141,4 +152,19 @@ func (api *ChartAPI) UnlinkChartFromDashboard(c *gin.Context) {
 		return
 	}
 	httppkg.OK(c, "Unlinked chart from dashboard")
+}
+
+// saveChartMeta saves chart metadata.
+func (api *ChartAPI) saveChartMeta(ctx context.Context, chart *model.Chart) error {
+	// connect integration
+	if chart.Integration != "" {
+		if err := api.deps.IntegrationSrv.ConnectSource(ctx, chart.Integration, chart.UID, model.ChartConnection); err != nil {
+			return err
+		}
+	} else {
+		if err := api.deps.IntegrationSrv.DisconnectSource(ctx, chart.UID, model.ChartConnection); err != nil {
+			return err
+		}
+	}
+	return nil
 }

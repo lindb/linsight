@@ -23,6 +23,7 @@ import (
 	"github.com/lindb/linsight"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
+	"github.com/lindb/linsight/pkg/util"
 )
 
 //go:generate mockgen -source=./integration.go -destination=./integration_mock.go -package=service
@@ -33,6 +34,10 @@ type IntegrationService interface {
 	Initialize() error
 	// GetIntegrations returns all supported integrations.
 	GetIntegrations(ctx context.Context) ([]model.Integration, error)
+	// ConnectSource connects integration and source.
+	ConnectSource(ctx context.Context, integrationUID, sourceUID string, connectionType model.ConnectionType) error
+	// DisconnectSource disconnects integration and source.
+	DisconnectSource(ctx context.Context, sourceUID string, connectionType model.ConnectionType) error
 }
 
 type integrationService struct {
@@ -80,4 +85,36 @@ func (srv *integrationService) GetIntegrations(ctx context.Context) ([]model.Int
 		return nil, err
 	}
 	return integrations, nil
+}
+
+// ConnectSource connects integration and source.
+func (srv *integrationService) ConnectSource(ctx context.Context,
+	integrationUID, sourceUID string,
+	connectionType model.ConnectionType) error {
+	signedUser := util.GetUser(ctx)
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		if err := tx.Delete(&model.IntegrationConnection{},
+			"org_id=? and source_id=? and type=?",
+			signedUser.Org.ID, sourceUID, connectionType); err != nil {
+			return err
+		}
+		return tx.Create(&model.IntegrationConnection{
+			BaseModel: model.BaseModel{
+				CreatedBy: signedUser.User.ID,
+				UpdatedBy: signedUser.User.ID,
+			},
+			OrgID:          signedUser.Org.ID,
+			IntegrationUID: integrationUID,
+			SourceUID:      sourceUID,
+			Type:           connectionType,
+		})
+	})
+}
+
+// DisconnectSource disconnects integration and source.
+func (srv *integrationService) DisconnectSource(ctx context.Context, sourceUID string, connectionType model.ConnectionType) error {
+	signedUser := util.GetUser(ctx)
+	return srv.db.Delete(&model.IntegrationConnection{},
+		"org_id=? and source_id=? and type=?",
+		signedUser.Org.ID, sourceUID, connectionType)
 }

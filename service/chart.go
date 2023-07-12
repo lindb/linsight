@@ -85,6 +85,8 @@ func (srv *chartService) UpdateChart(ctx context.Context, chart *model.Chart) er
 	chartFromDB.Title = chart.Title
 	chartFromDB.Desc = chart.Desc
 	chartFromDB.Model = chart.Model
+	chartFromDB.Integration = chart.Integration
+	chartFromDB.Type = chart.Type
 	chartFromDB.UpdatedBy = user.User.ID
 	return srv.db.Update(chartFromDB, "uid=? and org_id=?", chart.UID, user.Org.ID)
 }
