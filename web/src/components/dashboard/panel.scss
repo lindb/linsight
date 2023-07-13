@@ -35,3 +35,71 @@ under the License.
     }
   }
 }
+
+.add-panel-widget {
+  border: 1.5px solid var(--semi-color-primary);
+
+  .semi-button {
+    .linsighticon {
+      font-size: 24px;
+    }
+  }
+
+  .selected-item {
+    .semi-icon-close {
+      cursor: pointer;
+      visibility: hidden;
+      color: var(--semi-color-tertiary);
+    }
+
+    &:hover {
+      .semi-icon-close {
+        visibility: visible;
+      }
+    }
+  }
+}
+
+/*need add root style, because drag div created on root div*/
+.chart-selected-item,
+.chart-list {
+  height: 52px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-grow: 1;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--semi-color-border);
+
+  &:hover {
+    background-color: var(--semi-color-fill-0);
+  }
+
+  .chart-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-grow: 1;
+
+    .semi-checkbox-addon {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info {
+      flex: 1 1;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .semi-right-item-drag-handler {
+    cursor: move;
+  }
+}
+
+.semi-transfer-right-item-drag-item-move {
+	background-color: var(--semi-color-primary-light-default);
+}

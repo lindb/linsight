@@ -17,6 +17,8 @@ under the License.
 */
 // common components
 export { default as Icon } from '@src/components/common/Icon';
+export { default as IntegrationIcon } from '@src/components/common/IntegrationIcon';
+export { default as VisualizationIcon } from '@src/components/common/VisualizationIcon';
 export { default as StatusTip } from '@src/components/common/StatusTip';
 export { default as SimpleStatusTip } from '@src/components/common/SimpleStatusTip';
 export { default as LazyLoad } from '@src/components/common/LazyLoad';
@@ -34,16 +36,17 @@ export { default as DatasourceSelect } from '@src/components/input/DatasourceSel
 export { default as DatasourceSelectForm } from '@src/components/input/DatasourceSelectForm';
 export { default as SliderInput } from '@src/components/input/SliderInput';
 export { default as LinSelect } from '@src/components/input/LinSelect';
+export { default as IntegrationSelect } from '@src/components/input/IntegrationSelect';
 
 export { default as QueryEditor } from '@src/components/explore/QueryEditor';
 export { default as MetricExplore } from '@src/components/explore/MetricExplore';
 export { default as AddToCharts } from '@src/components/explore/AddToCharts';
+export { default as AddToDashboard } from '@src/components/explore/AddToDashboard';
+
 export { default as AddPanelWidget } from '@src/components/dashboard/AddPanelWidget';
 export { default as Panel } from '@src/components/dashboard/Panel';
-export { default as DashboardIcon } from '@src/components/dashboard/DashboardIcon';
 
 export { default as StatsList } from './StatsList';
-export { default as AddToDashboard } from './AddToDashboard';
 export { default as TraceTimeline } from './TraceTimeline';
 export { default as TraceFlame } from './TraceFlame';
 export { default as TraceFlame2 } from './TraceFlame2';

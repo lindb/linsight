@@ -45,7 +45,7 @@ import { DashboardSrv } from '@src/services';
 import React, { useEffect, useState } from 'react';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { isEmpty } from 'lodash-es';
-import { StatusTip, Notification, DashboardIcon } from '@src/components';
+import { StatusTip, Notification, IntegrationIcon } from '@src/components';
 import { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import { Dashboard, SearchDashboard } from '@src/types';
 import { ApiKit } from '@src/utils';
@@ -96,20 +96,18 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
         dataIndex: 'title',
         render: (_text: any, r: Dashboard, _index: any) => {
           return (
-            <div className="dashboard-title">
-              <DashboardIcon dashboard={r} style={{ fontSize: 16 }} />
-              <Text
-                link
-                onClick={() =>
-                  navigate({
-                    pathname: '/dashboard',
-                    search: `${createSearchParams({
-                      d: `${r.uid}`,
-                    })}`,
-                  })
-                }>
-                {r.title}
-              </Text>
+            <div
+              className="dashboard-title"
+              onClick={() => {
+                navigate({
+                  pathname: '/dashboard',
+                  search: `${createSearchParams({
+                    d: `${r.uid}`,
+                  })}`,
+                });
+              }}>
+              <IntegrationIcon integration={r.integration} style={{ fontSize: 16 }} />
+              <Text link>{r.title}</Text>
             </div>
           );
         },

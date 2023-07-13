@@ -59,6 +59,7 @@ export interface PanelSetting {
   id?: number;
   datasource?: { uid: string; type?: string };
   title?: string;
+  integration?: string;
   description?: string;
   type?: string;
   collapsed?: boolean;

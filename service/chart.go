@@ -98,7 +98,7 @@ func (srv *chartService) SearchCharts(ctx context.Context,
 	conditions := []string{"org_id=?"}
 	signedUser := util.GetUser(ctx)
 	params := []any{signedUser.Org.ID}
-	sql := `select c.uid,c.title,c.desc,
+	sql := `select c.uid,c.title,c.desc,c.type,c.integration,c.model,
 		(select count(1) from links l where l.source_uid=c.uid) as dashboards  
 	from charts c where c.org_id=?`
 	if req.Title != "" {

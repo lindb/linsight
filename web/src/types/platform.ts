@@ -82,6 +82,15 @@ class IconRepository {
     return this.icons.get(name);
   }
 
+  public setIntegrations(integrations: Integration[]) {
+    (integrations || []).forEach((i: Integration) => {
+      const icon = this.icons.get(i.icon);
+      if (icon) {
+        this.icons.set(i.uid, icon);
+      }
+    });
+  }
+
   public getIconCls(name: string, colored: boolean = true): string {
     const item = this.icons.get(name);
     if (!item) {

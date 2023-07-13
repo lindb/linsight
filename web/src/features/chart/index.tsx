@@ -33,13 +33,14 @@ import {
   Dropdown,
   Modal,
   Tag,
+  Tooltip,
 } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconSearchStroked, IconHandle, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { StatusTip, Notification, AddToDashboard } from '@src/components';
+import { StatusTip, Notification, AddToDashboard, IntegrationIcon, VisualizationIcon } from '@src/components';
 import { isEmpty } from 'lodash-es';
 import { useRequest } from '@src/hooks';
-import { Chart } from '@src/types';
+import { Chart, VisualizationRepositoryInst } from '@src/types';
 import './chart.scss';
 import ChartDetailModal from './ChartDetail';
 import { ApiKit } from '@src/utils';
@@ -149,17 +150,15 @@ const ListChart: React.FC = () => {
                       dataIndex: 'title',
                       render: (_text: any, r: any, _index: any) => {
                         return (
-                          <>
-                            {r.type && <i style={{ marginRight: 4 }} className={`devicon-${r.type}-plain colored`} />}
-                            <Text
-                              link
-                              onClick={() => {
-                                currentChart.current = r;
-                                setDashboardVisible(true);
-                              }}>
-                              {r.title}
-                            </Text>
-                          </>
+                          <div
+                            className="dashboard-title"
+                            onClick={() => {
+                              currentChart.current = r;
+                              setVisible(true);
+                            }}>
+                            <IntegrationIcon integration={r.integration} style={{ fontSize: 20 }} />
+                            <Text link>{r.title}</Text>
+                          </div>
                         );
                       },
                     },
@@ -168,6 +167,15 @@ const ListChart: React.FC = () => {
                       key: 'description',
                       align: 'left',
                       dataIndex: 'description',
+                    },
+                    {
+                      title: 'Visualization',
+                      key: 'type',
+                      dataIndex: 'type',
+                      align: 'center',
+                      render: (_text: any, r: any, _index: any) => {
+                        return <VisualizationIcon type={r.type} />;
+                      },
                     },
                     {
                       title: 'Dashboards',

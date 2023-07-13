@@ -19,7 +19,7 @@ import { Loading, Notification } from '@src/components';
 import { useRequest } from '@src/hooks';
 import { PlatformSrv, UserSrv } from '@src/services';
 import { DatasourceStore, MenuStore } from '@src/stores';
-import { Bootdata, FormatRepositoryInst, ThemeType } from '@src/types';
+import { Bootdata, FormatRepositoryInst, IconRepositoryInst, ThemeType } from '@src/types';
 import { ApiKit } from '@src/utils';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -82,6 +82,7 @@ export const PlatformContextProvider: React.FC<{ children?: React.ReactNode }> =
     if (result) {
       MenuStore.setMenus(result.navTree);
       DatasourceStore.setDatasources(result.datasources);
+      IconRepositoryInst.setIntegrations(result.integrations);
       setTheme(result.user.preference?.theme || ThemeType.Default);
       setCollapsed(result.user.preference?.collapsed);
       setBoot(result);

@@ -60,8 +60,11 @@ type SearchChartRequest struct {
 
 // ChartInfo represents chart basic information without config json.
 type ChartInfo struct {
-	UID        string `json:"uid"`
-	Title      string `json:"title"`
-	Desc       string `json:"description,omitempty"`
-	Dashboards int    `json:"dashboards"`
+	UID         string         `json:"uid"`
+	Title       string         `json:"title"`
+	Desc        string         `json:"description,omitempty"`
+	Type        string         `json:"type"`
+	Integration string         `json:"integration,omitempty"`
+	Dashboards  int            `json:"dashboards"`
+	Model       datatypes.JSON `json:"model,omitempty"`
 }

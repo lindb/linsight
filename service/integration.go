@@ -94,7 +94,7 @@ func (srv *integrationService) ConnectSource(ctx context.Context,
 	signedUser := util.GetUser(ctx)
 	return srv.db.Transaction(func(tx dbpkg.DB) error {
 		if err := tx.Delete(&model.IntegrationConnection{},
-			"org_id=? and source_id=? and type=?",
+			"org_id=? and source_uid=? and type=?",
 			signedUser.Org.ID, sourceUID, connectionType); err != nil {
 			return err
 		}
@@ -112,9 +112,10 @@ func (srv *integrationService) ConnectSource(ctx context.Context,
 }
 
 // DisconnectSource disconnects integration and source.
-func (srv *integrationService) DisconnectSource(ctx context.Context, sourceUID string, connectionType model.ConnectionType) error {
+func (srv *integrationService) DisconnectSource(ctx context.Context,
+	sourceUID string, connectionType model.ConnectionType) error {
 	signedUser := util.GetUser(ctx)
 	return srv.db.Delete(&model.IntegrationConnection{},
-		"org_id=? and source_id=? and type=?",
+		"org_id=? and source_uid=? and type=?",
 		signedUser.Org.ID, sourceUID, connectionType)
 }

@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Layout } from '@douyinfe/semi-ui';
+import { Button, Layout } from '@douyinfe/semi-ui';
 import React, { MutableRefObject, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, MetricExplore, TimePicker } from '@src/components';
 import { DatasourceInstance, PanelSetting, Tracker } from '@src/types';
@@ -38,6 +38,7 @@ const DefaultPanel = {
 
 const ExploreContent: React.FC = () => {
   const defaultDatasource = DatasourceStore.getDefaultDatasource();
+  const [visible, setVisible] = useState(false);
   const { panel, modifyPanel } = useContext(PanelEditContext);
   const [searchParams, setSearchParams] = useSearchParams();
   const addToChartBtn = useRef<any>();
@@ -85,7 +86,10 @@ const ExploreContent: React.FC = () => {
           />
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
-          <AddToCharts ref={addToChartBtn} />
+          <AddToCharts ref={addToChartBtn} visible={visible} setVisible={setVisible} />
+          <Button type="tertiary" onClick={() => setVisible(true)} icon={<Icon icon="repo" />}>
+            Save as chart
+          </Button>
           <AddToDashboard
             btnType="tertiary"
             btnTheme="light"

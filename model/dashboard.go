@@ -86,7 +86,7 @@ type Dashboard struct {
 	UID         string `json:"uid,omitempty" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
 	Title       string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
 	Desc        string `json:"description,omitempty" gorm:"column:desc"`
-	Integration string `json:"integration" gorm:"column:integration"`
+	Integration string `json:"integration,omitempty" gorm:"column:integration"`
 	Version     int    `json:"version,omitempty" gorm:"column:version"`
 
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
@@ -129,7 +129,12 @@ func findCharts(panelsJSON *gjson.Result) (chartUIDs []string, err error) {
 			continue
 		}
 
-		uid := panel.Get("libraryPanel.uid").String()
+		lib := panel.Get("libraryPanel")
+		if lib.Raw == "" {
+			continue
+		}
+
+		uid := lib.Get("uid").String()
 		if uid == "" {
 			return nil, fmt.Errorf("miss chart uid")
 		}

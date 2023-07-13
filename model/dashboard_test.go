@@ -85,6 +85,13 @@ func TestDashboard_GetCharts(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "no chart link",
+			dashboard: &Dashboard{
+				Config: datatypes.JSON(`{"panels":[{}]}`),
+			},
+			wantErr: false,
+		},
+		{
 			name: "not chart uid",
 			dashboard: &Dashboard{
 				Config: datatypes.JSON(`{"panels":[{"libraryPanel":{}}]}`),

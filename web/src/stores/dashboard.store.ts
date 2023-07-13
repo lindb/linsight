@@ -27,7 +27,21 @@ import {
 import { DashboardSrv } from '@src/services';
 import { Dashboard, GridPos, PanelSetting, Variable, Tracker, Chart } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
-import { set, get, find, cloneDeep, has, concat, findIndex, forIn, merge, pick, isEmpty, pullAt } from 'lodash-es';
+import {
+  set,
+  get,
+  find,
+  cloneDeep,
+  has,
+  concat,
+  findIndex,
+  forIn,
+  merge,
+  pick,
+  isEmpty,
+  pullAt,
+  remove,
+} from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
 import { ChartPendingAddStore } from '.';
 
@@ -239,6 +253,27 @@ class DashboardStore {
   isDashboardChanged(): boolean {
     // need remove underscore temp props
     return this.dashboardTracker.isChanged(ObjectKit.removeUnderscoreProperties(this.dashboard));
+  }
+
+  addCharts(charts: Chart[], removeAddPanel: boolean = true) {
+    const panels = this.getPanels();
+    if (removeAddPanel) {
+      remove(panels, (p: PanelSetting) => {
+        return p.type === VisualizationAddPanelType;
+      });
+    }
+    (charts || []).forEach((chart: Chart, index: number) => {
+      const panelId = this.assignPanelId();
+      panels.push({
+        id: panelId,
+        title: chart.title,
+        gridPos: { w: 12, h: 8, x: 12 * (index % 2), y: 0, i: `${panelId}` },
+        libraryPanel: {
+          name: chart.title,
+          uid: chart.uid,
+        },
+      });
+    });
   }
 
   async loadDashbaord(dashboardId: string | null) {
