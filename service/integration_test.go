@@ -127,7 +127,7 @@ func TestIntegrationService_DisconnectSource(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	mockDB.EXPECT().Delete(gomock.Any(),
-		"org_id=? and source_id=? and type=?",
+		"org_id=? and source_uid=? and type=?",
 		int64(12), "123", model.DashboardConnection).Return(nil)
 	srv := NewIntegrationService(mockDB)
 	assert.Nil(t, srv.DisconnectSource(ctx, "123", model.DashboardConnection))
@@ -152,7 +152,7 @@ func TestIntegrationService_ConnectSource(t *testing.T) {
 			name: "delete old failure",
 			prepare: func() {
 				mockDB.EXPECT().Delete(gomock.Any(),
-					"org_id=? and source_id=? and type=?",
+					"org_id=? and source_uid=? and type=?",
 					int64(12), "abc", model.ChartConnection).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -161,7 +161,7 @@ func TestIntegrationService_ConnectSource(t *testing.T) {
 			name: "connect successfully",
 			prepare: func() {
 				mockDB.EXPECT().Delete(gomock.Any(),
-					"org_id=? and source_id=? and type=?",
+					"org_id=? and source_uid=? and type=?",
 					int64(12), "abc", model.ChartConnection).Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
 			},

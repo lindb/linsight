@@ -35,14 +35,14 @@ import React, {
   MutableRefObject,
   useMemo,
 } from 'react';
-import { Icon, LazyLoad, SimpleStatusTip, Notification } from '@src/components';
+import { Icon, LazyLoad, SimpleStatusTip, AddToCharts } from '@src/components';
 import { PlatformContext } from '@src/contexts';
 import { useMetric, useRequest } from '@src/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import classNames from 'classnames';
 import { get, isEmpty, pick, cloneDeep, isArray, omit, has } from 'lodash-es';
-import { ApiKit, ChartKit, DataSetKit, ObjectKit } from '@src/utils';
+import { ChartKit, DataSetKit, ObjectKit } from '@src/utils';
 import './panel.scss';
 import { ChartPropsKey, PanelVisualizationOptions } from '@src/constants';
 import { ChartSrv } from '@src/services';
@@ -64,6 +64,8 @@ const PanelHeader = forwardRef(
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [menuVisible, setMenuVisible] = useState(false);
+    const [addChartVisible, setAddChartVisible] = useState(false);
+    const addToChartBtn = useRef<any>();
     useImperativeHandle(ref, () => ({
       // panel invoke, reduce panel rerender
       showMenu(show: boolean) {
@@ -126,13 +128,12 @@ const PanelHeader = forwardRef(
                 {!has(panel, ChartPropsKey) && (
                   <Dropdown.Item
                     icon={<Icon icon="repo" />}
-                    onClick={async () => {
-                      try {
-                        await ChartSrv.createChart(omit(panel, ['id', 'gridPos']));
-                        Notification.success('Save chart successfully');
-                      } catch (err) {
-                        Notification.error(ApiKit.getErrorMsg(err));
-                      }
+                    onClick={() => {
+                      const chartCfg = cloneDeep(panel);
+                      // init integration if has dashboard
+                      chartCfg.integration = DashboardStore.dashboard?.integration;
+                      addToChartBtn.current.setOptions(chartCfg);
+                      setAddChartVisible(true);
                     }}>
                     Save as chart
                   </Dropdown.Item>
@@ -151,6 +152,7 @@ const PanelHeader = forwardRef(
             <IconMenu className="btn" style={{ display: menuVisible ? 'block' : 'none' }} />
           </Dropdown>
         )}
+        <AddToCharts ref={addToChartBtn} visible={addChartVisible} setVisible={setAddChartVisible} />
       </div>
     );
   }

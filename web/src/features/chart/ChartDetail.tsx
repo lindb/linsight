@@ -17,7 +17,7 @@ under the License.
 */
 import { Button, SideSheet, Typography } from '@douyinfe/semi-ui';
 import { IconClose, IconSaveStroked } from '@douyinfe/semi-icons';
-import { DatasourceSelectForm, Icon, MetricExplore, Notification } from '@src/components';
+import { DatasourceSelectForm, Icon, IntegrationIcon, MetricExplore, Notification } from '@src/components';
 import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 import { ChartSrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
@@ -44,6 +44,7 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <IntegrationIcon integration={chart.integration} style={{ fontSize: 32 }} />
         <div style={{ flex: 1 }}>
           <Title heading={5}>{chart.title}</Title>
           <Text type="tertiary">{chart.description || 'N/A'}</Text>
@@ -62,10 +63,9 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
           type="primary"
           loading={submitting}
           onClick={async () => {
-            chart.model = panel;
             setSubmitting(true);
             try {
-              await ChartSrv.updateChart(chart);
+              await ChartSrv.updateChart({ uid: chart.uid, ...panel });
               Notification.success('Save chart successfully!');
             } catch (err) {
               console.warn('save chart error', err);
@@ -80,7 +80,7 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
           icon={<Icon icon="explore" />}
           type="tertiary"
           onClick={() => {
-            const panel = get(chart, 'config', {});
+            const panel = get(chart, 'model', {});
             unset(panel, 'title');
             unset(panel, 'description');
             const params = createSearchParams({ left: JSON.stringify(panel) });

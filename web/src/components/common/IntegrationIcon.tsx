@@ -15,13 +15,13 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Dashboard } from '@src/types';
 import React from 'react';
 import Icon from '../common/Icon';
 
-const DashboardIcon: React.FC<{ dashboard: Dashboard; style?: React.CSSProperties }> = (props) => {
-  const { dashboard, style } = props;
-  return <Icon icon={`${dashboard.integration ? dashboard?.integration : 'grid'}`} style={style} />;
+const IntegrationIcon: React.FC<{ integration?: string; style?: React.CSSProperties }> = (props) => {
+  const { integration = 'grid', style } = props;
+  console.error(integration);
+  return <Icon icon={integration} style={style} />;
 };
 
-export default DashboardIcon;
+export default IntegrationIcon;

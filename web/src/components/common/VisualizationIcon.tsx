@@ -15,25 +15,25 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { PanelSetting } from '@src/types';
+import { Tooltip } from '@douyinfe/semi-ui';
+import { VisualizationRepositoryInst } from '@src/types';
+import React from 'react';
 
-export interface Chart {
-  uid?: string;
-  title?: string;
-  description?: string;
-  integration?: string;
-  model?: PanelSetting;
-  isStarred?: boolean;
-  variables?: any[];
-}
+const VisualizationIcon: React.FC<{ type: string }> = (props) => {
+  const { type } = props;
+  try {
+    const plugin = VisualizationRepositoryInst.get(`${type}`);
+    if (!plugin) {
+      return null;
+    }
+    return (
+      <Tooltip content={plugin.Name}>
+        <img src={`${plugin.darkLogo}`} width={20} />
+      </Tooltip>
+    );
+  } catch (err) {
+    return null;
+  }
+};
 
-export interface SearchChart {
-  title?: string;
-  ownership?: string;
-  tags?: string[];
-}
-
-export interface SearchChartResult {
-  total: number;
-  charts: Chart[];
-}
+export default VisualizationIcon;

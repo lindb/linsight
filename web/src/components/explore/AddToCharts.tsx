@@ -21,81 +21,92 @@ import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { PanelSetting } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
 import { ChartSrv } from '@src/services';
-import { Icon, Notification } from '@src/components';
+import { IntegrationSelect, Notification } from '@src/components';
+import { omit } from 'lodash-es';
 
 /*
  * Add metric explore to chart repository.
  */
-const AddToCharts = forwardRef((_props: {}, ref) => {
-  const [visible, setVisible] = useState(false);
-  const chartOptions = useRef<PanelSetting>();
-  const formApi = useRef<any>();
-  const [submitting, setSubmitting] = useState(false);
-
-  useImperativeHandle(ref, () => ({
-    setOptions(options: PanelSetting) {
-      chartOptions.current = options;
+const AddToCharts = forwardRef(
+  (
+    props: {
+      visible: boolean;
+      setVisible: (v: boolean) => void;
     },
-  }));
+    ref
+  ) => {
+    const { visible, setVisible } = props;
+    const chartOptions = useRef<PanelSetting>();
+    const formApi = useRef<any>();
+    const [submitting, setSubmitting] = useState(false);
 
-  const saveChart = async (values: any) => {
-    setSubmitting(true);
-    try {
-      await ChartSrv.createChart(ObjectKit.merge(chartOptions.current || {}, values));
-      Notification.success('Save chart successfully');
-      setVisible(false);
-    } catch (err) {
-      Notification.error(ApiKit.getErrorMsg(err));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    useImperativeHandle(ref, () => ({
+      setOptions(options: PanelSetting) {
+        chartOptions.current = options;
+      },
+    }));
 
-  return (
-    <>
-      <Button type="tertiary" onClick={() => setVisible(true)} icon={<Icon icon="repo" />}>
-        Save as chart
-      </Button>
-      <Modal
-        size="medium"
-        title="Add to chart repository"
-        visible={visible}
-        motion={false}
-        onCancel={() => setVisible(false)}
-        footer={
-          <>
-            <Button type="tertiary" onClick={() => setVisible(false)}>
-              Cancel
-            </Button>
-            <Button
-              icon={<IconSaveStroked />}
-              loading={submitting}
-              type="primary"
-              theme="solid"
-              onClick={() => {
-                if (!formApi.current) {
-                  return;
-                }
-                formApi.current.submitForm();
-              }}>
-              Save
-            </Button>
-          </>
-        }>
-        <Form
-          className="linsight-form"
-          allowEmpty
-          getFormApi={(api: any) => (formApi.current = api)}
-          onSubmit={(values: any) => {
-            saveChart(values);
-          }}>
-          <Form.Input field="title" label="Title" rules={[{ required: true, message: 'Title is required' }]} />
-          <Form.TextArea field="description" label="Description" />
-        </Form>
-      </Modal>
-    </>
-  );
-});
+    const saveChart = async (values: any) => {
+      setSubmitting(true);
+      try {
+        const panel = ObjectKit.merge(chartOptions.current || {}, values);
+        await ChartSrv.createChart(omit(panel, ['id', 'gridPos', 'desc']));
+        Notification.success('Save chart successfully');
+        setVisible(false);
+      } catch (err) {
+        Notification.error(ApiKit.getErrorMsg(err));
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
+    return (
+      <>
+        <Modal
+          size="medium"
+          title="Add to chart repository"
+          visible={visible}
+          motion={false}
+          onCancel={() => setVisible(false)}
+          footer={
+            <>
+              <Button type="tertiary" onClick={() => setVisible(false)}>
+                Cancel
+              </Button>
+              <Button
+                icon={<IconSaveStroked />}
+                loading={submitting}
+                type="primary"
+                theme="solid"
+                onClick={() => {
+                  if (!formApi.current) {
+                    return;
+                  }
+                  formApi.current.submitForm();
+                }}>
+                Save
+              </Button>
+            </>
+          }>
+          <Form
+            className="linsight-form"
+            allowEmpty
+            getFormApi={(api: any) => {
+              formApi.current = api;
+            }}
+            initValues={chartOptions.current}
+            onSubmit={(values: any) => {
+              saveChart(values);
+            }}>
+            <Form.Input field="title" label="Title" rules={[{ required: true, message: 'Title is required' }]} />
+            <Form.TextArea field="description" label="Description" />
+            <IntegrationSelect />
+          </Form>
+        </Modal>
+      </>
+    );
+  }
+);
 
 AddToCharts.displayName = 'AddToCharts';
 

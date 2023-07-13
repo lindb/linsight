@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { List, SideSheet, Typography } from '@douyinfe/semi-ui';
-import { DashboardIcon } from '@src/components';
+import { IntegrationIcon } from '@src/components';
 import { useRequest } from '@src/hooks';
 import { ChartSrv } from '@src/services';
 import { Dashboard } from '@src/types';
@@ -55,7 +55,7 @@ const ListDashboardByChart: React.FC<{
         renderItem={(item: Dashboard) => {
           return (
             <List.Item key={item.uid} className="dashboard-title">
-              <DashboardIcon dashboard={item} style={{ fontSize: 20 }} />
+              <IntegrationIcon integration={item.integration} style={{ fontSize: 20 }} />
               <Text>{item.title}</Text>
             </List.Item>
           );

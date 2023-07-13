@@ -15,15 +15,104 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Button, Card, Typography } from '@douyinfe/semi-ui';
-import { IconClose } from '@douyinfe/semi-icons';
+import { Button, Card, Checkbox, Modal, Transfer, Typography } from '@douyinfe/semi-ui';
+import { IconClose, IconHandle } from '@douyinfe/semi-icons';
 import { DashboardStore } from '@src/stores';
-import React from 'react';
-import { Icon } from '@src/components';
+import React, { MutableRefObject, useRef, useState } from 'react';
+import { Icon, IntegrationIcon, StatusTip, VisualizationIcon } from '@src/components';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { PanelSetting } from '@src/types';
+import { Chart, PanelSetting } from '@src/types';
+import { useRequest } from '@src/hooks';
+import { ChartSrv } from '@src/services';
+import './panel.scss';
+import { isEmpty } from 'lodash-es';
 
 const { Text } = Typography;
+
+const AddPanelFromChartRepo: React.FC<{
+  visible: boolean;
+  setVisible: (v: boolean) => void;
+}> = (props) => {
+  const { visible, setVisible } = props;
+  const { result, loading, error } = useRequest(['search-charts'], () => ChartSrv.searchCharts({}));
+  const selectedCharts = useRef() as MutableRefObject<Chart[]>;
+
+  return (
+    <>
+      <Modal
+        title="Add panel from chart repository"
+        closeOnEsc
+        className="add-panel-widget"
+        closable={false}
+        motion={false}
+        maskClosable={false}
+        size="large"
+        visible={visible}
+        onOk={() => {
+          DashboardStore.addCharts(selectedCharts.current);
+          setVisible(false);
+        }}
+        okText="Add to dashboard"
+        onCancel={() => {
+          setVisible(false);
+        }}>
+        <Transfer
+          draggable
+          dataSource={(result?.charts || []).map((c: Chart) => {
+            return { value: c.uid, key: c.uid, ...c };
+          })}
+          emptyContent={{ left: <StatusTip isLoading={loading} isEmpty={isEmpty(result?.charts)} error={error} /> }}
+          onChange={(_values: any, items: any[]) => {
+            selectedCharts.current = items;
+          }}
+          renderSelectedItem={(item: any) => {
+            const { sortableHandle } = item;
+            const DragHandle = sortableHandle(() => <IconHandle className={`semi-right-item-drag-handler`} />);
+
+            return (
+              <div className="selected-item chart-selected-item" key={item.uid}>
+                <DragHandle />
+                <div className="chart-item">
+                  <IntegrationIcon integration={item.integration} style={{ fontSize: 28 }} />
+                  <div className="info">
+                    <Text>{item.title}</Text>
+                    <Text type="tertiary" size="small">
+                      {item.description || 'N/A'}
+                    </Text>
+                  </div>
+                </div>
+                <VisualizationIcon type={item.type} />
+                <IconClose onClick={item.onRemove} />
+              </div>
+            );
+          }}
+          renderSourceItem={(item: any) => {
+            return (
+              <div className="chart-list" key={item.uid}>
+                <Checkbox
+                  onChange={() => {
+                    item.onChange();
+                  }}
+                  value={item.uid}
+                  checked={item.checked}
+                  className="chart-item">
+                  <IntegrationIcon integration={item.integration} style={{ fontSize: 28 }} />
+                  <div className="info">
+                    <Text>{item.title}</Text>
+                    <Text type="tertiary" size="small">
+                      {item.description || 'N/A'}
+                    </Text>
+                  </div>
+                  <VisualizationIcon type={item.type} />
+                </Checkbox>
+              </div>
+            );
+          }}
+        />
+      </Modal>
+    </>
+  );
+};
 
 /*
  * Add panel widget in dashboard.
@@ -34,6 +123,7 @@ const AddPanelWidget: React.FC<{
   const { panel } = props;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [visible, setVisible] = useState(false);
   return (
     <>
       <Card
@@ -73,14 +163,18 @@ const AddPanelWidget: React.FC<{
             </div>
             <div>Add a new row</div>
           </Button>
-          <Button>
+          <Button
+            onClick={() => {
+              setVisible(true);
+            }}>
             <div>
               <Icon icon="repo" />
             </div>
-            <div>Add a panel from library</div>
+            <div>Add a panel from chart repo.</div>
           </Button>
         </div>
       </Card>
+      {visible && <AddPanelFromChartRepo visible={visible} setVisible={setVisible} />}
     </>
   );
 };
