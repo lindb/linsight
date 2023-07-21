@@ -21,14 +21,16 @@ import {
   Avatar,
   Button,
   Collapse,
+  Dropdown,
   Form,
+  Input,
   Modal,
   Radio,
   Select,
   SplitButtonGroup,
   Typography,
 } from '@douyinfe/semi-ui';
-import { IconPlusStroked, IconDeleteStroked, IconLink, IconUnlink } from '@douyinfe/semi-icons';
+import { IconPlusStroked, IconSearchStroked, IconDeleteStroked, IconLink, IconUnlink } from '@douyinfe/semi-icons';
 import { DatasourceStore } from '@src/stores';
 import {
   FieldConfig,
@@ -38,15 +40,17 @@ import {
   Threshold,
   VisualizationPlugin,
   VisualizationRepositoryInst,
+  Chart,
 } from '@src/types';
 import { ColorKit, ObjectKit } from '@src/utils';
 import { get, set, isEmpty, size, isNil, orderBy, maxBy, has, cloneDeep, unset } from 'lodash-es';
 import { PanelEditContext } from '@src/contexts';
-import { IntegrationIcon } from '@src/components';
+import { IntegrationIcon, StatusTip, VisualizationIcon } from '@src/components';
+import { ChartSrv } from '@src/services';
 
 const { Text } = Typography;
 
-const ChartRepoOptionsForm: React.FC = () => {
+const ChartInfo: React.FC = () => {
   const { panel, modifyPanel } = useContext(PanelEditContext);
   const [visible, setVisible] = useState(false);
 
@@ -55,38 +59,106 @@ const ChartRepoOptionsForm: React.FC = () => {
     modifyPanel(panel, true);
   };
 
+  return (
+    <>
+      <Modal
+        title="Do you really want to unlink this panel?"
+        visible={visible}
+        closeOnEsc
+        okButtonProps={{ type: 'danger' }}
+        okText="Yes,Unlink"
+        onOk={() => unlinkChart()}
+        onCancel={() => setVisible(false)}>
+        If you unlink this panel, you can edit it without affecting other dashboards. But once you make changes, you
+        cannot go back to the original reusable panel.
+      </Modal>
+      <SplitButtonGroup>
+        <Button icon={<IconUnlink />} type="tertiary" onClick={() => setVisible(true)} />
+        <Button
+          icon={<IntegrationIcon integration={panel.integration} style={{ fontSize: 18 }} />}
+          type="tertiary"
+          onClick={() => setVisible(true)}>
+          <Text>{panel.libraryPanel?.name}</Text>
+        </Button>
+      </SplitButtonGroup>
+    </>
+  );
+};
+
+const LinkChart: React.FC = () => {
+  const { modifyPanel } = useContext(PanelEditContext);
+  const [visible, setVisible] = useState(false);
+  const [charts, setCharts] = useState<Chart[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<any>(null);
+  const renderCharts = () => {
+    if (loading || error) {
+      return <StatusTip error={error} isLoading={loading} />;
+    }
+    return (charts || []).map((c: Chart) => {
+      return (
+        <Dropdown.Item
+          key={c.uid}
+          className="chart-item"
+          onClick={() => {
+            modifyPanel({ libraryPanel: { uid: c.uid, name: c.title } });
+          }}>
+          <IntegrationIcon integration={c.integration} style={{ fontSize: 24 }} />
+          <div className="info">
+            <Text>{c.title}</Text>
+            <Text type="tertiary" size="small">
+              {c.description || 'N/A'}
+            </Text>
+          </div>
+          <VisualizationIcon type={`${c.model?.type}`} />
+        </Dropdown.Item>
+      );
+    });
+  };
+  return (
+    <Dropdown
+      visible={visible}
+      trigger="custom"
+      position="bottom"
+      render={
+        <Dropdown.Menu className="chart-list" style={{ flexDirection: 'column', height: 'auto', alignItems: 'unset' }}>
+          <Dropdown.Item>
+            <Input prefix={<IconSearchStroked />} />
+          </Dropdown.Item>
+          {renderCharts()}
+        </Dropdown.Menu>
+      }>
+      <Button
+        icon={<IconLink />}
+        type="tertiary"
+        onClick={async () => {
+          try {
+            setError(null);
+            setVisible(true);
+            setLoading(true);
+            // TODO: add search logic
+            const rs = await ChartSrv.searchCharts({});
+            setCharts(rs?.charts || []);
+          } catch (err) {
+            setError(err);
+          } finally {
+            setLoading(false);
+          }
+        }}>
+        Link
+      </Button>
+    </Dropdown>
+  );
+};
+
+const ChartRepoOptionsForm: React.FC = () => {
+  const { panel } = useContext(PanelEditContext);
+
   if (panel.libraryPanel) {
-    return (
-      <>
-        <Modal
-          title="Do you really want to unlink this panel?"
-          visible={visible}
-          closeOnEsc
-          okButtonProps={{ type: 'danger' }}
-          okText="Yes,Unlink"
-          onOk={() => unlinkChart()}
-          onCancel={() => setVisible(false)}>
-          If you unlink this panel, you can edit it without affecting other dashboards. But once you make changes, you
-          cannot go back to the original reusable panel.
-        </Modal>
-        <SplitButtonGroup>
-          <Button icon={<IconUnlink />} type="tertiary" onClick={() => setVisible(true)} />
-          <Button
-            icon={<IntegrationIcon integration={panel.integration} style={{ fontSize: 18 }} />}
-            type="tertiary"
-            onClick={() => setVisible(true)}>
-            <Text>{panel.libraryPanel?.name}</Text>
-          </Button>
-        </SplitButtonGroup>
-      </>
-    );
+    return <ChartInfo />;
   }
 
-  return (
-    <Button icon={<IconLink />} type="tertiary">
-      Link
-    </Button>
-  );
+  return <LinkChart />;
 };
 
 /*
