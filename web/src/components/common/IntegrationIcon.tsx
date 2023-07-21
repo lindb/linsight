@@ -20,7 +20,6 @@ import Icon from '../common/Icon';
 
 const IntegrationIcon: React.FC<{ integration?: string; style?: React.CSSProperties }> = (props) => {
   const { integration = 'grid', style } = props;
-  console.error(integration);
   return <Icon icon={integration} style={style} />;
 };
 
