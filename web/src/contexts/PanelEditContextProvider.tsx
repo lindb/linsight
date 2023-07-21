@@ -27,7 +27,7 @@ import { MixedDatasource } from '@src/constants';
  */
 export const PanelEditContext = createContext({
   panel: {} as PanelSetting,
-  modifyPanel: (_panel: PanelSetting) => {},
+  modifyPanel: (_panel: PanelSetting, _overwrite?: boolean) => {},
 });
 
 /*
@@ -41,12 +41,13 @@ export const PanelEditContextProvider: React.FC<{ initPanel: PanelSetting; child
     panelTracker.current = new Tracker(initPanel);
     setPanel(initPanel);
   }, [initPanel]);
+
   /*
    * Modify panel options
    */
-  const modifyPanel = (cfg: PanelSetting) => {
+  const modifyPanel = (cfg: PanelSetting, overwrite?: boolean) => {
     const newPanel = cloneDeep(ObjectKit.merge(panel || {}, ObjectKit.removeUnderscoreProperties(cfg)));
-    if (panelTracker.current.isChanged(newPanel)) {
+    if (overwrite || panelTracker.current.isChanged(newPanel)) {
       const panelDatasourceUID = get(newPanel, 'datasource.uid');
       if (panelDatasourceUID !== MixedDatasource) {
         // if panel's datasource not mixed, need update all targets' datasource

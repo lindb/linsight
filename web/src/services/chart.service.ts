@@ -43,6 +43,10 @@ const getDashboardsByChart = (uid: string): Promise<Dashboard> => {
   return ApiKit.GET<Dashboard>(`${ApiPath.Chart}/${uid}/dashboards`);
 };
 
+const unlinkDashboard = (chartUid: string, dashboardUid: string): Promise<string> => {
+  return ApiKit.DELETE<string>(`${ApiPath.Chart}/${chartUid}/dashboards/${dashboardUid}`);
+};
+
 export default {
   searchCharts,
   createChart,
@@ -50,4 +54,5 @@ export default {
   deleteChart,
   getChart,
   getDashboardsByChart,
+  unlinkDashboard,
 };

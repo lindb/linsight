@@ -15,9 +15,20 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { useContext, useEffect, useRef } from 'react';
-import { ArrayField, Avatar, Button, Collapse, Form, Radio, Select, Typography } from '@douyinfe/semi-ui';
-import { IconPlusStroked, IconDeleteStroked } from '@douyinfe/semi-icons';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import {
+  ArrayField,
+  Avatar,
+  Button,
+  Collapse,
+  Form,
+  Modal,
+  Radio,
+  Select,
+  SplitButtonGroup,
+  Typography,
+} from '@douyinfe/semi-ui';
+import { IconPlusStroked, IconDeleteStroked, IconLink, IconUnlink } from '@douyinfe/semi-icons';
 import { DatasourceStore } from '@src/stores';
 import {
   FieldConfig,
@@ -29,10 +40,54 @@ import {
   VisualizationRepositoryInst,
 } from '@src/types';
 import { ColorKit, ObjectKit } from '@src/utils';
-import { get, set, isEmpty, size, isNil, orderBy, maxBy, has, cloneDeep } from 'lodash-es';
+import { get, set, isEmpty, size, isNil, orderBy, maxBy, has, cloneDeep, unset } from 'lodash-es';
 import { PanelEditContext } from '@src/contexts';
+import { IntegrationIcon } from '@src/components';
 
 const { Text } = Typography;
+
+const ChartRepoOptionsForm: React.FC = () => {
+  const { panel, modifyPanel } = useContext(PanelEditContext);
+  const [visible, setVisible] = useState(false);
+
+  const unlinkChart = () => {
+    unset(panel, 'libraryPanel');
+    modifyPanel(panel, true);
+  };
+
+  if (panel.libraryPanel) {
+    return (
+      <>
+        <Modal
+          title="Do you really want to unlink this panel?"
+          visible={visible}
+          closeOnEsc
+          okButtonProps={{ type: 'danger' }}
+          okText="Yes,Unlink"
+          onOk={() => unlinkChart()}
+          onCancel={() => setVisible(false)}>
+          If you unlink this panel, you can edit it without affecting other dashboards. But once you make changes, you
+          cannot go back to the original reusable panel.
+        </Modal>
+        <SplitButtonGroup>
+          <Button icon={<IconUnlink />} type="tertiary" onClick={() => setVisible(true)} />
+          <Button
+            icon={<IntegrationIcon integration={panel.integration} style={{ fontSize: 18 }} />}
+            type="tertiary"
+            onClick={() => setVisible(true)}>
+            <Text>{panel.libraryPanel?.name}</Text>
+          </Button>
+        </SplitButtonGroup>
+      </>
+    );
+  }
+
+  return (
+    <Button icon={<IconLink />} type="tertiary">
+      Link
+    </Button>
+  );
+};
 
 /*
  * Panle basic information
@@ -280,7 +335,10 @@ const PanelSetting: React.FC = () => {
     <>
       <Collapse
         expandIconPosition="left"
-        defaultActiveKey={['panelOptions', 'visualizations', 'standardOptions', 'thresholds']}>
+        defaultActiveKey={['chartOptions', 'panelOptions', 'visualizations', 'standardOptions', 'thresholds']}>
+        <Collapse.Panel header="Chart repo. options" itemKey="chartOptions">
+          <ChartRepoOptionsForm />
+        </Collapse.Panel>
         <Collapse.Panel header="Panel options" itemKey="panelOptions">
           <PanelOptionsForm />
         </Collapse.Panel>
@@ -291,7 +349,6 @@ const PanelSetting: React.FC = () => {
           <OptionsEditor
             panel={ObjectKit.merge(VisualizationRepositoryInst.getDefaultOptions(`${panel.type}`), panel)}
             onOptionsChange={(options: PanelSetting) => {
-              console.error('option ccc', options);
               modifyPanel(options);
             }}
           />
