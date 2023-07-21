@@ -18,11 +18,13 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/datatypes"
 
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
@@ -317,6 +319,192 @@ func TestDashboardService_GetDashboardsByChartUID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
 			_, err := srv.GetDashboardsByChartUID(ctx, "1234")
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestDashboardService_DeleteProvisioningDashboard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	srv := NewDashboardService(nil, mockDB)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "remove dashboards failure",
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"uid in (select dashboard_uid from dashboard_provisionings where org_id=? and name=? and external=?)",
+					int64(10), "name", "e").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "remove provisioning dashboards failure",
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"uid in (select dashboard_uid from dashboard_provisionings where org_id=? and name=? and external=?)",
+					int64(10), "name", "e").Return(nil)
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"org_id=? and name=? and external=?",
+					int64(10), "name", "e").Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "remove provisioning dashboards successfully",
+			prepare: func() {
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"uid in (select dashboard_uid from dashboard_provisionings where org_id=? and name=? and external=?)",
+					int64(10), "name", "e").Return(nil)
+				mockDB.EXPECT().Delete(gomock.Any(),
+					"org_id=? and name=? and external=?",
+					int64(10), "name", "e").Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.RemoveProvisioningDashboard(context.TODO(), &model.RemoveProvisioningDashboardRequest{
+				Org:      &model.Org{BaseModel: model.BaseModel{ID: 10}},
+				Name:     "name",
+				External: "e",
+			})
+
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestDashboardService_SaveProvisioningDashboard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	srv := NewDashboardService(nil, mockDB)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		body    datatypes.JSON
+		wantErr bool
+	}{
+		{
+			name: "title empty",
+			prepare: func() {
+			},
+			wantErr: true,
+		},
+		{
+			name: "uid empty",
+			body: datatypes.JSON(`{"title":"title"}`),
+			prepare: func() {
+			},
+			wantErr: true,
+		},
+		{
+			name: "check dashboard failure",
+			body: datatypes.JSON(`{"title":"title","uid":"123"}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(false, fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update dashboard failure",
+			body: datatypes.JSON(`{"title":"title","uid":"123"}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(true, nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update provisioning dashboard failure",
+			body: datatypes.JSON(`{"title":"title","uid":"123"}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(true, nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "dashboard_uid=? and org_id=?", "123", int64(10)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update provisioning dashboard successfully",
+			body: datatypes.JSON(`{"title":"title","uid":"123"}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(true, nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(nil)
+				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "dashboard_uid=? and org_id=?", "123", int64(10)).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "create dashboard failure",
+			body: datatypes.JSON(`{"title":"title","uid":"123"}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(false, nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "create provisioning dashboard failure",
+			body: datatypes.JSON(`{"title":"title","uid":"123"}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(false, nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "create provisioning dashboard successfully",
+			body: datatypes.JSON(`{"title":"title","uid":"123"}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(false, nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			err := srv.SaveProvisioningDashboard(context.TODO(), &model.SaveProvisioningDashboardRequest{
+				Org: &model.Org{BaseModel: model.BaseModel{ID: 10}},
+				Dashboard: &model.Dashboard{
+					Config: tt.body,
+				},
+				Provisioning: &model.DashboardProvisioning{
+					Name:     "name",
+					External: "e",
+				},
+			})
+
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

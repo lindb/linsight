@@ -21,6 +21,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
@@ -47,6 +48,11 @@ type DashboardService interface {
 	UnstarDashboard(ctx context.Context, uid string) error
 	// GetDashboardsByChartUID returns dashboards by chart.
 	GetDashboardsByChartUID(ctx context.Context, chartUID string) (rs []model.Dashboard, err error)
+
+	// SaveProvisioningDashboard saves provision dashboard from external.
+	SaveProvisioningDashboard(ctx context.Context, req *model.SaveProvisioningDashboardRequest) error
+	// RemoveProvisioningDashboard removes provision dashboard if not exist.
+	RemoveProvisioningDashboard(ctx context.Context, req *model.RemoveProvisioningDashboardRequest) error
 }
 
 // dashboardService implements DashboardService interface.
@@ -182,6 +188,66 @@ func (srv *dashboardService) GetDashboardsByChartUID(ctx context.Context, chartU
 		return nil, err
 	}
 	return
+}
+
+// SaveProvisioningDashboard saves provision dashboard from external.
+func (srv *dashboardService) SaveProvisioningDashboard(ctx context.Context, req *model.SaveProvisioningDashboardRequest) error {
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		dashboard := req.Dashboard
+		dashboard.ReadMeta()
+		// check dashboard data if valid
+		if dashboard.Title == "" {
+			return constant.ErrDashboardTitleEmpty
+		}
+		if dashboard.UID == "" {
+			return constant.ErrDashboardUIDEmpty
+		}
+
+		// persist provisioning dashboard data
+		req.Provisioning.DashboardUID = dashboard.UID
+		exist, err := tx.Exist(&model.Dashboard{}, "uid=? and org_id=?", dashboard.UID, req.Org.ID)
+		if err != nil {
+			return err
+		}
+		if exist {
+			// update dashboard
+			if err := tx.Updates(&model.Dashboard{}, dashboard,
+				"uid=? and org_id=?", dashboard.UID, req.Org.ID); err != nil {
+				return err
+			}
+			if err := tx.Updates(&model.DashboardProvisioning{},
+				req.Provisioning, "dashboard_uid=? and org_id=?",
+				dashboard.UID, req.Org.ID); err != nil {
+				return err
+			}
+		} else {
+			// create dashboard
+			if err := tx.Create(dashboard); err != nil {
+				return err
+			}
+			if err := tx.Create(req.Provisioning); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// RemoveProvisioningDashboard removes provision dashboard if not exist.
+func (srv *dashboardService) RemoveProvisioningDashboard(ctx context.Context, req *model.RemoveProvisioningDashboardRequest) error {
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		if err := tx.Delete(&model.Dashboard{},
+			"uid in (select dashboard_uid from dashboard_provisionings where org_id=? and name=? and external=?)",
+			req.Org.ID, req.Name, req.External); err != nil {
+			return err
+		}
+		if err := tx.Delete(&model.DashboardProvisioning{},
+			"org_id=? and name=? and external=?",
+			req.Org.ID, req.Name, req.External); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
 // toggleStar toggles the dashboard star.

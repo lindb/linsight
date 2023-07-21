@@ -84,7 +84,7 @@ type Dashboard struct {
 	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
 
 	UID         string `json:"uid,omitempty" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
-	Title       string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title,unique"`
+	Title       string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title"`
 	Desc        string `json:"description,omitempty" gorm:"column:desc"`
 	Integration string `json:"integration,omitempty" gorm:"column:integration"`
 	Version     int    `json:"version,omitempty" gorm:"column:version"`
@@ -93,6 +93,33 @@ type Dashboard struct {
 
 	// FIXME: need remove
 	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
+}
+
+// DashboardProvisioning represents dashboard provisioning information.
+type DashboardProvisioning struct {
+	BaseModel
+
+	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_provision,unique"`
+
+	DashboardUID   string `gorm:"column:dashboard_uid;index:u_idx_dashboard_provision,unique"`
+	Name           string `gorm:"column:name"`
+	AllowUIUpdates bool   `gorm:"column:allow_ui_updates"`
+	External       string `gorm:"column:external"`
+	Checksum       string `gorm:"column:check_sum"`
+}
+
+// SaveProvisioningDashboardRequest represents save provisioning dashboard request.
+type SaveProvisioningDashboardRequest struct {
+	Org          *Org
+	Dashboard    *Dashboard
+	Provisioning *DashboardProvisioning
+}
+
+// RemoveProvisioningDashboardRequest represents remove provisioning dashboard request.
+type RemoveProvisioningDashboardRequest struct {
+	Org      *Org
+	Name     string
+	External string
 }
 
 // ReadMeta reads dashboard metadata from json data.

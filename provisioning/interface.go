@@ -15,13 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package constant
+package provisioning
 
-import "errors"
-
-var (
-	ErrUserDisabled        = errors.New("user disabled")
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrDashboardTitleEmpty = errors.New("dashboard title is required")
-	ErrDashboardUIDEmpty   = errors.New("dashboard uid is required")
+import (
+	depspkg "github.com/lindb/linsight/provisioning/deps"
 )
+
+//go:generate mockgen -source=./interface.go -destination=./interface_mock.go -package=provisioning
+
+// NewProviderLoader represents create provider loader function.
+type NewProviderLoader func(fileName string, deps *depspkg.ProvisioningDeps) (ProviderLoader, error)
+
+// ProviderLoader represents provisioning provider loader.
+type ProviderLoader interface {
+	// Load returns provisioning providers from config file.
+	Load() []Provider
+}
+
+// Provider represents provisioning provider.
+type Provider interface {
+	// Name returns provider's identification.
+	Name() string
+	// Run runs provisioning resource discovery.
+	Run()
+}

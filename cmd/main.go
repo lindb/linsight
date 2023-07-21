@@ -24,12 +24,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/lindb/common/pkg/fileutil"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/plugin/datasource"
+	provisioningdeps "github.com/lindb/linsight/provisioning/deps"
+	provisionservice "github.com/lindb/linsight/provisioning/service"
 	"github.com/lindb/linsight/service"
 )
 
@@ -40,6 +43,7 @@ const (
 )
 
 var (
+	log     = logger.GetLogger("CMD", "Main")
 	cfgFile = ""
 )
 
@@ -103,8 +107,27 @@ func runServer(_ *cobra.Command, _ []string) error {
 		go func() {
 			apiServer := http.NewServer(cfg.HTTP)
 			engine := apiServer.GetEngine()
-			router := http.NewRouter(engine, buildDeps(db, cfg))
+			apiDeps := buildDeps(db, cfg)
+			router := http.NewRouter(engine, apiDeps)
 			router.RegisterRouters()
+
+			provisionSrv := provisionservice.NewProvisionService(&provisioningdeps.ProvisioningDeps{
+				BaseDir:      cfg.Provisioning,
+				OrgSrv:       apiDeps.OrgSrv,
+				DashboardSrv: apiDeps.DashboardSrv,
+			})
+			defer func() {
+				if err := provisionSrv.Shutdown(); err != nil {
+					log.Error("shutdown provisioning service failure", logger.Error(err))
+				}
+				if err := db.Close(); err != nil {
+					log.Error("close db failure", logger.Error(err))
+				}
+			}()
+			if err := provisionSrv.Run(); err != nil {
+				panic(err)
+			}
+
 			if err := apiServer.Run(); err != nil {
 				panic(err)
 			}

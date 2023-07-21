@@ -18,10 +18,11 @@
 package uuid
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShortUUID_Generate(t *testing.T) {
-	fmt.Println(GenerateShortUUID())
+	assert.NotEmpty(t, GenerateShortUUID())
 }
