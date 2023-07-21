@@ -15,13 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package constant
+package deps
 
-import "errors"
+import "github.com/lindb/linsight/service"
 
-var (
-	ErrUserDisabled        = errors.New("user disabled")
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrDashboardTitleEmpty = errors.New("dashboard title is required")
-	ErrDashboardUIDEmpty   = errors.New("dashboard uid is required")
-)
+// ProvisioningDeps represents provisioning runtime deps;
+type ProvisioningDeps struct {
+	BaseDir      string
+	OrgSrv       service.OrgService
+	DashboardSrv service.DashboardService
+}

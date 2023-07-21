@@ -19,6 +19,7 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -48,11 +49,12 @@ type HTTP struct {
 }
 
 type Server struct {
-	Migration bool            `envPrefix:"LINSIGHT_MIGRATION" toml:"migration"`
-	Database  *Database       `envPrefix:"LINSIGHT_DATABASE_" toml:"database"`
-	HTTP      *HTTP           `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
-	Cookie    *Cookie         `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
-	Logger    *logger.Setting `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
+	Migration    bool            `envPrefix:"LINSIGHT_MIGRATION" toml:"migration"`
+	Database     *Database       `envPrefix:"LINSIGHT_DATABASE_" toml:"database"`
+	HTTP         *HTTP           `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
+	Cookie       *Cookie         `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
+	Provisioning string          `envPrefix:"LINSIGHT_PROVISIONING" toml:"provisioning"`
+	Logger       *logger.Setting `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
 }
 
 func NewDefaultServer() *Server {
@@ -68,6 +70,7 @@ func NewDefaultServer() *Server {
 			WriteTimeout: ltoml.Duration(time.Second * 30),
 			ReadTimeout:  ltoml.Duration(time.Second * 30),
 		},
+		Provisioning: filepath.Join(".", "data", "provisioning"),
 		Cookie: &Cookie{
 			Name:   constant.LinSightCookie,
 			MaxAge: ltoml.Duration(time.Hour * 24 * 30),

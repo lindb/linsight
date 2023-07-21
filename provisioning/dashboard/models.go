@@ -15,13 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package constant
+package dashboard
 
-import "errors"
+// ProviderType represents dashboard provider type.
+type ProviderType string
 
-var (
-	ErrUserDisabled        = errors.New("user disabled")
-	ErrInvalidCredentials  = errors.New("invalid credentials")
-	ErrDashboardTitleEmpty = errors.New("dashboard title is required")
-	ErrDashboardUIDEmpty   = errors.New("dashboard uid is required")
+const (
+	FileProvider ProviderType = "file"
 )
+
+// Config represents dashboard provisioning configuration.
+type Config struct {
+	Providers []Provider
+}
+
+// Provider represents dashboard provider's configuration.
+type Provider struct {
+	Name            string         `yaml:"name"`
+	Type            ProviderType   `yaml:"type"`
+	OrgUID          string         `yaml:"orgUid"`
+	Editable        bool           `yaml:"editable"`
+	DisableDeletion bool           `yaml:"disableDeletion"`
+	AllowUIUpdates  bool           `yaml:"allowUiUpdates"`
+	Options         map[string]any `yaml:"options"`
+}

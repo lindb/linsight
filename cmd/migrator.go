@@ -22,6 +22,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/lindb/common/pkg/logger"
+
 	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
@@ -57,6 +59,12 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		panic(err)
 	}
+	defer func() {
+		if err = db.Close(); err != nil {
+			log.Error("close db failure when do migration", logger.Error(err))
+		}
+	}()
+
 	migrator := dbpkg.NewMigrator(db)
 	orgUser := dbpkg.NewMigration(&model.OrgUser{})
 	orgUser.AddInitRecord(
@@ -71,6 +79,7 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.Star{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Preference{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Dashboard{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.DashboardProvisioning{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Chart{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Link{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Team{}))
