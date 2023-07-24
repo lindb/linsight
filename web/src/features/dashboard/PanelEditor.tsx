@@ -20,7 +20,7 @@ import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
 import SplitPane from 'react-split-pane';
 import { PanelSetting as PanelOptions } from '@src/types';
 import { DatasourceSelectForm, Notification, Panel, QueryEditor } from '@src/components';
-import { get, isEmpty, omit } from 'lodash-es';
+import { get, isEmpty } from 'lodash-es';
 import { DashboardStore, DatasourceStore } from '@src/stores';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DatasourceInstance } from '@src/types';

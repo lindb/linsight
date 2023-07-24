@@ -22,6 +22,7 @@ import {
   IconDeleteStroked,
   IconCopyStroked,
   IconMenu,
+  IconUnlink,
 } from '@douyinfe/semi-icons';
 import { DataSetType, PanelSetting, Tracker, VisualizationPlugin, VisualizationRepositoryInst } from '@src/types';
 import React, {
@@ -35,13 +36,13 @@ import React, {
   MutableRefObject,
   useMemo,
 } from 'react';
-import { Icon, LazyLoad, SimpleStatusTip, AddToCharts } from '@src/components';
+import { Icon, LazyLoad, SimpleStatusTip, AddToCharts, UnlinkChart } from '@src/components';
 import { PlatformContext } from '@src/contexts';
 import { useMetric, useRequest } from '@src/hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardStore } from '@src/stores';
 import classNames from 'classnames';
-import { get, isEmpty, pick, cloneDeep, isArray, omit, has } from 'lodash-es';
+import { get, isEmpty, pick, cloneDeep, isArray, omit, has, unset } from 'lodash-es';
 import { ChartKit, DataSetKit, ObjectKit } from '@src/utils';
 import './panel.scss';
 import { ChartPropsKey, PanelVisualizationOptions } from '@src/constants';
@@ -65,6 +66,7 @@ const PanelHeader = forwardRef(
     const navigate = useNavigate();
     const [menuVisible, setMenuVisible] = useState(false);
     const [addChartVisible, setAddChartVisible] = useState(false);
+    const [unlinkVisible, setUnlinkVisible] = useState(false);
     const addToChartBtn = useRef<any>();
     useImperativeHandle(ref, () => ({
       // panel invoke, reduce panel rerender
@@ -73,8 +75,42 @@ const PanelHeader = forwardRef(
       },
     }));
 
+    const renderChartRepo = () => {
+      if (has(panel, ChartPropsKey)) {
+        // unlink
+        return (
+          <Dropdown.Item icon={<IconUnlink />} onClick={() => setUnlinkVisible(true)}>
+            Unlink chart
+          </Dropdown.Item>
+        );
+      }
+      // link
+      return (
+        <Dropdown.Item
+          icon={<Icon icon="repo" />}
+          onClick={() => {
+            const chartCfg = cloneDeep(panel);
+            // init integration if has dashboard
+            chartCfg.integration = DashboardStore.dashboard?.integration;
+            addToChartBtn.current.setOptions(chartCfg);
+            setAddChartVisible(true);
+          }}>
+          Save as chart
+        </Dropdown.Item>
+      );
+    };
+
     return (
       <div className="panel-header grid-drag-handle">
+        <UnlinkChart
+          visible={unlinkVisible}
+          setVisible={setUnlinkVisible}
+          unlinkChart={() => {
+            const chartCfg = cloneDeep(panel);
+            unset(chartCfg, 'libraryPanel');
+            DashboardStore.updatePanel(chartCfg);
+          }}
+        />
         <div className="title">
           {panel.title && (
             <>
@@ -125,19 +161,7 @@ const PanelHeader = forwardRef(
                   }}>
                   Explore
                 </Dropdown.Item>
-                {!has(panel, ChartPropsKey) && (
-                  <Dropdown.Item
-                    icon={<Icon icon="repo" />}
-                    onClick={() => {
-                      const chartCfg = cloneDeep(panel);
-                      // init integration if has dashboard
-                      chartCfg.integration = DashboardStore.dashboard?.integration;
-                      addToChartBtn.current.setOptions(chartCfg);
-                      setAddChartVisible(true);
-                    }}>
-                    Save as chart
-                  </Dropdown.Item>
-                )}
+                {renderChartRepo()}
                 <Dropdown.Divider />
                 {!isStatic && (
                   <Dropdown.Item
@@ -152,7 +176,19 @@ const PanelHeader = forwardRef(
             <IconMenu className="btn" style={{ display: menuVisible ? 'block' : 'none' }} />
           </Dropdown>
         )}
-        <AddToCharts ref={addToChartBtn} visible={addChartVisible} setVisible={setAddChartVisible} />
+        <AddToCharts
+          ref={addToChartBtn}
+          link={(chart: any) => {
+            DashboardStore.updatePanelConfig(panel, {
+              libraryPanel: {
+                uid: chart.uid,
+                name: chart.title,
+              },
+            });
+          }}
+          visible={addChartVisible}
+          setVisible={setAddChartVisible}
+        />
       </div>
     );
   }

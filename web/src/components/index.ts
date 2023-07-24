@@ -43,6 +43,7 @@ export { default as MetricExplore } from '@src/components/explore/MetricExplore'
 export { default as AddToCharts } from '@src/components/explore/AddToCharts';
 export { default as AddToDashboard } from '@src/components/explore/AddToDashboard';
 
+export { default as UnlinkChart } from '@src/components/dashboard/UnlinkChart';
 export { default as AddPanelWidget } from '@src/components/dashboard/AddPanelWidget';
 export { default as Panel } from '@src/components/dashboard/Panel';
 
