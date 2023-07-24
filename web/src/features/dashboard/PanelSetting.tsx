@@ -24,7 +24,6 @@ import {
   Dropdown,
   Form,
   Input,
-  Modal,
   Radio,
   Select,
   SplitButtonGroup,
@@ -45,7 +44,7 @@ import {
 import { ColorKit, ObjectKit } from '@src/utils';
 import { get, set, isEmpty, size, isNil, orderBy, maxBy, has, cloneDeep, unset } from 'lodash-es';
 import { PanelEditContext } from '@src/contexts';
-import { IntegrationIcon, StatusTip, VisualizationIcon } from '@src/components';
+import { IntegrationIcon, StatusTip, UnlinkChart, VisualizationIcon } from '@src/components';
 import { ChartSrv } from '@src/services';
 
 const { Text } = Typography;
@@ -61,17 +60,7 @@ const ChartInfo: React.FC = () => {
 
   return (
     <>
-      <Modal
-        title="Do you really want to unlink this panel?"
-        visible={visible}
-        closeOnEsc
-        okButtonProps={{ type: 'danger' }}
-        okText="Yes,Unlink"
-        onOk={() => unlinkChart()}
-        onCancel={() => setVisible(false)}>
-        If you unlink this panel, you can edit it without affecting other dashboards. But once you make changes, you
-        cannot go back to the original reusable panel.
-      </Modal>
+      <UnlinkChart visible={visible} setVisible={setVisible} unlinkChart={unlinkChart} />
       <SplitButtonGroup>
         <Button icon={<IconUnlink />} type="tertiary" onClick={() => setVisible(true)} />
         <Button

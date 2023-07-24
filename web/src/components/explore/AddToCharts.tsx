@@ -17,7 +17,7 @@ under the License.
 */
 import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { Button, Form, Modal } from '@douyinfe/semi-ui';
-import { IconSaveStroked } from '@douyinfe/semi-icons';
+import { IconSaveStroked, IconLink } from '@douyinfe/semi-icons';
 import { PanelSetting } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
 import { ChartSrv } from '@src/services';
@@ -30,12 +30,13 @@ import { omit } from 'lodash-es';
 const AddToCharts = forwardRef(
   (
     props: {
+      link?: (chart: any) => void;
       visible: boolean;
       setVisible: (v: boolean) => void;
     },
     ref
   ) => {
-    const { visible, setVisible } = props;
+    const { link, visible, setVisible } = props;
     const chartOptions = useRef<PanelSetting>();
     const formApi = useRef<any>();
     const [submitting, setSubmitting] = useState(false);
@@ -50,7 +51,12 @@ const AddToCharts = forwardRef(
       setSubmitting(true);
       try {
         const panel = ObjectKit.merge(chartOptions.current || {}, values);
-        await ChartSrv.createChart(omit(panel, ['id', 'gridPos', 'desc']));
+        const chart = omit(panel, ['id', 'gridPos', 'desc']) as any;
+        const chartUid = await ChartSrv.createChart(chart);
+        if (link) {
+          chart.uid = chartUid;
+          link(chart);
+        }
         Notification.success('Save chart successfully');
         setVisible(false);
       } catch (err) {
@@ -86,6 +92,21 @@ const AddToCharts = forwardRef(
                 }}>
                 Save
               </Button>
+              {link && (
+                <Button
+                  icon={<IconLink />}
+                  loading={submitting}
+                  type="primary"
+                  theme="solid"
+                  onClick={() => {
+                    if (!formApi.current) {
+                      return;
+                    }
+                    formApi.current.submitForm();
+                  }}>
+                  Save and link
+                </Button>
+              )}
             </>
           }>
           <Form
