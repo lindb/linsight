@@ -58,7 +58,7 @@ const View: React.FC = () => {
       case RowPanelType:
         return <RowPanel key={`${panel.id}`} panel={panel} />;
       default:
-        return <Panel key={`${panel.id}`} panel={panel} shortcutKey menu />;
+        return <Panel key={`${panel.id}`} panel={panel} shortcutKey menu isStatic={!DashboardStore.canEdit()} />;
     }
   };
 

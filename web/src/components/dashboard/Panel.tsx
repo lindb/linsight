@@ -161,8 +161,8 @@ const PanelHeader = forwardRef(
                   }}>
                   Explore
                 </Dropdown.Item>
-                {renderChartRepo()}
-                <Dropdown.Divider />
+                {!isStatic && renderChartRepo()}
+                {isStatic && <Dropdown.Divider />}
                 {!isStatic && (
                   <Dropdown.Item
                     icon={<IconDeleteStroked />}

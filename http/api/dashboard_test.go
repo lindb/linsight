@@ -317,6 +317,20 @@ func TestDashboardAPI_GetDashboardByUID(t *testing.T) {
 			},
 		},
 		{
+			name: "get provisioning dashboard failure",
+			prepare: func() {
+				var dashboard datatypes.JSON
+				_ = encoding.JSONUnmarshal([]byte("{}"), &dashboard)
+				dashboardSrv.EXPECT().GetDashboardByUID(gomock.Any(), "1234").Return(&model.Dashboard{
+					Config: dashboard,
+				}, nil)
+				dashboardSrv.EXPECT().GetProvisioningDashboard(gomock.Any(), "1234").Return(nil, fmt.Errorf("err"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
 			name: "get dashboard successfully",
 			prepare: func() {
 				var dashboard datatypes.JSON
@@ -324,6 +338,7 @@ func TestDashboardAPI_GetDashboardByUID(t *testing.T) {
 				dashboardSrv.EXPECT().GetDashboardByUID(gomock.Any(), "1234").Return(&model.Dashboard{
 					Config: dashboard,
 				}, nil)
+				dashboardSrv.EXPECT().GetProvisioningDashboard(gomock.Any(), "1234").Return(&model.DashboardProvisioning{AllowUIUpdates: false}, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)

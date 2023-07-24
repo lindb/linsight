@@ -95,6 +95,20 @@ type Dashboard struct {
 	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
 }
 
+// DashboardMeta represents dashboard metadata.
+type DashboardMeta struct {
+	CanEdit     bool `json:"canEdit"`
+	Provisioned bool `json:"provisioned"`
+}
+
+// NewDashboardMeta creates a dashboard metadata.
+func NewDashboardMeta() DashboardMeta {
+	return DashboardMeta{
+		CanEdit:     true,
+		Provisioned: false,
+	}
+}
+
 // DashboardProvisioning represents dashboard provisioning information.
 type DashboardProvisioning struct {
 	BaseModel

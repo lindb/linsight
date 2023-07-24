@@ -19,7 +19,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
+
+	"gorm.io/gorm"
 
 	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
@@ -53,6 +56,8 @@ type DashboardService interface {
 	SaveProvisioningDashboard(ctx context.Context, req *model.SaveProvisioningDashboardRequest) error
 	// RemoveProvisioningDashboard removes provision dashboard if not exist.
 	RemoveProvisioningDashboard(ctx context.Context, req *model.RemoveProvisioningDashboardRequest) error
+	// GetProvisioningDashboard returns provisioning dashboard by given dashboard uid.
+	GetProvisioningDashboard(ctx context.Context, dashboardUID string) (*model.DashboardProvisioning, error)
 }
 
 // dashboardService implements DashboardService interface.
@@ -248,6 +253,19 @@ func (srv *dashboardService) RemoveProvisioningDashboard(ctx context.Context, re
 		}
 		return nil
 	})
+}
+
+// GetProvisioningDashboard returns provisioning dashboard by given dashboard uid.
+func (srv *dashboardService) GetProvisioningDashboard(ctx context.Context, dashboardUID string) (*model.DashboardProvisioning, error) {
+	rs := &model.DashboardProvisioning{}
+	signedUser := util.GetUser(ctx)
+	if err := srv.db.Get(rs, "dashboard_uid=? and org_id=?", dashboardUID, signedUser.Org.ID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return rs, nil
 }
 
 // toggleStar toggles the dashboard star.
