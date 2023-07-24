@@ -33,14 +33,13 @@ import {
   Dropdown,
   Modal,
   Tag,
-  Tooltip,
 } from '@douyinfe/semi-ui';
 import { IconPlusStroked, IconSearchStroked, IconHandle, IconDeleteStroked } from '@douyinfe/semi-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { StatusTip, Notification, AddToDashboard, IntegrationIcon, VisualizationIcon } from '@src/components';
 import { isEmpty } from 'lodash-es';
-import { useRequest } from '@src/hooks';
-import { Chart, VisualizationRepositoryInst } from '@src/types';
+import { usePagination, useRequest } from '@src/hooks';
+import { Chart } from '@src/types';
 import './chart.scss';
 import ChartDetailModal from './ChartDetail';
 import { ApiKit } from '@src/utils';
@@ -52,6 +51,7 @@ const ListChart: React.FC = () => {
   const navigate = useNavigate();
   const title = searchParams.get('title') || '';
   const ownership = searchParams.get('ownership') || '0';
+  const { currentPage, pageSize, offset, onChange } = usePagination(1, 20);
   const [visible, setVisible] = useState(false);
   const [dashboardVisible, setDashboardVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
@@ -60,8 +60,8 @@ const ListChart: React.FC = () => {
   const currentChart = useRef<Chart>();
   const currentSelectedRows = useRef<any>();
 
-  const { result, loading, error, refetch } = useRequest(['fetch-charts', title, ownership], () =>
-    ChartSrv.searchCharts({ title: title, ownership: ownership })
+  const { result, loading, error, refetch } = useRequest(['fetch-charts', title, ownership, offset, pageSize], () =>
+    ChartSrv.searchCharts({ title: title, ownership: ownership, limit: pageSize, offset: offset })
   );
 
   return (
@@ -134,7 +134,16 @@ const ListChart: React.FC = () => {
                   pagination={
                     isEmpty(result?.charts)
                       ? false
-                      : { total: result?.total || 0, pageSize: 20, style: { marginLeft: 8 } }
+                      : {
+                          total: result?.total || 0,
+                          pageSize: pageSize,
+                          currentPage: currentPage,
+                          style: { marginLeft: 8 },
+                          showSizeChanger: true,
+                          onChange: (currentPage: number, pageSize: number) => {
+                            onChange(currentPage, pageSize);
+                          },
+                        }
                   }
                   rowSelection={{
                     onChange: (selectedRowKeys: any, selectedRows: any) => {
