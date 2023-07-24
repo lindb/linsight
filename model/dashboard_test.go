@@ -141,3 +141,9 @@ func TestDashboard_GetCharts(t *testing.T) {
 		})
 	}
 }
+
+func TestDashboard_NewDashboardMeta(t *testing.T) {
+	meta := NewDashboardMeta()
+	assert.True(t, meta.CanEdit)
+	assert.False(t, meta.Provisioned)
+}

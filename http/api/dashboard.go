@@ -109,19 +109,33 @@ func (api *DashboardAPI) DeleteDashboardByUID(c *gin.Context) {
 // GetDashboardByUID gets dashboard by given uid.
 func (api *DashboardAPI) GetDashboardByUID(c *gin.Context) {
 	uid := c.Param(constant.UID)
-	dashboard, err := api.deps.DashboardSrv.GetDashboardByUID(c.Request.Context(), uid)
+	ctx := c.Request.Context()
+	dashboard, err := api.deps.DashboardSrv.GetDashboardByUID(ctx, uid)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	var dashboardMap map[string]any
-	if err := jsonUnmarshalFn(dashboard.Config, &dashboardMap); err != nil {
+	if err = jsonUnmarshalFn(dashboard.Config, &dashboardMap); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	dashboardMap[constant.UID] = uid
+	provisioningDashboard, err := api.deps.DashboardSrv.GetProvisioningDashboard(ctx, uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	meta := model.NewDashboardMeta()
+	if provisioningDashboard != nil {
+		meta.Provisioned = true
+		if !provisioningDashboard.AllowUIUpdates {
+			meta.CanEdit = false
+		}
+	}
 	httppkg.OK(c, gin.H{
 		"dashboard": dashboardMap,
+		"meta":      meta,
 	})
 }
 

@@ -25,6 +25,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/db"
@@ -505,6 +506,53 @@ func TestDashboardService_SaveProvisioningDashboard(t *testing.T) {
 				},
 			})
 
+			if tt.wantErr != (err != nil) {
+				t.Fatal(tt.name)
+			}
+		})
+	}
+}
+
+func TestDashboardService_GetProvisioningDashboard(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewDashboardService(nil, mockDB)
+
+	cases := []struct {
+		name    string
+		prepare func()
+		wantErr bool
+	}{
+		{
+			name: "get dashboard failure",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "dashboard_uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "not found",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "dashboard_uid=? and org_id=?", "1234", int64(12)).Return(gorm.ErrRecordNotFound)
+			},
+			wantErr: false,
+		},
+		{
+			name: "found dashboard",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "dashboard_uid=? and org_id=?", "1234", int64(12)).Return(nil)
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tt.prepare()
+			_, err := srv.GetProvisioningDashboard(ctx, "1234")
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

@@ -25,7 +25,7 @@ import {
   VisualizationAddPanelType,
 } from '@src/constants';
 import { DashboardSrv } from '@src/services';
-import { Dashboard, GridPos, PanelSetting, Variable, Tracker, Chart } from '@src/types';
+import { Dashboard, GridPos, PanelSetting, Variable, Tracker, Chart, DashboardMeta } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
 import {
   set,
@@ -49,6 +49,7 @@ class DashboardStore {
   private panelSeq = 0;
   private dashboardTracker: Tracker<Dashboard> = new Tracker<Dashboard>({});
   public dashboard: Dashboard = {};
+  public meta: DashboardMeta = {} as any;
 
   constructor() {
     makeAutoObservable(this);
@@ -276,6 +277,10 @@ class DashboardStore {
     });
   }
 
+  canEdit(): boolean {
+    return get(this.meta, 'canEdit', false);
+  }
+
   async loadDashbaord(dashboardId: string | null) {
     try {
       // reset panel seq when load dashboard
@@ -285,6 +290,10 @@ class DashboardStore {
         const panels: PanelSetting[] = [];
         this.dashboard = {
           title: ChartPendingAddStore.dashboadTitle || 'New Dashboard',
+        };
+        this.meta = {
+          canEdit: true,
+          provisioned: false,
         };
         if (isEmpty(charts)) {
           const panelId = this.assignPanelId();
@@ -315,6 +324,7 @@ class DashboardStore {
       try {
         const dashboard = await DashboardSrv.getDashboard(`${dashboardId}`);
         this.initDashboard(dashboard.dashboard);
+        this.meta = dashboard.meta;
       } catch (err) {
         console.warn('load dashobard error', err);
         Notification.error(ApiKit.getErrorMsg(err));

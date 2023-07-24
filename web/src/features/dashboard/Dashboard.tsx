@@ -364,7 +364,7 @@ const Dashboard: React.FC = () => {
                   }}
                 />
               )}
-              <SaveDashboard />
+              {DashboardStore.canEdit() && <SaveDashboard />}
               <Button
                 type="tertiary"
                 icon={<IconSettingStroked />}

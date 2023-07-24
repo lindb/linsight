@@ -19,6 +19,7 @@ import { PanelSetting, Query } from '@src/types';
 
 export interface DashboardDetail {
   dashboard: Dashboard;
+  meta: DashboardMeta;
 }
 
 export interface Variable {
@@ -43,6 +44,11 @@ export interface Dashboard {
   isStarred?: boolean;
   panels?: PanelSetting[];
   templating?: Record<string, Variable>;
+}
+
+export interface DashboardMeta {
+  canEdit: boolean;
+  provisioned: boolean;
 }
 
 export interface SearchDashboard {
