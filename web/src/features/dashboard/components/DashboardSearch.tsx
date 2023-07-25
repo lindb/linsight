@@ -40,7 +40,7 @@ import {
   IconHandle,
   IconDeleteStroked,
 } from '@douyinfe/semi-icons';
-import { useRequest } from '@src/hooks';
+import { usePagination, useRequest } from '@src/hooks';
 import { DashboardSrv } from '@src/services';
 import React, { useEffect, useState } from 'react';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
@@ -55,6 +55,7 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
   const { searchOnly } = props;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { currentPage, pageSize, offset, onChange } = usePagination(1, 20);
   const [params, setParams] = useState<SearchDashboard>({});
 
   useEffect(() => {
@@ -68,7 +69,9 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
     loading,
     error,
     refetch,
-  } = useRequest(['fetch-dashboards', params], () => DashboardSrv.searchDashboards(params));
+  } = useRequest(['fetch-dashboards', params, offset, pageSize], () =>
+    DashboardSrv.searchDashboards({ limit: pageSize, offset: offset, ...params })
+  );
 
   const getColumns = () => {
     const columns: ColumnProps[] = [
@@ -245,7 +248,16 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
                 pagination={
                   isEmpty(data?.dashboards)
                     ? false
-                    : { total: data?.total || 0, pageSize: 20, style: { marginLeft: 8 } }
+                    : {
+                        total: data?.total || 0,
+                        pageSize: pageSize,
+                        currentPage: currentPage,
+                        style: { marginLeft: 8 },
+                        showSizeChanger: true,
+                        onChange: (currentPage: number, pageSize: number) => {
+                          onChange(currentPage, pageSize);
+                        },
+                      }
                 }
                 columns={getColumns()}
                 scroll={{ y: 400 }}

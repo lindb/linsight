@@ -28,6 +28,8 @@ export interface Chart {
 }
 
 export interface SearchChart {
+  limit?: number;
+  offset?: number;
   title?: string;
   ownership?: string;
   tags?: string[];

@@ -52,6 +52,8 @@ export interface DashboardMeta {
 }
 
 export interface SearchDashboard {
+  limit?: number;
+  offset?: number;
   title?: string;
   ownership?: string;
   tags?: string[];

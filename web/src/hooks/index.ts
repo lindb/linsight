@@ -20,3 +20,4 @@ export * from '@src/hooks/use.metric';
 export * from '@src/hooks/use.request';
 export * from '@src/hooks/use.event';
 export * from '@src/hooks/use.variable';
+export * from '@src/hooks/use.pagination';

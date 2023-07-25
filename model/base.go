@@ -31,6 +31,6 @@ type BaseModel struct {
 
 // PagingParam represents pagination params.
 type PagingParam struct {
-	Offset int `json:"offset"`
-	Limit  int `json:"limit"`
+	Offset int `form:"offset" json:"offset"`
+	Limit  int `form:"limit" json:"limit"`
 }

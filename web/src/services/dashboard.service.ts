@@ -47,19 +47,6 @@ const searchDashboards = (req: SearchDashboard): Promise<SearchDashboardResult> 
   return ApiKit.GET<SearchDashboardResult>(ApiPath.Dashboard, req);
 };
 
-// FIXME: remove it
-function getDashboardList() {
-  return [
-    { id: 1, favorite: false, type: 'kubernetes', name: 'Kubernetes workload overview', modified: 'Oct 14 00:00' },
-    { id: 2, favorite: true, type: 'linux', name: 'Host system overview', modified: 'Oct 14 00:00' },
-    { id: 3, favorite: false, type: 'java', name: 'JVM Metric', modified: 'Oct 14 00:00' },
-    { id: 4, favorite: false, type: 'redis', name: 'Redis overview', modified: 'Oct 14 00:00' },
-    { id: 5, favorite: false, type: 'go', name: 'Go runtime overview', modified: 'Oct 14 00:00' },
-    { id: 6, favorite: true, type: 'docker', name: 'Docker overview', modified: 'Oct 14 00:00' },
-    { id: 7, favorite: true, name: 'APM overview', modified: 'Oct 14 00:00' },
-  ];
-}
-
 function getMetricsList() {
   return [
     {
