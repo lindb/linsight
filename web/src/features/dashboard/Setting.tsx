@@ -38,10 +38,13 @@ const GeneralForm: React.FC = observer(() => {
       labelPosition="top"
       style={{ maxWidth: 650 }}
       getFormApi={(api: any) => (formApi.current = api)}
-      onValueChange={(values: any) => DashboardStore.updateDashboardProps(values)}>
+      onValueChange={(values: any) => {
+        DashboardStore.updateDashboardProps(values);
+      }}>
       <Form.Input label="Title" field="title" />
       <Form.TextArea label="Description" field="desc" />
       <IntegrationSelect />
+      <Form.TagInput label="Tag" field="tags" />
     </Form>
   );
 });

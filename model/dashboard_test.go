@@ -33,6 +33,26 @@ func TestDashboard_ReadMeta(t *testing.T) {
 	assert.Equal(t, "John", dashboard.Title)
 	assert.Equal(t, "desc", dashboard.Desc)
 	assert.Equal(t, "UID", dashboard.UID)
+	assert.Empty(t, dashboard.Tags)
+
+	dashboard = &Dashboard{
+		Config: datatypes.JSON(`{"tags": "John"}`),
+	}
+	dashboard.ReadMeta()
+	assert.Empty(t, dashboard.Tags)
+	dashboard = &Dashboard{
+		Config: datatypes.JSON(`{"tags": ["John"]}`),
+	}
+	dashboard.ReadMeta()
+	assert.Equal(t, []string{"John"}, dashboard.TagList)
+	assert.Equal(t, datatypes.JSON(`["John"]`), dashboard.Tags)
+
+	dashboard = &Dashboard{
+		Config: datatypes.JSON(`{"tags": [1]}`),
+	}
+	dashboard.ReadMeta()
+	assert.Equal(t, []string{"1"}, dashboard.TagList)
+	assert.Equal(t, datatypes.JSON(`["1"]`), dashboard.Tags)
 }
 
 func TestDashboard_PermissionType_String(t *testing.T) {

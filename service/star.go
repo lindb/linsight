@@ -29,12 +29,12 @@ import (
 
 // StarService represents user star manager interface.
 type StarService interface {
-	// Star stars a entity by id/type.
-	Star(ctx context.Context, entityID int64, entityType model.EntityType) error
-	// Unstar unstars a entity by id/type.
-	Unstar(ctx context.Context, entityID int64, entityType model.EntityType) error
-	// IsStarred checks if star the entity by id/type.
-	IsStarred(ctx context.Context, entityID int64, entityType model.EntityType) (bool, error)
+	// Star stars a resource by uid/type.
+	Star(ctx context.Context, resourceUID string, resourceType model.ResourceType) error
+	// Unstar unstars a resource by uid/type.
+	Unstar(ctx context.Context, resourceUID string, resourceType model.ResourceType) error
+	// IsStarred checks if star the resource by uid/type.
+	IsStarred(ctx context.Context, resourceUID string, resourceType model.ResourceType) (bool, error)
 }
 
 // starService implements StarService interface.
@@ -49,9 +49,9 @@ func NewStarService(db dbpkg.DB) StarService {
 	}
 }
 
-// Star stars a entity by id/type.
-func (srv *starService) Star(ctx context.Context, entityID int64, entityType model.EntityType) error {
-	started, err := srv.IsStarred(ctx, entityID, entityType)
+// Star stars a resource by uid/type.
+func (srv *starService) Star(ctx context.Context, resourceUID string, resourceType model.ResourceType) error {
+	started, err := srv.IsStarred(ctx, resourceUID, resourceType)
 	if err != nil {
 		return err
 	}
@@ -61,32 +61,32 @@ func (srv *starService) Star(ctx context.Context, entityID int64, entityType mod
 	signedUser := util.GetUser(ctx)
 	userID := signedUser.User.ID
 	star := &model.Star{
-		OrgID:      signedUser.Org.ID,
-		UserID:     userID,
-		EntityID:   entityID,
-		EntityType: entityType,
+		OrgID:        signedUser.Org.ID,
+		UserID:       userID,
+		ResourceUID:  resourceUID,
+		ResourceType: resourceType,
 	}
 	star.CreatedBy = userID
 	star.UpdatedBy = userID
 	return srv.db.Create(star)
 }
 
-// Unstar unstars a entity by id/type.
-func (srv *starService) Unstar(ctx context.Context, entityID int64, entityType model.EntityType) error {
+// Unstar unstars a resource by uid/type.
+func (srv *starService) Unstar(ctx context.Context, resourceUID string, resourceType model.ResourceType) error {
 	signedUser := util.GetUser(ctx)
 	return srv.db.Delete(
 		&model.Star{},
-		"user_id=? and org_id=? and entity_id=? and entity_type=?",
-		signedUser.User.ID, signedUser.Org.ID, entityID, entityType,
+		"user_id=? and org_id=? and resource_uid=? and resource_type=?",
+		signedUser.User.ID, signedUser.Org.ID, resourceUID, resourceType,
 	)
 }
 
-// IsStarred checks if star the entity by id/type.
-func (srv *starService) IsStarred(ctx context.Context, entityID int64, entityType model.EntityType) (bool, error) {
+// IsStarred checks if star the resource by uid/type.
+func (srv *starService) IsStarred(ctx context.Context, resourceUID string, resourceType model.ResourceType) (bool, error) {
 	signedUser := util.GetUser(ctx)
 	return srv.db.Exist(
 		&model.Star{},
-		"user_id=? and org_id=? and entity_id=? and entity_type=?",
-		signedUser.User.ID, signedUser.Org.ID, entityID, entityType,
+		"user_id=? and org_id=? and resource_uid=? and resource_type=?",
+		signedUser.User.ID, signedUser.Org.ID, resourceUID, resourceType,
 	)
 }

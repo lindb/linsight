@@ -154,6 +154,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	}
 	userSrv := service.NewUserService(db, orgSrv)
 	starSrv := service.NewStarService(db)
+	tagSrv := service.NewTagService(db)
 	return &deps.API{
 		Config:          cfg,
 		OrgSrv:          orgSrv,
@@ -163,8 +164,9 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		IntegrationSrv:  integrationSrv,
 		AuthorizeSrv:    authorizeSrv,
 		AuthenticateSrv: service.NewAuthenticateService(userSrv, db),
+		TagSrv:          tagSrv,
 		DatasourceSrv:   service.NewDatasourceService(db),
-		DashboardSrv:    service.NewDashboardService(starSrv, db),
+		DashboardSrv:    service.NewDashboardService(starSrv, tagSrv, db),
 		ChartSrv:        service.NewChartService(db),
 
 		DatasourceMgr: datasource.NewDatasourceManager(),

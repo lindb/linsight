@@ -98,7 +98,7 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 			prepare: func() {
 				dashboardSrv.EXPECT().CreateDashboard(gomock.Any(), gomock.Any()).Return("1234", nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
-				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.DashboardConnection).Return(fmt.Errorf("err"))
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.DashboardResource).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
@@ -110,7 +110,7 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 			prepare: func() {
 				dashboardSrv.EXPECT().CreateDashboard(gomock.Any(), gomock.Any()).Return("1234", nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
-				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.DashboardConnection).Return(nil)
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.DashboardResource).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -191,7 +191,7 @@ func TestDashboardAPI_UpdateDashboard(t *testing.T) {
 			prepare: func() {
 				dashboardSrv.EXPECT().UpdateDashboard(gomock.Any(), gomock.Any()).Return(nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
-				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.DashboardConnection).Return(fmt.Errorf("err"))
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.DashboardResource).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
@@ -203,7 +203,7 @@ func TestDashboardAPI_UpdateDashboard(t *testing.T) {
 			prepare: func() {
 				dashboardSrv.EXPECT().UpdateDashboard(gomock.Any(), gomock.Any()).Return(nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
-				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.DashboardConnection).Return(nil)
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.DashboardResource).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)

@@ -36,7 +36,11 @@ func TestDashboardService_CreateDashboard(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewDashboardService(nil, mockDB)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	tagSrv := NewMockTagService(ctrl)
+	srv := NewDashboardService(nil, tagSrv, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -50,9 +54,18 @@ func TestDashboardService_CreateDashboard(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "save tags failure",
+			prepare: func() {
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, gomock.Any(), model.DashboardResource).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
 			name: "create dashboard successfully",
 			prepare: func() {
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, gomock.Any(), model.DashboardResource).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -62,7 +75,7 @@ func TestDashboardService_CreateDashboard(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.CreateDashboard(ctx, &model.Dashboard{})
+			_, err := srv.CreateDashboard(ctx, &model.Dashboard{TagList: []string{"tag"}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -79,22 +92,33 @@ func TestDashboardService_DeleteDashboardByUID(t *testing.T) {
 		return fn(mockDB)
 	}).AnyTimes()
 
-	srv := NewDashboardService(nil, mockDB)
+	srv := NewDashboardService(nil, nil, mockDB)
 	t.Run("delete dashboard failure", func(t *testing.T) {
 		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
 		err := srv.DeleteDashboardByUID(ctx, "1234")
 		assert.Error(t, err)
 	})
+	t.Run("delete tags failure", func(t *testing.T) {
+		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+		mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and resource_uid=? and type=?", int64(12), "1234", model.DashboardResource).
+			Return(fmt.Errorf("xx"))
+		err := srv.DeleteDashboardByUID(ctx, "1234")
+		assert.Error(t, err)
+	})
 	t.Run("delete star failure", func(t *testing.T) {
 		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-		mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and entity_id=? and entity_type=?", int64(12), "1234", model.DasbboardEntity).
+		mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and resource_uid=? and type=?", int64(12), "1234", model.DashboardResource).
+			Return(nil)
+		mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and resource_uid=? and resource_type=?", int64(12), "1234", model.DashboardResource).
 			Return(fmt.Errorf("xx"))
 		err := srv.DeleteDashboardByUID(ctx, "1234")
 		assert.Error(t, err)
 	})
 	t.Run("delete successfully", func(t *testing.T) {
 		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-		mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and entity_id=? and entity_type=?", int64(12), "1234", model.DasbboardEntity).
+		mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and resource_uid=? and type=?", int64(12), "1234", model.DashboardResource).
+			Return(nil)
+		mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and resource_uid=? and resource_type=?", int64(12), "1234", model.DashboardResource).
 			Return(nil)
 		err := srv.DeleteDashboardByUID(ctx, "1234")
 		assert.NoError(t, err)
@@ -106,7 +130,11 @@ func TestDashboardService_UpdateDashboard(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewDashboardService(nil, mockDB)
+	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
+		return fn(mockDB)
+	}).AnyTimes()
+	tagSrv := NewMockTagService(ctrl)
+	srv := NewDashboardService(nil, tagSrv, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -120,10 +148,10 @@ func TestDashboardService_UpdateDashboard(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "update dashboard failure",
+			name: "update tags failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, "1234", model.DashboardResource).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
@@ -131,6 +159,16 @@ func TestDashboardService_UpdateDashboard(t *testing.T) {
 			name: "update dashboard failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, "1234", model.DashboardResource).Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
+		{
+			name: "update dashboard successfully",
+			prepare: func() {
+				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, "1234", model.DashboardResource).Return(nil)
 				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 			},
 			wantErr: false,
@@ -141,7 +179,7 @@ func TestDashboardService_UpdateDashboard(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.UpdateDashboard(ctx, &model.Dashboard{UID: "1234"})
+			err := srv.UpdateDashboard(ctx, &model.Dashboard{UID: "1234", TagList: []string{"tag"}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -155,7 +193,7 @@ func TestDashboardService_GetDashboardByUID(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	starSrv := NewMockStarService(ctrl)
-	srv := NewDashboardService(starSrv, mockDB)
+	srv := NewDashboardService(starSrv, nil, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -204,7 +242,7 @@ func TestDashboardService_Star(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	starSrv := NewMockStarService(ctrl)
-	srv := NewDashboardService(starSrv, mockDB)
+	srv := NewDashboardService(starSrv, nil, mockDB)
 
 	mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
 	err := srv.StarDashboard(ctx, "1234")
@@ -223,7 +261,7 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewDashboardService(nil, mockDB)
+	srv := NewDashboardService(nil, nil, mockDB)
 
 	cases := []struct {
 		name    string
@@ -293,7 +331,7 @@ func TestDashboardService_GetDashboardsByChartUID(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	starSrv := NewMockStarService(ctrl)
-	srv := NewDashboardService(starSrv, mockDB)
+	srv := NewDashboardService(starSrv, nil, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -335,7 +373,7 @@ func TestDashboardService_DeleteProvisioningDashboard(t *testing.T) {
 	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
 		return fn(mockDB)
 	}).AnyTimes()
-	srv := NewDashboardService(nil, mockDB)
+	srv := NewDashboardService(nil, nil, mockDB)
 
 	cases := []struct {
 		name    string
@@ -402,7 +440,8 @@ func TestDashboardService_SaveProvisioningDashboard(t *testing.T) {
 	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
 		return fn(mockDB)
 	}).AnyTimes()
-	srv := NewDashboardService(nil, mockDB)
+	tagSrv := NewMockTagService(ctrl)
+	srv := NewDashboardService(nil, tagSrv, mockDB)
 
 	cases := []struct {
 		name    string
@@ -489,6 +528,17 @@ func TestDashboardService_SaveProvisioningDashboard(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "save tags failure",
+			body: datatypes.JSON(`{"title":"title","uid":"123","tags":["tag"]}`),
+			prepare: func() {
+				mockDB.EXPECT().Exist(gomock.Any(), "uid=? and org_id=?", "123", int64(10)).Return(false, nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				tagSrv.EXPECT().SaveTags(int64(10), []string{"tag"}, "123", model.DashboardResource).Return(fmt.Errorf("err"))
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range cases {
@@ -518,7 +568,7 @@ func TestDashboardService_GetProvisioningDashboard(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewDashboardService(nil, mockDB)
+	srv := NewDashboardService(nil, nil, mockDB)
 
 	cases := []struct {
 		name    string

@@ -187,11 +187,11 @@ func (api *DashboardAPI) saveDashbardMeta(ctx context.Context, dashboard *model.
 	}
 	// connect integration
 	if dashboard.Integration != "" {
-		if err := api.deps.IntegrationSrv.ConnectSource(ctx, dashboard.Integration, dashboard.UID, model.DashboardConnection); err != nil {
+		if err := api.deps.IntegrationSrv.ConnectSource(ctx, dashboard.Integration, dashboard.UID, model.DashboardResource); err != nil {
 			return err
 		}
 	} else {
-		if err := api.deps.IntegrationSrv.DisconnectSource(ctx, dashboard.UID, model.DashboardConnection); err != nil {
+		if err := api.deps.IntegrationSrv.DisconnectSource(ctx, dashboard.UID, model.DashboardResource); err != nil {
 			return err
 		}
 	}

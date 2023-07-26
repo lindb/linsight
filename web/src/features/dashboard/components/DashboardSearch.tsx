@@ -16,7 +16,6 @@ specific language governing permissions and limitations
 under the License.
 */
 import {
-  Avatar,
   Button,
   Card,
   Checkbox,
@@ -29,6 +28,7 @@ import {
   RadioGroup,
   Row,
   Table,
+  Tag,
   Typography,
 } from '@douyinfe/semi-ui';
 import {
@@ -48,7 +48,7 @@ import { isEmpty } from 'lodash-es';
 import { StatusTip, Notification, IntegrationIcon } from '@src/components';
 import { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import { Dashboard, SearchDashboard } from '@src/types';
-import { ApiKit } from '@src/utils';
+import { ApiKit, ColorKit } from '@src/utils';
 const { Text } = Typography;
 
 const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
@@ -116,25 +116,25 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
         },
       },
       {
-        title: 'Owner',
-        key: 'owner',
-        width: 120,
-        align: 'center',
-        dataIndex: 'owner',
-        render: () => {
+        title: 'Tags',
+        key: 'tags',
+        align: 'left',
+        width: '40%',
+        dataIndex: 'tags',
+        render: (_text: any, r: Dashboard, _index: any) => {
+          if (isEmpty(r.tags)) {
+            return null;
+          }
           return (
-            <Avatar color="blue" size="extra-small">
-              Df
-            </Avatar>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {(r.tags || []).map((tag: string, index: number) => (
+                <Tag key={tag} style={{ backgroundColor: ColorKit.getColor(index) }} type="solid">
+                  {tag}
+                </Tag>
+              ))}
+            </div>
           );
         },
-      },
-      {
-        title: 'Modified At',
-        key: 'modified',
-        width: 120,
-        align: 'center',
-        dataIndex: 'modified',
       },
     ];
     if (!searchOnly) {

@@ -35,9 +35,9 @@ type IntegrationService interface {
 	// GetIntegrations returns all supported integrations.
 	GetIntegrations(ctx context.Context) ([]model.Integration, error)
 	// ConnectSource connects integration and source.
-	ConnectSource(ctx context.Context, integrationUID, sourceUID string, connectionType model.ConnectionType) error
+	ConnectSource(ctx context.Context, integrationUID, sourceUID string, resourceType model.ResourceType) error
 	// DisconnectSource disconnects integration and source.
-	DisconnectSource(ctx context.Context, sourceUID string, connectionType model.ConnectionType) error
+	DisconnectSource(ctx context.Context, sourceUID string, resourceType model.ResourceType) error
 }
 
 type integrationService struct {
@@ -90,12 +90,12 @@ func (srv *integrationService) GetIntegrations(ctx context.Context) ([]model.Int
 // ConnectSource connects integration and source.
 func (srv *integrationService) ConnectSource(ctx context.Context,
 	integrationUID, sourceUID string,
-	connectionType model.ConnectionType) error {
+	resourceType model.ResourceType) error {
 	signedUser := util.GetUser(ctx)
 	return srv.db.Transaction(func(tx dbpkg.DB) error {
 		if err := tx.Delete(&model.IntegrationConnection{},
 			"org_id=? and source_uid=? and type=?",
-			signedUser.Org.ID, sourceUID, connectionType); err != nil {
+			signedUser.Org.ID, sourceUID, resourceType); err != nil {
 			return err
 		}
 		return tx.Create(&model.IntegrationConnection{
@@ -106,16 +106,16 @@ func (srv *integrationService) ConnectSource(ctx context.Context,
 			OrgID:          signedUser.Org.ID,
 			IntegrationUID: integrationUID,
 			SourceUID:      sourceUID,
-			Type:           connectionType,
+			Type:           resourceType,
 		})
 	})
 }
 
 // DisconnectSource disconnects integration and source.
 func (srv *integrationService) DisconnectSource(ctx context.Context,
-	sourceUID string, connectionType model.ConnectionType) error {
+	sourceUID string, resourceType model.ResourceType) error {
 	signedUser := util.GetUser(ctx)
 	return srv.db.Delete(&model.IntegrationConnection{},
 		"org_id=? and source_uid=? and type=?",
-		signedUser.Org.ID, sourceUID, connectionType)
+		signedUser.Org.ID, sourceUID, resourceType)
 }
