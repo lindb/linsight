@@ -19,6 +19,13 @@ package model
 
 import "time"
 
+type ResourceType int
+
+const (
+	DashboardResource ResourceType = iota + 1
+	ChartResource
+)
+
 // BaseModel represents base model information.
 type BaseModel struct {
 	ID        int64     `json:"-" gorm:"column:id"`

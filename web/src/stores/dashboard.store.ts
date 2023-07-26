@@ -27,21 +27,7 @@ import {
 import { DashboardSrv } from '@src/services';
 import { Dashboard, GridPos, PanelSetting, Variable, Tracker, Chart, DashboardMeta } from '@src/types';
 import { ApiKit, ObjectKit } from '@src/utils';
-import {
-  set,
-  get,
-  find,
-  cloneDeep,
-  has,
-  concat,
-  findIndex,
-  forIn,
-  merge,
-  pick,
-  isEmpty,
-  pullAt,
-  remove,
-} from 'lodash-es';
+import { set, get, find, cloneDeep, has, concat, findIndex, forIn, pick, isEmpty, pullAt, remove } from 'lodash-es';
 import { makeAutoObservable, toJS } from 'mobx';
 import { ChartPendingAddStore } from '.';
 
@@ -126,7 +112,6 @@ class DashboardStore {
       newPanel.gridPos.y += panel.gridPos.y;
     }
     this.addPanel(newPanel);
-    console.error(newPanel, toJS(this.dashboard));
   }
 
   createPanelConfig(newID: boolean = true): PanelSetting {
@@ -202,7 +187,7 @@ class DashboardStore {
   }
 
   updateDashboardProps(values: any) {
-    this.dashboard = merge(this.dashboard, values);
+    this.dashboard = ObjectKit.merge(this.dashboard, values);
   }
 
   getVariables(): Variable[] {
@@ -318,7 +303,6 @@ class DashboardStore {
           });
         }
         this.dashboard.panels = panels;
-        console.error('init dashboard', toJS(this.dashboard), charts);
         return this.dashboard;
       }
       try {

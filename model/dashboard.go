@@ -83,16 +83,19 @@ type Dashboard struct {
 
 	OrgID int64 `json:"-" gorm:"column:org_id;index:u_idx_dashboard_org_title,unique"`
 
-	UID         string `json:"uid,omitempty" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
-	Title       string `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title"`
-	Desc        string `json:"description,omitempty" gorm:"column:desc"`
-	Integration string `json:"integration,omitempty" gorm:"column:integration"`
-	Version     int    `json:"version,omitempty" gorm:"column:version"`
+	UID         string         `json:"uid,omitempty" gorm:"column:uid;index:u_idx_dashboard_uid,unique"`
+	Title       string         `json:"title" gorm:"column:title;index:u_idx_dashboard_org_title"`
+	Desc        string         `json:"description,omitempty" gorm:"column:desc"`
+	Integration string         `json:"integration,omitempty" gorm:"column:integration"`
+	Version     int            `json:"version,omitempty" gorm:"column:version"`
+	Tags        datatypes.JSON `json:"tags,omitempty" gorm:"tags"`
 
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
 
 	// FIXME: need remove
 	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
+
+	TagList []string `json:"-" gorm:"-"`
 }
 
 // DashboardMeta represents dashboard metadata.
@@ -143,6 +146,18 @@ func (d *Dashboard) ReadMeta() {
 	d.Desc = gjson.Get(jsonData, "description").String()
 	d.UID = gjson.Get(jsonData, "uid").String()
 	d.Integration = gjson.Get(jsonData, "integration").String()
+
+	// get tags
+	tagsRS := gjson.Get(jsonData, "tags")
+	if tagsRS.IsArray() {
+		tagArray := tagsRS.Array()
+		for _, tag := range tagArray {
+			d.TagList = append(d.TagList, tag.String())
+		}
+	}
+	if len(d.TagList) > 0 {
+		d.Tags = datatypes.JSON(encoding.JSONMarshal(&d.TagList))
+	}
 }
 
 // GetCharts returns chart uid list from dashboard config.

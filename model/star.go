@@ -20,8 +20,8 @@ package model
 type Star struct {
 	BaseModel
 
-	OrgID      int64      `json:"-" gorm:"column:org_id"`
-	UserID     int64      `json:"-" gorm:"column:user_id"`
-	EntityID   int64      `json:"-" gorm:"column:entity_id"`
-	EntityType EntityType `json:"entityType" gorm:"column:entity_type"`
+	OrgID        int64        `json:"-" gorm:"column:org_id"`
+	UserID       int64        `json:"-" gorm:"column:user_id"`
+	ResourceUID  string       `json:"resourceUid" gorm:"column:resource_uid"`
+	ResourceType ResourceType `json:"resourceType" gorm:"column:resource_type"`
 }

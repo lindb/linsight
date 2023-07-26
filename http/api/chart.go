@@ -158,11 +158,11 @@ func (api *ChartAPI) UnlinkChartFromDashboard(c *gin.Context) {
 func (api *ChartAPI) saveChartMeta(ctx context.Context, chart *model.Chart) error {
 	// connect integration
 	if chart.Integration != "" {
-		if err := api.deps.IntegrationSrv.ConnectSource(ctx, chart.Integration, chart.UID, model.ChartConnection); err != nil {
+		if err := api.deps.IntegrationSrv.ConnectSource(ctx, chart.Integration, chart.UID, model.ChartResource); err != nil {
 			return err
 		}
 	} else {
-		if err := api.deps.IntegrationSrv.DisconnectSource(ctx, chart.UID, model.ChartConnection); err != nil {
+		if err := api.deps.IntegrationSrv.DisconnectSource(ctx, chart.UID, model.ChartResource); err != nil {
 			return err
 		}
 	}

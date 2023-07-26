@@ -42,6 +42,7 @@ export interface Dashboard {
   description?: string;
   integration?: string;
   isStarred?: boolean;
+  tags?: string[];
   panels?: PanelSetting[];
   templating?: Record<string, Variable>;
 }

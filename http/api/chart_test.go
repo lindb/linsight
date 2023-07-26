@@ -82,7 +82,7 @@ func TestChartAPI_CreateChart(t *testing.T) {
 			body: bytes.NewBuffer(body),
 			prepare: func() {
 				chartSrv.EXPECT().CreateChart(gomock.Any(), gomock.Any()).Return("1234", nil)
-				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.ChartConnection).Return(fmt.Errorf("err"))
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.ChartResource).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
@@ -93,7 +93,7 @@ func TestChartAPI_CreateChart(t *testing.T) {
 			body: bytes.NewBuffer(body),
 			prepare: func() {
 				chartSrv.EXPECT().CreateChart(gomock.Any(), gomock.Any()).Return("1234", nil)
-				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.ChartConnection).Return(nil)
+				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.ChartResource).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -219,7 +219,7 @@ func TestChartAPI_UpdateChart(t *testing.T) {
 			body: bytes.NewBuffer(body),
 			prepare: func() {
 				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(nil)
-				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.ChartConnection).Return(fmt.Errorf("err"))
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.ChartResource).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
@@ -230,7 +230,7 @@ func TestChartAPI_UpdateChart(t *testing.T) {
 			body: bytes.NewBuffer(body),
 			prepare: func() {
 				chartSrv.EXPECT().UpdateChart(gomock.Any(), gomock.Any()).Return(nil)
-				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.ChartConnection).Return(nil)
+				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.ChartResource).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)

@@ -64,26 +64,40 @@ type DashboardService interface {
 type dashboardService struct {
 	db      dbpkg.DB
 	starSrv StarService
+	tagSrv  TagService
 }
 
 // NewDashboardService creates a DashboardService instance.
-func NewDashboardService(starSrv StarService, db dbpkg.DB) DashboardService {
+func NewDashboardService(starSrv StarService, tagSrv TagService, db dbpkg.DB) DashboardService {
 	return &dashboardService{
 		db:      db,
 		starSrv: starSrv,
+		tagSrv:  tagSrv,
 	}
 }
 
 // CreateDashboard creates a dashboard.
 func (srv *dashboardService) CreateDashboard(ctx context.Context, dashboard *model.Dashboard) (string, error) {
-	dashboard.UID = uuid.GenerateShortUUID()
-	// set dashboard org/user info
-	user := util.GetUser(ctx)
-	dashboard.OrgID = user.Org.ID
-	userID := user.User.ID
-	dashboard.CreatedBy = userID
-	dashboard.UpdatedBy = userID
-	if err := srv.db.Create(dashboard); err != nil {
+	err := srv.db.Transaction(func(tx dbpkg.DB) error {
+		dashboard.UID = uuid.GenerateShortUUID()
+		// set dashboard org/user info
+		user := util.GetUser(ctx)
+		dashboard.OrgID = user.Org.ID
+		userID := user.User.ID
+		dashboard.CreatedBy = userID
+		dashboard.UpdatedBy = userID
+		if err := tx.Create(dashboard); err != nil {
+			return err
+		}
+		if len(dashboard.TagList) > 0 {
+			// save tags
+			if err := srv.tagSrv.SaveTags(user.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		return "", err
 	}
 	return dashboard.UID, nil
@@ -95,16 +109,26 @@ func (srv *dashboardService) UpdateDashboard(ctx context.Context, dashboard *mod
 	if err != nil {
 		return err
 	}
-	user := util.GetUser(ctx)
-	userID := user.User.ID
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		user := util.GetUser(ctx)
+		userID := user.User.ID
 
-	// update datasource
-	dashboardFromDB.Title = dashboard.Title
-	dashboardFromDB.Desc = dashboard.Desc
-	dashboardFromDB.Config = dashboard.Config
-	dashboardFromDB.Integration = dashboard.Integration
-	dashboardFromDB.UpdatedBy = userID
-	return srv.db.Update(dashboardFromDB, "uid=? and org_id=?", dashboard.UID, user.Org.ID)
+		if len(dashboard.TagList) > 0 {
+			// save tags
+			if err := srv.tagSrv.SaveTags(user.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource); err != nil {
+				return err
+			}
+		}
+
+		// update datasource
+		dashboardFromDB.Title = dashboard.Title
+		dashboardFromDB.Desc = dashboard.Desc
+		dashboardFromDB.Config = dashboard.Config
+		dashboardFromDB.Integration = dashboard.Integration
+		dashboardFromDB.Tags = dashboard.Tags
+		dashboardFromDB.UpdatedBy = userID
+		return tx.Update(dashboardFromDB, "uid=? and org_id=?", dashboard.UID, user.Org.ID)
+	})
 }
 
 // DeleteDashboardByUID deletes the dashboard by uid.
@@ -116,8 +140,14 @@ func (srv *dashboardService) DeleteDashboardByUID(ctx context.Context, uid strin
 		if err := tx.Delete(&model.Dashboard{}, "uid=? and org_id=?", uid, orgID); err != nil {
 			return err
 		}
-		// delete start record
-		return tx.Delete(&model.Star{}, "org_id=? and entity_id=? and entity_type=?", orgID, uid, model.DasbboardEntity)
+		// delete tags
+		if err := tx.Delete(&model.ResourceTag{},
+			"org_id=? and resource_uid=? and type=?",
+			orgID, uid, model.DashboardResource); err != nil {
+			return err
+		}
+		//TODO: delete start record
+		return tx.Delete(&model.Star{}, "org_id=? and resource_uid=? and resource_type=?", orgID, uid, model.DashboardResource)
 	})
 }
 
@@ -165,7 +195,7 @@ func (srv *dashboardService) GetDashboardByUID(ctx context.Context, uid string) 
 	if err != nil {
 		return nil, err
 	}
-	isStarred, err := srv.starSrv.IsStarred(ctx, rs.ID, model.DasbboardEntity)
+	isStarred, err := srv.starSrv.IsStarred(ctx, rs.UID, model.DashboardResource)
 	if err != nil {
 		//TODO: ignore check star err:
 		return nil, err
@@ -234,6 +264,10 @@ func (srv *dashboardService) SaveProvisioningDashboard(ctx context.Context, req 
 				return err
 			}
 		}
+		if len(dashboard.TagList) > 0 {
+			// save tags
+			return srv.tagSrv.SaveTags(req.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource)
+		}
 		return nil
 	})
 }
@@ -246,6 +280,7 @@ func (srv *dashboardService) RemoveProvisioningDashboard(ctx context.Context, re
 			req.Org.ID, req.Name, req.External); err != nil {
 			return err
 		}
+		// FIXME: remove other resource
 		if err := tx.Delete(&model.DashboardProvisioning{},
 			"org_id=? and name=? and external=?",
 			req.Org.ID, req.Name, req.External); err != nil {
@@ -275,9 +310,9 @@ func (srv *dashboardService) toggleStar(ctx context.Context, uid string, star bo
 		return err
 	}
 	if star {
-		return srv.starSrv.Star(ctx, dashboard.ID, model.DasbboardEntity)
+		return srv.starSrv.Star(ctx, dashboard.UID, model.DashboardResource)
 	} else {
-		return srv.starSrv.Unstar(ctx, dashboard.ID, model.DasbboardEntity)
+		return srv.starSrv.Unstar(ctx, dashboard.UID, model.DashboardResource)
 	}
 }
 

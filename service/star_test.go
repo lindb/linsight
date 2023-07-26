@@ -42,24 +42,24 @@ func TestStarService_Star(t *testing.T) {
 		{
 			name: "check if star failure",
 			prepare: func() {
-				mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and entity_id=? and entity_type=?",
-					int64(10), int64(12), int64(100), model.DasbboardEntity).Return(false, fmt.Errorf("err"))
+				mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and resource_uid=? and resource_type=?",
+					int64(10), int64(12), "100", model.DashboardResource).Return(false, fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
 			name: "already starred",
 			prepare: func() {
-				mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and entity_id=? and entity_type=?",
-					int64(10), int64(12), int64(100), model.DasbboardEntity).Return(true, nil)
+				mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and resource_uid=? and resource_type=?",
+					int64(10), int64(12), "100", model.DashboardResource).Return(true, nil)
 			},
 			wantErr: false,
 		},
 		{
 			name: "star failure",
 			prepare: func() {
-				mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and entity_id=? and entity_type=?",
-					int64(10), int64(12), int64(100), model.DasbboardEntity).Return(false, nil)
+				mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and resource_uid=? and resource_type=?",
+					int64(10), int64(12), "100", model.DashboardResource).Return(false, nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -70,7 +70,7 @@ func TestStarService_Star(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.Star(ctx, 100, model.DasbboardEntity)
+			err := srv.Star(ctx, "100", model.DashboardResource)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -84,9 +84,9 @@ func TestStarService_Unstar(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	srv := NewStarService(mockDB)
-	mockDB.EXPECT().Delete(gomock.Any(), "user_id=? and org_id=? and entity_id=? and entity_type=?",
-		int64(10), int64(12), int64(100), model.DasbboardEntity).Return(nil)
-	err := srv.Unstar(ctx, 100, model.DasbboardEntity)
+	mockDB.EXPECT().Delete(gomock.Any(), "user_id=? and org_id=? and resource_uid=? and resource_type=?",
+		int64(10), int64(12), "100", model.DashboardResource).Return(nil)
+	err := srv.Unstar(ctx, "100", model.DashboardResource)
 	assert.NoError(t, err)
 }
 
@@ -96,9 +96,9 @@ func TestStarService_IsStarred(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	srv := NewStarService(mockDB)
-	mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and entity_id=? and entity_type=?",
-		int64(10), int64(12), int64(100), model.DasbboardEntity).Return(true, nil)
-	starrted, err := srv.IsStarred(ctx, 100, model.DasbboardEntity)
+	mockDB.EXPECT().Exist(gomock.Any(), "user_id=? and org_id=? and resource_uid=? and resource_type=?",
+		int64(10), int64(12), "100", model.DashboardResource).Return(true, nil)
+	starrted, err := srv.IsStarred(ctx, "100", model.DashboardResource)
 	assert.NoError(t, err)
 	assert.True(t, starrted)
 }

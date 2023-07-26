@@ -15,22 +15,35 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package model
+package api
 
-// Tag represents term of tags.
-type Tag struct {
-	BaseModel
+import (
+	"github.com/gin-gonic/gin"
 
-	OrgID int64  `json:"-" gorm:"column:org_id;index:u_idx_tags,unique"`
-	Term  string `gorm:"column:team;index:u_idx_tags,unique"`
+	httppkg "github.com/lindb/common/pkg/http"
+
+	depspkg "github.com/lindb/linsight/http/deps"
+)
+
+// TagAPI represents tag related api handlers.
+type TagAPI struct {
+	deps *depspkg.API
 }
 
-// ResourceTag represents resource's tags information.
-type ResourceTag struct {
-	BaseModel
+// NewTagAPI creates a TagAPI instance.
+func NewTagAPI(deps *depspkg.API) *TagAPI {
+	return &TagAPI{
+		deps: deps,
+	}
+}
 
-	OrgID       int64        `json:"-" gorm:"column:org_id;index:u_idx_resource_tag,unique"`
-	TagID       int64        `json:"-" gorm:"column:tag_id;index:u_idx_resource_tag,unique"`
-	ResourceUID string       `json:"resourceUid" gorm:"column:resource_uid;index:u_idx_resource_tag,unique"`
-	Type        ResourceType `json:"type" gorm:"column:type;index:u_idx_resource_tag,unique"`
+// FindTags returns tag list by given term prefix.
+func (api *TagAPI) FindTags(c *gin.Context) {
+	term := c.Query("term")
+	tags, err := api.deps.TagSrv.FindTags(c.Request.Context(), term)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, tags)
 }
