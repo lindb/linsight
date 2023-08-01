@@ -22,7 +22,7 @@ type Tag struct {
 	BaseModel
 
 	OrgID int64  `json:"-" gorm:"column:org_id;index:u_idx_tags,unique"`
-	Term  string `gorm:"column:team;index:u_idx_tags,unique"`
+	Term  string `gorm:"column:term;index:u_idx_tags,unique"`
 }
 
 // ResourceTag represents resource's tags information.

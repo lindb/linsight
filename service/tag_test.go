@@ -41,15 +41,15 @@ func TestTagService_FindTags(t *testing.T) {
 		{
 			name: "find tags failure",
 			prepare: func() {
-				mockDB.EXPECT().Find(gomock.Any(), "org_id=? and term like ?", int64(12), "name%").Return(fmt.Errorf("err"))
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 0, 100, "id desc", "org_id=? and term like ?", int64(12), "name%").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
 			name: "find tags successfully",
 			prepare: func() {
-				mockDB.EXPECT().Find(gomock.Any(), "org_id=? and term like ?", int64(12), "name%").
-					DoAndReturn(func(rs *[]model.Tag, _ string, _ int64, _ string) error {
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 0, 100, "id desc", "org_id=? and term like ?", int64(12), "name%").
+					DoAndReturn(func(rs *[]model.Tag, _ int, _ int, _ string, _ string, _ int64, _ string) error {
 						*rs = append(*rs, model.Tag{Term: "tag"})
 						return nil
 					})

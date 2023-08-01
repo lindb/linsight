@@ -166,6 +166,16 @@ func (srv *dashboardService) SearchDashboards(ctx context.Context,
 		conditions = append(conditions, "created_by=?")
 		params = append(params, signedUser.User.ID)
 	}
+	if len(req.Tags) > 0 {
+		tags := util.RemoveDuplicates(req.Tags)
+		// ref: http://howto.philippkeller.com/2005/04/24/Tags-Database-schemas/
+		tagFilter := `uid in 
+		(select rt.resource_uid from resource_tags rt,tags t 
+		where t.id=rt.tag_id and rt.org_id=? and rt.type=? and t.term in ? group by rt.resource_uid having count(rt.resource_uid)=?)
+		`
+		conditions = append(conditions, tagFilter)
+		params = append(params, signedUser.Org.ID, model.DashboardResource, tags, len(tags))
+	}
 	offset := 0
 	limit := 20
 	if req.Offset > 0 {

@@ -15,25 +15,39 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export enum ApiPath {
-  Login = '/login',
-  Logout = '/logout',
-  Boot = '/boot',
-  Component = '/components',
-  User = '/users',
-  ChangePassword = '/user/password/change',
-  ResetPassword = '/user/password/reset',
-  Team = '/org/teams',
-  Org = '/orgs',
-  Tag = '/tags',
-  OrgUsers = '/org/users',
-  UserOrg = '/user/orgs',
-  SwitchOrg = '/user/orgs/switch',
-  Preference = '/user/preference',
-  Datasources = '/datasources',
-  Datasource = '/datasource',
-  Dashboard = '/dashboards',
-  DataQuery = '/data/query',
-  MetadataQuery = '/metadata/query',
-  Chart = '/charts',
+.search-box {
+  width: 100%;
+  position: relative;
+
+  /* stylelint-disable-next-line selector-class-pattern */
+  .semi-tagInput-wrapper {
+    gap: 4px;
+  }
+
+  .semi-input {
+    font-size: 14px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .suggest-placeholder {
+    position: absolute;
+    top: 30px;
+  }
+}
+
+.suggest-list {
+  min-width: 180px;
+
+  .list-item {
+    cursor: pointer;
+
+    &:hover {
+      background-color: var(--semi-color-fill-0);
+    }
+
+    &:active {
+      background-color: var(--semi-color-fill-1);
+    }
+  }
 }

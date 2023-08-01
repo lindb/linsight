@@ -44,7 +44,7 @@ const GeneralForm: React.FC = observer(() => {
       <Form.Input label="Title" field="title" />
       <Form.TextArea label="Description" field="desc" />
       <IntegrationSelect />
-      <Form.TagInput label="Tag" field="tags" />
+      <Form.TagInput label="Tag" field="tags" allowDuplicates={false} />
     </Form>
   );
 });

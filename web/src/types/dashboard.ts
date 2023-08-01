@@ -57,6 +57,7 @@ export interface SearchDashboard {
   offset?: number;
   title?: string;
   ownership?: string;
+  favorite?: string;
   tags?: string[];
 }
 

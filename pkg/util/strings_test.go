@@ -65,3 +65,8 @@ func Test_RandomHex(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, str)
 }
+
+func Test_RemoveDuplicates(t *testing.T) {
+	assert.Equal(t, []string{"a", "b"}, RemoveDuplicates([]string{"a", "b"}))
+	assert.Equal(t, []string{"a", "b"}, RemoveDuplicates([]string{"a", "b", "b"}))
+}
