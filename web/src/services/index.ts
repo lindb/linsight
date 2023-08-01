@@ -18,6 +18,7 @@ under the License.
 export { default as UserSrv } from './user.service';
 export { default as TeamSrv } from './team.service';
 export { default as ComponentSrv } from './component.service';
+export { default as TagSrv } from './tag.service';
 export { default as OrgSrv } from './org.service';
 export { default as PlatformSrv } from './platform.service';
 export { default as MetricSrv } from './metric.service';

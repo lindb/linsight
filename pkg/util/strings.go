@@ -52,3 +52,17 @@ func RandomHex(n int) (string, error) {
 	}
 	return hex.EncodeToString(bytes), nil
 }
+
+func RemoveDuplicates(slice []string) []string {
+	uniqueMap := make(map[string]bool)
+	uniqueSlice := []string{}
+
+	for _, str := range slice {
+		if _, exists := uniqueMap[str]; !exists {
+			uniqueMap[str] = true
+			uniqueSlice = append(uniqueSlice, str)
+		}
+	}
+
+	return uniqueSlice
+}

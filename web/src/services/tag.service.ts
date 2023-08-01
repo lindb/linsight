@@ -15,25 +15,13 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-export enum ApiPath {
-  Login = '/login',
-  Logout = '/logout',
-  Boot = '/boot',
-  Component = '/components',
-  User = '/users',
-  ChangePassword = '/user/password/change',
-  ResetPassword = '/user/password/reset',
-  Team = '/org/teams',
-  Org = '/orgs',
-  Tag = '/tags',
-  OrgUsers = '/org/users',
-  UserOrg = '/user/orgs',
-  SwitchOrg = '/user/orgs/switch',
-  Preference = '/user/preference',
-  Datasources = '/datasources',
-  Datasource = '/datasource',
-  Dashboard = '/dashboards',
-  DataQuery = '/data/query',
-  MetadataQuery = '/metadata/query',
-  Chart = '/charts',
-}
+import { ApiPath } from '@src/constants';
+import { ApiKit } from '@src/utils';
+
+const findTags = (prefix: string): Promise<string[]> => {
+  return ApiKit.GET<string[]>(ApiPath.Tag, { term: prefix });
+};
+
+export default {
+  findTags,
+};

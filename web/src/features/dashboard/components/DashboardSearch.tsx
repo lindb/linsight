@@ -22,17 +22,16 @@ import {
   Col,
   Collapse,
   Dropdown,
-  Input,
   List,
   Radio,
   RadioGroup,
   Row,
   Table,
   Tag,
+  Tooltip,
   Typography,
 } from '@douyinfe/semi-ui';
 import {
-  IconSearchStroked,
   IconPlusStroked,
   IconStarStroked,
   IconStar,
@@ -41,37 +40,88 @@ import {
   IconDeleteStroked,
 } from '@douyinfe/semi-icons';
 import { usePagination, useRequest } from '@src/hooks';
-import { DashboardSrv } from '@src/services';
+import { DashboardSrv, TagSrv } from '@src/services';
 import React, { useEffect, useState } from 'react';
 import { createSearchParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { isEmpty } from 'lodash-es';
-import { StatusTip, Notification, IntegrationIcon } from '@src/components';
+import { includes, isEmpty, set, union } from 'lodash-es';
+import { StatusTip, Notification, IntegrationIcon, SearchFilterInput, AttributeProps } from '@src/components';
 import { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import { Dashboard, SearchDashboard } from '@src/types';
 import { ApiKit, ColorKit } from '@src/utils';
 const { Text } = Typography;
+
+const attributes: AttributeProps[] = [
+  {
+    type: 'input',
+    value: 'title',
+    label: 'Title',
+  },
+  {
+    type: 'select',
+    value: 'tags',
+    label: 'Tag',
+    multiple: true,
+    remote: (prefix: string) => {
+      return TagSrv.findTags(prefix);
+    },
+  },
+  {
+    type: 'select',
+    value: 'favorite',
+    label: 'Favorite',
+    options: [
+      { value: '1', label: 'Any' },
+      { value: '2', label: 'Yes' },
+      { value: '3', label: 'No' },
+    ],
+  },
+  {
+    type: 'select',
+    value: 'ownership',
+    label: 'Ownership',
+    options: [
+      { value: '0', label: 'Any' },
+      { value: '1', label: 'Mine' },
+    ],
+  },
+];
+
+const getSearchParams = (searchParams: URLSearchParams): SearchDashboard => {
+  const value: SearchDashboard = {};
+  attributes.forEach((attr: AttributeProps) => {
+    if (!searchParams.has(attr.value)) {
+      return;
+    }
+    if (attr.multiple) {
+      set(value, attr.value, union(searchParams.getAll(attr.value)));
+    } else {
+      set(value, attr.value, searchParams.get(attr.value));
+    }
+  });
+  return value;
+};
 
 const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
   const { searchOnly } = props;
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentPage, pageSize, offset, onChange } = usePagination(1, 20);
-  const [params, setParams] = useState<SearchDashboard>({});
-
-  useEffect(() => {
-    const title = searchParams.get('title') || '';
-    const ownership = searchParams.get('ownership') || '0';
-    setParams({ title: title, ownership: ownership });
-  }, [searchParams]);
+  const [params, setParams] = useState<SearchDashboard>(() => {
+    return getSearchParams(searchParams);
+  });
 
   const {
     result: data,
     loading,
     error,
     refetch,
-  } = useRequest(['fetch-dashboards', params, offset, pageSize], () =>
-    DashboardSrv.searchDashboards({ limit: pageSize, offset: offset, ...params })
-  );
+  } = useRequest(['fetch-dashboards', params, offset, pageSize], () => {
+    return DashboardSrv.searchDashboards({ limit: pageSize, offset: offset, ...params });
+  });
+
+  useEffect(() => {
+    setParams(getSearchParams(searchParams));
+  }, [searchParams]);
 
   const getColumns = () => {
     const columns: ColumnProps[] = [
@@ -128,9 +178,20 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
           return (
             <div style={{ display: 'flex', gap: 2 }}>
               {(r.tags || []).map((tag: string, index: number) => (
-                <Tag key={tag} style={{ backgroundColor: ColorKit.getColor(index) }} type="solid">
-                  {tag}
-                </Tag>
+                <Tooltip key={tag} content="Add tag filter">
+                  <Tag
+                    style={{ backgroundColor: ColorKit.getColor(index), cursor: 'pointer' }}
+                    type="solid"
+                    onClick={() => {
+                      const tags = searchParams.getAll('tags');
+                      if (!includes(tags, tag)) {
+                        searchParams.append('tags', tag);
+                        setSearchParams(searchParams);
+                      }
+                    }}>
+                    {tag}
+                  </Tag>
+                </Tooltip>
               ))}
             </div>
           );
@@ -179,22 +240,9 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
   return (
     <Card className="linsight-feature" bodyStyle={{ padding: 0 }}>
       <div style={{ margin: 16, display: 'flex', gap: 8 }}>
-        <Input
-          prefix={<IconSearchStroked />}
-          placeholder="Filter dashboard"
-          defaultValue={params.title}
-          showClear
-          onChange={(value: string) => {
-            if (isEmpty(value)) {
-              searchParams.delete('title');
-            } else {
-              searchParams.set('title', value);
-            }
-            setSearchParams(searchParams);
-          }}
-        />
+        <SearchFilterInput placeholder="Filter dashboard" values={params} attributes={attributes} />
         {!searchOnly && (
-          <Button icon={<IconPlusStroked />} onClick={() => navigate('/dashboard/new')}>
+          <Button size="large" icon={<IconPlusStroked />} onClick={() => navigate('/dashboard/new')}>
             New
           </Button>
         )}
@@ -203,7 +251,7 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
         <Col span={4}>
           <Collapse defaultActiveKey={['1', '2', '3', '4']}>
             <Collapse.Panel itemKey="1" header="Favorite">
-              <RadioGroup direction="vertical" defaultValue="2">
+              <RadioGroup direction="vertical" value={params.favorite || '1'}>
                 <Radio value="1">Any</Radio>
                 <Radio value="2">Yes</Radio>
                 <Radio value="3">No</Radio>
@@ -212,24 +260,19 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
             <Collapse.Panel itemKey="2" header="Ownership">
               <RadioGroup
                 direction="vertical"
-                defaultValue={params.ownership}
+                value={params.ownership || '0'}
                 onChange={(e: any) => {
                   searchParams.set('ownership', e.target.value);
                   setSearchParams(searchParams);
                 }}>
                 <Radio value="0">Any</Radio>
                 <Radio value="1">Mine</Radio>
-                <Radio value="2">Shared with me</Radio>
               </RadioGroup>
             </Collapse.Panel>
             <Collapse.Panel itemKey="3" header="Preset">
               <List split={false}>
                 <List.Item main={<Checkbox>All Custom</Checkbox>} style={{ padding: '4px 0px 4px 0px' }} />
                 <List.Item main={<Checkbox>All Integrations</Checkbox>} style={{ padding: '4px 0px 4px 0px' }} />
-                <List.Item
-                  main={<Checkbox>Frequently Viewed By You</Checkbox>}
-                  style={{ padding: '4px 0px 4px 0px' }}
-                />
               </List>
             </Collapse.Panel>
           </Collapse>

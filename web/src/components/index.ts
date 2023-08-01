@@ -32,6 +32,7 @@ export { default as Footer } from '@src/components/layout/Footer';
 export { default as FeatureMenu } from '@src/components/layout/FeatureMenu';
 
 // form components
+export * from '@src/components/input/SearchFilterInput';
 export { default as DatasourceSelect } from '@src/components/input/DatasourceSelect';
 export { default as DatasourceSelectForm } from '@src/components/input/DatasourceSelectForm';
 export { default as SliderInput } from '@src/components/input/SliderInput';

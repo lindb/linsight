@@ -51,7 +51,7 @@ func NewTagService(db dbpkg.DB) TagService {
 func (srv *tagService) FindTags(ctx context.Context, term string) (tags []string, err error) {
 	var rs []model.Tag
 	signedUser := util.GetUser(ctx)
-	if err := srv.db.Find(&rs, "org_id=? and term like ?", signedUser.Org.ID, term+"%"); err != nil {
+	if err := srv.db.FindForPaging(&rs, 0, 100, "id desc", "org_id=? and term like ?", signedUser.Org.ID, term+"%"); err != nil {
 		return nil, err
 	}
 	for _, tag := range rs {
