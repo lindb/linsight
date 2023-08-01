@@ -47,7 +47,7 @@ import { includes, isEmpty, set, union } from 'lodash-es';
 import { StatusTip, Notification, IntegrationIcon, SearchFilterInput, AttributeProps } from '@src/components';
 import { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import { Dashboard, SearchDashboard } from '@src/types';
-import { ApiKit, ColorKit } from '@src/utils';
+import { ApiKit, ColorKit, StringKit } from '@src/utils';
 const { Text } = Typography;
 
 const attributes: AttributeProps[] = [
@@ -177,10 +177,10 @@ const DashboardSearch: React.FC<{ searchOnly?: boolean }> = (props) => {
           }
           return (
             <div style={{ display: 'flex', gap: 2 }}>
-              {(r.tags || []).map((tag: string, index: number) => (
+              {(r.tags || []).map((tag: string) => (
                 <Tooltip key={tag} content="Add tag filter">
                   <Tag
-                    style={{ backgroundColor: ColorKit.getColor(index), cursor: 'pointer' }}
+                    style={{ backgroundColor: ColorKit.getColor(StringKit.hashcode(tag)), cursor: 'pointer' }}
                     type="solid"
                     onClick={() => {
                       const tags = searchParams.getAll('tags');

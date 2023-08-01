@@ -15,23 +15,15 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-
-/**
- * generate char sequence based on [A-Z]
- */
-const generateCharSeq = (idx: number): string => {
-  return String.fromCharCode(65 + (idx % 26));
-};
-
-const hashcode = (str: string): number => {
-  var h = 0,
-    i = str.length;
-  while (i > 0) {
-    h = ((h << 5) - h + str.charCodeAt(--i)) | 0;
+.tag-select-input {
+  position: relative;
+  /* stylelint-disable-next-line selector-class-pattern */
+  .semi-tagInput-wrapper {
+    gap: 4px;
   }
-  return h;
-};
-export default {
-  generateCharSeq,
-  hashcode,
-};
+
+  .suggest-placeholder {
+    position: absolute;
+    top: 60px;
+  }
+}

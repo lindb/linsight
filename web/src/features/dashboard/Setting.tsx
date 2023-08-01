@@ -21,7 +21,7 @@ import { DashboardStore } from '@src/stores';
 import Variables from './components/Variables';
 import { observer } from 'mobx-react-lite';
 import { useSearchParams } from 'react-router-dom';
-import { IntegrationSelect } from '@src/components';
+import { IntegrationSelect, TagSelectInput } from '@src/components';
 
 const GeneralForm: React.FC = observer(() => {
   const { dashboard } = DashboardStore;
@@ -44,7 +44,7 @@ const GeneralForm: React.FC = observer(() => {
       <Form.Input label="Title" field="title" />
       <Form.TextArea label="Description" field="desc" />
       <IntegrationSelect />
-      <Form.TagInput label="Tag" field="tags" allowDuplicates={false} />
+      <TagSelectInput field="tags" />
     </Form>
   );
 });

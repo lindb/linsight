@@ -315,7 +315,6 @@ export const SearchFilterInput: React.FC<SearchFilterInputProps> = (props) => {
         renderTagItem={(value: any, _index: number, onClose: () => void) => {
           const att = find(attributes, { value: value.label });
           const tagValue = buildTagInputValue(att as any, value.value);
-          console.error('tag......', value);
           return (
             <Tag
               key={value.label}
