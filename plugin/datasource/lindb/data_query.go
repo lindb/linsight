@@ -21,13 +21,10 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
-	"time"
-
-	"github.com/lindb/linsight/model"
 )
 
 // buildDataQuerySQL builds LinDB query language based on data query request and time range.
-func buildDataQuerySQL(req *DataQueryRequest, timeRange model.TimeRange) (string, error) {
+func buildDataQuerySQL(req *DataQueryRequest, from, to string) (string, error) {
 	groupBy := req.GroupBy
 	if req.Stats {
 		groupBy = append(groupBy, "time()")
@@ -38,7 +35,7 @@ func buildDataQuerySQL(req *DataQueryRequest, timeRange model.TimeRange) (string
 		Where(req.Where...).
 		GroupBy(groupBy...)
 
-	builder.TimeRange(timeRange)
+	builder.TimeRange(from, to)
 	sql, err := builder.ToSQL()
 	if err != nil {
 		return "", err
@@ -97,9 +94,9 @@ func (b *DataQueryBuilder) GroupBy(groupBy ...string) *DataQueryBuilder {
 }
 
 // TimeRange sets time range.
-func (b *DataQueryBuilder) TimeRange(timeRange model.TimeRange) *DataQueryBuilder {
-	b.setTimeCondition(timeRange.From, GtEq)
-	b.setTimeCondition(timeRange.To, LtEq)
+func (b *DataQueryBuilder) TimeRange(from, to string) *DataQueryBuilder {
+	b.setTimeCondition(from, GtEq)
+	b.setTimeCondition(to, LtEq)
 	return b
 }
 
@@ -154,19 +151,9 @@ func (b *DataQueryBuilder) joinWhere(sep string) string {
 	return buffer.String()
 }
 
-// isTimestamp checks if timestamp format.
-func (b *DataQueryBuilder) isTimestamp(timestamp string) bool {
-	_, err := time.Parse("2006-01-02 15:04:05", timestamp)
-	return err == nil
-}
-
 // setTimeCondition set timestamp condition
 func (b *DataQueryBuilder) setTimeCondition(timestamp string, op Operator) {
 	if timestamp != "" {
-		if b.isTimestamp(timestamp) {
-			b.Where(Expr{Key: "time", Op: op, Value: timestamp})
-		} else {
-			b.Where(Expr{Key: "time", Op: op, Value: timestamp, raw: true})
-		}
+		b.Where(Expr{Key: "time", Op: op, Value: timestamp})
 	}
 }

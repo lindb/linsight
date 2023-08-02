@@ -103,19 +103,34 @@ const TimePicker: React.FC = () => {
     return <Dropdown.Menu>{SelectItems}</Dropdown.Menu>;
   };
 
+  const renderTimeRange = (): string => {
+    if (isEmpty(to)) {
+      return `${from} ~ now`;
+    }
+    const parsedFrom = moment(from, DateTimeFormat);
+    const parsedTo = moment(to, DateTimeFormat);
+
+    const areDatesSame = parsedFrom.isSame(parsedTo, 'day');
+    if (areDatesSame) {
+      return `${parsedFrom.format(DateTimeFormat)} ~ ${parsedTo.format('HH:mm:ss')}`;
+    } else {
+      return `${parsedFrom.format(DateTimeFormat)} ~ ${parsedTo.format(DateTimeFormat)}`;
+    }
+  };
+
   /**
    * Render current selected time
    */
-  function renderSelectedTime() {
+  const renderSelectedTime = () => {
     return (
-      <Button icon={<Icon icon="iconclock" />} onClick={() => setVisible(true)}>
+      <Button icon={<Icon icon="time" />} onClick={() => setVisible(true)}>
         {quick && quick.title}
-        {!quick && `${from} ~ ${to ? `${to}` : 'now'}`}
+        {!quick && renderTimeRange()}
       </Button>
     );
-  }
+  };
 
-  function renderTimeSelectPanel() {
+  const renderTimeSelectPanel = () => {
     return (
       <Space style={{ width: 460, padding: 20 }} align="start">
         <div style={{ width: 230 }}>
@@ -175,7 +190,7 @@ const TimePicker: React.FC = () => {
         </div>
       </Space>
     );
-  }
+  };
 
   return (
     <>

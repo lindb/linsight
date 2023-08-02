@@ -17,11 +17,14 @@
 
 package model
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
+// TimeRange represents data query time range.
 type TimeRange struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	From int64 `json:"from"`
+	To   int64 `json:"to"`
 }
 
 type QueryRequest struct {

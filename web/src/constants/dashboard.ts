@@ -34,21 +34,21 @@ export const AutoRefreshList: QuickSelectItem[] = [
   { value: '300', title: `5m` },
 ];
 
-export const DefaultQuickItem = { title: 'Last 1 hour', value: 'now()-1h' };
+export const DefaultQuickItem = { title: 'Last 1 hour', value: 'now-1h' };
 export const DefaultAutoRefreshItem = { title: 'off', value: '' };
 export const QuickSelectList: QuickSelectItem[] = [
-  { title: 'Last 15 minutes', value: 'now()-15m' },
-  { title: 'Last 30 minutes', value: 'now()-30m' },
+  { title: 'Last 15 minutes', value: 'now-15m' },
+  { title: 'Last 30 minutes', value: 'now-30m' },
   DefaultQuickItem,
-  { title: 'Last 3 hours', value: 'now()-3h' },
-  { title: 'Last 6 hours', value: 'now()-6h' },
-  { title: 'Last 12 hours', value: 'now()-12h' },
-  { title: 'Last 1 day', value: 'now()-1d' },
-  { title: 'Last 2 days', value: 'now()-2d' },
-  { title: 'Last 3 days', value: 'now()-3d' },
-  { title: 'Last 7 days', value: 'now()-7d' },
-  { title: 'Last 15 days', value: 'now()-15d' },
-  { title: 'Last 30 days', value: 'now()-30d' },
+  { title: 'Last 3 hours', value: 'now-3h' },
+  { title: 'Last 6 hours', value: 'now-6h' },
+  { title: 'Last 12 hours', value: 'now-12h' },
+  { title: 'Last 1 day', value: 'now-1d' },
+  { title: 'Last 2 days', value: 'now-2d' },
+  { title: 'Last 3 days', value: 'now-3d' },
+  { title: 'Last 7 days', value: 'now-7d' },
+  { title: 'Last 15 days', value: 'now-15d' },
+  { title: 'Last 30 days', value: 'now-30d' },
 ];
 
 export const MixedDatasource = '-- Mixed --';

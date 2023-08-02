@@ -23,11 +23,12 @@ import { DatasourceSrv } from '@src/services';
 import { DatasourcePlugin, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon, Notification } from '@src/components';
-import { ApiKit, ObjectKit } from '@src/utils';
+import { ApiKit, ObjectKit, TimeKit } from '@src/utils';
 import { useRequest } from '@src/hooks';
 import { DatasourceStore } from '@src/stores';
 import DeleteDatasourceButton from './components/DeleteDatasourceButton';
 import { PlatformContext } from '@src/contexts';
+import moment from 'moment-timezone';
 import './datasource.scss';
 
 const { Text, Title } = Typography;
@@ -140,6 +141,35 @@ const EditDataSource: React.FC = () => {
         }}>
         <Form.Input field="name" label="Name" rules={[{ required: true, message: 'Name is required' }]} />
         <Form.Switch field="isDefault" label="Default" />
+        <Form.Select
+          field="timeZone"
+          label="Time zone"
+          style={{ width: '100%' }}
+          filter
+          optionList={moment.tz.names().map((n: string) => {
+            return { label: n, value: n, showTick: true };
+          })}
+          onChange={(value: any): void => {
+            console.error('kkkk', value);
+          }}
+          renderOptionItem={(props: any) => {
+            const { value, onClick } = props;
+            return (
+              <Select.Option value={value} showTick={false} className="time-zone-select" onClick={() => onClick()}>
+                <Text className="time-zone-name">{value}</Text>
+                <Tag>{TimeKit.utcOffset(value)}</Tag>
+              </Select.Option>
+            );
+          }}
+          renderSelectedItem={(n: Record<string, any>) => {
+            return (
+              <div style={{ display: 'flex', gap: 4 }}>
+                <Text>{n.value}</Text>
+                <Tag>{TimeKit.utcOffset(n.value)}</Tag>
+              </div>
+            );
+          }}
+        />
         <Form.Select
           label="Type"
           field="type"

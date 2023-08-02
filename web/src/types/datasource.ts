@@ -25,8 +25,8 @@ export enum DatasourceCategory {
 }
 
 export interface TimeRange {
-  from?: string;
-  to?: string;
+  from?: number;
+  to?: number;
 }
 
 export interface DataQuery {
@@ -55,6 +55,7 @@ export interface DatasourceSetting {
   type: string;
   category: DatasourceCategory;
   url: string;
+  timeZone?: string;
   isDefault: boolean;
 }
 

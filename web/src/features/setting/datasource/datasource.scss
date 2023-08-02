@@ -20,3 +20,11 @@ under the License.
     width: 700px;
   }
 }
+
+.time-zone-select {
+  display: flex;
+
+  .time-zone-name {
+    flex: 1;
+  }
+}

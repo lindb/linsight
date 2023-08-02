@@ -38,6 +38,7 @@ type Datasource struct {
 	Name      string         `json:"name" gorm:"column:name;index:u_idx_datasource_org_name,unique"`
 	Type      DatasourceType `json:"type" gorm:"column:type"`
 	URL       string         `json:"url" gorm:"column:url"`
+	TimeZone  string         `json:"timeZone" gorm:"column:time_zone"`
 	Config    datatypes.JSON `json:"config" gorm:"column:config"`
 	IsDefault bool           `json:"isDefault" gorm:"column:is_default"`
 }

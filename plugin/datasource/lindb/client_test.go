@@ -22,10 +22,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/common/pkg/logger"
+	"github.com/lindb/common/pkg/timeutil"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/lindb/linsight/model"
@@ -35,20 +37,33 @@ import (
 func TestClient_NewClient(t *testing.T) {
 	defer func() {
 		jsonUnmarshalFn = encoding.JSONUnmarshal
+		loadLocationFn = time.LoadLocation
 	}()
 	t.Run("create client failure", func(t *testing.T) {
 		jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
 			return fmt.Errorf("err")
 		}
-		cli, err := NewClient("url", []byte{})
+		cli, err := NewClient(&model.Datasource{}, []byte{})
+		assert.Error(t, err)
+		assert.Nil(t, cli)
+	})
+	t.Run("load time location failure", func(t *testing.T) {
+		jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
+			return nil
+		}
+		loadLocationFn = func(_ string) (*time.Location, error) {
+			return nil, fmt.Errorf("err")
+		}
+		cli, err := NewClient(&model.Datasource{TimeZone: "UTC"}, []byte{})
 		assert.Error(t, err)
 		assert.Nil(t, cli)
 	})
 	t.Run("create client successfully", func(t *testing.T) {
+		loadLocationFn = time.LoadLocation
 		jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
 			return nil
 		}
-		cli, err := NewClient("url", []byte{})
+		cli, err := NewClient(&model.Datasource{}, []byte{})
 		assert.NoError(t, err)
 		assert.NotNil(t, cli)
 	})
@@ -62,9 +77,10 @@ func TestClient_DataQuery(t *testing.T) {
 	dq := lincli.NewMockDataQuery(ctrl)
 	mockCli.EXPECT().DataQuery().Return(dq).AnyTimes()
 	cli := &client{
-		cfg:    &DatasourceConfig{},
-		logger: logger.GetLogger("Test", "LinDB"),
-		client: mockCli,
+		cfg:      &DatasourceConfig{},
+		location: time.Local,
+		logger:   logger.GetLogger("Test", "LinDB"),
+		client:   mockCli,
 	}
 
 	cases := []struct {
@@ -87,7 +103,7 @@ func TestClient_DataQuery(t *testing.T) {
 				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
 					return nil
 				}
-				buildDataQuerySQLFn = func(_ *DataQueryRequest, _ model.TimeRange) (string, error) {
+				buildDataQuerySQLFn = func(_ *DataQueryRequest, _ string, _ string) (string, error) {
 					return "", fmt.Errorf("err")
 				}
 			},
@@ -99,7 +115,7 @@ func TestClient_DataQuery(t *testing.T) {
 				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
 					return nil
 				}
-				buildDataQuerySQLFn = func(_ *DataQueryRequest, _ model.TimeRange) (string, error) {
+				buildDataQuerySQLFn = func(_ *DataQueryRequest, _ string, _ string) (string, error) {
 					return "sql", nil
 				}
 				dq.EXPECT().DataQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
@@ -112,7 +128,7 @@ func TestClient_DataQuery(t *testing.T) {
 				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
 					return nil
 				}
-				buildDataQuerySQLFn = func(_ *DataQueryRequest, _ model.TimeRange) (string, error) {
+				buildDataQuerySQLFn = func(_ *DataQueryRequest, _ string, _ string) (string, error) {
 					return "data_sql", nil
 				}
 				dq.EXPECT().DataQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
@@ -131,7 +147,7 @@ func TestClient_DataQuery(t *testing.T) {
 			tt.prepare()
 			_, err := cli.DataQuery(context.TODO(), &model.Query{
 				Request: json.RawMessage{},
-			}, model.TimeRange{})
+			}, model.TimeRange{From: timeutil.Now()})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

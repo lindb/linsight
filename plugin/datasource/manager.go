@@ -56,5 +56,5 @@ func (mgr *manager) GetPlugin(datasource *model.Datasource) (plugin.DatasourcePl
 		return nil, fmt.Errorf("datasouce not support, type: %s", datasource.Type)
 	}
 	// FIXME: add cache
-	return newCliFn(datasource.URL, json.RawMessage(datasource.Config))
+	return newCliFn(datasource, json.RawMessage(datasource.Config))
 }

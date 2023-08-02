@@ -31,6 +31,7 @@ const hashcode = (str: string): number => {
   }
   return h;
 };
+
 export default {
   generateCharSeq,
   hashcode,
