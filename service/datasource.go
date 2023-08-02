@@ -100,6 +100,7 @@ func (srv *datasourceService) UpdateDatasource(ctx context.Context, datasource *
 				"is_default": datasource.IsDefault,
 				"url":        datasource.URL,
 				"config":     datasource.Config,
+				"time_zone":  datasource.TimeZone,
 				"updated_by": userID,
 			}, "uid=? and org_id=?", datasource.UID, user.Org.ID); err != nil {
 			return err

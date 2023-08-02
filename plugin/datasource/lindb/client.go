@@ -35,10 +35,12 @@ package lindb
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	lincli "github.com/lindb/client_go"
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/common/pkg/logger"
+	"github.com/lindb/common/pkg/timeutil"
 
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/plugin"
@@ -52,27 +54,42 @@ var (
 	jsonUnmarshalFn         = encoding.JSONUnmarshal
 	buildDataQuerySQLFn     = buildDataQuerySQL
 	buildMetadataQuerySQLFn = buildMetadataQuerySQL
+	loadLocationFn          = time.LoadLocation
 )
 
 // client implements plugin.DatasourcePlugin for LinDB.
 type client struct {
-	cfg    *DatasourceConfig
-	client lincli.Client
+	datasouce *model.Datasource
+	cfg       *DatasourceConfig
+	client    lincli.Client
+	location  *time.Location
 
 	logger logger.Logger
 }
 
 // NewClient creates a LinDB client.
-func NewClient(url string, cfg json.RawMessage) (plugin.DatasourcePlugin, error) {
+func NewClient(datasource *model.Datasource, cfg json.RawMessage) (p plugin.DatasourcePlugin, err error) {
 	config := &DatasourceConfig{}
 	cfgData, _ := cfg.MarshalJSON()
-	if err := jsonUnmarshalFn(cfgData, config); err != nil {
-		return nil, err
+	if err0 := jsonUnmarshalFn(cfgData, config); err0 != nil {
+		return nil, err0
 	}
+	var location *time.Location
+	if datasource.TimeZone == "" {
+		location = time.Local
+	} else {
+		location, err = loadLocationFn(datasource.TimeZone)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &client{
-		cfg:    config,
-		client: lincli.NewClient(url),
-		logger: logger.GetLogger("DatasourcePlugin", "LinDB"),
+		cfg:       config,
+		datasouce: datasource,
+		location:  location,
+		client:    lincli.NewClient(datasource.URL),
+		logger:    logger.GetLogger("DatasourcePlugin", "LinDB"),
 	}, nil
 }
 
@@ -83,8 +100,7 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 	if err := jsonUnmarshalFn(data, &dataQueryReq); err != nil {
 		return nil, err
 	}
-
-	sql, err := buildDataQuerySQLFn(dataQueryReq, timeRange)
+	sql, err := buildDataQuerySQLFn(dataQueryReq, cli.formatTime(timeRange.From), cli.formatTime(timeRange.To))
 	if err != nil {
 		return nil, err
 	}
@@ -116,4 +132,12 @@ func (cli *client) MetadataQuery(ctx context.Context, req *model.Query) (any, er
 	}
 	cli.logger.Info("metadata query", logger.String("database", cli.cfg.Database), logger.String("sql", sql))
 	return rs, nil
+}
+
+func (cli *client) formatTime(timestamp int64) string {
+	if timestamp <= 0 {
+		return ""
+	}
+	ts := time.UnixMilli(timestamp)
+	return ts.In(cli.location).Format(timeutil.DataTimeFormat2)
 }

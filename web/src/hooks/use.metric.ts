@@ -20,6 +20,7 @@ import { VariableContext } from '@src/contexts';
 import { DataQuerySrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
 import { DataQuery, DataSetType, Query, TimeRange } from '@src/types';
+import { TimeKit } from '@src/utils';
 import { isEmpty, cloneDeep, get } from 'lodash-es';
 import { useContext } from 'react';
 import { useRequest } from './use.request';
@@ -68,10 +69,10 @@ export const useMetric = (queries: Query[], dataset: DataSetType, defaultDatasou
     async () => {
       const range: TimeRange = {};
       if (!isEmpty(from)) {
-        range.from = `${from}`;
+        range.from = TimeKit.parseTime(from);
       }
       if (!isEmpty(to)) {
-        range.to = `${to}`;
+        range.to = TimeKit.parseTime(to);
       }
       dataQuery.range = range;
       return DataQuerySrv.dataQuery(dataQuery);

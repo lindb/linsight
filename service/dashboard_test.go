@@ -271,7 +271,8 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 		{
 			name: "count failure",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -279,7 +280,8 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 		{
 			name: "count 0",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), nil)
 			},
 			wantErr: false,
@@ -287,9 +289,11 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 		{
 			name: "find failure",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "org_id=? and title like ? and created_by=?",
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -297,9 +301,11 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 		{
 			name: "find successfully",
 			prepare: func() {
-				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", "org_id=? and title like ? and created_by=?",
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -313,6 +319,7 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 			_, _, err := srv.SearchDashboards(ctx, &model.SearchDashboardRequest{
 				Title:     "title",
 				Ownership: model.Mine,
+				Tags:      []string{"tag"},
 				PagingParam: model.PagingParam{
 					Limit:  10,
 					Offset: 20,

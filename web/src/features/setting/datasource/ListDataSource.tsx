@@ -26,6 +26,7 @@ import { Icon, StatusTip } from '@src/components';
 import { useRequest } from '@src/hooks';
 import DeleteDatasourceButton from './components/DeleteDatasourceButton';
 import { PlatformContext } from '@src/contexts';
+import { TimeKit } from '@src/utils';
 
 const { Title, Text } = Typography;
 
@@ -108,15 +109,23 @@ const ListDataSource: React.FC = () => {
                       })}`,
                     })
                   }>
-                  <Title heading={5}>{ds.name}</Title>
-                  <div style={{ marginTop: 8 }}>
+                  <Title heading={5}>
+                    {ds.name}
+                    {ds.isDefault && (
+                      <Tag color="orange" style={{ marginLeft: 8 }}>
+                        Default
+                      </Tag>
+                    )}
+                  </Title>
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center' }}>
                     <Text>{item?.Name}</Text>
                     <Divider layout="vertical" style={{ margin: '0 8px' }} />
                     <Text>{ds.url}</Text>
-                    {ds.isDefault && (
+                    {ds.timeZone && (
                       <>
                         <Divider layout="vertical" style={{ margin: '0 8px' }} />
-                        <Tag color="orange">Default</Tag>
+                        <Text>{ds.timeZone}</Text>
+                        <Tag style={{ marginLeft: 6 }}>{TimeKit.utcOffset(ds.timeZone)}</Tag>
                       </>
                     )}
                   </div>

@@ -27,7 +27,7 @@ import (
 //go:generate mockgen -source=./datasource.go -destination=./datasource_mock.go -package=plugin
 
 // NewDatasourcePlugin represents new datasource plugin instance function.
-type NewDatasourcePlugin func(url string, cfg json.RawMessage) (DatasourcePlugin, error)
+type NewDatasourcePlugin func(datasource *model.Datasource, cfg json.RawMessage) (DatasourcePlugin, error)
 
 // DatasourcePlugin represents datasource plugin.
 type DatasourcePlugin interface {
