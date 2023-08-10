@@ -16,12 +16,13 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatRepositoryInst } from '@src/types';
-import { day, hour, microsecond, millisecond, minute, second, Time } from './time';
+import { FormatKit } from '@src/utils';
+import { Time } from './time';
 
 FormatRepositoryInst.register(new Time('nanoseconds (ns)', 'ns', 1))
-  .register(new Time('microseconds (µs)', 'µs', microsecond))
-  .register(new Time('milliseconds (ms)', 'ms', millisecond))
-  .register(new Time('seconds (s)', 's', second))
-  .register(new Time('minutes (m)', 'm', minute))
-  .register(new Time('hours (h)', 'h', hour))
-  .register(new Time('days (d)', 'd', day));
+  .register(new Time('microseconds (µs)', 'µs', FormatKit.microsecond))
+  .register(new Time('milliseconds (ms)', 'ms', FormatKit.millisecond))
+  .register(new Time('seconds (s)', 's', FormatKit.second))
+  .register(new Time('minutes (m)', 'm', FormatKit.minute))
+  .register(new Time('hours (h)', 'h', FormatKit.hour))
+  .register(new Time('days (d)', 'd', FormatKit.day));

@@ -28,3 +28,4 @@ export * from '@src/types/feature';
 export * from '@src/types/platform';
 export * from '@src/types/format';
 export * from '@src/types/dashboard';
+export * from '@src/types/trace';

@@ -19,10 +19,11 @@ import React, { useCallback, useContext, useMemo, useRef } from 'react';
 import { Layout } from '@douyinfe/semi-ui';
 import { ErrorPage, FeatureMenu, Footer } from '@src/components';
 import { PlatformContext } from '@src/contexts';
-import { FeatureRepositoryInst, NavItem } from '@src/types';
+import { FeatureRepositoryInst, Component as NavItem } from '@src/types';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Explore from './features/explore/Explore';
 import User from './features/user/User';
+import TraceView from './features/trace/TraceView';
 
 const Content: React.FC = React.memo(() => {
   const { boot } = useContext(PlatformContext);
@@ -55,6 +56,7 @@ const Content: React.FC = React.memo(() => {
       <Route path="/user/*" element={<User />} errorElement={<ErrorPage />} />
       {/* put /explore route to fix if routes is empty infinite loop*/}
       <Route path="/explore" element={<Explore />} errorElement={<ErrorPage />} />
+      <Route path="/trace" element={<TraceView />} errorElement={<ErrorPage />} />
       <Route path="/*" element={<Navigate to={boot.home || '/explore'} />} errorElement={<ErrorPage />} />
     </Routes>
   );

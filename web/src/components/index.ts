@@ -50,8 +50,6 @@ export { default as AddPanelWidget } from '@src/components/dashboard/AddPanelWid
 export { default as Panel } from '@src/components/dashboard/Panel';
 
 export { default as StatsList } from './StatsList';
-export { default as TraceTimeline } from './TraceTimeline';
 export { default as TraceFlame } from './TraceFlame';
-export { default as TraceFlame2 } from './TraceFlame2';
 export { default as TraceMap } from './TraceMap';
 export { default as TraceSummary } from './TraceSummary';

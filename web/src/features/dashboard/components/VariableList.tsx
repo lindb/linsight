@@ -175,15 +175,18 @@ const VariableList: React.FC = () => {
               dataIndex: 'name',
               render: (_text: any, r: Variable, index: number) => {
                 return (
-                  <Text
-                    style={{ padding: '12px 0 12px 0' }}
-                    link
-                    onClick={() => {
-                      searchParams.set('edit', `${index}`);
-                      setSearchParams(searchParams);
-                    }}>
-                    {r.name}
-                  </Text>
+                  <div className="item">
+                    <IconHandle className="drag" {...get(r, '_provided.dragHandleProps', {})} size="large" />
+                    <Text
+                      style={{ padding: '12px 0 12px 0' }}
+                      link
+                      onClick={() => {
+                        searchParams.set('edit', `${index}`);
+                        setSearchParams(searchParams);
+                      }}>
+                      {r.name}
+                    </Text>
+                  </div>
                 );
               },
             },
@@ -194,7 +197,7 @@ const VariableList: React.FC = () => {
               width: 120,
               render: (_text: any, r: Variable, index: number) => {
                 return (
-                  <div style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                  <div className="item">
                     <Button
                       type="primary"
                       icon={<IconCopyStroked size="large" />}
@@ -209,7 +212,6 @@ const VariableList: React.FC = () => {
                       icon={<IconDeleteStroked size="large" />}
                       onClick={() => DashboardStore.deleteVariable(`${index}`)}
                     />
-                    <IconHandle className="drag" {...get(r, '_provided.dragHandleProps', {})} size="large" />
                   </div>
                 );
               },

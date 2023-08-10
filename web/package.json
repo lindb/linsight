@@ -53,6 +53,7 @@
   "devDependencies": {
     "@types/chart.js": "^2.9.37",
     "@types/lodash-es": "^4.17.6",
+    "@types/node": "^20.4.5",
     "@types/qs": "^6.9.7",
     "@types/react": "^18.0.0",
     "@types/react-beautiful-dnd": "^13.1.3",

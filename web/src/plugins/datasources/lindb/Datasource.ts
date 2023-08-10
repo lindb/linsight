@@ -26,7 +26,7 @@ export class LinDBDatasource extends DatasourceAPI {
     super(setting);
   }
 
-  rewriteQuery(query: Query, variables: {}, dataset: DataSetType): Query | null {
+  rewriteQuery(query: Query, variables: {}, dataset?: DataSetType): Query | null {
     if (!query.request || isEmpty(query.request.metric) || isEmpty(query.request.fields)) {
       return null;
     }
