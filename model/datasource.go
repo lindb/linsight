@@ -25,6 +25,7 @@ type DatasourceType = string
 // Define all support datasource types.
 var (
 	LinDBDatasource DatasourceType = "lindb"
+	LinGoDatasource DatasourceType = "lingo"
 )
 
 // Datasource represents datasource information.

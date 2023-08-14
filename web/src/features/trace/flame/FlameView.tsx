@@ -15,30 +15,27 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { Card } from '@douyinfe/semi-ui';
+import { FlamegraphRenderer } from '@pyroscope/flamegraph';
+import '@pyroscope/flamegraph/dist/index.css';
+import { Trace } from '@src/types';
+import React from 'react';
+import { default as TraceKit } from '../util/trace';
 
-.login {
-  background-color: var(--semi-color-fill-0);
-  height: calc(100vh - 48px);
-  display: flex;
-  align-items: center;
+const FlameView: React.FC<{ traces: Trace[] }> = (props) => {
+  const { traces } = props;
+  return (
+    <Card className="linsight-feature" bodyStyle={{ padding: 8 }}>
+      <FlamegraphRenderer
+        profile={TraceKit.convertTraceToProfile(traces)}
+        // onlyDisplay="both"
+        // onlyDisplay="sandwich"
+        onlyDisplay="flamegraph"
+        showToolbar={false}
+        showCredit={false}
+      />
+    </Card>
+  );
+};
 
-  .semi-row {
-    width: 100%;
-    display: flex;
-    align-items: center;
-  }
-
-  .login-form {
-    width: 100%;
-
-    .semi-form-field {
-      padding-top: 6px;
-      padding-bottom: 6px;
-    }
-  }
-
-  /* stylelint-disable-next-line selector-class-pattern */
-  .semi-divider_inner-text {
-    padding: 0 12px;
-  }
-}
+export default FlameView;

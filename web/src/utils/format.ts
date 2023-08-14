@@ -15,8 +15,16 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+
 import { Formatted } from '@src/types';
 import { round, divide, get } from 'lodash-es';
+
+const microsecond = 1000;
+const millisecond = microsecond * 1000;
+const second = millisecond * 1000;
+const minute = second * 60;
+const hour = minute * 60;
+const day = hour * 24;
 
 const toObject = (input: string): any => {
   switch (input) {
@@ -26,6 +34,24 @@ const toObject = (input: string): any => {
       return true;
     default:
       return input;
+  }
+};
+
+const formatNanoseconds = (nanoseconds: number, decimals: number | undefined = 2): Formatted => {
+  if (nanoseconds >= day) {
+    return { value: `${round(nanoseconds / day, decimals)}`, suffix: 'day' };
+  } else if (nanoseconds >= hour) {
+    return { value: `${round(nanoseconds / hour, decimals)}`, suffix: 'hour' };
+  } else if (nanoseconds >= minute) {
+    return { value: `${round(nanoseconds / minute, decimals)}`, suffix: 'min' };
+  } else if (nanoseconds >= second) {
+    return { value: `${round(nanoseconds / second, decimals)}`, suffix: 's' };
+  } else if (nanoseconds >= millisecond) {
+    return { value: `${round(nanoseconds / millisecond, decimals)}`, suffix: 'ms' };
+  } else if (nanoseconds >= microsecond) {
+    return { value: `${round(nanoseconds / microsecond, decimals)}`, suffix: 'µs' };
+  } else {
+    return { value: `${round(nanoseconds, decimals)}`, suffix: 'ns' };
   }
 };
 
@@ -46,6 +72,13 @@ const formatUnit = (value: number | null, units: string[], k = 1000, decimals = 
 };
 
 export default {
-  formatUnit,
   toObject,
+  formatUnit,
+  formatNanoseconds,
+  millisecond,
+  microsecond,
+  second,
+  minute,
+  hour,
+  day,
 };

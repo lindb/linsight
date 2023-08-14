@@ -44,4 +44,10 @@ under the License.
     cursor: move;
     color: var(--semi-color-text-2);
   }
+
+  .item {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
 }

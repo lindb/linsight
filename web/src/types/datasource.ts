@@ -125,7 +125,7 @@ abstract class DatasourceAPI {
   /**
    * Rewrite query request, if request invalid return null.
    */
-  abstract rewriteQuery(query: Query, variables: {}, dataset: DataSetType): Query | null;
+  abstract rewriteQuery(query: Query, variables: {}, dataset?: DataSetType): Query | null;
 
   /**
    * Rewrite metadata query request, if request invalid return null.

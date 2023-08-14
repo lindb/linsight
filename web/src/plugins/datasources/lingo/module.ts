@@ -15,21 +15,18 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { FlamegraphRenderer, convertJaegerTraceToProfile } from '@pyroscope/flamegraph';
-import '@pyroscope/flamegraph/dist/index.css';
-import React from 'react';
+import { DatasourceCategory, DatasourcePlugin, DatasourceRepositoryInst } from '@src/types';
+import { LinGoDatasource } from './Datasource';
+import Logo from './images/logo.svg';
+import { SettingEditor } from './SettingEditor';
 
-const TraceFlame2: React.FC = () => {
-  return (
-    <div>
-      <FlamegraphRenderer
-        //profile={convertJaegerTraceToProfile(APMSrv.getTraceData2()[0])}
-        onlyDisplay="flamegraph"
-        showToolbar={false}
-        showCredit={false}
-      />
-    </div>
-  );
-};
+const LinGo = new DatasourcePlugin(
+  DatasourceCategory.Trace,
+  'LinGo',
+  'lingo',
+  'An open-source, lightweight tool for building observability pipelines',
+  LinGoDatasource
+);
 
-export default TraceFlame2;
+LinGo.setSettingEditor(SettingEditor).setDarkLogo(Logo).setLightLogo(Logo);
+DatasourceRepositoryInst.register(LinGo);

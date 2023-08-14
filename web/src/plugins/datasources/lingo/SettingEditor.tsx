@@ -15,30 +15,25 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
+import { Form } from '@douyinfe/semi-ui';
+import React from 'react';
 
-.login {
-  background-color: var(--semi-color-fill-0);
-  height: calc(100vh - 48px);
-  display: flex;
-  align-items: center;
-
-  .semi-row {
-    width: 100%;
-    display: flex;
-    align-items: center;
-  }
-
-  .login-form {
-    width: 100%;
-
-    .semi-form-field {
-      padding-top: 6px;
-      padding-bottom: 6px;
-    }
-  }
-
-  /* stylelint-disable-next-line selector-class-pattern */
-  .semi-divider_inner-text {
-    padding: 0 12px;
-  }
-}
+export const SettingEditor: React.FC = () => {
+  return (
+    <>
+      <Form.Section text="Setting">
+        <Form.Input
+          field="url"
+          label="URL"
+          rules={[{ required: true, message: 'URL is required' }]}
+          placeholder="http://localhost:9000"
+        />
+        <Form.Input
+          field="config.pipeline"
+          label="Pipeline"
+          rules={[{ required: true, message: 'Pipeline is required' }]}
+        />
+      </Form.Section>
+    </>
+  );
+};

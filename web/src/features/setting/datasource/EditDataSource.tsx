@@ -162,6 +162,9 @@ const EditDataSource: React.FC = () => {
             );
           }}
           renderSelectedItem={(n: Record<string, any>) => {
+            if (isEmpty(n.value)) {
+              return null;
+            }
             return (
               <div style={{ display: 'flex', gap: 4 }}>
                 <Text>{n.value}</Text>

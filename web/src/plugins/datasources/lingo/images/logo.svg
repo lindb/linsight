@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" width="300px" height="304px" viewBox="-13.967 4.956 288.396 297.11" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
+  <path style="stroke: rgb(0, 0, 0); stroke-width: 0px; fill: rgb(232, 91, 45);" d="M -13.967 30.046 L 77.711 30.046 L 27.277 303.066 L -13.967 303.066"/>
+  <path style="stroke: rgb(0, 0, 0); stroke-width: 0px; fill: rgb(232, 91, 45);" d="M 50.124 222.767 L 114.212 222.766 L 154.261 5.955 L 90.173 5.956 L 50.124 222.767 Z" transform="matrix(1, 0.000026, -0.000026, 1, 0.002973, -0.002657)" bx:origin="0.499995 0.5"/>
+  <path style="stroke-width: 0px; stroke: rgb(232, 91, 45); paint-order: stroke; fill: rgb(232, 91, 45);" d="M 157.825 30.046 L 274.429 30.046 L 274.429 303.066 L 210.341 303.066 L 210.341 222.766 L 122.22 222.766 L 157.825 30.046 Z"/>
+  <path style="stroke: rgb(0, 0, 0); stroke-width: 0px; fill: rgb(232, 91, 45);" d="M 48.64 230.796 L 36.772 295.036 L 202.33 295.036 L 202.33 230.796 L 48.64 230.796 Z"/>
+</svg>

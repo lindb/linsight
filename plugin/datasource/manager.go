@@ -24,6 +24,7 @@ import (
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/plugin"
 	"github.com/lindb/linsight/plugin/datasource/lindb"
+	"github.com/lindb/linsight/plugin/datasource/lingo"
 )
 
 //go:generate mockgen -source=./manager.go -destination=./manager_mock.go -package=datasource
@@ -32,6 +33,7 @@ var datasourceClients = make(map[string]plugin.NewDatasourcePlugin)
 
 func init() {
 	datasourceClients[model.LinDBDatasource] = lindb.NewClient
+	datasourceClients[model.LinGoDatasource] = lingo.NewClient
 }
 
 // Manager represents datasouce plugin manager.

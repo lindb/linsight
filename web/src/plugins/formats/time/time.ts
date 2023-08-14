@@ -16,14 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { FormatCate, Formatted, Formatter } from '@src/types';
-import { round } from 'lodash-es';
-
-const microsecond = 1000;
-const millisecond = microsecond * 1000;
-const second = millisecond * 1000;
-const minute = second * 60;
-const hour = minute * 60;
-const day = hour * 24;
+import { FormatKit } from '@src/utils';
 
 class Time extends Formatter {
   k: number;
@@ -38,22 +31,8 @@ class Time extends Formatter {
 
   format(input: number | null, decimals?: number | undefined): Formatted {
     const nanoseconds = (input || 0) * this.k;
-    if (nanoseconds >= day) {
-      return { value: `${round(nanoseconds / day, decimals)}`, suffix: 'day' };
-    } else if (nanoseconds >= hour) {
-      return { value: `${round(nanoseconds / hour, decimals)}`, suffix: 'hour' };
-    } else if (nanoseconds >= minute) {
-      return { value: `${round(nanoseconds / minute, decimals)}`, suffix: 'min' };
-    } else if (nanoseconds >= second) {
-      return { value: `${round(nanoseconds / second, decimals)}`, suffix: 's' };
-    } else if (nanoseconds >= millisecond) {
-      return { value: `${round(nanoseconds / millisecond, decimals)}`, suffix: 'ms' };
-    } else if (nanoseconds >= microsecond) {
-      return { value: `${round(nanoseconds / microsecond, decimals)}`, suffix: 'µs' };
-    } else {
-      return { value: `${round(nanoseconds, decimals)}`, suffix: 'ns' };
-    }
+    return FormatKit.formatNanoseconds(nanoseconds, decimals);
   }
 }
 
-export { Time, microsecond, millisecond, second, minute, hour, day };
+export { Time };
