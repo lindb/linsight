@@ -17,8 +17,7 @@ under the License.
 */
 import { Button, Dropdown, Layout } from '@douyinfe/semi-ui';
 import { IconInheritStroked, IconDescend, IconFlowChartStroked, IconPieChart2Stroked } from '@douyinfe/semi-icons';
-import { useRequest, useTrace } from '@src/hooks';
-import { DataQuerySrv } from '@src/services';
+import { useTrace } from '@src/hooks';
 import React, { useState } from 'react';
 import TimelineView from './timeline/TimelineView';
 import { Trace } from '@src/types';

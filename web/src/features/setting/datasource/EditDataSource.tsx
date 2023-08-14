@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import React, { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { isEmpty, get } from 'lodash-es';
+import { isEmpty, get, filter } from 'lodash-es';
 import { Button, Select, Card, Typography, Form, Space, Tag } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
@@ -33,6 +33,44 @@ import './datasource.scss';
 
 const { Text, Title } = Typography;
 
+const TimeZoneSelect: React.FC = () => {
+  const [timeZones, setTimeZones] = useState<string[]>(moment.tz.names());
+  return (
+    <Form.Select
+      field="timeZone"
+      label="Time zone"
+      style={{ width: '100%' }}
+      filter
+      onSearch={(v: string) => {
+        const search = v.toLowerCase();
+        setTimeZones(
+          filter(moment.tz.names(), (tz: string) => {
+            return tz.toLowerCase().indexOf(search) >= 0;
+          })
+        );
+      }}
+      renderSelectedItem={(n: Record<string, any>) => {
+        if (isEmpty(n.value)) {
+          return null;
+        }
+        return (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <Text>{n.value}</Text>
+            <Tag>{TimeKit.utcOffset(n.value)}</Tag>
+          </div>
+        );
+      }}>
+      {timeZones.map((tz: string) => {
+        return (
+          <Select.Option key={tz} value={tz} showTick={false} className="time-zone-select">
+            <Text className="time-zone-name">{tz}</Text>
+            <Tag>{TimeKit.utcOffset(tz)}</Tag>
+          </Select.Option>
+        );
+      })}
+    </Form.Select>
+  );
+};
 const DatasourceSettingForm: React.FC<{
   formApi: any;
   datasource?: DatasourceSetting;
@@ -85,7 +123,6 @@ const EditDataSource: React.FC = () => {
   const gotoDatasourceList = () => {
     navigate({ pathname: '/setting/datasources' });
   };
-
   return (
     <Card
       loading={!isEmpty(uid) && loading}
@@ -141,38 +178,7 @@ const EditDataSource: React.FC = () => {
         }}>
         <Form.Input field="name" label="Name" rules={[{ required: true, message: 'Name is required' }]} />
         <Form.Switch field="isDefault" label="Default" />
-        <Form.Select
-          field="timeZone"
-          label="Time zone"
-          style={{ width: '100%' }}
-          filter
-          optionList={moment.tz.names().map((n: string) => {
-            return { label: n, value: n, showTick: true };
-          })}
-          onChange={(value: any): void => {
-            console.error('kkkk', value);
-          }}
-          renderOptionItem={(props: any) => {
-            const { value, onClick } = props;
-            return (
-              <Select.Option value={value} showTick={false} className="time-zone-select" onClick={() => onClick()}>
-                <Text className="time-zone-name">{value}</Text>
-                <Tag>{TimeKit.utcOffset(value)}</Tag>
-              </Select.Option>
-            );
-          }}
-          renderSelectedItem={(n: Record<string, any>) => {
-            if (isEmpty(n.value)) {
-              return null;
-            }
-            return (
-              <div style={{ display: 'flex', gap: 4 }}>
-                <Text>{n.value}</Text>
-                <Tag>{TimeKit.utcOffset(n.value)}</Tag>
-              </div>
-            );
-          }}
-        />
+        <TimeZoneSelect />
         <Form.Select
           label="Type"
           field="type"
