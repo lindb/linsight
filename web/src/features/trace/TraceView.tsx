@@ -28,7 +28,6 @@ import './trace-view.scss';
 import { useSearchParams } from 'react-router-dom';
 
 const { Header } = Layout;
-
 const TraceView: React.FC = () => {
   const [viewType, setViewType] = useState('timeline');
   const [searchParams] = useSearchParams();
@@ -57,6 +56,7 @@ const TraceView: React.FC = () => {
         return <TimelineView traces={cloneDeep(result as Trace[])} />;
     }
   };
+
   const renderIcon = () => {
     switch (viewType) {
       case 'flame':
@@ -65,6 +65,7 @@ const TraceView: React.FC = () => {
         return <IconInheritStroked />;
     }
   };
+
   return (
     <Layout className="trace-view">
       <Header className="linsight-feature-header" style={{ padding: '0 12px' }}>
