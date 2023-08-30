@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Button, Layout } from '@douyinfe/semi-ui';
+import { Button, Card, Empty, Layout } from '@douyinfe/semi-ui';
 import React, { MutableRefObject, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, MetricExplore, TimePicker } from '@src/components';
 import { DatasourceInstance, PanelSetting, Tracker } from '@src/types';
@@ -70,6 +70,22 @@ const ExploreContent: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panel]);
 
+  const renderContent = () => {
+    if (!datasource || isEmpty(DatasourceStore.getDatasources(false))) {
+      return (
+        <Card
+          className="linsight-feature"
+          bodyStyle={{ height: 300, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Empty
+            image={<Icon icon="empty" style={{ fontSize: 48 }} />}
+            description="No datasource, please add your first datasource."
+          />
+        </Card>
+      );
+    }
+    return <MetricExplore datasource={datasource} />;
+  };
+
   return (
     <Layout className="linsight-explore">
       <Header className="linsight-feature-header">
@@ -106,7 +122,7 @@ const ExploreContent: React.FC = () => {
           <TimePicker />
         </div>
       </Header>
-      {datasource && <MetricExplore datasource={datasource} />}
+      {renderContent()}
     </Layout>
   );
 };

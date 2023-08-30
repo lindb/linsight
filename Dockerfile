@@ -34,7 +34,7 @@ COPY --from=web_builder /web_workspace/web/static/ web/static
 RUN	CGO_ENABLED=1 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
     go build "${LD_FLAGS}" -o linsight ./cmd
 
-FROM centos:latest
+FROM ubuntu:23.10
 WORKDIR /
 COPY --from=go_builder /go_workspace/linsight /usr/bin/linsight
 RUN ln -s /usr/bin/linsight /usr/local/bin/linsight

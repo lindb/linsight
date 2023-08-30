@@ -66,7 +66,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
         const refId = `${target.refId}`;
         const datasourceUID = get(target, 'datasource.uid', get(defaultDatasource, 'setting.uid'));
         const datasource = DatasourceStore.getDatasource(`${datasourceUID}`);
-        if (!datasource) {
+        if (!datasource || datasource.setting.uid === MixedDatasource) {
           return null;
         }
         const QueryEditor = datasource.plugin.getQueryEditor();
