@@ -15,14 +15,20 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
+import React, { MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { Legend } from '@src/plugins/visualizations/timeseries/components/Legend';
 import Tooltip from '@src/plugins/visualizations/timeseries/components/Tooltip';
-import { getChartConfig, modifyChartConfigs } from '@src/plugins/visualizations/timeseries/components/chart.config';
+import {
+  getChartConfig,
+  modifyChartConfigs,
+  transferAnnotations,
+} from '@src/plugins/visualizations/timeseries/components/chart.config';
 import { Chart, registerables } from 'chart.js';
-import { cloneDeep, get, set, find, isEmpty } from 'lodash-es';
+import { cloneDeep, get, set, find, isEmpty, startsWith, remove } from 'lodash-es';
 import classNames from 'classnames';
 import {
+  Annotation,
+  AnnotationPrefix,
   FormatRepositoryInst,
   LegendPlacement,
   MouseEventType,
@@ -30,13 +36,15 @@ import {
   SearchParamKeys,
   ThemeType,
 } from '@src/types';
-import { PlatformStore } from '@src/stores';
+import { AnnotationStore, PlatformStore } from '@src/stores';
 import { CSSKit } from '@src/utils';
 import annotationPlugin from 'chartjs-plugin-annotation';
 import { getCustomOptions } from '../types';
 import moment from 'moment';
 import { DateTimeFormat } from '@src/constants';
 import { useSearchParams } from 'react-router-dom';
+import Menu from './Menu';
+import { reaction, toJS } from 'mobx';
 
 Chart.register(annotationPlugin);
 Chart.register(...registerables);
@@ -61,6 +69,42 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
   const crosshairRef = useRef() as MutableRefObject<HTMLDivElement>;
 
   const currPointIndex = useRef(-1);
+
+  const setAnnotations = useCallback(
+    (chartCfg: any, annotations: Annotation[]): boolean => {
+      const chartAnnotations: any = get(chartCfg, 'options.plugins.annotation.annotations');
+      // remove old annotations
+      remove(chartAnnotations, (a: any) => {
+        return startsWith(a.id, AnnotationPrefix);
+      });
+      const newAnnotations = transferAnnotations(
+        annotations,
+        theme,
+        get(datasets, 'times', []),
+        get(datasets, 'interval', 0)
+      );
+      if (!isEmpty(newAnnotations)) {
+        chartAnnotations.push(...newAnnotations);
+        return true;
+      }
+      return false;
+    },
+    [datasets, theme]
+  );
+
+  useEffect(() => {
+    const disposer = reaction(
+      () => toJS(AnnotationStore.annotations),
+      (annotations: Annotation[]) => {
+        const currChart = chartInstance.current;
+        if (setAnnotations(currChart, annotations)) {
+          currChart?.update();
+        }
+      }
+    );
+
+    return () => disposer();
+  }, [theme, setAnnotations]);
 
   const isZoom = (chart: Chart | null) => {
     return get(chart, 'options.zoom', false);
@@ -147,10 +191,22 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
   };
 
   const handleMouseClick = (e: MouseEvent) => {
-    console.log('xxxxxx..... cccccc');
+    if (!chartInstance.current) {
+      return;
+    }
+    const chart = chartInstance.current;
+    const points: any = chart.getElementsAtEventForMode(e, 'point', { intersect: true }, false);
+    if (!points || points.length <= 0) {
+      return;
+    }
+
+    const series = datasets.datasets[points[0].datasetIndex];
+    const timestamp = datasets.times[points[0].index];
     PlatformStore.setMouseEvent({
       type: MouseEventType.Click,
       native: e,
+      series: series,
+      timestamp: timestamp,
     });
   };
 
@@ -269,8 +325,8 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
     }
     const customOptions = getCustomOptions(panel);
     const chartCfg: any = getChartConfig(theme);
+    setAnnotations(chartCfg, AnnotationStore.annotations);
     chartCfg.options.legend = get(panel, 'options.legend', {});
-    console.error('chart cfg', chartCfg, customOptions);
     if (!chartInstance.current) {
       chartCfg.data = datasets || [];
       modifyChartConfigs(chartCfg, customOptions);
@@ -310,7 +366,7 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
       }
     });
     setSelectedSeries(Array.from(currentSelectedSet));
-    console.error('re-render time series chart');
+    console.error('re-render time series chart', datasets, chartInstance.current);
   }, [datasets, theme, panel]);
 
   /**
@@ -346,6 +402,7 @@ export const TimeSeriesChart: React.FC<{ datasets: any; theme: ThemeType; panel:
       </div>
       <Legend chart={chartInstance.current} />
       <Tooltip chart={chartInstance.current} />
+      <Menu chart={chartInstance.current} />
     </div>
   );
 };

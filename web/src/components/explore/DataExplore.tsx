@@ -18,23 +18,37 @@ under the License.
 import React, { useContext } from 'react';
 import { DatasourceInstance } from '@src/types';
 import { Card } from '@douyinfe/semi-ui';
+import { TraceView, QueryEditor } from '@src/components';
 import Panel from '../dashboard/Panel';
 import { PanelEditContext } from '@src/contexts';
-import { QueryEditor } from '..';
+import { get } from 'lodash-es';
+import { DatasourceKit } from '@src/utils';
 
-const MetricExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
+const DataExplore: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   const { datasource } = props;
   const { panel } = useContext(PanelEditContext);
+  const renderContent = () => {
+    if (DatasourceKit.isTrace(datasource)) {
+      return (
+        <TraceView
+          newWindowLink
+          traceId={get(panel, 'targets[0].request.traceId')}
+          datasources={[datasource.setting.uid]}
+        />
+      );
+    }
+    return <Panel panel={panel} />;
+  };
   return (
     <>
       <Card className="linsight-feature" bodyStyle={{ padding: 8 }}>
         <QueryEditor datasource={datasource} />
       </Card>
       <div className="linsight-feature" style={{ marginTop: 0, height: 300 }}>
-        <Panel panel={panel} />
+        {renderContent()}
       </div>
     </>
   );
 };
 
-export default MetricExplore;
+export default DataExplore;

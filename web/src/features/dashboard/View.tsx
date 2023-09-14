@@ -17,73 +17,11 @@ under the License.
 */
 import React from 'react';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { pick } from 'lodash-es';
-import { AddPanelWidget, Panel } from '@src/components';
+import { Dashboard } from '@src/components';
 import { Observer } from 'mobx-react-lite';
-import { DashboardStore } from '@src/stores';
-import RGL, { WidthProvider } from 'react-grid-layout';
-import {
-  DefaultColumns,
-  DefaultRowHeight,
-  PanelGridPos,
-  RowPanelType,
-  VisualizationAddPanelType,
-} from '@src/constants';
 import ViewVariables from './components/ViewVariables';
-import { PanelSetting } from '@src/types';
-import RowPanel from './components/RowPanel';
-
-const ReactGridLayout = WidthProvider(RGL);
 
 const View: React.FC = () => {
-  const buildLayout = (panels: any) => {
-    const layout: any[] = [];
-    (panels || []).map((item: any, _index: number) => {
-      if (!item) {
-        return;
-      }
-      const gridPos = pick(item.gridPos, ['i', ...PanelGridPos]) as ReactGridLayout.Layout;
-      if (item.type === RowPanelType) {
-        gridPos.isResizable = false;
-      }
-      layout.push(gridPos);
-    });
-    return layout;
-  };
-
-  const renderPanel = (panel: PanelSetting) => {
-    switch (panel.type) {
-      case VisualizationAddPanelType:
-        return <AddPanelWidget panel={panel} />;
-      case RowPanelType:
-        return <RowPanel key={`${panel.id}`} panel={panel} />;
-      default:
-        return <Panel key={`${panel.id}`} panel={panel} shortcutKey menu isStatic={!DashboardStore.canEdit()} />;
-    }
-  };
-
-  const renderPanels = () => {
-    const panels = DashboardStore.getPanels();
-    return panels.map((item: PanelSetting, _index: number) => {
-      if (!item) {
-        return null;
-      }
-      return <div key={item.id}>{renderPanel(item)}</div>;
-    });
-  };
-
-  const updatePanelGridPos = (layout: ReactGridLayout.Layout[]) => {
-    // NOTE: if use onLayoutChange will re-layout when component init
-    // and impact lazy load when toggle row
-    (layout || []).forEach((item: any) => {
-      const panel = DashboardStore.getPanel(parseInt(item.i));
-      if (panel) {
-        DashboardStore.updatePanelConfig(panel, { gridPos: item });
-        DashboardStore.sortPanels();
-      }
-    });
-  };
-
   return (
     <div>
       <ViewVariables className="variables" />
@@ -94,23 +32,7 @@ const View: React.FC = () => {
           }
           return (
             <div style={{ width: `${width}px` }}>
-              <Observer>
-                {() => (
-                  <ReactGridLayout
-                    className="layout"
-                    layout={buildLayout(DashboardStore.getPanels())}
-                    useCSSTransforms={false}
-                    onResizeStop={updatePanelGridPos}
-                    onDragStop={updatePanelGridPos}
-                    margin={[6, 6]}
-                    cols={DefaultColumns}
-                    rowHeight={DefaultRowHeight}
-                    width={width}
-                    draggableHandle=".grid-drag-handle">
-                    {renderPanels()}
-                  </ReactGridLayout>
-                )}
-              </Observer>
+              <Observer>{() => <Dashboard />}</Observer>
             </div>
           );
         }}

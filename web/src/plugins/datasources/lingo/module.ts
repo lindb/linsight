@@ -18,6 +18,7 @@ under the License.
 import { DatasourceCategory, DatasourcePlugin, DatasourceRepositoryInst } from '@src/types';
 import { LinGoDatasource } from './Datasource';
 import Logo from './images/logo.svg';
+import QueryEditor from './QueryEditor';
 import { SettingEditor } from './SettingEditor';
 
 const LinGo = new DatasourcePlugin(
@@ -28,5 +29,18 @@ const LinGo = new DatasourcePlugin(
   LinGoDatasource
 );
 
-LinGo.setSettingEditor(SettingEditor).setDarkLogo(Logo).setLightLogo(Logo);
+LinGo.setQueryEditor(QueryEditor)
+  .setDefaultParams({
+    targets: [
+      {
+        refId: 'A',
+        request: {
+          traceId: '',
+        },
+      },
+    ],
+  })
+  .setSettingEditor(SettingEditor)
+  .setDarkLogo(Logo)
+  .setLightLogo(Logo);
 DatasourceRepositoryInst.register(LinGo);

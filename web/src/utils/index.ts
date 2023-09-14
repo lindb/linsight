@@ -28,3 +28,5 @@ export { default as ChartKit } from '@src/utils/panel/chart';
 export { default as StringKit } from '@src/utils/string';
 export { default as DNDKit } from '@src/utils/dnd';
 export { default as TimeKit } from '@src/utils/time';
+export { default as TraceKit } from '@src/utils/trace';
+export { default as DatasourceKit } from '@src/utils/datasource';

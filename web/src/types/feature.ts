@@ -22,12 +22,20 @@ export class Feature {
   label: string;
   desc: string;
   component: ComponentType;
+  getDefaultSearchParams?: () => string;
 
-  constructor(key: string, label: string, desc: string, component: ComponentType) {
+  constructor(
+    key: string,
+    label: string,
+    desc: string,
+    component: ComponentType,
+    getDefaultSearchParams?: () => string
+  ) {
     this.key = key;
     this.label = label;
     this.desc = desc;
     this.component = component;
+    this.getDefaultSearchParams = getDefaultSearchParams;
   }
 }
 

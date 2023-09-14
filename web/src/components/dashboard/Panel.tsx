@@ -161,15 +161,17 @@ const PanelHeader = forwardRef(
                   }}>
                   Explore
                 </Dropdown.Item>
-                {!isStatic && renderChartRepo()}
-                {isStatic && <Dropdown.Divider />}
                 {!isStatic && (
-                  <Dropdown.Item
-                    icon={<IconDeleteStroked />}
-                    type="danger"
-                    onClick={() => DashboardStore.deletePanel(panel)}>
-                    Remove
-                  </Dropdown.Item>
+                  <>
+                    {renderChartRepo()}
+                    <Dropdown.Divider />
+                    <Dropdown.Item
+                      icon={<IconDeleteStroked />}
+                      type="danger"
+                      onClick={() => DashboardStore.deletePanel(panel)}>
+                      Remove
+                    </Dropdown.Item>
+                  </>
                 )}
               </Dropdown.Menu>
             }>
@@ -260,6 +262,7 @@ const ViewPanel: React.FC<{
   const { panel, shortcutKey, isStatic, className, menu } = props;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // FIXME: maybe plugin not exist
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const datasetType = plugin.getDataSetType(panel);
   const header = useRef<any>();

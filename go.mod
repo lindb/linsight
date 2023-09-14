@@ -71,7 +71,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lindb/client_go v0.0.2
-	github.com/lindb/common v0.0.2
+	github.com/lindb/common v0.0.4
 	github.com/mattn/go-isatty v0.0.18 // indirect
 	github.com/mattn/go-sqlite3 v1.14.15 // indirect
 	github.com/microsoft/go-mssqldb v0.17.0 // indirect

@@ -19,42 +19,48 @@ import { MixedDatasource } from '@src/constants';
 import { VariableContext } from '@src/contexts';
 import { DataQuerySrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
-import { DataQuery, Query, TimeRange } from '@src/types';
-import { TimeKit } from '@src/utils';
+import { DataQuery, Query, Span, TimeRange, Trace } from '@src/types';
+import { StringKit, TimeKit, TraceKit } from '@src/utils';
 import { isEmpty, cloneDeep, get } from 'lodash-es';
-import { useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useRequest } from './use.request';
 
-const getDataQuery = (query: Query, variables: object): DataQuery => {
+const getDataQuery = (queries: Query[], variables: object): DataQuery => {
   const dataQuery: DataQuery = { queries: [] };
-  let datasourceUID = get(query.datasource, 'uid');
-  if (datasourceUID === MixedDatasource) {
-    // ignore mixed datasource
-    return dataQuery;
-  }
-  const ds = DatasourceStore.getDatasource(datasourceUID);
-  if (!ds) {
-    return dataQuery;
-  }
-  // NOTE: need clone new q, because rewrite query will modify it
-  const queryAfterRewrite = ds.api.rewriteQuery(cloneDeep(query), variables);
-  if (isEmpty(queryAfterRewrite)) {
-    return dataQuery;
-  }
-  // need set datasource, maybe target no datasource setting, using default datasource
-  queryAfterRewrite.datasource = { uid: datasourceUID };
-  queryAfterRewrite.refId = 'A';
-  // add query request into batch
-  dataQuery.queries.push(queryAfterRewrite);
+  (queries || []).forEach((query: Query, idx: number) => {
+    let datasourceUID = get(query.datasource, 'uid');
+    if (datasourceUID === MixedDatasource) {
+      // ignore mixed datasource
+      return dataQuery;
+    }
+    const ds = DatasourceStore.getDatasource(datasourceUID);
+    if (!ds) {
+      return dataQuery;
+    }
+    // NOTE: need clone new q, because rewrite query will modify it
+    const queryAfterRewrite = ds.api.rewriteQuery(cloneDeep(query), variables);
+    if (isEmpty(queryAfterRewrite)) {
+      return dataQuery;
+    }
+    // need set datasource, maybe target no datasource setting, using default datasource
+    queryAfterRewrite.datasource = { uid: datasourceUID };
+    queryAfterRewrite.refId = StringKit.generateCharSeq(idx);
+    // add query request into batch
+    dataQuery.queries.push(queryAfterRewrite);
+  });
   return dataQuery;
 };
 
-export const useTrace = (queries: Query) => {
+export const useTrace = (queries: Query[]) => {
   const { variables, from, to, refreshTime } = useContext(VariableContext);
   const dataQuery: DataQuery = getDataQuery(queries, variables);
+  const [traces, setTraces] = useState<Trace[]>([]);
+  const [tree, setTree] = useState<Span[]>([]);
+  const [spanMap, setSpanMap] = useState<Map<string, Span>>();
   const { result, loading, refetch, error } = useRequest(
     ['get_trace_data', dataQuery, from, to, refreshTime], // watch dataQuery/from/to if changed
     async () => {
+      console.error('trace request.....');
       const range: TimeRange = {};
       if (!isEmpty(from)) {
         range.from = TimeKit.parseTime(from);
@@ -67,9 +73,20 @@ export const useTrace = (queries: Query) => {
     },
     { enabled: !isEmpty(dataQuery.queries) }
   );
+
+  useEffect(() => {
+    const traces = TraceKit.createTraceDatasets(result);
+    setTraces(traces);
+    const tree = TraceKit.buildTraceTree(traces);
+    setTree(tree.tree);
+    setSpanMap(tree.spanMap);
+  }, [result]);
+
   return {
     loading,
-    result: get(result, 'A', []),
+    traces,
+    tree,
+    spanMap,
     error,
     refetch,
   };

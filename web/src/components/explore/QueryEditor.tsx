@@ -26,7 +26,7 @@ import {
   IconChevronRight,
 } from '@douyinfe/semi-icons';
 import { PanelEditContext, QueryEditContextProvider, TargetsContext, TargetsContextProvider } from '@src/contexts';
-import { DatasourceInstance, Query } from '@src/types';
+import { DatasourceCategory, DatasourceInstance, Query } from '@src/types';
 import { cloneDeep, get, isEmpty } from 'lodash-es';
 import Icon from '../common/Icon';
 import './query.editor.scss';
@@ -40,7 +40,7 @@ import {
   DroppableStateSnapshot,
 } from 'react-beautiful-dnd';
 import classNames from 'classnames';
-import { DNDKit } from '@src/utils';
+import { DatasourceKit, DNDKit } from '@src/utils';
 import DatasourceSelectForm from '../input/DatasourceSelectForm';
 import { MixedDatasource } from '@src/constants';
 import { DatasourceStore } from '@src/stores';
@@ -59,6 +59,45 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
     deleteTarget,
     updateTargetConfig,
   } = useContext(TargetsContext);
+
+  const renderActions = (target: Query, index: number) => {
+    if (!DatasourceKit.isMetric(defaultDatasource)) {
+      return null;
+    }
+    return (
+      <>
+        <Button
+          size="small"
+          theme="borderless"
+          type="tertiary"
+          icon={<IconCopy />}
+          onClick={() => {
+            const newTarget = cloneDeep(target);
+            addTarget(newTarget);
+          }}
+        />
+        <Button
+          size="small"
+          theme="borderless"
+          style={{ color: target.hide ? 'var(--semi-color-primary)' : '' }}
+          type={target.hide ? 'primary' : 'tertiary'}
+          icon={<Icon icon={target.hide ? 'eye-close' : 'eye'} />}
+          onClick={() => {
+            toggleTargetHide(index);
+          }}
+        />
+        <Button
+          size="small"
+          theme="borderless"
+          type="tertiary"
+          icon={<IconDeleteStroked />}
+          onClick={() => {
+            deleteTarget(index);
+          }}
+        />
+      </>
+    );
+  };
 
   return (
     <Collapse activeKey={activeIds} expandIconPosition="left" clickHeaderToExpand={false}>
@@ -101,6 +140,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
                               noLabel
                               value={datasourceUID}
                               style={{ width: 200 }}
+                              categories={[DatasourceCategory.Metric]}
                               onChange={(instance: DatasourceInstance) => {
                                 updateTargetConfig(index, {
                                   datasource: { uid: instance.setting.uid, type: instance.setting.type },
@@ -119,35 +159,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
                           )}
                         </div>
                         <div className="actions">
-                          <Button
-                            size="small"
-                            theme="borderless"
-                            type="tertiary"
-                            icon={<IconCopy />}
-                            onClick={() => {
-                              const newTarget = cloneDeep(target);
-                              addTarget(newTarget);
-                            }}
-                          />
-                          <Button
-                            size="small"
-                            theme="borderless"
-                            style={{ color: target.hide ? 'var(--semi-color-primary)' : '' }}
-                            type={target.hide ? 'primary' : 'tertiary'}
-                            icon={<Icon icon={target.hide ? 'eye-close' : 'eye'} />}
-                            onClick={() => {
-                              toggleTargetHide(index);
-                            }}
-                          />
-                          <Button
-                            size="small"
-                            theme="borderless"
-                            type="tertiary"
-                            icon={<IconDeleteStroked />}
-                            onClick={() => {
-                              deleteTarget(index);
-                            }}
-                          />
+                          {renderActions(target, index)}
                           <IconHandle className="drag" size="large" {...provided.dragHandleProps} />
                         </div>
                       </div>
@@ -218,21 +230,23 @@ const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
           }}
         </Droppable>
       </DragDropContext>
-      <Button
-        style={{ marginTop: 12 }}
-        icon={<IconPlusStroked />}
-        onClick={() => {
-          let ds = datasource;
-          // if panel's datasource type is mixed, need select default datasource
-          if (ds.setting.uid === MixedDatasource) {
-            ds = DatasourceStore.getDefaultDatasource() as any;
-          }
-          addTarget({
-            datasource: { uid: ds.setting.uid, type: ds.setting.type },
-          } as Query);
-        }}>
-        Query
-      </Button>
+      {DatasourceKit.isMetric(datasource) && (
+        <Button
+          style={{ marginTop: 12 }}
+          icon={<IconPlusStroked />}
+          onClick={() => {
+            let ds = datasource;
+            // if panel's datasource type is mixed, need select default datasource
+            if (ds.setting.uid === MixedDatasource) {
+              ds = DatasourceStore.getDefaultDatasource() as any;
+            }
+            addTarget({
+              datasource: { uid: ds.setting.uid, type: ds.setting.type },
+            } as Query);
+          }}>
+          Query
+        </Button>
+      )}
     </div>
   );
 };

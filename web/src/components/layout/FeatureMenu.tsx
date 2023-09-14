@@ -17,7 +17,7 @@ under the License.
 */
 import { PlatformContext } from '@src/contexts';
 import { MenuStore } from '@src/stores';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isEmpty, get, upperFirst } from 'lodash-es';
 import { Button, Dropdown, Modal, Nav, Table, Tag, Typography } from '@douyinfe/semi-ui';
@@ -26,7 +26,7 @@ import { Notification } from '@src/components';
 import Icon from '../common/Icon';
 import Sider from '@douyinfe/semi-ui/lib/es/layout/Sider';
 import Logo from '@src/images/logo.svg';
-import { ThemeType, UserOrg } from '@src/types';
+import { FeatureRepositoryInst, ThemeType, UserOrg } from '@src/types';
 import { UserSrv } from '@src/services';
 import { matchPath } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
@@ -138,6 +138,21 @@ const FeatureMenu: React.FC = () => {
     return menu;
   };
 
+  const goto = useCallback(
+    (item: any) => {
+      const feature = FeatureRepositoryInst.getFeature(item.component);
+      let params = '';
+      if (feature && feature.getDefaultSearchParams) {
+        params = feature.getDefaultSearchParams();
+      }
+      navigate({
+        pathname: item.path,
+        search: params,
+      });
+    },
+    [navigate]
+  );
+
   useEffect(() => {
     const renderMenus = (menus: any) => {
       return (menus || []).map((item: any) => {
@@ -156,7 +171,7 @@ const FeatureMenu: React.FC = () => {
                   icon={<Icon icon={child.icon} style={{ fontSize: 20 }} />}
                   text={child.label}
                   itemKey={child.path || child.label}
-                  onClick={() => navigate(child.path)}
+                  onClick={() => goto(child)}
                 />
               ))}
             </Nav.Sub>
@@ -177,7 +192,7 @@ const FeatureMenu: React.FC = () => {
                 itemKey={item.path || item.label}
                 key={uuidv4()}
                 text={item.label}
-                onClick={() => navigate(item.path)}
+                onClick={() => goto(item)}
               />
             </Nav.Sub>
           );
@@ -195,14 +210,14 @@ const FeatureMenu: React.FC = () => {
       });
     };
     setMenus(renderMenus(boot.navTree));
-  }, [boot.navTree, collapsed, navigate]);
+  }, [boot.navTree, collapsed, navigate, goto]);
 
   return (
     <>
       {visible && (
         <SwitchOrg
-          userUid={get(boot, 'user.uid')}
-          currentOrgUid={currentOrg.uid}
+          userUid={get(boot, 'user.uid', '')}
+          currentOrgUid={get(currentOrg, 'uid', '')}
           visible={visible}
           setVisible={(v: boolean) => {
             setVisible(v);
@@ -251,7 +266,7 @@ const FeatureMenu: React.FC = () => {
                             setVisible(true);
                           }}>
                           <span style={{ marginRight: 8 }}>Organization:</span>
-                          <Tag color="orange">{currentOrg.name}</Tag>
+                          <Tag color="orange">{get(currentOrg, 'name', 'N/A')}</Tag>
                         </Dropdown.Item>
                       )}
                       <Dropdown.Item onClick={() => navigate('/user/profile')}>Your profile</Dropdown.Item>

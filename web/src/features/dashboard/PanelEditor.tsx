@@ -18,7 +18,7 @@ under the License.
 import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Card, Tabs, TabPane, Avatar } from '@douyinfe/semi-ui';
 import SplitPane from 'react-split-pane';
-import { PanelSetting as PanelOptions } from '@src/types';
+import { DatasourceCategory, PanelSetting as PanelOptions } from '@src/types';
 import { DatasourceSelectForm, Notification, Panel, QueryEditor } from '@src/components';
 import { get, isEmpty } from 'lodash-es';
 import { DashboardStore, DatasourceStore } from '@src/stores';
@@ -54,6 +54,7 @@ const MetricSetting: React.FC = () => {
         value={get(datasource, 'setting.uid')}
         style={{ width: 200 }}
         includeMixed
+        categories={[DatasourceCategory.Metric]}
         onChange={(instance: DatasourceInstance) => {
           setDatasource(instance);
         }}

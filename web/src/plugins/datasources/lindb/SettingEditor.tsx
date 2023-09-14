@@ -37,6 +37,7 @@ export const SettingEditor: React.FC = () => {
           <Form.Input field="config.namespace" noLabel style={{ width: 340 }} placeholder="Namespace" />
           <Form.Input field="config.alias" noLabel style={{ flex: 1 }} placeholder="Namespace alias" />
         </Form.InputGroup>
+        <Form.Switch field="config.exemplar" label="Exemplar" />
       </Form.Section>
     </>
   );

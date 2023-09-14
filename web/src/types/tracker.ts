@@ -15,13 +15,15 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { isEqual, cloneDeep } from 'lodash-es';
+import { cloneDeep } from 'lodash-es';
 
 class Tracker<T> {
   private val: T;
+  private strVal: string;
   constructor(initVal: T) {
     // NOTE: need clone val, avoid modify some object
     this.val = cloneDeep(initVal);
+    this.strVal = JSON.stringify(this.val);
   }
 
   getVal(): T {
@@ -30,10 +32,11 @@ class Tracker<T> {
 
   setNewVal(newVal: T) {
     this.val = cloneDeep(newVal);
+    this.strVal = JSON.stringify(this.val);
   }
 
   isChanged(newVal: T): boolean {
-    return !isEqual(this.val, newVal);
+    return this.strVal !== JSON.stringify(newVal);
   }
 }
 

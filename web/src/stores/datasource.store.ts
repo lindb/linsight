@@ -16,7 +16,7 @@ specific language governing permissions and limitations
 under the License.
 */
 import { makeAutoObservable, toJS } from 'mobx';
-import { DatasourceInstance, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
+import { DatasourceCategory, DatasourceInstance, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { filter, find, get } from 'lodash-es';
 import { DatasourceSrv } from '@src/services';
 import { MixedDatasource } from '@src/constants';
@@ -41,6 +41,14 @@ class DatasourceStore {
       return toJS(ds);
     }
     return null;
+  }
+
+  getDatasourceCategory(uid: string): DatasourceCategory {
+    const ds = this.getDatasource(uid);
+    if (!ds) {
+      return DatasourceCategory.Unknown;
+    }
+    return ds.plugin.category;
   }
 
   getDatasources(includeMixed?: boolean): DatasourceInstance[] {
@@ -69,6 +77,11 @@ class DatasourceStore {
         uid: MixedDatasource,
         name: MixedDatasource,
         type: 'mixed',
+      },
+      plugin: {
+        Name: MixedDatasource,
+        Type: 'mixed',
+        category: DatasourceCategory.Metric,
       },
     } as any);
     this.datasources = rs;

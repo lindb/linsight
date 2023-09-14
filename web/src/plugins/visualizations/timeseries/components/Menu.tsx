@@ -15,16 +15,15 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Popover, List, Typography } from '@douyinfe/semi-ui';
+import { Dropdown } from '@douyinfe/semi-ui';
 import { Icon } from '@src/components';
-import { PlatformStore } from '@src/stores';
+import { DatasourceStore, ExemplarStore, PlatformStore } from '@src/stores';
 import { MouseEvent, MouseEventType } from '@src/types';
 import { Chart } from 'chart.js';
 import { reaction } from 'mobx';
 import React, { MutableRefObject, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import * as _ from 'lodash-es';
-const { Text } = Typography;
+import { get, isEmpty } from 'lodash-es';
 
 const Menu: React.FC<{ chart: Chart | null }> = (props) => {
   const { chart } = props;
@@ -33,6 +32,7 @@ const Menu: React.FC<{ chart: Chart | null }> = (props) => {
   const left = useRef(0);
   const timer = useRef<number | null>();
   const container = useRef() as MutableRefObject<HTMLDivElement>;
+  const event = useRef<MouseEvent | null>();
 
   const [visible, setVisible] = useState<boolean>(false);
 
@@ -56,7 +56,7 @@ const Menu: React.FC<{ chart: Chart | null }> = (props) => {
         if (!chart || !native) {
           return;
         }
-        if (_.get(chartOfMove, 'id', 0) != _.get(chart, 'id', 0)) {
+        if (get(chartOfMove, 'id', 0) != get(chart, 'id', 0)) {
           return;
         }
         // disable click
@@ -66,6 +66,7 @@ const Menu: React.FC<{ chart: Chart | null }> = (props) => {
         if (type === MouseEventType.Click) {
           chartRect.current = chart?.canvas?.getBoundingClientRect();
           left.current = native.offsetX;
+          event.current = mouseEvent;
           setVisible(true);
         } else {
           removeMenu();
@@ -76,6 +77,15 @@ const Menu: React.FC<{ chart: Chart | null }> = (props) => {
     return () => disposer();
   }, [chart]);
 
+  const isSupport = (key: string): boolean => {
+    const datasourceUID = get(event.current, 'series.meta.target.datasource.uid', '');
+    const datasource = DatasourceStore.getDatasource(datasourceUID);
+    if (!datasource) {
+      return false;
+    }
+    return !isEmpty(get(datasource, `setting.config.${key}`));
+  };
+
   const keepMenu = () => {
     if (!timer.current) {
       return;
@@ -84,41 +94,63 @@ const Menu: React.FC<{ chart: Chart | null }> = (props) => {
     timer.current = null;
   };
 
-  if (!visible) {
+  if (!visible || !chartRect.current) {
     return null;
   }
 
   return createPortal(
     <div
       style={{
-        left: left.current + chartRect.current?.left,
-        top: chartRect.current.y + chartRect.current?.height / 2,
+        left: left.current + chartRect.current.left,
+        top: event.current?.native.offsetY + chartRect.current.top,
         position: 'absolute',
       }}
       ref={container}
       onMouseMove={keepMenu}
       onMouseLeave={removeMenu}>
-      <Popover
+      <Dropdown
         visible={visible}
         position="right"
         trigger="custom"
-        content={
-          <List
-            size="small"
-            dataSource={[
-              { name: 'View related traces', icon: 'icon-tracing' },
-              { name: 'View related containers', icon: 'icon-docker' },
-              { name: 'View related logs', icon: 'icon-logging' },
-              { name: 'View related incidents', icon: 'icon-alerting' },
-              { name: 'Find correlated metric', icon: 'icon-metrics' },
-            ]}
-            renderItem={(item) => (
-              <List.Item style={{ padding: '4px 12px' }}>
-                <Text icon={<Icon icon={item.icon} />}> {item.name}</Text>
-              </List.Item>
-            )}
-          />
-        }
+        menu={[
+          {
+            node: 'item',
+            name: 'View related traces',
+            icon: <Icon icon="tracing" />,
+            disabled: !isSupport('traceDatasources'),
+            onClick: () => {
+              const series = get(event.current, 'series');
+              if (series) {
+                ExemplarStore.setSelectDataPoint({
+                  timestamp: get(event.current, 'timestamp', 0),
+                  point: series,
+                });
+              } else {
+                ExemplarStore.setSelectDataPoint(null);
+              }
+              setVisible(false);
+            },
+          },
+          {
+            node: 'item',
+            name: 'View related logs',
+            icon: <Icon icon="logging" />,
+            disabled: !isSupport('loggingDatasources'),
+          },
+          {
+            node: 'item',
+            name: 'View related incidents',
+            icon: <Icon icon="alerting" />,
+
+            disabled: !isSupport('alertingDatasources'),
+          },
+          {
+            node: 'item',
+            name: 'Find correlated metric',
+            icon: <Icon icon="metrics" />,
+            disabled: !isSupport('metricDatasources'),
+          },
+        ]}
       />
     </div>,
     document.body

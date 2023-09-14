@@ -41,15 +41,19 @@ export { default as LinSelect } from '@src/components/input/LinSelect';
 export { default as IntegrationSelect } from '@src/components/input/IntegrationSelect';
 
 export { default as QueryEditor } from '@src/components/explore/QueryEditor';
-export { default as MetricExplore } from '@src/components/explore/MetricExplore';
+export { default as DataExplore } from '@src/components/explore/DataExplore';
 export { default as AddToCharts } from '@src/components/explore/AddToCharts';
 export { default as AddToDashboard } from '@src/components/explore/AddToDashboard';
 
 export { default as UnlinkChart } from '@src/components/dashboard/UnlinkChart';
 export { default as AddPanelWidget } from '@src/components/dashboard/AddPanelWidget';
+export { default as RowPanel } from '@src/components/dashboard/RowPanel';
 export { default as Panel } from '@src/components/dashboard/Panel';
+export { default as Dashboard } from '@src/components/dashboard/Dashboard';
 
-export { default as StatsList } from './StatsList';
-export { default as TraceFlame } from './TraceFlame';
+// view
+export { default as TraceView } from '@src/components/view/trace/TraceView';
+export { default as ExemplarView } from '@src/components/view/exemplar/ExemplarView';
+export { default as DashboardView } from '@src/components/view/dashboard/DashboardView';
+
 export { default as TraceMap } from './TraceMap';
-export { default as TraceSummary } from './TraceSummary';

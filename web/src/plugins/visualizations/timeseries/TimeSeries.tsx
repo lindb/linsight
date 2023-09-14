@@ -19,11 +19,17 @@ import React from 'react';
 import { VisualizationProps } from '@src/types';
 import { TimeSeriesChart } from './components/TimeSeriesChart';
 import './components/timeseries.scss';
+import { ExemplarView } from '@src/components';
 
 /**
  * TimeSeries is a visualization component for time series chart.
  */
 export const TimeSeries: React.FC<VisualizationProps> = (props) => {
   const { panel, theme, datasets } = props;
-  return <TimeSeriesChart theme={theme} panel={panel} datasets={datasets} />;
+  return (
+    <>
+      <ExemplarView />
+      <TimeSeriesChart theme={theme} panel={panel} datasets={datasets} />;
+    </>
+  );
 };

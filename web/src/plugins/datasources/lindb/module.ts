@@ -32,6 +32,25 @@ const LinDB = new DatasourcePlugin(
 );
 
 LinDB.setSettingEditor(SettingEditor)
+  .setDefaultParams({
+    targets: [
+      {
+        refId: 'A',
+        request: {
+          fields: [],
+          groupBy: [],
+          metric: '',
+          where: [],
+        },
+      },
+    ],
+    type: 'timeseries',
+    fieldConfig: {
+      defaults: {
+        unit: 'short',
+      },
+    },
+  })
   .setQueryEditor(QueryEditor)
   .setVariableEditor(VariableEditor)
   .setDarkLogo(DarkLogo)

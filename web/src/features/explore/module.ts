@@ -17,5 +17,15 @@ under the License.
 */
 import { Feature, FeatureRepositoryInst } from '@src/types';
 import Explore from '@src/features/explore/Explore';
+import { DatasourceStore } from '@src/stores';
+import { DatasourceKit } from '@src/utils';
 
-FeatureRepositoryInst.register(new Feature('/explore', 'Explore', 'Explore all data', Explore));
+FeatureRepositoryInst.register(
+  new Feature('/explore', 'Explore', 'Explore all data', Explore, (): string => {
+    const defaultDS = DatasourceStore.getDefaultDatasource();
+    if (!defaultDS) {
+      return '';
+    }
+    return DatasourceKit.getDatasourceDefaultParams(defaultDS.setting.uid);
+  })
+);

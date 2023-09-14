@@ -17,8 +17,10 @@ under the License.
 */
 import { ComponentType } from 'react';
 import { DataSetType, Plugin, Variable } from '@src/types';
+import { cloneDeep } from 'lodash-es';
 
 export enum DatasourceCategory {
+  Unknown = 'Unknown',
   Metric = 'metric',
   Log = 'log',
   Trace = 'trace',
@@ -80,6 +82,7 @@ export interface DatasourceConstructor {
 
 class DatasourcePlugin extends Plugin {
   components: DatasourcePluginComponents = {};
+  defaultParams: any = {};
 
   constructor(
     public category: DatasourceCategory,
@@ -101,9 +104,18 @@ class DatasourcePlugin extends Plugin {
     return this;
   }
 
+  setDefaultParams(params: any): DatasourcePlugin {
+    this.defaultParams = params;
+    return this;
+  }
+
   setVariableEditor(VariableEditor: ComponentType<any>): DatasourcePlugin {
     this.components.VariableEditor = VariableEditor;
     return this;
+  }
+
+  getDefaultParams() {
+    return cloneDeep(this.defaultParams || {});
   }
 
   getQueryEditor(): ComponentType<QueryEditorProps> {
