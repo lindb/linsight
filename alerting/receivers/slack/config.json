@@ -1,0 +1,15 @@
+[
+	{
+		"type": "Input",
+		"props": {
+			"field": "channel",
+			"label": "Channel",
+			"rules": [
+				{
+					"required": true,
+					"message": "Channel is required"
+				}
+			]
+		}
+	}
+]

@@ -62,6 +62,7 @@ export interface DatasourceSetting {
 }
 
 export interface QueryEditorProps {
+  disableOptions?: boolean;
   datasource: DatasourceInstance;
 }
 

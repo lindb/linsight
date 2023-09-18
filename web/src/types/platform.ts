@@ -21,6 +21,7 @@ import { Chart } from 'chart.js';
 
 import DevIcon from '~devicon/devicon.json';
 import { replace } from 'lodash-es';
+import { NotificationPlugin } from './alerting';
 
 export interface Bootdata {
   home?: string; // home page
@@ -29,6 +30,7 @@ export interface Bootdata {
   datasources: DatasourceSetting[];
   integrations: Integration[];
   preference?: Preference;
+  notifications?: NotificationPlugin[];
 }
 
 export interface Integration {

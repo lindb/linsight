@@ -40,5 +40,8 @@ type API struct {
 	DashboardSrv service.DashboardService
 	ChartSrv     service.ChartService
 
+	NotificationSrv service.NotificationService
+	AlertRuleSrv    service.AlertRuleService
+
 	DatasourceMgr datasource.Manager
 }

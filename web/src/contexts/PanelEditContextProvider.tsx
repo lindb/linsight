@@ -116,7 +116,7 @@ export const PanelEditContextProvider: React.FC<{
         newPanel = ds?.plugin.getDefaultParams();
         newPanel.datasource = newPanelDatasource;
       }
-      console.error('change panel data.......', newPanel);
+      console.error('change panel data.......', newPanel, newPanelDatasourceUID);
 
       if (newPanelDatasourceUID !== MixedDatasource) {
         // if panel's datasource not mixed, need clean all targets' datasource, use panel datasource

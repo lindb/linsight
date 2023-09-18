@@ -15,7 +15,7 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-.query-editor {
+.linsight-collapse {
   .semi-collapse-header {
     background-color: var(--semi-color-fill-0);
     margin: 4px 0;
@@ -35,16 +35,16 @@ under the License.
     background: var(--semi-color-primary-light-hover);
   }
 
-  .query-item-dragging {
+  .item-dragging {
     background: var(--semi-color-bg-2);
   }
 
-  .query-item {
+  .item {
     display: flex;
     width: 100%;
     align-items: center;
 
-    .query-desc {
+    .desc {
       flex: 1;
       display: flex;
       align-items: center;
@@ -69,6 +69,15 @@ under the License.
     .semi-button {
       color: var(--semi-color-text-2);
       border-radius: 50%;
+    }
+  }
+}
+
+.linsight-steps.semi-steps-vertical {
+  .semi-steps-item {
+    .semi-steps-item-content {
+      padding-bottom: 0;
+      flex: 1;
     }
   }
 }

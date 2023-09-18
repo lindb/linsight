@@ -29,7 +29,6 @@ import { PanelEditContext, QueryEditContextProvider, TargetsContext, TargetsCont
 import { DatasourceCategory, DatasourceInstance, Query } from '@src/types';
 import { cloneDeep, get, isEmpty } from 'lodash-es';
 import Icon from '../common/Icon';
-import './query.editor.scss';
 import {
   DragDropContext,
   Draggable,
@@ -41,14 +40,15 @@ import {
 } from 'react-beautiful-dnd';
 import classNames from 'classnames';
 import { DatasourceKit, DNDKit } from '@src/utils';
-import DatasourceSelectForm from '../input/DatasourceSelectForm';
+import DatasourceSelectForm from '../form/DatasourceSelectForm';
 import { MixedDatasource } from '@src/constants';
 import { DatasourceStore } from '@src/stores';
+import { toJS } from 'mobx';
 
 const { Text } = Typography;
 
-const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
-  const { datasource: defaultDatasource /*default datasource*/ } = props;
+const Targets: React.FC<{ disableOptions?: boolean; datasource: DatasourceInstance }> = (props) => {
+  const { disableOptions, datasource: defaultDatasource /*default datasource*/ } = props;
   const {
     targets,
     activeIds,
@@ -100,7 +100,12 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   };
 
   return (
-    <Collapse activeKey={activeIds} expandIconPosition="left" clickHeaderToExpand={false}>
+    <Collapse
+      className="linsight-collapse"
+      activeKey={activeIds}
+      expandIconPosition="left"
+      clickHeaderToExpand={false}
+      motion={false}>
       {targets.map((target: Query, index: number) => {
         const refId = `${target.refId}`;
         const datasourceUID = get(target, 'datasource.uid', get(defaultDatasource, 'setting.uid'));
@@ -118,13 +123,13 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
                   {...provided.draggableProps}
                   ref={provided.innerRef}
                   style={DNDKit.getDraggbleItemStyle(provided.draggableProps.style, snapshot)}
-                  className={classNames({ 'query-item-dragging': snapshot.isDragging })}>
+                  className={classNames({ 'item-dragging': snapshot.isDragging })}>
                   <Collapse.Panel
                     showArrow={false}
                     itemKey={refId}
                     header={
-                      <div className="query-item">
-                        <div className="query-desc">
+                      <div className="item">
+                        <div className="desc">
                           <Button
                             icon={isActive(refId) ? <IconChevronDown /> : <IconChevronRight />}
                             size="small"
@@ -169,7 +174,7 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
                       onTargetChange={(newTarget: Query) => {
                         updateTargetConfig(index, newTarget);
                       }}>
-                      <QueryEditor datasource={datasource || defaultDatasource} />
+                      <QueryEditor disableOptions={disableOptions} datasource={datasource || defaultDatasource} />
                     </QueryEditContextProvider>
                   </Collapse.Panel>
                 </div>
@@ -182,8 +187,8 @@ const Targets: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   );
 };
 
-const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
-  const { datasource } = props;
+const TargetsEditor: React.FC<{ disableOptions?: boolean; datasource: DatasourceInstance }> = (props) => {
+  const { disableOptions, datasource } = props;
   const [placeholderProps, setPlaceholderProps] = useState<any>({});
   const { swapTargets, addTarget } = useContext(TargetsContext);
   return (
@@ -212,7 +217,7 @@ const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
           {(provided: DroppableProvided, _snapshot: DroppableStateSnapshot) => {
             return (
               <div ref={provided.innerRef} {...provided.droppableProps} style={{ position: 'relative' }}>
-                <Targets datasource={datasource} />
+                <Targets disableOptions={disableOptions} datasource={datasource} />
                 {provided.placeholder}
                 {!isEmpty(placeholderProps) && (
                   <div
@@ -240,6 +245,7 @@ const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
             if (ds.setting.uid === MixedDatasource) {
               ds = DatasourceStore.getDefaultDatasource() as any;
             }
+            console.error('dddd......', toJS(datasource), toJS(ds));
             addTarget({
               datasource: { uid: ds.setting.uid, type: ds.setting.type },
             } as Query);
@@ -251,16 +257,17 @@ const TargetsEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
   );
 };
 
-const QueryEditor: React.FC<{ datasource: DatasourceInstance }> = (props) => {
-  const { datasource } = props;
+const QueryEditor: React.FC<{ disableOptions?: boolean; datasource: DatasourceInstance }> = (props) => {
+  const { datasource, disableOptions } = props;
   const { panel, modifyPanel } = useContext(PanelEditContext);
   return (
     <TargetsContextProvider
       initTargets={get(panel, 'targets', [])}
       onTargetsChange={(targets) => {
+        console.error('kkkkk.......', toJS(targets));
         modifyPanel({ targets: targets });
       }}>
-      <TargetsEditor datasource={datasource} />
+      <TargetsEditor disableOptions={disableOptions} datasource={datasource} />
     </TargetsContextProvider>
   );
 };

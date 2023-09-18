@@ -32,13 +32,14 @@ export { default as Footer } from '@src/components/layout/Footer';
 export { default as FeatureMenu } from '@src/components/layout/FeatureMenu';
 
 // form components
-export { default as TagSelectInput } from '@src/components/input/TagSelectInput';
-export * from '@src/components/input/SearchFilterInput';
-export { default as DatasourceSelect } from '@src/components/input/DatasourceSelect';
-export { default as DatasourceSelectForm } from '@src/components/input/DatasourceSelectForm';
-export { default as SliderInput } from '@src/components/input/SliderInput';
-export { default as LinSelect } from '@src/components/input/LinSelect';
-export { default as IntegrationSelect } from '@src/components/input/IntegrationSelect';
+export { default as TagSelectInput } from '@src/components/form/TagSelectInput';
+export * from '@src/components/form/SearchFilterInput';
+export { default as DatasourceSelect } from '@src/components/form/DatasourceSelect';
+export { default as DatasourceSelectForm } from '@src/components/form/DatasourceSelectForm';
+export { default as SliderInput } from '@src/components/form/SliderInput';
+export { default as LinSelect } from '@src/components/form/LinSelect';
+export { default as IntegrationSelect } from '@src/components/form/IntegrationSelect';
+export { default as DynamicForm } from '@src/components/form/DynamicForm';
 
 export { default as QueryEditor } from '@src/components/explore/QueryEditor';
 export { default as DataExplore } from '@src/components/explore/DataExplore';

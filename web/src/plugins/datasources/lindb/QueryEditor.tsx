@@ -108,7 +108,7 @@ const OptionsEditor: React.FC = () => {
 };
 
 const QueryEditor: React.FC<QueryEditorProps> = (props) => {
-  const { datasource } = props;
+  const { datasource, disableOptions } = props;
   const { target, modifyTarget } = useContext(QueryEditContext);
   const api = datasource.api as LinDBDatasource; // covert LinDB datasource
   const namespace = get(datasource, 'setting.config.namespace', '');
@@ -173,7 +173,7 @@ const QueryEditor: React.FC<QueryEditorProps> = (props) => {
           </>
         )}
       </Form>
-      <OptionsEditor />
+      {!disableOptions && <OptionsEditor />}
     </>
   );
 };

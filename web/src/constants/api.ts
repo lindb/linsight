@@ -36,4 +36,7 @@ export enum ApiPath {
   DataQuery = '/data/query',
   MetadataQuery = '/metadata/query',
   Chart = '/charts',
+  NotificationSetting = '/alerting/notification/settings',
+  Notifications = '/alerting/notifications',
+  AlertRule = '/alerting/rules',
 }

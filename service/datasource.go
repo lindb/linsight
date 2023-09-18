@@ -40,6 +40,7 @@ type DatasourceService interface {
 	GetDatasources(ctx context.Context) ([]model.Datasource, error)
 	// GetDatasourceByUID returns data source by uid from current org.
 	GetDatasourceByUID(ctx context.Context, uid string) (*model.Datasource, error)
+	GetDatasourceByOrgAndUID(orgID int64, uid string) (*model.Datasource, error)
 }
 
 // datasourceService implements DatasourceService interface.
@@ -128,12 +129,8 @@ func (srv *datasourceService) GetDatasources(ctx context.Context) ([]model.Datas
 
 // GetDatasourceByUID returns data source by uid from current org.
 func (srv *datasourceService) GetDatasourceByUID(ctx context.Context, uid string) (*model.Datasource, error) {
-	var rs model.Datasource
 	user := util.GetUser(ctx)
-	if err := srv.db.Get(&rs, "uid=? and org_id=?", uid, user.Org.ID); err != nil {
-		return nil, err
-	}
-	return &rs, nil
+	return srv.GetDatasourceByOrgAndUID(user.User.OrgID, uid)
 }
 
 // cleanDefaultDatasource cleans default datasource if exist when set new default datasource.
@@ -143,4 +140,11 @@ func (srv *datasourceService) cleanDefaultDatasource(tx dbpkg.DB, orgID int64, d
 		return tx.UpdateSingle(&model.Datasource{}, "is_default", false, "org_id=?", orgID)
 	}
 	return nil
+}
+
+func (srv *datasourceService) GetDatasourceByOrgAndUID(orgID int64, uid string) (rs *model.Datasource, err error) {
+	if err := srv.db.Get(&rs, "uid=? and org_id=?", uid, orgID); err != nil {
+		return nil, err
+	}
+	return rs, nil
 }

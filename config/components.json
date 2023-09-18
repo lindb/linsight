@@ -1,99 +1,131 @@
 [
-   {
-      "uid":"explore",
-      "label":"Explore",
-      "path":"/explore",
-      "icon":"explore",
-      "component":"/explore",
-      "role":"Viewer"
-   },
-   {
-      "uid":"dashboard",
-      "label":"Dashboard",
-      "icon":"dashboard",
-      "role":"Viewer",
-      "children":[
-         {
-            "uid":"dashboardlist",
-            "label":"Dashboard List",
-            "path":"/dashboards",
-            "icon":"list",
-			"component":"/dashboards",
-            "role":"Viewer"
-         },
-         {
-            "uid":"newdatabase",
-            "label":"New Dashboard",
-            "path":"/dashboard/new",
-			"component":"/dashboard/*",
-            "icon":"dashboard-add",
-            "role":"Editor"
-         },
-         {
-            "uid":"charts",
-            "label":"Chart Repository",
-            "path":"/charts",
-			"component":"/charts",
-            "icon":"repo",
-            "role":"Viewer"
-         }
-      ]
-   },
-   {
-      "uid":"setting",
-      "label":"Setting",
-      "path":"/setting",
-      "icon":"setting",
-      "role":"Admin",
-      "children":[
-         {
-            "uid":"datasource",
-            "label":"Datasource",
-            "path":"/setting/datasources",
-            "component":"/setting/datasources/*",
-            "icon":"datasource",
-            "role":"Admin"
-         },
-         {
-            "uid":"user",
-            "label":"User",
-            "path":"/setting/users",
-            "component":"/setting/users/*",
-            "icon":"user",
-            "role":"Lin"
-         },
-         {
-            "uid":"team",
-            "label":"Team",
-            "path":"/setting/orgs/teams",
-            "component":"/setting/orgs/teams/*",
-            "icon":"team",
-            "role":"Admin"
-         },
-         {
-            "uid":"organization",
-            "label":"Organization",
-            "path":"/setting/orgs",
-            "component":"/setting/orgs/*",
-            "icon":"org",
-            "role":"Lin"
-         },
-         {
-            "uid":"component",
-            "label":"Component",
-            "path":"/setting/components",
-            "component":"/setting/components/*",
-            "icon":"menu",
-            "role":"Lin"
-         },
-         {
-            "uid":"orgcomponent",
-            "label":"Org. Component",
-            "path":"/setting/orgs/components",
-            "component":"/setting/orgs/components/*",
-            "icon":"menu",
-            "role":"Admin"
-         }
-      ]
-   }
+	{
+		"uid": "explore",
+		"label": "Explore",
+		"path": "/explore",
+		"icon": "explore",
+		"component": "/explore",
+		"role": "Viewer"
+	},
+	{
+		"uid": "dashboard",
+		"label": "Dashboard",
+		"icon": "dashboard",
+		"role": "Viewer",
+		"children": [
+			{
+				"uid": "dashboardlist",
+				"label": "Dashboard List",
+				"path": "/dashboards",
+				"icon": "list",
+				"component": "/dashboards",
+				"role": "Viewer"
+			},
+			{
+				"uid": "newDashboard",
+				"label": "New Dashboard",
+				"path": "/dashboard/new",
+				"component": "/dashboard/*",
+				"icon": "dashboard-add",
+				"role": "Editor"
+			},
+			{
+				"uid": "charts",
+				"label": "Chart Repository",
+				"path": "/charts",
+				"component": "/charts",
+				"icon": "repo",
+				"role": "Viewer"
+			}
+		]
+	},
+	{
+		"uid": "alerting",
+		"label": "Alerting",
+		"icon": "alert",
+		"role": "Editor",
+		"children": [
+			{
+				"uid": "rulelist",
+				"label": "Rule",
+				"path": "/alerting/rules",
+				"icon": "alert",
+				"component": "/alerting/rules/*",
+				"role": "Viewer"
+			},
+			{
+				"uid": "notificationlist",
+				"label": "Notification",
+				"path": "/alerting/notifications",
+				"icon": "notification",
+				"component": "/alerting/notifications/*",
+				"role": "Editor"
+			},
+			{
+				"uid": "alertingSetting",
+				"label": "Setting",
+				"path": "/alerting/setting",
+				"icon": "setting",
+				"component": "/alerting/setting",
+				"role": "Admin"
+			}
+		]
+	},
+	{
+		"uid": "setting",
+		"label": "Setting",
+		"path": "/setting",
+		"icon": "setting",
+		"role": "Admin",
+		"children": [
+			{
+				"uid": "datasource",
+				"label": "Datasource",
+				"path": "/setting/datasources",
+				"component": "/setting/datasources/*",
+				"icon": "datasource",
+				"role": "Admin"
+			},
+			{
+				"uid": "user",
+				"label": "User",
+				"path": "/setting/users",
+				"component": "/setting/users/*",
+				"icon": "user",
+				"role": "Lin"
+			},
+			{
+				"uid": "team",
+				"label": "Team",
+				"path": "/setting/orgs/teams",
+				"component": "/setting/orgs/teams/*",
+				"icon": "team",
+				"role": "Admin"
+			},
+			{
+				"uid": "organization",
+				"label": "Organization",
+				"path": "/setting/orgs",
+				"component": "/setting/orgs/*",
+				"icon": "org",
+				"role": "Lin"
+			},
+			{
+				"uid": "component",
+				"label": "Component",
+				"path": "/setting/components",
+				"component": "/setting/components/*",
+				"icon": "menu",
+				"role": "Lin"
+			},
+			{
+				"uid": "orgcomponent",
+				"label": "Org. Component",
+				"path": "/setting/orgs/components",
+				"component": "/setting/orgs/components/*",
+				"icon": "menu",
+				"role": "Admin"
+			}
+		]
+	}
 ]

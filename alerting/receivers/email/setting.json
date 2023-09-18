@@ -1,0 +1,15 @@
+[
+	{
+		"type": "TextArea",
+		"props": {
+			"field": "addresses",
+			"label": "Addresses",
+			"rules": [
+				{
+					"required": true,
+					"message": "Addresses is required"
+				}
+			]
+		}
+	}
+]

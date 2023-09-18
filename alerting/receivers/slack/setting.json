@@ -1,0 +1,15 @@
+[
+	{
+		"type": "Input",
+		"props": {
+			"field": "config.token",
+			"label": "Token",
+			"rules": [
+				{
+					"required": true,
+					"message": "Token is required"
+				}
+			]
+		}
+	}
+]

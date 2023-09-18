@@ -45,6 +45,9 @@ type Router struct {
 
 	dashboardAPI *api.DashboardAPI
 	chartAPI     *api.ChartAPI
+
+	notificationAPI *api.NotificationAPI
+	alertRuleAPI    *api.AlertRuleAPI
 }
 
 // NewRouter creates a Router instance.
@@ -65,6 +68,9 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 
 		dashboardAPI: api.NewDashboardAPI(deps),
 		chartAPI:     api.NewChartAPI(deps),
+
+		notificationAPI: api.NewNotificationAPI(deps),
+		alertRuleAPI:    api.NewAlertRuleAPI(deps),
 	}
 }
 
@@ -212,4 +218,39 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceQueryAPI.DataQuery)...)
 	router.PUT("/metadata/query",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceQueryAPI.MetadataQuery)...)
+
+	// alerting
+	r.registerAlertingRouters(router)
+}
+
+func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {
+	router.GET("/alerting/notification/settings",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.notificationAPI.GetAllNotificationSettings)...)
+	router.PUT("/alerting/notification/settings",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.notificationAPI.SaveNotificationSetting)...)
+	router.DELETE("/alerting/notification/settings/:type",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.notificationAPI.DeleteNotificationSettting)...)
+
+	router.POST("/alerting/notifications",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationAPI.CreateNotification)...)
+	router.PUT("/alerting/notifications",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationAPI.UpdateNotification)...)
+	router.GET("/alerting/notifications",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.notificationAPI.SearchNotifications)...)
+	router.GET("/alerting/notifications/:uid",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.notificationAPI.GetNotificationByUID)...)
+
+	router.PUT("/alerting/notifications/test",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationAPI.Test)...)
+
+	router.POST("/alerting/rules",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertRuleAPI.CreateAlertRule)...)
+	router.PUT("/alerting/rules",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertRuleAPI.UpdateAlertRule)...)
+	router.DELETE("/alerting/rules/:uid",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.chartAPI.DeleteChartByUID)...)
+	router.GET("/alerting/rules/:uid",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRuleAPI.GetAlertRuleByUID)...)
+	router.GET("/alerting/rules",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRuleAPI.SearchAlertRules)...)
 }

@@ -47,6 +47,7 @@ import { ChartKit, DataSetKit, ObjectKit } from '@src/utils';
 import './panel.scss';
 import { ChartPropsKey, PanelVisualizationOptions } from '@src/constants';
 import { ChartSrv } from '@src/services';
+import { toJS } from 'mobx';
 
 const { Text } = Typography;
 
@@ -262,6 +263,7 @@ const ViewPanel: React.FC<{
   const { panel, shortcutKey, isStatic, className, menu } = props;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  console.error(toJS(panel));
   // FIXME: maybe plugin not exist
   const plugin = VisualizationRepositoryInst.get(`${panel.type}`);
   const datasetType = plugin.getDataSetType(panel);

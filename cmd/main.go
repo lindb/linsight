@@ -20,12 +20,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/lindb/common/pkg/fileutil"
 	"github.com/lindb/common/pkg/logger"
 
+	_ "github.com/lindb/linsight/alerting"
+	"github.com/lindb/linsight/alerting/schedule"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
@@ -111,6 +114,23 @@ func runServer(_ *cobra.Command, _ []string) error {
 			router := http.NewRouter(engine, apiDeps)
 			router.RegisterRouters()
 
+			// TODO:
+			sche := schedule.NewSchedule(
+				ctx,
+				1,
+				&schedule.Deps{
+					Opts: &schedule.Options{
+						Interval:        time.Second * 10,
+						MinEvalInterval: time.Second * 10,
+					},
+					DatasourceSrv:   apiDeps.DatasourceSrv,
+					AlertRuleSrv:    apiDeps.AlertRuleSrv,
+					NotificationSrv: apiDeps.NotificationSrv,
+					DatasourceMgr:   apiDeps.DatasourceMgr,
+				},
+			)
+			sche.Run()
+
 			provisionSrv := provisionservice.NewProvisionService(&provisioningdeps.ProvisioningDeps{
 				BaseDir:      cfg.Provisioning,
 				OrgSrv:       apiDeps.OrgSrv,
@@ -168,6 +188,9 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DatasourceSrv:   service.NewDatasourceService(db),
 		DashboardSrv:    service.NewDashboardService(starSrv, tagSrv, db),
 		ChartSrv:        service.NewChartService(db),
+
+		NotificationSrv: service.NewNotificationService(db),
+		AlertRuleSrv:    service.NewAlertRuleService(db),
 
 		DatasourceMgr: datasource.NewDatasourceManager(),
 	}

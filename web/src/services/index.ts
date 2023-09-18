@@ -26,3 +26,4 @@ export { default as DashboardSrv } from './dashboard.service';
 export { default as ChartSrv } from './chart.service';
 export { default as DatasourceSrv } from './datasource.service';
 export { default as DataQuerySrv } from './query.service';
+export { default as AlertingSrv } from './alerting.service';

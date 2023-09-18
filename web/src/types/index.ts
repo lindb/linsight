@@ -30,3 +30,4 @@ export * from '@src/types/format';
 export * from '@src/types/dashboard';
 export * from '@src/types/trace';
 export * from '@src/types/annotation';
+export * from '@src/types/alerting';
