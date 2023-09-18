@@ -20,4 +20,7 @@ export { default as UserStore } from '@src/stores/user.store';
 export { default as MenuStore } from '@src/stores/menu.store';
 export { default as DatasourceStore } from '@src/stores/datasource.store';
 export { default as ChartPendingAddStore } from '@src/stores/chart.pending.store';
+export { default as TraceViewStore } from '@src/stores/trace.view.store';
+export { default as ExemplarStore } from '@src/stores/exemplar.store';
 export { default as DashboardStore } from '@src/stores/dashboard.store';
+export { default as AnnotationStore } from '@src/stores/annotation.store';

@@ -26,6 +26,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/lindb/common/pkg/http/middleware"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/config"
 )
@@ -71,7 +72,7 @@ func (s *Server) initialize() {
 	// Using middlewares on group.
 	s.engine.Use(middleware.Recovery())
 	// use AccessLog to log panic error with zap
-	s.engine.Use(middleware.AccessLog())
+	s.engine.Use(middleware.AccessLog(logger.GetLogger(logger.AccessLogModule, "HTTP")))
 	s.engine.Use(cors.Default())
 	// handle static resource
 	handleStatic(s.engine)

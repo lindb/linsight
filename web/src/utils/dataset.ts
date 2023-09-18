@@ -18,7 +18,7 @@ under the License.
 import { isEmpty, keys, forIn, get, trim, find } from 'lodash-es';
 import { ColorKit } from '@src/utils';
 import moment from 'moment';
-import { DataSetType, PanelSetting, Query } from '@src/types';
+import { DataSetType, Exemplar, PanelSetting, Query } from '@src/types';
 
 const getGroupByTags = (tags?: any): string => {
   if (!tags) {
@@ -94,7 +94,7 @@ const createTimeSeriesDatasets = (resultSet: any, panel: PanelSetting): any => {
     if (!rs) {
       return;
     }
-    const { series, startTime, endTime, interval, metricName } = rs;
+    const { series, startTime, endTime, interval, metricName, namespace } = rs;
 
     if (isEmpty(series)) {
       return;
@@ -159,8 +159,11 @@ const createTimeSeriesDatasets = (resultSet: any, panel: PanelSetting): any => {
           stats,
           meta: {
             metricName,
+            namespace,
             tags,
             field: key,
+            interval,
+            target,
           },
         });
       });
@@ -209,6 +212,32 @@ const createDatasets = (resultSet: any, type: DataSetType, panel: PanelSetting):
   }
 };
 
+const createExemplarDatasets = (resultSet: any): Exemplar[] => {
+  const datasets: Exemplar[] = [];
+  forIn(resultSet, (rs: any, _: string) => {
+    if (!rs) {
+      return;
+    }
+    const { series } = rs;
+    if (isEmpty(series)) {
+      return;
+    }
+    series.forEach((item: any) => {
+      const { exemplars } = item;
+      if (!exemplars) {
+        return;
+      }
+      forIn(exemplars, (exemplar: any, _: string) => {
+        forIn(exemplar, (list: any, _: any) => {
+          datasets.push(...list);
+        });
+      });
+    });
+  });
+  return datasets;
+};
+
 export default {
   createDatasets,
+  createExemplarDatasets,
 };

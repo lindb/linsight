@@ -17,41 +17,53 @@ under the License.
 */
 import { Form } from '@douyinfe/semi-ui';
 import { DatasourceStore } from '@src/stores';
-import React, { MutableRefObject, useMemo, useRef } from 'react';
-import { DatasourceInstance } from '@src/types';
+import React, { MutableRefObject, useEffect, useMemo, useRef } from 'react';
+import { DatasourceInstance, Tracker } from '@src/types';
 import { DatasourceSelect } from '@src/components';
 
 const DatasourceSelectForm: React.FC<{
-  value?: string | null;
+  value?: string;
   label?: string;
   noLabel?: boolean;
+  categories?: string[];
   labelPosition?: 'top' | 'left' | 'inset';
   includeMixed?: boolean;
   style?: React.CSSProperties;
   onChange?: (instance: DatasourceInstance) => void;
 }> = (props) => {
-  const { value, label, labelPosition, noLabel, includeMixed, style, onChange } = props;
-  const previousValue = useRef() as MutableRefObject<string>;
+  const { value, label, categories, labelPosition, noLabel, includeMixed, style, onChange } = props;
+  const tracker = useRef() as MutableRefObject<Tracker<string | undefined>>;
+  const formApi = useRef<any>();
 
   useMemo(() => {
-    previousValue.current = `${value}`;
+    tracker.current = new Tracker(value);
+  }, [value]); // NOTE: just init
+
+  useEffect(() => {
+    if (formApi.current) {
+      formApi.current.setValues({ datasource: value });
+    }
   }, [value]);
 
   return (
     <Form
-      initValues={{ datasource: value }}
+      getFormApi={(api: any) => {
+        formApi.current = api;
+      }}
       onValueChange={(values: any) => {
         if (!onChange) {
           return;
         }
+
         const value = values['datasource'];
-        if (value === previousValue.current) {
-          return;
-        }
-        previousValue.current = value;
-        const ds = DatasourceStore.getDatasource(value);
-        if (ds) {
-          onChange(ds);
+
+        if (tracker.current.isChanged(value)) {
+          tracker.current.setNewVal(value);
+
+          const ds = DatasourceStore.getDatasource(value);
+          if (ds) {
+            onChange(ds);
+          }
         }
       }}>
       <DatasourceSelect
@@ -59,6 +71,7 @@ const DatasourceSelectForm: React.FC<{
         label={label}
         noLabel={noLabel}
         style={style}
+        categories={categories}
         includeMixed={includeMixed}
       />
     </Form>

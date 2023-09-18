@@ -17,15 +17,16 @@ under the License.
 */
 import { Button, SideSheet, Typography } from '@douyinfe/semi-ui';
 import { IconClose, IconSaveStroked } from '@douyinfe/semi-icons';
-import { DatasourceSelectForm, Icon, IntegrationIcon, MetricExplore, Notification } from '@src/components';
+import { DatasourceSelectForm, Icon, IntegrationIcon, DataExplore, Notification } from '@src/components';
 import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
 import { ChartSrv } from '@src/services';
 import { DatasourceStore } from '@src/stores';
-import { Chart, DatasourceInstance, PanelSetting } from '@src/types';
+import { Chart, DatasourceCategory, DatasourceInstance, PanelSetting } from '@src/types';
 import { ApiKit } from '@src/utils';
-import React, { useContext, useState } from 'react';
+import React, { useContext, useRef, useState } from 'react';
 import { createSearchParams, useNavigate } from 'react-router-dom';
 import { get, unset } from 'lodash-es';
+import { Resizable } from 're-resizable';
 const { Text, Title } = Typography;
 
 const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> = (props) => {
@@ -52,6 +53,7 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
         <DatasourceSelectForm
           noLabel
           value={datasource?.setting.uid}
+          categories={[DatasourceCategory.Metric]}
           style={{ width: 200 }}
           onChange={(instance: DatasourceInstance) => {
             modifyPanel({ datasource: { uid: instance.setting.uid } });
@@ -90,7 +92,7 @@ const ChartDetail: React.FC<{ chart: Chart; setVisible: (v: boolean) => void }> 
         </Button>
         <Button icon={<IconClose />} type="tertiary" onClick={() => setVisible(false)} />
       </div>
-      {datasource && <MetricExplore datasource={datasource} />}
+      {datasource && <DataExplore datasource={datasource} />}
     </div>
   );
 };
@@ -99,19 +101,35 @@ const ChartDetailModal: React.FC<{ chart: Chart; visible: boolean; setVisible: (
   props
 ) => {
   const { visible, setVisible, chart } = props;
+  const initWidth = useRef(document.body.clientWidth * 0.55);
+  const [width, setWidth] = useState(initWidth.current);
+
   return (
     <SideSheet
-      className="chart-detail"
+      className="chart-detail split-view"
       headerStyle={{ padding: 0 }}
       size="large"
       closeOnEsc
+      width={width}
+      height={'100vh'}
       motion={false}
       closable={false}
       visible={visible}
       onCancel={() => setVisible(false)}>
-      <PanelEditContextProvider initPanel={(chart.model || {}) as PanelSetting}>
-        <ChartDetail chart={chart} setVisible={setVisible} />
-      </PanelEditContextProvider>
+      <Resizable
+        defaultSize={{ width: width, height: '100%' }}
+        handleClasses={{ left: 'left-handler' }}
+        enable={{ left: true }}
+        onResizeStop={(_e, _direction, _ref, d) => {
+          initWidth.current += d.width;
+        }}
+        onResize={(_e, _direction, _ref, d) => {
+          setWidth(d.width + initWidth.current);
+        }}>
+        <PanelEditContextProvider initPanel={(chart.model || {}) as PanelSetting}>
+          <ChartDetail chart={chart} setVisible={setVisible} />
+        </PanelEditContextProvider>
+      </Resizable>
     </SideSheet>
   );
 };

@@ -233,3 +233,57 @@ under the License.
   align-items: center;
   justify-content: center;
 }
+
+.split-view {
+  height: 100vh;
+  position: absolute !important;
+
+  .semi-sidesheet-header {
+    padding: 12px;
+  }
+
+  .semi-timeline-item {
+    padding: 0 0 8px;
+  }
+
+  .semi-sidesheet-body {
+    padding: 0;
+
+    .left-handler {
+      width: 10px;
+      min-width: 10px;
+      position: relative;
+      cursor: col-resize;
+      left: 0 !important;
+
+      &::before {
+        border-left: 1px solid transparent;
+        height: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      &::after {
+        width: 4px;
+        height: 200px;
+        z-index: 9999;
+        background: var(--semi-color-primary);
+        content: '';
+        position: fixed;
+        top: 50%;
+        transition: background 0.2s ease-in-out 0s;
+        transform: translate(-50%, -50%);
+        border-radius: 4px;
+      }
+    }
+
+    .semi-tabs {
+      padding: 0 14px;
+    }
+  }
+
+  .react-resizable-handle-se {
+    left: 0;
+    bottom: 50%;
+  }
+}

@@ -17,35 +17,68 @@ under the License.
 */
 import { Card, Space, Table, Typography } from '@douyinfe/semi-ui';
 import { IntegrationIcon } from '@src/components';
-import { FormatRepositoryInst, Span, Trace } from '@src/types';
+import { TraceViewStore } from '@src/stores';
+import { FormatRepositoryInst, Span } from '@src/types';
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
+import SpanStatus from '../components/SpanStatus';
+import SpanType from '../components/SpanType';
 import SpanView from '../components/SpanView';
-import { default as TraceKit } from '../util/trace';
 
 const { Text } = Typography;
 
-const TimelineView: React.FC<{ traces: Trace[] }> = (props) => {
-  const { traces } = props;
-  const [traceTree, setTraceTree] = useState<Span[]>([]);
+const TimelineView: React.FC<{
+  traceTree: Span[];
+  spanId?: string;
+  spanMap?: Map<string, Span>;
+  openSelectedSpan?: boolean;
+}> = (props) => {
+  const { traceTree, spanId, spanMap, openSelectedSpan } = props;
   const [currentSpan, setCurrentSpan] = useState<Span | undefined>(undefined);
-  const [visible, setVisible] = useState(false);
-
   useEffect(() => {
-    setTraceTree(TraceKit.buildTraceTree(traces));
-  }, [traces]);
+    if (openSelectedSpan && spanMap) {
+      const span = spanMap.get(spanId || '');
+      if (span) {
+        TraceViewStore.setVisibleSpanView(true);
+        setCurrentSpan(span);
+      }
+    }
+  }, [spanId, spanMap, openSelectedSpan]);
+
+  const onCell = (record: any) => {
+    if (record.spanId === spanId) {
+      return {
+        className: 'span-highlight',
+      };
+    } else {
+      return {};
+    }
+  };
 
   return (
-    <Card className="linsight-feature timeline-view" bodyStyle={{ padding: 8 }}>
-      {visible && <SpanView visible={visible} setVisible={setVisible} span={currentSpan} />}
+    <Card
+      className="linsight-feature timeline-view"
+      bodyStyle={{ padding: 8 }}
+      style={{ margin: '6px 0' }}
+      bordered={false}>
+      <SpanView span={currentSpan} />
       <Table
         bordered
         expandAllRows
         pagination={false}
         indentSize={15}
         size="small"
-        dataSource={traceTree}
+        dataSource={traceTree || []}
         rowKey="spanId"
+        onRow={(r: any, _index: any) => {
+          return {
+            onClick: (_e) => {
+              setCurrentSpan(r);
+              TraceViewStore.setVisibleSpanView(true);
+            },
+            style: { cursor: 'pointer' },
+          };
+        }}
         columns={[
           {
             title: 'Service & Operation',
@@ -56,18 +89,30 @@ const TimelineView: React.FC<{ traces: Trace[] }> = (props) => {
               return (
                 <Space>
                   <div
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
-                    onClick={() => {
-                      setCurrentSpan(r);
-                      setVisible(true);
-                    }}>
-                    <Text strong icon={<IntegrationIcon integration={language} />}>
+                    ref={(div) => {
+                      if (r.spanId === spanId) {
+                        div?.scrollIntoView({ behavior: 'auto' });
+                      }
+                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                    <Text strong icon={<IntegrationIcon integration={language || 'unknown'} />}>
                       {serviceName}
                     </Text>
                     <Text type="tertiary">{r.name}</Text>
+                    <SpanType span={r} />
                   </div>
                 </Space>
               );
+            },
+            onCell: onCell,
+          },
+          {
+            title: 'Status',
+            dataIndex: 'status',
+            width: 80,
+            align: 'center',
+            render: (_text: any, r: Span) => {
+              return <SpanStatus span={r} width={'100%'} />;
             },
           },
           {
@@ -111,7 +156,7 @@ const TimelineView: React.FC<{ traces: Trace[] }> = (props) => {
             dataIndex: 'startTime',
             width: 120,
             render: (text: any) => {
-              return moment(text / 1000).format('HH:mm:ss.SSS');
+              return moment(text / 1000000).format('HH:mm:ss.SSS');
             },
           },
         ]}

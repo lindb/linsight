@@ -26,13 +26,9 @@ import { Icon, StatusTip } from '@src/components';
 import { useRequest } from '@src/hooks';
 import DeleteDatasourceButton from './components/DeleteDatasourceButton';
 import { PlatformContext } from '@src/contexts';
-import { TimeKit } from '@src/utils';
+import { DatasourceKit, TimeKit } from '@src/utils';
 
 const { Title, Text } = Typography;
-
-const getExploreDatasourceParams = (ds: DatasourceSetting) => {
-  return createSearchParams({ left: JSON.stringify({ datasource: { uid: ds.uid } }) });
-};
 
 const ListDataSource: React.FC = () => {
   const { theme } = useContext(PlatformContext);
@@ -85,7 +81,7 @@ const ListDataSource: React.FC = () => {
                     type="tertiary"
                     icon={<Icon icon="explore" />}
                     onClick={() => {
-                      navigate({ pathname: '/explore', search: `${getExploreDatasourceParams(ds)}` });
+                      navigate({ pathname: '/explore', search: DatasourceKit.getDatasourceDefaultParams(ds.uid) });
                     }}>
                     Explore
                   </Button>

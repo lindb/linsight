@@ -15,9 +15,9 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { ThemeType } from '@src/types';
+import { Annotation, AnnotationPrefix, AnnotationType, ThemeType } from '@src/types';
 import { ColorKit, CSSKit } from '@src/utils';
-import { has, get, set, forIn } from 'lodash-es';
+import { has, get, set, forIn, indexOf } from 'lodash-es';
 import { TimeSeriesOptions } from '../types';
 
 export const format = (chart: any, val: number) => {
@@ -108,6 +108,59 @@ export const modifyChartConfigs = (chart: any, cfg: TimeSeriesOptions) => {
   }
 };
 
+export const transferAnnotations = (
+  annotations: Annotation[],
+  theme: ThemeType,
+  times: any[],
+  interval: number
+): any[] => {
+  const rs: any[] = [];
+  (annotations || []).forEach((a: Annotation) => {
+    if (a.type === AnnotationType.Span) {
+      const spanId = get(a.data, 'span.spanId', '');
+      const ts = a.timestamp - (a.timestamp % interval);
+      const idx = indexOf(times, ts);
+      if (idx < 0) {
+        return;
+      }
+      rs.push({
+        id: `${AnnotationPrefix}${spanId}-point`,
+        type: 'point',
+        backgroundColor: CSSKit.getColor('--semi-color-primary', theme),
+        borderWidth: 0,
+        pointStyle: 'triangle',
+        radius: 6,
+        value: idx,
+        scaleID: 'x',
+        yAdjust: 6,
+        yValue: 0,
+        yScaleID: 'y',
+      });
+      rs.push({
+        id: `${AnnotationPrefix}${spanId}-line`,
+        type: 'line',
+        label: {
+          display: true,
+          content: 'Span',
+          opacity: 0,
+          color: CSSKit.getColor('--semi-color-text-2', theme),
+          backgroundColor: 'transparent',
+          font: {
+            size: 10,
+            weight: 400,
+          },
+        },
+        value: idx,
+        scaleID: 'x',
+        borderDash: [3, 1],
+        borderColor: CSSKit.getColor('--semi-color-primary', theme),
+        borderWidth: 1,
+      });
+    }
+  });
+  return rs;
+};
+
 export const getChartConfig = (theme: ThemeType) => {
   return {
     type: 'line',
@@ -175,6 +228,10 @@ export const getChartConfig = (theme: ThemeType) => {
       },
       plugins: {
         annotation: {
+          clip: false,
+          common: {
+            // drawTime: 'afterDraw',
+          },
           annotations: [],
         },
         legend: {

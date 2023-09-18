@@ -45,7 +45,7 @@ export interface Span {
   spanId: string;
   traceState: string;
   name: string;
-  kind: string;
+  kind: SpanKind;
   startTime: number; // ns
   endTime: number; // ns
   duration: number; // ns
@@ -66,4 +66,27 @@ export interface Span {
 export interface Trace {
   process: Process;
   spans: Span[];
+}
+
+export interface Exemplar {
+  traceId: string;
+  spanId: string;
+  duration: number;
+}
+
+export enum SpanKind {
+  Unspecified = 'Unspecified',
+  Internal = 'Internal',
+  Server = 'Server',
+  Client = 'Client',
+  Producer = 'Producer',
+  Consumer = 'Consumer',
+}
+
+// ref: https://github.com/open-telemetry/opentelemetry-collector/blob/main/semconv/v1.18.0/generated_trace.go
+export enum TraceAttributes {
+  DBSystem = 'db.system',
+  RPCSystem = 'rpc.system',
+  MessagingSystem = 'messaging.system',
+  HTTPScheme = 'http.scheme',
 }

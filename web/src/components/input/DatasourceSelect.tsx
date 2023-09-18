@@ -15,10 +15,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Divider, Form, Select, Typography } from '@douyinfe/semi-ui';
+import { Divider, Form, Select, Tag, Typography } from '@douyinfe/semi-ui';
 import { DatasourceStore } from '@src/stores';
 import React, { useContext } from 'react';
-import { isEmpty } from 'lodash-es';
+import { filter, includes, isEmpty } from 'lodash-es';
 import { DatasourceInstance } from '@src/types';
 import { PlatformContext } from '@src/contexts';
 import { useNavigate } from 'react-router-dom';
@@ -32,20 +32,60 @@ const DatasourceSelect: React.FC<{
   field?: string;
   label?: string;
   noLabel?: boolean;
+  multiple?: boolean;
   includeMixed?: boolean;
+  categories?: string[];
   labelPosition?: 'top' | 'left' | 'inset';
   rules?: RuleItem[];
   style?: React.CSSProperties;
 }> = (props) => {
-  const { label, field, includeMixed, rules, labelPosition, noLabel, style } = props;
+  const { label, field, multiple, categories, includeMixed, rules, labelPosition, noLabel, style } = props;
   const datasources = DatasourceStore.getDatasources(includeMixed);
   const { theme } = useContext(PlatformContext);
   const navigate = useNavigate();
+
+  const renderSelectedItem = (n: Record<string, any>): any => {
+    const ds = DatasourceStore.getDatasource(n.value);
+    if (!ds) {
+      return null;
+    }
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {n.value === MixedDatasource ? (
+          <Icon icon="mixed" style={{ fontSize: 22 }} />
+        ) : (
+          <img src={`${ds.plugin.getLogo(theme)}`} width={24} />
+        )}
+        <Text>{ds.setting.name}</Text>
+      </div>
+    );
+  };
+  const renderMultipleSelectedItem = (n: Record<string, any>, { onClose }: any): any => {
+    const ds = DatasourceStore.getDatasource(n.value);
+    if (!ds) {
+      return null;
+    }
+    const content = (
+      <Tag avatarShape="square" closable={true} onClose={onClose} size="large">
+        {n.value === MixedDatasource ? (
+          <Icon icon="mixed" style={{ fontSize: 18 }} />
+        ) : (
+          <img src={`${ds.plugin.getLogo(theme)}`} width={20} />
+        )}
+        <Text style={{ marginLeft: 4 }}>{ds.setting.name}</Text>
+      </Tag>
+    );
+    return {
+      isRenderInTag: false,
+      content,
+    };
+  };
 
   return (
     <Form.Select
       field={field || 'datasource'}
       className="linsight-select"
+      multiple={multiple}
       labelPosition={labelPosition}
       label={label}
       noLabel={noLabel}
@@ -62,23 +102,13 @@ const DatasourceSelect: React.FC<{
           </div>
         )
       }
-      renderSelectedItem={(n: Record<string, any>) => {
-        const ds = DatasourceStore.getDatasource(n.value);
-        if (!ds) {
-          return null;
+      renderSelectedItem={multiple ? renderMultipleSelectedItem : renderSelectedItem}>
+      {filter(datasources, (ds: DatasourceInstance) => {
+        if (isEmpty(categories)) {
+          return true;
         }
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {n.value === MixedDatasource ? (
-              <Icon icon="mixed" style={{ fontSize: 22 }} />
-            ) : (
-              <img src={`${ds.plugin.getLogo(theme)}`} width={24} />
-            )}
-            <Text>{ds.setting.name}</Text>
-          </div>
-        );
-      }}>
-      {datasources.map((ds: DatasourceInstance) => {
+        return includes(categories, ds.plugin.category);
+      }).map((ds: DatasourceInstance) => {
         const setting = ds.setting;
         return (
           <Select.Option key={setting.uid} value={setting.uid} showTick={false}>

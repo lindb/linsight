@@ -20,6 +20,7 @@ import { Preference, User } from './user';
 import { Chart } from 'chart.js';
 
 import DevIcon from '~devicon/devicon.json';
+import { replace } from 'lodash-es';
 
 export interface Bootdata {
   home?: string; // home page
@@ -64,6 +65,8 @@ export interface MouseEvent {
   native: any;
   index?: any;
   chart?: Chart;
+  series?: any;
+  timestamp?: number;
 }
 
 export interface IconItem {
@@ -75,6 +78,8 @@ class IconRepository {
   constructor() {
     (DevIcon || []).forEach((i: any) => {
       this.icons.set(i.name, { name: i.name });
+      // NOTE: (hack) fix apachekafka->kafka
+      this.icons.set(replace(i.name, 'apache', ''), { name: i.name });
     });
   }
 

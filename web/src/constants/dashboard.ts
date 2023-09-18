@@ -23,6 +23,8 @@ export const RowPanelType = 'row';
 export const DateTimeFormat = 'YYYY-MM-DD HH:mm:ss';
 export const DefaultColumns = 24;
 export const DefaultRowHeight = 30;
+export const OneMinute = 60 * 1000;
+export const OneHour = 60 * OneMinute;
 export const AutoRefreshList: QuickSelectItem[] = [
   {
     value: '',

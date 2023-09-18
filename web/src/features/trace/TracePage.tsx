@@ -15,29 +15,20 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-.trace-view {
-  .timeline-view {
-    .semi-table-row-cell {
-      padding-top: 4px !important;
-      padding-bottom: 4px !important;
-    }
+import { TraceView } from '@src/components';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-    .duration-percent {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      background-color: var(--semi-color-fill-0);
+const TracePage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  return (
+    <TraceView
+      openSelectedSpan
+      datasources={searchParams.getAll('datasources') || []}
+      traceId={searchParams.get('trace') || ''}
+      spanId={searchParams.get('span') || ''}
+    />
+  );
+};
 
-      .inner {
-        height: 20px;
-      }
-
-      .percent-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-      }
-    }
-  }
-}
+export default TracePage;

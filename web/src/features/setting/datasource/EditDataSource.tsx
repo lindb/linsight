@@ -20,10 +20,10 @@ import { isEmpty, get, filter } from 'lodash-es';
 import { Button, Select, Card, Typography, Form, Space, Tag } from '@douyinfe/semi-ui';
 import { IconSaveStroked } from '@douyinfe/semi-icons';
 import { DatasourceSrv } from '@src/services';
-import { DatasourcePlugin, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
+import { DatasourceCategory, DatasourcePlugin, DatasourceRepositoryInst, DatasourceSetting } from '@src/types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Icon, Notification } from '@src/components';
-import { ApiKit, ObjectKit, TimeKit } from '@src/utils';
+import { DatasourceSelect, Icon, Notification } from '@src/components';
+import { ApiKit, DatasourceKit, ObjectKit, TimeKit } from '@src/utils';
 import { useRequest } from '@src/hooks';
 import { DatasourceStore } from '@src/stores';
 import DeleteDatasourceButton from './components/DeleteDatasourceButton';
@@ -120,9 +120,11 @@ const EditDataSource: React.FC = () => {
     }
     return null;
   };
+
   const gotoDatasourceList = () => {
     navigate({ pathname: '/setting/datasources' });
   };
+
   return (
     <Card
       loading={!isEmpty(uid) && loading}
@@ -213,26 +215,41 @@ const EditDataSource: React.FC = () => {
         </Form.Select>
 
         <PluginSetting />
-
+        <Form.Section text="Correlate">
+          <DatasourceSelect
+            style={{ width: '100%' }}
+            multiple
+            label="Trace Datasource"
+            field="config.traceDatasources"
+            categories={[DatasourceCategory.Trace]}
+          />
+        </Form.Section>
         <Form.Slot>
           <Space>
             <Button type="tertiary" onClick={() => navigate('/setting/datasources')}>
               Back
             </Button>
-            <Button icon={<Icon icon="explore" />} type="tertiary" onClick={() => navigate('/explore')}>
-              Explore
-            </Button>
             {uid && (
-              <DeleteDatasourceButton
-                uid={uid}
-                name={datasource?.name}
-                onCompleted={() => {
-                  navigate({
-                    pathname: '/setting/datasources',
-                  });
-                }}
-                text="Delete"
-              />
+              <>
+                <Button
+                  icon={<Icon icon="explore" />}
+                  type="tertiary"
+                  onClick={() =>
+                    navigate({ pathname: '/explore', search: DatasourceKit.getDatasourceDefaultParams(uid) })
+                  }>
+                  Explore
+                </Button>
+                <DeleteDatasourceButton
+                  uid={uid}
+                  name={datasource?.name}
+                  onCompleted={() => {
+                    navigate({
+                      pathname: '/setting/datasources',
+                    });
+                  }}
+                  text="Delete"
+                />
+              </>
             )}
             <Button icon={<IconSaveStroked />} htmlType="submit" loading={submitting}>
               Save & Test

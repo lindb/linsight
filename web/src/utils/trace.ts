@@ -15,9 +15,10 @@ KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations
 under the License.
 */
-import { Span, Trace } from '@src/types';
-import { forIn, map, groupBy } from 'lodash-es';
+import { Span, SpanKind, Trace, TraceAttributes } from '@src/types';
+import { forIn, map, groupBy, get, isEmpty } from 'lodash-es';
 import type { Profile } from '@pyroscope/models/src';
+import { OneHour, OneMinute } from '@src/constants';
 
 const groupSpans = (span: Span, tTotal: number, tStart: number) => {
   (span.children || []).forEach((x) => groupSpans(x, tTotal, tStart));
@@ -69,7 +70,7 @@ const buildTraceTree = (traces: Trace[]) => {
 
   //FIXME: need process no root
 
-  return tree;
+  return { tree, spanMap };
 };
 
 const toKeyValueList = (tags: object) => {
@@ -90,7 +91,7 @@ const convertTraceToProfile = (traces: Trace[]): Profile => {
     levels: [] as number[][],
   };
 
-  const tree = buildTraceTree(traces);
+  const { tree } = buildTraceTree(traces);
 
   if (tree) {
     // Step 3: traversing the tree
@@ -129,8 +130,58 @@ const convertTraceToProfile = (traces: Trace[]): Profile => {
   };
 };
 
+const createTraceDatasets = (resultSet: any): Trace[] => {
+  const datasets: Trace[] = [];
+  forIn(resultSet, (rs: any, _: string) => {
+    if (!rs) {
+      return;
+    }
+    datasets.push(...rs);
+  });
+  return datasets;
+};
+
+const getSpanType = (span: Span): string => {
+  if (span.kind === SpanKind.Internal) {
+    return '';
+  }
+  const attributes = [
+    TraceAttributes.DBSystem,
+    TraceAttributes.RPCSystem,
+    TraceAttributes.MessagingSystem,
+    TraceAttributes.HTTPScheme,
+  ];
+
+  for (let attribute of attributes) {
+    const value = get(span.tags, attribute, '');
+    if (!isEmpty(value)) {
+      return value;
+    }
+  }
+  return '';
+};
+
+const calcMetricQueryTimeRange = (span: Span) => {
+  const ts = span.startTime / 1000000; // ns->ms
+  const now = new Date().getTime();
+  if (ts + 30 * OneMinute < now) {
+    return {
+      from: ts - 30 * OneMinute,
+      to: ts + 30 * OneMinute,
+    };
+  } else {
+    return {
+      from: now - OneHour,
+      to: now,
+    };
+  }
+};
+
 export default {
+  createTraceDatasets,
   buildTraceTree,
   toKeyValueList,
   convertTraceToProfile,
+  getSpanType,
+  calcMetricQueryTimeRange,
 };

@@ -16,59 +16,27 @@ specific language governing permissions and limitations
 under the License.
 */
 import { Button, Card, Empty, Layout } from '@douyinfe/semi-ui';
-import React, { MutableRefObject, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, MetricExplore, TimePicker } from '@src/components';
-import { DatasourceInstance, PanelSetting, Tracker } from '@src/types';
-import { useSearchParams } from 'react-router-dom';
+import React, { useContext, useRef, useState } from 'react';
+import { AddToCharts, AddToDashboard, DatasourceSelectForm, Icon, DataExplore, TimePicker } from '@src/components';
+import { DatasourceInstance } from '@src/types';
 import { DatasourceStore } from '@src/stores';
-import { get, set, isEmpty, cloneDeep } from 'lodash-es';
+import { get, isEmpty, cloneDeep } from 'lodash-es';
 import './explore.scss';
 import { PanelEditContext, PanelEditContextProvider } from '@src/contexts';
+import { DatasourceKit } from '@src/utils';
 
 const { Header } = Layout;
-const DefaultPanel = {
-  targets: [{}],
-  type: 'timeseries',
-  fieldConfig: {
-    defaults: {
-      unit: 'short',
-    },
-  },
-};
 
 const ExploreContent: React.FC = () => {
   const defaultDatasource = DatasourceStore.getDefaultDatasource();
   const [visible, setVisible] = useState(false);
   const { panel, modifyPanel } = useContext(PanelEditContext);
-  const [searchParams, setSearchParams] = useSearchParams();
   const addToChartBtn = useRef<any>();
   const getDatasource = () => {
     const datasourceUID = get(panel, 'datasource.uid', get(defaultDatasource, 'setting.uid'));
     return DatasourceStore.getDatasource(`${datasourceUID}`);
   };
-  const [datasource, setDatasource] = useState<DatasourceInstance | null | undefined>(() => {
-    return getDatasource();
-  });
-  const panelTracker = useRef<Tracker<PanelSetting>>() as MutableRefObject<Tracker<PanelSetting>>;
-
-  useMemo(() => {
-    const datasource = getDatasource();
-    panel.datasource = { uid: get(datasource, 'setting.uid', '') };
-    panelTracker.current = new Tracker(panel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // just init
-
-  useEffect(() => {
-    addToChartBtn.current.setOptions(panel);
-
-    if (panelTracker.current.isChanged(panel)) {
-      panelTracker.current.setNewVal(panel);
-      searchParams.set('left', JSON.stringify(panel));
-      setSearchParams(searchParams);
-      setDatasource(getDatasource());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panel]);
+  const datasource = getDatasource();
 
   const renderContent = () => {
     if (!datasource || isEmpty(DatasourceStore.getDatasources(false))) {
@@ -83,7 +51,7 @@ const ExploreContent: React.FC = () => {
         </Card>
       );
     }
-    return <MetricExplore datasource={datasource} />;
+    return <DataExplore datasource={datasource} />;
   };
 
   return (
@@ -97,30 +65,32 @@ const ExploreContent: React.FC = () => {
             style={{ width: 200 }}
             includeMixed
             onChange={(instance: DatasourceInstance) => {
-              modifyPanel({ datasource: { uid: instance.setting.uid } });
+              modifyPanel({ datasource: { uid: instance.setting.uid, type: instance.plugin.Type } });
             }}
           />
         </div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <AddToCharts ref={addToChartBtn} visible={visible} setVisible={setVisible} />
-          <Button type="tertiary" onClick={() => setVisible(true)} icon={<Icon icon="repo" />}>
-            Save as chart
-          </Button>
-          <AddToDashboard
-            btnType="tertiary"
-            btnTheme="light"
-            getCharts={() => {
-              const p = cloneDeep(panel);
-              p.title = 'Panel title';
-              return [
-                {
-                  model: p,
-                },
-              ];
-            }}
-          />
-          <TimePicker />
-        </div>
+        {DatasourceKit.isMetric(datasource) && (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <AddToCharts ref={addToChartBtn} visible={visible} setVisible={setVisible} />
+            <Button type="tertiary" onClick={() => setVisible(true)} icon={<Icon icon="repo" />}>
+              Save as chart
+            </Button>
+            <AddToDashboard
+              btnType="tertiary"
+              btnTheme="light"
+              getCharts={() => {
+                const p = cloneDeep(panel);
+                p.title = 'Panel title';
+                return [
+                  {
+                    model: p,
+                  },
+                ];
+              }}
+            />
+            <TimePicker />
+          </div>
+        )}
       </Header>
       {renderContent()}
     </Layout>
@@ -128,36 +98,8 @@ const ExploreContent: React.FC = () => {
 };
 
 const Explore: React.FC = () => {
-  const [searchParams] = useSearchParams();
-
-  const getOptions = (key: string) => {
-    const options = `${searchParams.get(key)}`;
-    if (!options || isEmpty(options)) {
-      return DefaultPanel;
-    }
-    try {
-      const panel = JSON.parse(options);
-      if (!panel) {
-        return DefaultPanel;
-      }
-      if (isEmpty(get(panel, 'targets', []))) {
-        set(panel, 'targets', [{}]);
-      }
-      set(panel, 'type', 'timeseries');
-      set(panel, 'fieldConfig', {
-        defaults: {
-          unit: 'short',
-        },
-      });
-      return panel;
-    } catch (err) {
-      console.warn('parse metric explore error', err);
-    }
-    return DefaultPanel;
-  };
-
   return (
-    <PanelEditContextProvider initPanel={getOptions('left')}>
+    <PanelEditContextProvider initPanel={{}} urlBind="left">
       <ExploreContent />
     </PanelEditContextProvider>
   );

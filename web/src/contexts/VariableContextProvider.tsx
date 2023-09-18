@@ -18,7 +18,7 @@ under the License.
 import React, { createContext, MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SearchParamKeys, Tracker, Variable } from '@src/types';
-import { isEmpty, set } from 'lodash-es';
+import { get, has, isEmpty, set } from 'lodash-es';
 
 export const VariableContext = createContext({
   variables: {},
@@ -30,30 +30,36 @@ export const VariableContext = createContext({
   refresh: () => {},
 });
 
-const getValues = (variables: Variable[], searchParams: URLSearchParams): object => {
+const getValues = (variables: Variable[], searchParams: URLSearchParams, initValues: any): object => {
   const newValues = {};
   variables.forEach((variable: Variable) => {
     if (searchParams.has(variable.name)) {
-      // FIXME: add multi/all logic
       if (variable.multi) {
         set(newValues, variable.name, searchParams.getAll(variable.name));
       } else {
         set(newValues, variable.name, searchParams.get(variable.name));
       }
+    } else if (has(initValues, variable.name)) {
+      // FIXME: add multi/all logic
+      set(newValues, variable.name, get(initValues, variable.name));
     }
   });
   return newValues;
 };
 
-export const VariableContextProvider: React.FC<{ variables: Variable[]; children: React.ReactNode }> = (props) => {
-  const { children, variables } = props;
+export const VariableContextProvider: React.FC<{
+  variables: Variable[];
+  children: React.ReactNode;
+  initValues?: object;
+}> = (props) => {
+  const { children, variables, initValues } = props;
   const [searchParams] = useSearchParams();
   const [valuesOfVariable, setValuesOfVariable] = useState(() => {
-    return getValues(variables, searchParams);
+    return getValues(variables, searchParams, initValues);
   });
   const [refreshTime, setRefreshTime] = useState(0);
-  const from = searchParams.get(SearchParamKeys.From) || '';
-  const to = searchParams.get(SearchParamKeys.To) || '';
+  const from = searchParams.get(SearchParamKeys.From) || get(initValues, 'from', '');
+  const to = searchParams.get(SearchParamKeys.To) || get(initValues, 'to', '');
   const refreshInterval = searchParams.get(SearchParamKeys.Refresh) || '';
   const valuesTrackerRef = useRef() as MutableRefObject<Tracker<any>>;
 
@@ -65,12 +71,12 @@ export const VariableContextProvider: React.FC<{ variables: Variable[]; children
     if (isEmpty(variables)) {
       return;
     }
-    const newValues = getValues(variables, searchParams);
+    const newValues = getValues(variables, searchParams, initValues);
     if (valuesTrackerRef.current.isChanged(newValues)) {
       valuesTrackerRef.current.setNewVal(newValues);
       setValuesOfVariable(newValues);
     }
-  }, [searchParams, variables]);
+  }, [searchParams, variables, initValues]);
 
   const refresh = () => {
     setRefreshTime(refreshTime + 1);
