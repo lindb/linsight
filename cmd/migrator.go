@@ -20,9 +20,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-
 	"github.com/lindb/common/pkg/logger"
+	"github.com/spf13/cobra"
 
 	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/constant"
@@ -90,8 +89,8 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.Link{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Team{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.TeamMember{}))
-	migrator.AddMigration(dbpkg.NewMigration(&model.Component{}))
-	migrator.AddMigration(dbpkg.NewMigration(&model.OrgComponent{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Page{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.OrgPage{}))
 	org := dbpkg.NewMigration(&model.Org{})
 	org.AddInitRecord(
 		&model.Org{Name: constant.AdminOrgName, UID: uuid.GenerateShortUUID()},

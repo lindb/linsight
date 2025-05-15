@@ -21,10 +21,9 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/datatypes"
-
 	"github.com/lindb/common/pkg/encoding"
 	httppkg "github.com/lindb/common/pkg/http"
+	"gorm.io/datatypes"
 
 	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
@@ -121,6 +120,8 @@ func (api *DashboardAPI) GetDashboardByUID(c *gin.Context) {
 		return
 	}
 	dashboardMap[constant.UID] = uid
+	// TODO: modify
+	dashboardMap["isStarred"] = dashboard.IsStarred
 	provisioningDashboard, err := api.deps.DashboardSrv.GetProvisioningDashboard(ctx, uid)
 	if err != nil {
 		httppkg.Error(c, err)

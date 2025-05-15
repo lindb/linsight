@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_Components_ToTree(t *testing.T) {
-	cmps := Components{
+func Test_Pages_ToTree(t *testing.T) {
+	pages := Pages{
 		{UID: "1", Label: "node1", ParentUID: ""},
 		{UID: "2", Label: "node2", ParentUID: "1"},
 		{UID: "3", Label: "node3", ParentUID: "1"},
@@ -34,7 +34,7 @@ func Test_Components_ToTree(t *testing.T) {
 		{UID: "7", Label: "node7", ParentUID: "3"},
 	}
 
-	tree := cmps.ToTree()
+	tree := pages.ToTree()
 	assert.Len(t, tree, 1)
 	assert.Equal(t, "node1", tree[0].Label)
 	assert.Len(t, tree[0].Children, 2)

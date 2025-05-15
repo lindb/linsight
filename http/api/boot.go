@@ -19,7 +19,6 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
-
 	httppkg "github.com/lindb/common/pkg/http"
 	"github.com/lindb/common/pkg/logger"
 
@@ -67,7 +66,7 @@ func (api *BootAPI) Boot(c *gin.Context) {
 		} else {
 			boot.Datasources = datasources
 		}
-		nav, err0 := api.deps.CmpSrv.GetComponentTreeByCurrentOrg(ctx)
+		nav, err0 := api.deps.PageSrv.GetPageTreeByCurrentOrg(ctx)
 		if err0 != nil {
 			api.logger.Error("get nav tree for current org fail", logger.Error(err0))
 		} else {

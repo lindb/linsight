@@ -34,7 +34,7 @@ type Router struct {
 
 	loginAPI           *api.LoginAPI
 	bootAPI            *api.BootAPI
-	cmpAPI             *api.ComponentAPI
+	pageAPI            *api.PageAPI
 	integrationAPI     *api.IntegerationAPI
 	orgAPI             *api.OrgAPI
 	teamAPI            *api.TeamAPI
@@ -57,7 +57,7 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		deps:               deps,
 		loginAPI:           api.NewLoginAPI(deps),
 		bootAPI:            api.NewBootAPI(deps),
-		cmpAPI:             api.NewComponentAPI(deps),
+		pageAPI:            api.NewPageAPI(deps),
 		integrationAPI:     api.NewIntegrationAPI(deps),
 		orgAPI:             api.NewOrgAPI(deps),
 		userAPI:            api.NewUserAPI(deps),
@@ -87,25 +87,25 @@ func (r *Router) RegisterRouters() {
 	router.GET("/integrations", middleware.Authenticate(r.deps), r.integrationAPI.GetIntegrations)
 	router.GET("/tags", middleware.Authenticate(r.deps), r.tagAPI.FindTags)
 
-	router.GET("/components",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.cmpAPI.LoadComponentTree)...)
-	router.POST("/components",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.CreateComponent)...)
-	router.PUT("/components",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.UpdateComponent)...)
-	router.PUT("/components/sort",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.SortComponents)...)
-	router.DELETE("/components/:uid",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.DeleteComponentByUID)...)
-	router.PUT("/orgs/:uid/components",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.cmpAPI.SaveOrgComponents)...)
-	router.GET("/orgs/:uid/components",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.cmpAPI.GetOrgComponents)...)
+	router.GET("/pages",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.pageAPI.LoadPageTree)...)
+	router.POST("/pages",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.CreatePage)...)
+	router.PUT("/pages",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.UpdatePage)...)
+	router.PUT("/pages/sort",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.SortPages)...)
+	router.DELETE("/pages/:uid",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.DeletePageByUID)...)
+	router.PUT("/orgs/:uid/pages",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.SaveOrgPages)...)
+	router.GET("/orgs/:uid/pages",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.pageAPI.GetOrgPages)...)
 
-	router.GET("/orgs/components",
-		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.cmpAPI.GetComponentTreeByCurrentOrg)...)
-	router.PUT("/orgs/components/roles",
-		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.cmpAPI.UpdateRolesOfOrgComponent)...)
+	router.GET("/orgs/pages",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.pageAPI.GetPageTreeByCurrentOrg)...)
+	router.PUT("/orgs/pages/roles",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.pageAPI.UpdateRolesOfOrgPages)...)
 
 	router.GET("/orgs",
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.orgAPI.SearchOrg)...)

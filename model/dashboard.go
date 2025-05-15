@@ -60,7 +60,7 @@ func (p *PermissionType) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*p = 0
-	for i := 0; i < len(permissionTypes); i++ {
+	for i := range len(permissionTypes) {
 		if strings.Contains(s, permissionTypes[i]) {
 			*p = PermissionType(i)
 			return nil

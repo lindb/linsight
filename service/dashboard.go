@@ -146,7 +146,7 @@ func (srv *dashboardService) DeleteDashboardByUID(ctx context.Context, uid strin
 			orgID, uid, model.DashboardResource); err != nil {
 			return err
 		}
-		//TODO: delete start record
+		// TODO: delete start record
 		return tx.Delete(&model.Star{}, "org_id=? and resource_uid=? and resource_type=?", orgID, uid, model.DashboardResource)
 	})
 }
@@ -207,7 +207,7 @@ func (srv *dashboardService) GetDashboardByUID(ctx context.Context, uid string) 
 	}
 	isStarred, err := srv.starSrv.IsStarred(ctx, rs.UID, model.DashboardResource)
 	if err != nil {
-		//TODO: ignore check star err:
+		// TODO: ignore check star err:
 		return nil, err
 	}
 	rs.IsStarred = isStarred

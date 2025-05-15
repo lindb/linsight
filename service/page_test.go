@@ -33,7 +33,7 @@ import (
 	"github.com/lindb/linsight/pkg/db"
 )
 
-func TestComponentService_Initialize(t *testing.T) {
+func TestPageService_Initialize(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -41,7 +41,7 @@ func TestComponentService_Initialize(t *testing.T) {
 	authorizeSrv := NewMockAuthorizeService(ctrl)
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := &componentService{
+	srv := &pageService{
 		orgSrv:       orgSrv,
 		authorizeSrv: authorizeSrv,
 		db:           mockDB,
@@ -59,10 +59,10 @@ func TestComponentService_Initialize(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "unmarshal cmp failure",
+			name: "unmarshal page failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByName(gomock.Any(), constant.AdminOrgName).Return(nil, nil)
-				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
+				jsonUnmarshalFn = func(_ []byte, _ any) error {
 					return fmt.Errorf("err")
 				}
 			},
@@ -102,7 +102,7 @@ func TestComponentService_Initialize(t *testing.T) {
 	}
 }
 
-func TestComponentService_saveComponent(t *testing.T) {
+func TestPageService_savePage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -110,7 +110,7 @@ func TestComponentService_saveComponent(t *testing.T) {
 	authorizeSrv := NewMockAuthorizeService(ctrl)
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := &componentService{
+	srv := &pageService{
 		orgSrv:       orgSrv,
 		authorizeSrv: authorizeSrv,
 		db:           mockDB,
@@ -121,14 +121,14 @@ func TestComponentService_saveComponent(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "get cmp failure",
+			name: "get page failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "create cmp failure",
+			name: "create page failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(gorm.ErrRecordNotFound)
 				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
@@ -145,7 +145,7 @@ func TestComponentService_saveComponent(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create org. cmp failure",
+			name: "create org. page failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
@@ -163,7 +163,7 @@ func TestComponentService_saveComponent(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "save child cmp failure",
+			name: "save child page failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil)
@@ -177,8 +177,8 @@ func TestComponentService_saveComponent(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.saveComponent(&model.Component{
-				Children: []*model.Component{{}},
+			err := srv.savePage(&model.Page{
+				Children: []*model.Page{{}},
 			}, 123)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
@@ -187,47 +187,47 @@ func TestComponentService_saveComponent(t *testing.T) {
 	}
 }
 
-func TestComponentService_LoadComponentTree(t *testing.T) {
+func TestPageService_LoadPageTree(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewComponentService(mockDB, nil, nil)
+	srv := NewPageService(mockDB, nil, nil)
 
 	t.Run("load failure", func(t *testing.T) {
 		mockDB.EXPECT().Find(gomock.Any()).Return(fmt.Errorf("err"))
-		tree, err := srv.LoadComponentTree(context.TODO())
+		tree, err := srv.LoadPageTree(context.TODO())
 		assert.Error(t, err)
 		assert.Nil(t, tree)
 	})
 
 	t.Run("load successfully", func(t *testing.T) {
 		mockDB.EXPECT().Find(gomock.Any()).Return(nil)
-		tree, err := srv.LoadComponentTree(context.TODO())
+		tree, err := srv.LoadPageTree(context.TODO())
 		assert.NoError(t, err)
 		assert.Nil(t, tree)
 	})
 }
 
-func TestComponentService_UpdateComponent(t *testing.T) {
+func TestPageService_UpdatePage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewComponentService(mockDB, nil, nil)
+	srv := NewPageService(mockDB, nil, nil)
 
-	cmp := &model.Component{UID: "1234"}
+	page := &model.Page{UID: "1234"}
 	mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
-	err := srv.UpdateComponent(ctx, cmp)
+	err := srv.UpdatePage(ctx, page)
 	assert.Error(t, err)
 }
 
-func TestComponentService_CreateComponent(t *testing.T) {
+func TestPageService_CreatePage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewComponentService(mockDB, nil, nil)
+	srv := NewPageService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -248,7 +248,7 @@ func TestComponentService_CreateComponent(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create cmp failure",
+			name: "create page failure",
 			prepare: func() {
 				mockDB.EXPECT().Exist(gomock.Any(), "uid=?", "123").Return(true, nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
@@ -256,7 +256,7 @@ func TestComponentService_CreateComponent(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create cmp successfully",
+			name: "create page successfully",
 			prepare: func() {
 				mockDB.EXPECT().Exist(gomock.Any(), "uid=?", "123").Return(true, nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
@@ -268,7 +268,7 @@ func TestComponentService_CreateComponent(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.CreateComponent(ctx, &model.Component{
+			_, err := srv.CreatePage(ctx, &model.Page{
 				ParentUID: "123",
 			})
 			if tt.wantErr != (err != nil) {
@@ -278,12 +278,12 @@ func TestComponentService_CreateComponent(t *testing.T) {
 	}
 }
 
-func TestComponentService_DeleteComponent(t *testing.T) {
+func TestPageService_DeletePage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewComponentService(mockDB, nil, nil)
+	srv := NewPageService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -304,7 +304,7 @@ func TestComponentService_DeleteComponent(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "delete cmp successfully",
+			name: "delete page successfully",
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "parent_uid=?", "abc").Return(int64(0), nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "uid=?", "abc").Return(nil)
@@ -316,7 +316,7 @@ func TestComponentService_DeleteComponent(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.DeleteComponentByUID(ctx, "abc")
+			err := srv.DeletePageByUID(ctx, "abc")
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -324,7 +324,7 @@ func TestComponentService_DeleteComponent(t *testing.T) {
 	}
 }
 
-func TestComponentService_SortComponents(t *testing.T) {
+func TestPageService_SortPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -332,21 +332,21 @@ func TestComponentService_SortComponents(t *testing.T) {
 	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
 		return fn(mockDB)
 	}).AnyTimes()
-	srv := NewComponentService(mockDB, nil, nil)
+	srv := NewPageService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "sort cmps failure",
+			name: "sort pages failure",
 			prepare: func() {
 				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=?", "abc").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "sort cmps successfully",
+			name: "sort pages successfully",
 			prepare: func() {
 				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=?", "abc").Return(nil).MaxTimes(2)
 			},
@@ -357,7 +357,7 @@ func TestComponentService_SortComponents(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.SortComponents(ctx, model.Components{{UID: "abc"}, {UID: "abc"}})
+			err := srv.SortPages(ctx, model.Pages{{UID: "abc"}, {UID: "abc"}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -365,20 +365,20 @@ func TestComponentService_SortComponents(t *testing.T) {
 	}
 }
 
-func TestComponentService_GetComponentTreeByCurrentOrg(t *testing.T) {
+func TestPageService_GetPageTreeByCurrentOrg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
 	authorizeSrv := NewMockAuthorizeService(ctrl)
-	srv := NewComponentService(mockDB, nil, authorizeSrv)
+	srv := NewPageService(mockDB, nil, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "find cmps failure",
+			name: "find pages failure",
 			prepare: func() {
 				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), int64(12)).Return(fmt.Errorf("err"))
 			},
@@ -393,10 +393,10 @@ func TestComponentService_GetComponentTreeByCurrentOrg(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "get org's cmps successfully",
+			name: "get org's pages successfully",
 			prepare: func() {
-				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), int64(12)).DoAndReturn(func(cmps *model.Components, _ string, _ int64) error {
-					*cmps = append(*cmps, &model.Component{})
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), int64(12)).DoAndReturn(func(pages *model.Pages, _ string, _ int64) error {
+					*pages = append(*pages, &model.Page{})
 					return nil
 				})
 				authorizeSrv.EXPECT().CheckResourcesACL(gomock.Any()).Return([]bool{true}, nil)
@@ -408,7 +408,7 @@ func TestComponentService_GetComponentTreeByCurrentOrg(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.GetComponentTreeByCurrentOrg(ctx)
+			_, err := srv.GetPageTreeByCurrentOrg(ctx)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -416,27 +416,27 @@ func TestComponentService_GetComponentTreeByCurrentOrg(t *testing.T) {
 	}
 }
 
-func TestComponentService_GetOrgComponents(t *testing.T) {
+func TestPageService_GetOrgPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
 	authorizeSrv := NewMockAuthorizeService(ctrl)
-	srv := NewComponentService(mockDB, nil, authorizeSrv)
+	srv := NewPageService(mockDB, nil, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "get org. cmps failure",
+			name: "get org. pages failure",
 			prepare: func() {
 				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), "123").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "get org's cmps successfully",
+			name: "get org's pages successfully",
 			prepare: func() {
 				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), "123").Return(nil)
 			},
@@ -447,7 +447,7 @@ func TestComponentService_GetOrgComponents(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.GetOrgComponents(ctx, "123")
+			_, err := srv.GetOrgPages(ctx, "123")
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -455,7 +455,7 @@ func TestComponentService_GetOrgComponents(t *testing.T) {
 	}
 }
 
-func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
+func TestPageService_UpdateRolesOfOrgPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -464,25 +464,25 @@ func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
 		return fn(mockDB)
 	}).AnyTimes()
 	authorizeSrv := NewMockAuthorizeService(ctrl)
-	srv := NewComponentService(mockDB, nil, authorizeSrv)
+	srv := NewPageService(mockDB, nil, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "get cmp failure",
+			name: "get page failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "update role for org's cmp failure",
+			name: "update role for org's page failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, "org_id=? and component_id=?", int64(12),
+					accesscontrol.RoleAdmin, "org_id=? and page_id=?", int64(12),
 					gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -492,18 +492,18 @@ func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, "org_id=? and component_id=?", int64(12),
+					accesscontrol.RoleAdmin, "org_id=? and page_id=?", int64(12),
 					gomock.Any()).Return(nil)
 				authorizeSrv.EXPECT().UpdateResourceRole(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "update role for org's cmp successfully",
+			name: "update role for org's page successfully",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, "org_id=? and component_id=?", int64(12),
+					accesscontrol.RoleAdmin, "org_id=? and page_id=?", int64(12),
 					gomock.Any()).Return(nil)
 				authorizeSrv.EXPECT().UpdateResourceRole(gomock.Any()).Return(nil)
 			},
@@ -514,8 +514,8 @@ func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.UpdateRolesOfOrgComponent(ctx,
-				[]model.OrgComponentInfo{{ComponentUID: "123", Role: accesscontrol.RoleAdmin}})
+			err := srv.UpdateRolesOfOrgPages(ctx,
+				[]model.OrgPageInfo{{PageUID: "123", Role: accesscontrol.RoleAdmin}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -523,7 +523,7 @@ func TestComponentService_UpdateRolesOfOrgComponent(t *testing.T) {
 	}
 }
 
-func TestComponentService_SaveOrgComponents(t *testing.T) {
+func TestPageService_SaveOrgPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -533,7 +533,7 @@ func TestComponentService_SaveOrgComponents(t *testing.T) {
 	}).AnyTimes()
 	authorizeSrv := NewMockAuthorizeService(ctrl)
 	orgSrv := NewMockOrgService(ctrl)
-	srv := NewComponentService(mockDB, orgSrv, authorizeSrv)
+	srv := NewPageService(mockDB, orgSrv, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -547,7 +547,7 @@ func TestComponentService_SaveOrgComponents(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "delete org cmps failure",
+			name: "delete org pages failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(fmt.Errorf("err"))
@@ -555,7 +555,7 @@ func TestComponentService_SaveOrgComponents(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "get cmp failure",
+			name: "get page failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
@@ -564,7 +564,7 @@ func TestComponentService_SaveOrgComponents(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create org cmp failure",
+			name: "create org page failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
@@ -580,7 +580,7 @@ func TestComponentService_SaveOrgComponents(t *testing.T) {
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
-				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Component).Return(fmt.Errorf("err"))
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Page).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
@@ -591,19 +591,19 @@ func TestComponentService_SaveOrgComponents(t *testing.T) {
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
-				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Component).Return(nil)
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Page).Return(nil)
 				authorizeSrv.EXPECT().AddResourcePolicy(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "save org's cmp successfully",
+			name: "save org's page successfully",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
-				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Component).Return(nil)
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Page).Return(nil)
 				authorizeSrv.EXPECT().AddResourcePolicy(gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -613,7 +613,7 @@ func TestComponentService_SaveOrgComponents(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.SaveOrgComponents(ctx, "123", []model.OrgComponentInfo{{ComponentUID: "123", Role: accesscontrol.RoleAdmin}})
+			err := srv.SaveOrgPages(ctx, "123", []model.OrgPageInfo{{PageUID: "123", Role: accesscontrol.RoleAdmin}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

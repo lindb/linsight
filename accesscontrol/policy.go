@@ -18,12 +18,14 @@
 package accesscontrol
 
 type ActionType string
+
 type ResourceType string
+
 type ResourceCategory string
 
 const (
 	Dashboard ResourceCategory = "Dashboard"
-	Component ResourceCategory = "Component"
+	Page      ResourceCategory = "Page"
 )
 
 const (

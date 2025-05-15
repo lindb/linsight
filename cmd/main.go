@@ -22,10 +22,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"github.com/lindb/common/pkg/fileutil"
 	"github.com/lindb/common/pkg/logger"
+	"github.com/spf13/cobra"
 
 	_ "github.com/lindb/linsight/alerting"
 	"github.com/lindb/linsight/alerting/schedule"
@@ -162,7 +161,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		panic(err)
 	}
 	orgSrv := service.NewOrgService(db)
-	cmpSrv := service.NewComponentService(db, orgSrv, authorizeSrv)
+	cmpSrv := service.NewPageService(db, orgSrv, authorizeSrv)
 	// initialize supported component
 	if err := cmpSrv.Initialize(); err != nil {
 		panic(err)
@@ -180,7 +179,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		OrgSrv:          orgSrv,
 		UserSrv:         userSrv,
 		TeamSrv:         service.NewTeamService(db, userSrv),
-		CmpSrv:          cmpSrv,
+		PageSrv:         cmpSrv,
 		IntegrationSrv:  integrationSrv,
 		AuthorizeSrv:    authorizeSrv,
 		AuthenticateSrv: service.NewAuthenticateService(userSrv, db),

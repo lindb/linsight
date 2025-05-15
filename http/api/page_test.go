@@ -28,9 +28,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/lindb/common/pkg/encoding"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/lindb/linsight/accesscontrol"
 	"github.com/lindb/linsight/http/deps"
@@ -42,16 +41,16 @@ func init() {
 	gin.SetMode(gin.ReleaseMode)
 }
 
-func TestComponentAPI_LoadComponentTree(t *testing.T) {
+func TestPageAPI_LoadPageTree(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.GET("/components", api.LoadComponentTree)
+	r.GET("/pages", api.LoadPageTree)
 
 	cases := []struct {
 		name    string
@@ -59,18 +58,18 @@ func TestComponentAPI_LoadComponentTree(t *testing.T) {
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "load cmp tree failure",
+			name: "load page tree failure",
 			prepare: func() {
-				cmpSrv.EXPECT().LoadComponentTree(gomock.Any()).Return(nil, fmt.Errorf("err"))
+				pageSrv.EXPECT().LoadPageTree(gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "load cmp tree successfully",
+			name: "load page tree successfully",
 			prepare: func() {
-				cmpSrv.EXPECT().LoadComponentTree(gomock.Any()).Return(model.Components{}, nil)
+				pageSrv.EXPECT().LoadPageTree(gomock.Any()).Return(model.Pages{}, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -80,7 +79,7 @@ func TestComponentAPI_LoadComponentTree(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/components", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/pages", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -92,17 +91,17 @@ func TestComponentAPI_LoadComponentTree(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_CreateComponent(t *testing.T) {
+func TestPageAPI_CreatePage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.POST("/components", api.CreateComponent)
-	body := encoding.JSONMarshal(&model.Component{})
+	r.POST("/pages", api.CreatePage)
+	body := encoding.JSONMarshal(&model.Page{})
 
 	cases := []struct {
 		name    string
@@ -118,20 +117,20 @@ func TestComponentAPI_CreateComponent(t *testing.T) {
 			},
 		},
 		{
-			name: "create cmp failure",
+			name: "create page failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().CreateComponent(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
+				pageSrv.EXPECT().CreatePage(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "create cmp successfully",
+			name: "create page successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().CreateComponent(gomock.Any(), gomock.Any()).Return("1234", nil)
+				pageSrv.EXPECT().CreatePage(gomock.Any(), gomock.Any()).Return("1234", nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -142,7 +141,7 @@ func TestComponentAPI_CreateComponent(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/components", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/pages", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -154,17 +153,17 @@ func TestComponentAPI_CreateComponent(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_UpdateComponent(t *testing.T) {
+func TestPageAPI_UpdatePage(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.PUT("/components", api.UpdateComponent)
-	body := encoding.JSONMarshal(&model.Component{})
+	r.PUT("/pages", api.UpdatePage)
+	body := encoding.JSONMarshal(&model.Page{})
 
 	cases := []struct {
 		name    string
@@ -180,20 +179,20 @@ func TestComponentAPI_UpdateComponent(t *testing.T) {
 			},
 		},
 		{
-			name: "update cmp failure",
+			name: "update page failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().UpdateComponent(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				pageSrv.EXPECT().UpdatePage(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "update cmp successfully",
+			name: "update page successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().UpdateComponent(gomock.Any(), gomock.Any()).Return(nil)
+				pageSrv.EXPECT().UpdatePage(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -203,7 +202,7 @@ func TestComponentAPI_UpdateComponent(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/components", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -215,17 +214,17 @@ func TestComponentAPI_UpdateComponent(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_SortComponents(t *testing.T) {
+func TestPageAPI_SortPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.PUT("/components/sort", api.SortComponents)
-	body := encoding.JSONMarshal(&model.Components{})
+	r.PUT("/pages/sort", api.SortPages)
+	body := encoding.JSONMarshal(&model.Pages{})
 
 	cases := []struct {
 		name    string
@@ -241,20 +240,20 @@ func TestComponentAPI_SortComponents(t *testing.T) {
 			},
 		},
 		{
-			name: "sort cmp failure",
+			name: "sort pages failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().SortComponents(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				pageSrv.EXPECT().SortPages(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "sort cmp successfully",
+			name: "sort pages successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().SortComponents(gomock.Any(), gomock.Any()).Return(nil)
+				pageSrv.EXPECT().SortPages(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -264,7 +263,7 @@ func TestComponentAPI_SortComponents(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/components/sort", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages/sort", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -276,16 +275,16 @@ func TestComponentAPI_SortComponents(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_DeleteComponentByUID(t *testing.T) {
+func TestPageAPI_DeletePageByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.DELETE("/components/:uid", api.DeleteComponentByUID)
+	r.DELETE("/pages/:uid", api.DeletePageByUID)
 
 	cases := []struct {
 		name    string
@@ -293,18 +292,18 @@ func TestComponentAPI_DeleteComponentByUID(t *testing.T) {
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "delete cmp failure",
+			name: "delete page failure",
 			prepare: func() {
-				cmpSrv.EXPECT().DeleteComponentByUID(gomock.Any(), "1234").Return(fmt.Errorf("err"))
+				pageSrv.EXPECT().DeletePageByUID(gomock.Any(), "1234").Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "delete cmp successfully",
+			name: "delete page successfully",
 			prepare: func() {
-				cmpSrv.EXPECT().DeleteComponentByUID(gomock.Any(), "1234").Return(nil)
+				pageSrv.EXPECT().DeletePageByUID(gomock.Any(), "1234").Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -314,7 +313,7 @@ func TestComponentAPI_DeleteComponentByUID(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/components/1234", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/pages/1234", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -326,17 +325,17 @@ func TestComponentAPI_DeleteComponentByUID(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_SaveOrgComponents(t *testing.T) {
+func TestPageAPI_SaveOrgPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.PUT("/components/:uid", api.SaveOrgComponents)
-	body := encoding.JSONMarshal([]model.OrgComponentInfo{{Role: accesscontrol.RoleAdmin}})
+	r.PUT("/pages/:uid", api.SaveOrgPages)
+	body := encoding.JSONMarshal([]model.OrgPageInfo{{Role: accesscontrol.RoleAdmin}})
 
 	cases := []struct {
 		name    string
@@ -353,20 +352,20 @@ func TestComponentAPI_SaveOrgComponents(t *testing.T) {
 			},
 		},
 		{
-			name: "save org cmp failure",
+			name: "save org page failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().SaveOrgComponents(gomock.Any(), "1234", gomock.Any()).Return(fmt.Errorf("err"))
+				pageSrv.EXPECT().SaveOrgPages(gomock.Any(), "1234", gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "save org cmp successfully",
+			name: "save org page successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().SaveOrgComponents(gomock.Any(), "1234", gomock.Any()).Return(nil)
+				pageSrv.EXPECT().SaveOrgPages(gomock.Any(), "1234", gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -376,7 +375,7 @@ func TestComponentAPI_SaveOrgComponents(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/components/1234", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages/1234", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -388,17 +387,17 @@ func TestComponentAPI_SaveOrgComponents(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_UpdateRolesOrgComponents(t *testing.T) {
+func TestPageAPI_UpdateRolesOrgPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.PUT("/components", api.UpdateRolesOfOrgComponent)
-	body := encoding.JSONMarshal([]model.OrgComponentInfo{{Role: accesscontrol.RoleAdmin}})
+	r.PUT("/pages", api.UpdateRolesOfOrgPages)
+	body := encoding.JSONMarshal([]model.OrgPageInfo{{Role: accesscontrol.RoleAdmin}})
 
 	cases := []struct {
 		name    string
@@ -415,20 +414,20 @@ func TestComponentAPI_UpdateRolesOrgComponents(t *testing.T) {
 			},
 		},
 		{
-			name: "update role for org cmp failure",
+			name: "update role for org pages failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().UpdateRolesOfOrgComponent(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				pageSrv.EXPECT().UpdateRolesOfOrgPages(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "update role for org cmp successfully",
+			name: "update role for org pages successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				cmpSrv.EXPECT().UpdateRolesOfOrgComponent(gomock.Any(), gomock.Any()).Return(nil)
+				pageSrv.EXPECT().UpdateRolesOfOrgPages(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -438,7 +437,7 @@ func TestComponentAPI_UpdateRolesOrgComponents(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/components", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -450,34 +449,34 @@ func TestComponentAPI_UpdateRolesOrgComponents(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_GetComponentTreeByCurrentOrg(t *testing.T) {
+func TestPageAPI_GetPageTreeByCurrentOrg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.GET("/components", api.GetComponentTreeByCurrentOrg)
+	r.GET("/pages", api.GetPageTreeByCurrentOrg)
 	cases := []struct {
 		name    string
 		prepare func()
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "get org cmp failure",
+			name: "get org page failure",
 			prepare: func() {
-				cmpSrv.EXPECT().GetComponentTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
+				pageSrv.EXPECT().GetPageTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "get org cmp successfully",
+			name: "get org page successfully",
 			prepare: func() {
-				cmpSrv.EXPECT().GetComponentTreeByCurrentOrg(gomock.Any()).Return(nil, nil)
+				pageSrv.EXPECT().GetPageTreeByCurrentOrg(gomock.Any()).Return(nil, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -487,7 +486,7 @@ func TestComponentAPI_GetComponentTreeByCurrentOrg(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/components", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/pages", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -499,34 +498,34 @@ func TestComponentAPI_GetComponentTreeByCurrentOrg(t *testing.T) {
 	}
 }
 
-func TestComponentAPI_GetOrgComponents(t *testing.T) {
+func TestPageAPI_GetOrgPages(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	cmpSrv := service.NewMockComponentService(ctrl)
+	pageSrv := service.NewMockPageService(ctrl)
 	r := gin.New()
-	api := NewComponentAPI(&deps.API{
-		CmpSrv: cmpSrv,
+	api := NewPageAPI(&deps.API{
+		PageSrv: pageSrv,
 	})
-	r.GET("/components/:uid", api.GetOrgComponents)
+	r.GET("/pages/:uid", api.GetOrgPages)
 	cases := []struct {
 		name    string
 		prepare func()
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "get org cmp failure",
+			name: "get org pages failure",
 			prepare: func() {
-				cmpSrv.EXPECT().GetOrgComponents(gomock.Any(), "123").Return(nil, fmt.Errorf("err"))
+				pageSrv.EXPECT().GetOrgPages(gomock.Any(), "123").Return(nil, fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "get org cmp successfully",
+			name: "get org pages successfully",
 			prepare: func() {
-				cmpSrv.EXPECT().GetOrgComponents(gomock.Any(), "123").Return(nil, nil)
+				pageSrv.EXPECT().GetOrgPages(gomock.Any(), "123").Return(nil, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -536,7 +535,7 @@ func TestComponentAPI_GetOrgComponents(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/components/123", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/pages/123", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {

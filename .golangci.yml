@@ -9,13 +9,41 @@ linters-settings:
     # Default: 30 (but we recommend 10-20)
     min-complexity: 50
   depguard:
-    list-type: blacklist
-    packages:
-      # logging is allowed only by logutils.Log, logrus
-      # is allowed to use only in logutils package
-      - github.com/sirupsen/logrus
-    packages-with-error-message:
-      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
+    # Rules to apply.
+    #
+    # Variables:
+    # - File Variables
+    #   you can still use and exclamation mark ! in front of a variable to say not to use it.
+    #   Example !$test will match any file that is not a go test file.
+    #
+    #   `$all` - matches all go files
+    #   `$test` - matches all go test files
+    #
+    # - Package Variables
+    #
+    #  `$gostd` - matches all of go's standard library (Pulled from `GOROOT`)
+    #
+    # Default: Only allow $gostd in all files.
+    rules:
+      # Name of a rule.
+      main:
+        # Used to determine the package matching priority.
+        # There are three different modes: `original`, `strict`, and `lax`.
+        # Default: "original"
+        list-mode: lax
+        # List of file globs that will match this list of settings to compare against.
+        # Default: $all
+        files:
+          - "!**/*_a _file.go"
+        # List of allowed packages.
+        allow:
+          - $gostd
+        # Packages that are not allowed where the value is a suggestion.
+        deny:
+          - pkg: "github.com/sirupsen/logrus"
+            desc: not allowed
+          - pkg: "github.com/pkg/errors"
+            desc: Should be replaced by standard lib errors package
   dupl:
     threshold: 100
   funlen:

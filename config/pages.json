@@ -1,0 +1,99 @@
+[
+  {
+    "uid": "explore",
+    "label": "Explore",
+    "path": "/explore",
+    "icon": "explore",
+    "page": "/explore",
+    "role": "Viewer"
+  },
+  {
+    "uid": "dashboard",
+    "label": "Dashboard",
+    "icon": "dashboard",
+    "role": "Viewer",
+    "children": [
+      {
+        "uid": "dashboardlist",
+        "label": "Dashboard List",
+        "path": "/dashboards",
+        "icon": "list",
+        "page": "/dashboards",
+        "role": "Viewer"
+      },
+      {
+        "uid": "newdatabase",
+        "label": "New Dashboard",
+        "path": "/dashboard/new",
+        "page": "/dashboard/*",
+        "icon": "dashboard-add",
+        "role": "Editor"
+      },
+      {
+        "uid": "charts",
+        "label": "Chart Repository",
+        "path": "/charts",
+        "page": "/charts",
+        "icon": "repo",
+        "role": "Viewer"
+      }
+    ]
+  },
+  {
+    "uid": "setting",
+    "label": "Setting",
+    "path": "/setting",
+    "icon": "setting",
+    "role": "Admin",
+    "children": [
+      {
+        "uid": "datasource",
+        "label": "Datasource",
+        "path": "/setting/datasources",
+        "page": "/setting/datasources/*",
+        "icon": "datasource",
+        "role": "Admin"
+      },
+      {
+        "uid": "user",
+        "label": "User",
+        "path": "/setting/users",
+        "page": "/setting/users/*",
+        "icon": "user",
+        "role": "Lin"
+      },
+      {
+        "uid": "team",
+        "label": "Team",
+        "path": "/setting/orgs/teams",
+        "page": "/setting/orgs/teams/*",
+        "icon": "team",
+        "role": "Admin"
+      },
+      {
+        "uid": "organization",
+        "label": "Organization",
+        "path": "/setting/orgs",
+        "page": "/setting/orgs/*",
+        "icon": "org",
+        "role": "Lin"
+      },
+      {
+        "uid": "page",
+        "label": "Page",
+        "path": "/setting/pages",
+        "page": "/setting/pages/*",
+        "icon": "menu",
+        "role": "Lin"
+      },
+      {
+        "uid": "org_page",
+        "label": "Org. Page",
+        "path": "/setting/orgs/pages",
+        "page": "/setting/orgs/pages/*",
+        "icon": "menu",
+        "role": "Admin"
+      }
+    ]
+  }
+]

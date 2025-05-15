@@ -25,10 +25,9 @@ import (
 	"github.com/casbin/casbin/v2/model"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/golang/mock/gomock"
+	"github.com/lindb/common/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
-
-	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/accesscontrol"
 	modelpkg "github.com/lindb/linsight/model"
@@ -188,7 +187,7 @@ func TestAuthorizeService_CheckResourceACL(t *testing.T) {
 		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Component,
+			Category: accesscontrol.Page,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -199,7 +198,7 @@ func TestAuthorizeService_CheckResourceACL(t *testing.T) {
 		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Component,
+			Category: accesscontrol.Page,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -220,7 +219,7 @@ func TestAuthorizeService_CheckResourcesACL(t *testing.T) {
 	ok, err := srv.CheckResourcesACL([]modelpkg.ResourceACLParam{{
 		Role:     accesscontrol.RoleAdmin,
 		OrgID:    123,
-		Category: accesscontrol.Component,
+		Category: accesscontrol.Page,
 		Resource: "abc",
 		Action:   accesscontrol.Write,
 	}})
@@ -237,8 +236,8 @@ func TestAuthorizeService_RemoveResourcesACL(t *testing.T) {
 		resource: enforcer,
 		logger:   logger.GetLogger("Service", "AuthTest"),
 	}
-	enforcer.EXPECT().RemoveFilteredNamedPolicy("p", 1, "123", accesscontrol.Component.String()).Return(false, fmt.Errorf("err"))
-	err := srv.RemoveResourcePoliciesByCategory(123, accesscontrol.Component)
+	enforcer.EXPECT().RemoveFilteredNamedPolicy("p", 1, "123", accesscontrol.Page.String()).Return(false, fmt.Errorf("err"))
+	err := srv.RemoveResourcePoliciesByCategory(123, accesscontrol.Page)
 	assert.Error(t, err)
 }
 
@@ -257,7 +256,7 @@ func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
 		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Component,
+			Category: accesscontrol.Page,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -269,7 +268,7 @@ func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
 		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Component,
+			Category: accesscontrol.Page,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -288,10 +287,10 @@ func TestAuthorizeService_UpdateResourcesRole(t *testing.T) {
 	}
 	enforcer.EXPECT().UpdateFilteredPolicies(
 		[][]string{{"Admin", "123", "Component", "abc", "write"}},
-		1, "123", accesscontrol.Component.String(), "abc", "write").Return(false, fmt.Errorf("err"))
+		1, "123", accesscontrol.Page.String(), "abc", "write").Return(false, fmt.Errorf("err"))
 	err := srv.UpdateResourceRole(&modelpkg.ResourceACLParam{
 		OrgID:    123,
-		Category: accesscontrol.Component,
+		Category: accesscontrol.Page,
 		Role:     accesscontrol.RoleAdmin,
 		Resource: "abc",
 		Action:   accesscontrol.Write,

@@ -16,7 +16,7 @@ gomock: ## go generate mock file.
 lint: ## run lint
 ifeq (, $(shell which golangci-lint))
 	# binary will be $(go env GOPATH)/bin/golangci-lint
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell go env GOPATH)/bin v1.51.2
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $(go env GOPATH)/bin v2.1.6
 else
 	echo "Found golangci-lint"
 endif

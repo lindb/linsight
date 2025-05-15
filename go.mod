@@ -1,6 +1,6 @@
 module github.com/lindb/linsight
 
-go 1.20
+go 1.24
 
 require (
 	github.com/caarlos0/env/v7 v7.1.0
@@ -13,6 +13,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.4
 	github.com/teris-io/shortid v0.0.0-20220617161101-71ec9f2aa569
+	go.uber.org/atomic v1.10.0
 	golang.org/x/crypto v0.6.0
 	gorm.io/datatypes v1.1.0
 	gorm.io/driver/sqlite v1.4.4
@@ -34,7 +35,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
@@ -101,5 +101,3 @@ require (
 	modernc.org/memory v1.4.0 // indirect
 	modernc.org/sqlite v1.19.1 // indirect
 )
-
-replace github.com/lindb/common => ../common
