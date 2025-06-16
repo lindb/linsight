@@ -23,8 +23,8 @@ import (
 
 // TimeRange represents data query time range.
 type TimeRange struct {
-	From int64 `json:"from"`
-	To   int64 `json:"to"`
+	Start int64 `json:"start"`
+	End   int64 `json:"end"`
 }
 
 type QueryRequest struct {
@@ -34,7 +34,7 @@ type QueryRequest struct {
 
 type Query struct {
 	Datasource TargetDatasource `json:"datasource" binding:"required"`
-	Request    json.RawMessage  `json:"request"`
+	Params     json.RawMessage  `json:"params"`
 	RefID      string           `json:"refId"`
 }
 

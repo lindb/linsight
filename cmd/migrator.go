@@ -89,8 +89,8 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.Link{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Team{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.TeamMember{}))
-	migrator.AddMigration(dbpkg.NewMigration(&model.Page{}))
-	migrator.AddMigration(dbpkg.NewMigration(&model.OrgPage{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.Menu{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.OrgMenu{}))
 	org := dbpkg.NewMigration(&model.Org{})
 	org.AddInitRecord(
 		&model.Org{Name: constant.AdminOrgName, UID: uuid.GenerateShortUUID()},

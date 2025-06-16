@@ -141,8 +141,8 @@ func TestClient_DataQuery(t *testing.T) {
 			}()
 			tt.prepare()
 			_, err := cli.DataQuery(context.TODO(), &model.Query{
-				Request: json.RawMessage([]byte(`{}`)),
-			}, model.TimeRange{From: timeutil.Now()})
+				Params: json.RawMessage([]byte(`{}`)),
+			}, model.TimeRange{Start: timeutil.Now()})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

@@ -28,8 +28,9 @@ type API struct {
 
 	OrgSrv         service.OrgService
 	UserSrv        service.UserService
+	UserCacheSrv   service.UserCacheService
 	TeamSrv        service.TeamService
-	PageSrv        service.PageService
+	MenuSrv        service.MenuService
 	IntegrationSrv service.IntegrationService
 
 	DatasourceSrv   service.DatasourceService

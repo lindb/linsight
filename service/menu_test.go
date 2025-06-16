@@ -33,7 +33,7 @@ import (
 	"github.com/lindb/linsight/pkg/db"
 )
 
-func TestPageService_Initialize(t *testing.T) {
+func TestMenuService_Initialize(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -41,7 +41,7 @@ func TestPageService_Initialize(t *testing.T) {
 	authorizeSrv := NewMockAuthorizeService(ctrl)
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := &pageService{
+	srv := &menService{
 		orgSrv:       orgSrv,
 		authorizeSrv: authorizeSrv,
 		db:           mockDB,
@@ -59,7 +59,7 @@ func TestPageService_Initialize(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "unmarshal page failure",
+			name: "unmarshal menu failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByName(gomock.Any(), constant.AdminOrgName).Return(nil, nil)
 				jsonUnmarshalFn = func(_ []byte, _ any) error {
@@ -102,7 +102,7 @@ func TestPageService_Initialize(t *testing.T) {
 	}
 }
 
-func TestPageService_savePage(t *testing.T) {
+func TestMenuService_saveMenu(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -110,7 +110,7 @@ func TestPageService_savePage(t *testing.T) {
 	authorizeSrv := NewMockAuthorizeService(ctrl)
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := &pageService{
+	srv := &menService{
 		orgSrv:       orgSrv,
 		authorizeSrv: authorizeSrv,
 		db:           mockDB,
@@ -121,14 +121,14 @@ func TestPageService_savePage(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "get page failure",
+			name: "get menu failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "create page failure",
+			name: "create menu failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(gorm.ErrRecordNotFound)
 				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
@@ -145,7 +145,7 @@ func TestPageService_savePage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create org. page failure",
+			name: "create org. menu failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
@@ -163,7 +163,7 @@ func TestPageService_savePage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "save child page failure",
+			name: "save child menu failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Exist(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil)
@@ -177,8 +177,8 @@ func TestPageService_savePage(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.savePage(&model.Page{
-				Children: []*model.Page{{}},
+			err := srv.saveMenu(&model.Menu{
+				Children: []*model.Menu{{}},
 			}, 123)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
@@ -187,47 +187,47 @@ func TestPageService_savePage(t *testing.T) {
 	}
 }
 
-func TestPageService_LoadPageTree(t *testing.T) {
+func TestMenuService_LoadMenuTree(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewPageService(mockDB, nil, nil)
+	srv := NewMenuService(mockDB, nil, nil)
 
 	t.Run("load failure", func(t *testing.T) {
 		mockDB.EXPECT().Find(gomock.Any()).Return(fmt.Errorf("err"))
-		tree, err := srv.LoadPageTree(context.TODO())
+		tree, err := srv.LoadMenuTree(context.TODO())
 		assert.Error(t, err)
 		assert.Nil(t, tree)
 	})
 
 	t.Run("load successfully", func(t *testing.T) {
 		mockDB.EXPECT().Find(gomock.Any()).Return(nil)
-		tree, err := srv.LoadPageTree(context.TODO())
+		tree, err := srv.LoadMenuTree(context.TODO())
 		assert.NoError(t, err)
 		assert.Nil(t, tree)
 	})
 }
 
-func TestPageService_UpdatePage(t *testing.T) {
+func TestMenuService_UpdateMenu(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewPageService(mockDB, nil, nil)
+	srv := NewMenuService(mockDB, nil, nil)
 
-	page := &model.Page{UID: "1234"}
+	menu := &model.Menu{UID: "1234"}
 	mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=?", "1234").Return(fmt.Errorf("err"))
-	err := srv.UpdatePage(ctx, page)
+	err := srv.UpdateMenu(ctx, menu)
 	assert.Error(t, err)
 }
 
-func TestPageService_CreatePage(t *testing.T) {
+func TestMenuService_CreateMenu(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewPageService(mockDB, nil, nil)
+	srv := NewMenuService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -248,7 +248,7 @@ func TestPageService_CreatePage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create page failure",
+			name: "create menu failure",
 			prepare: func() {
 				mockDB.EXPECT().Exist(gomock.Any(), "uid=?", "123").Return(true, nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(fmt.Errorf("err"))
@@ -256,7 +256,7 @@ func TestPageService_CreatePage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create page successfully",
+			name: "create menu successfully",
 			prepare: func() {
 				mockDB.EXPECT().Exist(gomock.Any(), "uid=?", "123").Return(true, nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
@@ -268,7 +268,7 @@ func TestPageService_CreatePage(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.CreatePage(ctx, &model.Page{
+			_, err := srv.CreateMenu(ctx, &model.Menu{
 				ParentUID: "123",
 			})
 			if tt.wantErr != (err != nil) {
@@ -278,12 +278,12 @@ func TestPageService_CreatePage(t *testing.T) {
 	}
 }
 
-func TestPageService_DeletePage(t *testing.T) {
+func TestMenuService_DeleteMenu(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewPageService(mockDB, nil, nil)
+	srv := NewMenuService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -304,7 +304,7 @@ func TestPageService_DeletePage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "delete page successfully",
+			name: "delete menu successfully",
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "parent_uid=?", "abc").Return(int64(0), nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "uid=?", "abc").Return(nil)
@@ -316,7 +316,7 @@ func TestPageService_DeletePage(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.DeletePageByUID(ctx, "abc")
+			err := srv.DeleteMenuByUID(ctx, "abc")
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -324,7 +324,7 @@ func TestPageService_DeletePage(t *testing.T) {
 	}
 }
 
-func TestPageService_SortPages(t *testing.T) {
+func TestMenuService_SortMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -332,21 +332,21 @@ func TestPageService_SortPages(t *testing.T) {
 	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
 		return fn(mockDB)
 	}).AnyTimes()
-	srv := NewPageService(mockDB, nil, nil)
+	srv := NewMenuService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "sort pages failure",
+			name: "sort menus failure",
 			prepare: func() {
 				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=?", "abc").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "sort pages successfully",
+			name: "sort menus successfully",
 			prepare: func() {
 				mockDB.EXPECT().Updates(gomock.Any(), gomock.Any(), "uid=?", "abc").Return(nil).MaxTimes(2)
 			},
@@ -357,7 +357,7 @@ func TestPageService_SortPages(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.SortPages(ctx, model.Pages{{UID: "abc"}, {UID: "abc"}})
+			err := srv.SortMenus(ctx, model.Menus{{UID: "abc"}, {UID: "abc"}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -365,20 +365,20 @@ func TestPageService_SortPages(t *testing.T) {
 	}
 }
 
-func TestPageService_GetPageTreeByCurrentOrg(t *testing.T) {
+func TestMenuService_GetMenuTreeByCurrentOrg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
 	authorizeSrv := NewMockAuthorizeService(ctrl)
-	srv := NewPageService(mockDB, nil, authorizeSrv)
+	srv := NewMenuService(mockDB, nil, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "find pages failure",
+			name: "find menus failure",
 			prepare: func() {
 				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), int64(12)).Return(fmt.Errorf("err"))
 			},
@@ -393,10 +393,10 @@ func TestPageService_GetPageTreeByCurrentOrg(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "get org's pages successfully",
+			name: "get org's menus successfully",
 			prepare: func() {
-				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), int64(12)).DoAndReturn(func(pages *model.Pages, _ string, _ int64) error {
-					*pages = append(*pages, &model.Page{})
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), int64(12)).DoAndReturn(func(menus *model.Menus, _ string, _ int64) error {
+					*menus = append(*menus, &model.Menu{})
 					return nil
 				})
 				authorizeSrv.EXPECT().CheckResourcesACL(gomock.Any()).Return([]bool{true}, nil)
@@ -408,7 +408,7 @@ func TestPageService_GetPageTreeByCurrentOrg(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.GetPageTreeByCurrentOrg(ctx)
+			_, err := srv.GetMenuTreeByCurrentOrg(ctx)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -416,27 +416,27 @@ func TestPageService_GetPageTreeByCurrentOrg(t *testing.T) {
 	}
 }
 
-func TestPageService_GetOrgPages(t *testing.T) {
+func TestMenuService_GetOrgMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
 	authorizeSrv := NewMockAuthorizeService(ctrl)
-	srv := NewPageService(mockDB, nil, authorizeSrv)
+	srv := NewMenuService(mockDB, nil, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "get org. pages failure",
+			name: "get org. menus failure",
 			prepare: func() {
 				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), "123").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "get org's pages successfully",
+			name: "get org's menus successfully",
 			prepare: func() {
 				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), "123").Return(nil)
 			},
@@ -447,7 +447,7 @@ func TestPageService_GetOrgPages(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, err := srv.GetOrgPages(ctx, "123")
+			_, err := srv.GetOrgMenus(ctx, "123")
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -455,7 +455,7 @@ func TestPageService_GetOrgPages(t *testing.T) {
 	}
 }
 
-func TestPageService_UpdateRolesOfOrgPages(t *testing.T) {
+func TestMenuService_UpdateRolesOfOrgMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -464,25 +464,25 @@ func TestPageService_UpdateRolesOfOrgPages(t *testing.T) {
 		return fn(mockDB)
 	}).AnyTimes()
 	authorizeSrv := NewMockAuthorizeService(ctrl)
-	srv := NewPageService(mockDB, nil, authorizeSrv)
+	srv := NewMenuService(mockDB, nil, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
 		wantErr bool
 	}{
 		{
-			name: "get page failure",
+			name: "get menu failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "update role for org's page failure",
+			name: "update role for org's menu failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, "org_id=? and page_id=?", int64(12),
+					accesscontrol.RoleAdmin, "org_id=? and menu_id=?", int64(12),
 					gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -492,18 +492,18 @@ func TestPageService_UpdateRolesOfOrgPages(t *testing.T) {
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, "org_id=? and page_id=?", int64(12),
+					accesscontrol.RoleAdmin, "org_id=? and menu_id=?", int64(12),
 					gomock.Any()).Return(nil)
 				authorizeSrv.EXPECT().UpdateResourceRole(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "update role for org's page successfully",
+			name: "update role for org's menu successfully",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().UpdateSingle(gomock.Any(), "role",
-					accesscontrol.RoleAdmin, "org_id=? and page_id=?", int64(12),
+					accesscontrol.RoleAdmin, "org_id=? and menu_id=?", int64(12),
 					gomock.Any()).Return(nil)
 				authorizeSrv.EXPECT().UpdateResourceRole(gomock.Any()).Return(nil)
 			},
@@ -514,8 +514,8 @@ func TestPageService_UpdateRolesOfOrgPages(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.UpdateRolesOfOrgPages(ctx,
-				[]model.OrgPageInfo{{PageUID: "123", Role: accesscontrol.RoleAdmin}})
+			err := srv.UpdateRolesOfOrgMenus(ctx,
+				[]model.OrgMenuInfo{{MenuUID: "123", Role: accesscontrol.RoleAdmin}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -523,7 +523,7 @@ func TestPageService_UpdateRolesOfOrgPages(t *testing.T) {
 	}
 }
 
-func TestPageService_SaveOrgPages(t *testing.T) {
+func TestMenuService_SaveOrgMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -533,7 +533,7 @@ func TestPageService_SaveOrgPages(t *testing.T) {
 	}).AnyTimes()
 	authorizeSrv := NewMockAuthorizeService(ctrl)
 	orgSrv := NewMockOrgService(ctrl)
-	srv := NewPageService(mockDB, orgSrv, authorizeSrv)
+	srv := NewMenuService(mockDB, orgSrv, authorizeSrv)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -547,7 +547,7 @@ func TestPageService_SaveOrgPages(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "delete org pages failure",
+			name: "delete org menus failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(fmt.Errorf("err"))
@@ -555,7 +555,7 @@ func TestPageService_SaveOrgPages(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "get page failure",
+			name: "get menu failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
@@ -564,7 +564,7 @@ func TestPageService_SaveOrgPages(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "create org page failure",
+			name: "create org menu failure",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
@@ -580,7 +580,7 @@ func TestPageService_SaveOrgPages(t *testing.T) {
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
-				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Page).Return(fmt.Errorf("err"))
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Menu).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
@@ -591,19 +591,19 @@ func TestPageService_SaveOrgPages(t *testing.T) {
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
-				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Page).Return(nil)
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Menu).Return(nil)
 				authorizeSrv.EXPECT().AddResourcePolicy(gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "save org's page successfully",
+			name: "save org's menu successfully",
 			prepare: func() {
 				orgSrv.EXPECT().GetOrgByUID(gomock.Any(), "123").Return(&model.Org{}, nil)
 				mockDB.EXPECT().Delete(gomock.Any(), "org_id=?", gomock.Any()).Return(nil)
 				mockDB.EXPECT().Get(gomock.Any(), "uid=?", "123").Return(nil)
 				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
-				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Page).Return(nil)
+				authorizeSrv.EXPECT().RemoveResourcePoliciesByCategory(gomock.Any(), accesscontrol.Menu).Return(nil)
 				authorizeSrv.EXPECT().AddResourcePolicy(gomock.Any()).Return(nil)
 			},
 			wantErr: false,
@@ -613,7 +613,7 @@ func TestPageService_SaveOrgPages(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			err := srv.SaveOrgPages(ctx, "123", []model.OrgPageInfo{{PageUID: "123", Role: accesscontrol.RoleAdmin}})
+			err := srv.SaveOrgMenus(ctx, "123", []model.OrgMenuInfo{{MenuUID: "123", Role: accesscontrol.RoleAdmin}})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}

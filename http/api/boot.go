@@ -46,13 +46,7 @@ func NewBootAPI(deps *depspkg.API) *BootAPI {
 // Boot gets boot information after signed in.
 func (api *BootAPI) Boot(c *gin.Context) {
 	ctx := c.Request.Context()
-	user := util.GetUser(ctx)
-	// need read data from backend
-	signedUser, err := api.deps.UserSrv.GetSignedUser(ctx, user.User.ID)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
+	signedUser := util.GetUser(ctx)
 	boot := &model.BootData{
 		Home:          signedUser.Preference.HomePage,
 		User:          *signedUser,
@@ -66,7 +60,7 @@ func (api *BootAPI) Boot(c *gin.Context) {
 		} else {
 			boot.Datasources = datasources
 		}
-		nav, err0 := api.deps.PageSrv.GetPageTreeByCurrentOrg(ctx)
+		nav, err0 := api.deps.MenuSrv.GetMenuTreeByCurrentOrg(ctx)
 		if err0 != nil {
 			api.logger.Error("get nav tree for current org fail", logger.Error(err0))
 		} else {

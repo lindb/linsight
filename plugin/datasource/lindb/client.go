@@ -20,8 +20,12 @@ package lindb
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
 	"time"
 
+	resty "github.com/go-resty/resty/v2"
 	lincli "github.com/lindb/client_go"
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/common/pkg/logger"
@@ -47,6 +51,7 @@ type client struct {
 	datasouce *model.Datasource
 	cfg       *DatasourceConfig
 	client    lincli.Client
+	cli       *resty.Client
 	location  *time.Location
 
 	logger logger.Logger
@@ -68,11 +73,14 @@ func NewClient(datasource *model.Datasource, cfg json.RawMessage) (p plugin.Data
 			return nil, err
 		}
 	}
+	cli := resty.New()
+	cli.SetBaseURL(datasource.URL)
 
 	return &client{
 		cfg:       config,
 		datasouce: datasource,
 		location:  location,
+		cli:       cli,
 		client:    lincli.NewClient(datasource.URL),
 		logger:    logger.GetLogger("DatasourcePlugin", "LinDB"),
 	}, nil
@@ -80,27 +88,57 @@ func NewClient(datasource *model.Datasource, cfg json.RawMessage) (p plugin.Data
 
 // DataQuery queries metric data.
 func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error) {
-	data, _ := req.Request.MarshalJSON()
-	dataQueryReq := &DataQueryRequest{}
-	if err := jsonUnmarshalFn(data, &dataQueryReq); err != nil {
-		return nil, err
+	data, _ := req.Params.MarshalJSON()
+	dataQueryReq := DataQueryRequest{}
+	var err error
+	var sql string
+	if err0 := jsonUnmarshalFn(data, &dataQueryReq); err0 != nil {
+		return nil, err0
 	}
-	sql, err := buildDataQuerySQLFn(dataQueryReq, cli.formatTime(timeRange.From), cli.formatTime(timeRange.To))
+	if dataQueryReq.SQL != "" {
+		sql = dataQueryReq.SQL
+	}
+	fmt.Printf("......req=%v,dataQueryReq=%v\n", string(data), dataQueryReq)
+	if dataQueryReq.SQL == "" && dataQueryReq.Metric != "" {
+		sql, err = buildDataQuerySQLFn(&dataQueryReq, cli.formatTime(timeRange.Start), cli.formatTime(timeRange.End))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if sql == "" {
+		cli.logger.Warn("sql is empty", logger.String("params", string(data)))
+		return nil, nil
+	}
+	// send request
+	resp, err := cli.cli.R().
+		SetBody(map[string]any{"sql": sql, "db": cli.cfg.Database, "timeRange": timeRange}).
+		SetHeader("Accept", "application/json").
+		Put("/api/v1/exec")
 	if err != nil {
 		return nil, err
 	}
-	query := cli.client.DataQuery()
-	rs, err := query.DataQuery(ctx, cli.cfg.Database, sql)
-	if err != nil {
-		return nil, err
+	if resp.StatusCode() == http.StatusOK {
+		// if success, unmarshal response
+		data := resp.Body()
+		if len(data) > 0 {
+			return json.RawMessage(data), nil
+		}
+		return nil, errors.New("no data found")
 	}
-	cli.logger.Info("data query", logger.String("database", cli.cfg.Database), logger.String("sql", sql))
-	return rs, nil
+	return nil, errors.New("query error")
+
+	// query := cli.client.DataQuery()
+	// rs, err := query.DataQuery(ctx, cli.cfg.Database, sql)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// cli.logger.Info("data query", logger.String("database", cli.cfg.Database), logger.String("sql", sql))
+	// return rs, nil
 }
 
 // MetadataQuery queries metric metadata.
 func (cli *client) MetadataQuery(ctx context.Context, req *model.Query) (any, error) {
-	data, _ := req.Request.MarshalJSON()
+	data, _ := req.Params.MarshalJSON()
 	dataQueryReq := &MetadataQueryRequest{}
 	if err := jsonUnmarshalFn(data, &dataQueryReq); err != nil {
 		return nil, err

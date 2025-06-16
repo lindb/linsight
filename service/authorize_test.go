@@ -47,14 +47,14 @@ func TestAuthorizeService_New(t *testing.T) {
 	mockDB.EXPECT().RawDB().Return(nil).AnyTimes()
 
 	assert.Panics(t, func() {
-		newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ interface{}, _ ...string) (*gormadapter.Adapter, error) {
+		newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ any, _ ...string) (*gormadapter.Adapter, error) {
 			return nil, fmt.Errorf("err")
 		}
 		_ = NewAuthorizeService(mockDB)
 		assert.True(t, false)
 	})
 	assert.Panics(t, func() {
-		newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ interface{}, _ ...string) (*gormadapter.Adapter, error) {
+		newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ any, _ ...string) (*gormadapter.Adapter, error) {
 			return nil, nil
 		}
 		newModelFromStringFn = func(_ string) (model.Model, error) {
@@ -64,25 +64,25 @@ func TestAuthorizeService_New(t *testing.T) {
 		assert.True(t, false)
 	})
 	assert.Panics(t, func() {
-		newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ interface{}, _ ...string) (*gormadapter.Adapter, error) {
+		newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ any, _ ...string) (*gormadapter.Adapter, error) {
 			return nil, nil
 		}
 		newModelFromStringFn = func(_ string) (model.Model, error) {
 			return nil, nil
 		}
-		newEnforcerFn = func(_ ...interface{}) (*casbin.Enforcer, error) {
+		newEnforcerFn = func(_ ...any) (*casbin.Enforcer, error) {
 			return nil, fmt.Errorf("err")
 		}
 		NewAuthorizeService(mockDB)
 		assert.True(t, false)
 	})
-	newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ interface{}, _ ...string) (*gormadapter.Adapter, error) {
+	newAdapterByDBWithCustomTableFn = func(_ *gorm.DB, _ any, _ ...string) (*gormadapter.Adapter, error) {
 		return nil, nil
 	}
 	newModelFromStringFn = func(_ string) (model.Model, error) {
 		return nil, nil
 	}
-	newEnforcerFn = func(_ ...interface{}) (*casbin.Enforcer, error) {
+	newEnforcerFn = func(_ ...any) (*casbin.Enforcer, error) {
 		return nil, nil
 	}
 	srv := NewAuthorizeService(mockDB)
@@ -187,7 +187,7 @@ func TestAuthorizeService_CheckResourceACL(t *testing.T) {
 		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Page,
+			Category: accesscontrol.Menu,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -198,7 +198,7 @@ func TestAuthorizeService_CheckResourceACL(t *testing.T) {
 		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Page,
+			Category: accesscontrol.Menu,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -219,7 +219,7 @@ func TestAuthorizeService_CheckResourcesACL(t *testing.T) {
 	ok, err := srv.CheckResourcesACL([]modelpkg.ResourceACLParam{{
 		Role:     accesscontrol.RoleAdmin,
 		OrgID:    123,
-		Category: accesscontrol.Page,
+		Category: accesscontrol.Menu,
 		Resource: "abc",
 		Action:   accesscontrol.Write,
 	}})
@@ -236,8 +236,8 @@ func TestAuthorizeService_RemoveResourcesACL(t *testing.T) {
 		resource: enforcer,
 		logger:   logger.GetLogger("Service", "AuthTest"),
 	}
-	enforcer.EXPECT().RemoveFilteredNamedPolicy("p", 1, "123", accesscontrol.Page.String()).Return(false, fmt.Errorf("err"))
-	err := srv.RemoveResourcePoliciesByCategory(123, accesscontrol.Page)
+	enforcer.EXPECT().RemoveFilteredNamedPolicy("p", 1, "123", accesscontrol.Menu.String()).Return(false, fmt.Errorf("err"))
+	err := srv.RemoveResourcePoliciesByCategory(123, accesscontrol.Menu)
 	assert.Error(t, err)
 }
 
@@ -256,7 +256,7 @@ func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
 		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Page,
+			Category: accesscontrol.Menu,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -268,7 +268,7 @@ func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
 		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
-			Category: accesscontrol.Page,
+			Category: accesscontrol.Menu,
 			Resource: "abc",
 			Action:   accesscontrol.Write,
 		})
@@ -287,10 +287,10 @@ func TestAuthorizeService_UpdateResourcesRole(t *testing.T) {
 	}
 	enforcer.EXPECT().UpdateFilteredPolicies(
 		[][]string{{"Admin", "123", "Component", "abc", "write"}},
-		1, "123", accesscontrol.Page.String(), "abc", "write").Return(false, fmt.Errorf("err"))
+		1, "123", accesscontrol.Menu.String(), "abc", "write").Return(false, fmt.Errorf("err"))
 	err := srv.UpdateResourceRole(&modelpkg.ResourceACLParam{
 		OrgID:    123,
-		Category: accesscontrol.Page,
+		Category: accesscontrol.Menu,
 		Role:     accesscontrol.RoleAdmin,
 		Resource: "abc",
 		Action:   accesscontrol.Write,

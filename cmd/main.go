@@ -161,9 +161,9 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		panic(err)
 	}
 	orgSrv := service.NewOrgService(db)
-	cmpSrv := service.NewPageService(db, orgSrv, authorizeSrv)
+	menuSrv := service.NewMenuService(db, orgSrv, authorizeSrv)
 	// initialize supported component
-	if err := cmpSrv.Initialize(); err != nil {
+	if err := menuSrv.Initialize(); err != nil {
 		panic(err)
 	}
 	integrationSrv := service.NewIntegrationService(db)
@@ -171,15 +171,17 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	if err := integrationSrv.Initialize(); err != nil {
 		panic(err)
 	}
-	userSrv := service.NewUserService(db, orgSrv)
+	cache := service.NewUserCacheService()
+	userSrv := service.NewUserService(db, orgSrv, cache)
 	starSrv := service.NewStarService(db)
 	tagSrv := service.NewTagService(db)
 	return &deps.API{
 		Config:          cfg,
 		OrgSrv:          orgSrv,
 		UserSrv:         userSrv,
+		UserCacheSrv:    cache,
 		TeamSrv:         service.NewTeamService(db, userSrv),
-		PageSrv:         cmpSrv,
+		MenuSrv:         menuSrv,
 		IntegrationSrv:  integrationSrv,
 		AuthorizeSrv:    authorizeSrv,
 		AuthenticateSrv: service.NewAuthenticateService(userSrv, db),

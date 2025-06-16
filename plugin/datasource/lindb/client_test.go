@@ -40,7 +40,7 @@ func TestClient_NewClient(t *testing.T) {
 		loadLocationFn = time.LoadLocation
 	}()
 	t.Run("create client failure", func(t *testing.T) {
-		jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
+		jsonUnmarshalFn = func(_ []byte, _ any) error {
 			return fmt.Errorf("err")
 		}
 		cli, err := NewClient(&model.Datasource{}, []byte{})
@@ -146,8 +146,8 @@ func TestClient_DataQuery(t *testing.T) {
 			}()
 			tt.prepare()
 			_, err := cli.DataQuery(context.TODO(), &model.Query{
-				Request: json.RawMessage{},
-			}, model.TimeRange{From: timeutil.Now()})
+				Params: json.RawMessage{},
+			}, model.TimeRange{Start: timeutil.Now()})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -231,7 +231,7 @@ func TestClient_MetadataQuery(t *testing.T) {
 			}()
 			tt.prepare()
 			_, err := cli.MetadataQuery(context.TODO(), &model.Query{
-				Request: json.RawMessage{},
+				Params: json.RawMessage{},
 			})
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)

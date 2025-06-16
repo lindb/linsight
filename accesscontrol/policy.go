@@ -25,7 +25,7 @@ type ResourceCategory string
 
 const (
 	Dashboard ResourceCategory = "Dashboard"
-	Page      ResourceCategory = "Page"
+	Menu      ResourceCategory = "menu"
 )
 
 const (

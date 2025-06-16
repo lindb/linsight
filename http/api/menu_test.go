@@ -41,16 +41,16 @@ func init() {
 	gin.SetMode(gin.ReleaseMode)
 }
 
-func TestPageAPI_LoadPageTree(t *testing.T) {
+func TestMenuAPI_LoadMenuTree(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.GET("/pages", api.LoadPageTree)
+	r.GET("/menus", api.LoadMenuTree)
 
 	cases := []struct {
 		name    string
@@ -58,18 +58,18 @@ func TestPageAPI_LoadPageTree(t *testing.T) {
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "load page tree failure",
+			name: "load menu tree failure",
 			prepare: func() {
-				pageSrv.EXPECT().LoadPageTree(gomock.Any()).Return(nil, fmt.Errorf("err"))
+				menuSrv.EXPECT().LoadMenuTree(gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "load page tree successfully",
+			name: "load menu tree successfully",
 			prepare: func() {
-				pageSrv.EXPECT().LoadPageTree(gomock.Any()).Return(model.Pages{}, nil)
+				menuSrv.EXPECT().LoadMenuTree(gomock.Any()).Return(model.Menus{}, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -79,7 +79,7 @@ func TestPageAPI_LoadPageTree(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/pages", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/menus", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -91,17 +91,17 @@ func TestPageAPI_LoadPageTree(t *testing.T) {
 	}
 }
 
-func TestPageAPI_CreatePage(t *testing.T) {
+func TestMenuAPI_CreateMenu(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.POST("/pages", api.CreatePage)
-	body := encoding.JSONMarshal(&model.Page{})
+	r.POST("/menus", api.CreateMenu)
+	body := encoding.JSONMarshal(&model.Menu{})
 
 	cases := []struct {
 		name    string
@@ -117,20 +117,20 @@ func TestPageAPI_CreatePage(t *testing.T) {
 			},
 		},
 		{
-			name: "create page failure",
+			name: "create menu failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().CreatePage(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
+				menuSrv.EXPECT().CreateMenu(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "create page successfully",
+			name: "create menu successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().CreatePage(gomock.Any(), gomock.Any()).Return("1234", nil)
+				menuSrv.EXPECT().CreateMenu(gomock.Any(), gomock.Any()).Return("1234", nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -141,7 +141,7 @@ func TestPageAPI_CreatePage(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/pages", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/menus", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -153,17 +153,17 @@ func TestPageAPI_CreatePage(t *testing.T) {
 	}
 }
 
-func TestPageAPI_UpdatePage(t *testing.T) {
+func TestMenuAPI_UpdateMenu(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.PUT("/pages", api.UpdatePage)
-	body := encoding.JSONMarshal(&model.Page{})
+	r.PUT("/menus", api.UpdateMenu)
+	body := encoding.JSONMarshal(&model.Menu{})
 
 	cases := []struct {
 		name    string
@@ -179,20 +179,20 @@ func TestPageAPI_UpdatePage(t *testing.T) {
 			},
 		},
 		{
-			name: "update page failure",
+			name: "update menu failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().UpdatePage(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				menuSrv.EXPECT().UpdateMenu(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "update page successfully",
+			name: "update menu successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().UpdatePage(gomock.Any(), gomock.Any()).Return(nil)
+				menuSrv.EXPECT().UpdateMenu(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -202,7 +202,7 @@ func TestPageAPI_UpdatePage(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/menus", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -214,17 +214,17 @@ func TestPageAPI_UpdatePage(t *testing.T) {
 	}
 }
 
-func TestPageAPI_SortPages(t *testing.T) {
+func TestMenuAPI_SortMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.PUT("/pages/sort", api.SortPages)
-	body := encoding.JSONMarshal(&model.Pages{})
+	r.PUT("/menus/sort", api.SortMenus)
+	body := encoding.JSONMarshal(&model.Menus{})
 
 	cases := []struct {
 		name    string
@@ -240,20 +240,20 @@ func TestPageAPI_SortPages(t *testing.T) {
 			},
 		},
 		{
-			name: "sort pages failure",
+			name: "sort menus failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().SortPages(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				menuSrv.EXPECT().SortMenus(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "sort pages successfully",
+			name: "sort menus successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().SortPages(gomock.Any(), gomock.Any()).Return(nil)
+				menuSrv.EXPECT().SortMenus(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -263,7 +263,7 @@ func TestPageAPI_SortPages(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages/sort", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/menus/sort", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -275,16 +275,16 @@ func TestPageAPI_SortPages(t *testing.T) {
 	}
 }
 
-func TestPageAPI_DeletePageByUID(t *testing.T) {
+func TestMenuAPI_DeleteMenuByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.DELETE("/pages/:uid", api.DeletePageByUID)
+	r.DELETE("/menus/:uid", api.DeleteMenuByUID)
 
 	cases := []struct {
 		name    string
@@ -292,18 +292,18 @@ func TestPageAPI_DeletePageByUID(t *testing.T) {
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "delete page failure",
+			name: "delete menu failure",
 			prepare: func() {
-				pageSrv.EXPECT().DeletePageByUID(gomock.Any(), "1234").Return(fmt.Errorf("err"))
+				menuSrv.EXPECT().DeleteMenuByUID(gomock.Any(), "1234").Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "delete page successfully",
+			name: "delete menu successfully",
 			prepare: func() {
-				pageSrv.EXPECT().DeletePageByUID(gomock.Any(), "1234").Return(nil)
+				menuSrv.EXPECT().DeleteMenuByUID(gomock.Any(), "1234").Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -313,7 +313,7 @@ func TestPageAPI_DeletePageByUID(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/pages/1234", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/menus/1234", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -325,17 +325,17 @@ func TestPageAPI_DeletePageByUID(t *testing.T) {
 	}
 }
 
-func TestPageAPI_SaveOrgPages(t *testing.T) {
+func TestMenuAPI_SaveOrgMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.PUT("/pages/:uid", api.SaveOrgPages)
-	body := encoding.JSONMarshal([]model.OrgPageInfo{{Role: accesscontrol.RoleAdmin}})
+	r.PUT("/menus/:uid", api.SaveOrgMenus)
+	body := encoding.JSONMarshal([]model.OrgMenuInfo{{Role: accesscontrol.RoleAdmin}})
 
 	cases := []struct {
 		name    string
@@ -352,20 +352,20 @@ func TestPageAPI_SaveOrgPages(t *testing.T) {
 			},
 		},
 		{
-			name: "save org page failure",
+			name: "save org menu failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().SaveOrgPages(gomock.Any(), "1234", gomock.Any()).Return(fmt.Errorf("err"))
+				menuSrv.EXPECT().SaveOrgMenus(gomock.Any(), "1234", gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "save org page successfully",
+			name: "save org menu successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().SaveOrgPages(gomock.Any(), "1234", gomock.Any()).Return(nil)
+				menuSrv.EXPECT().SaveOrgMenus(gomock.Any(), "1234", gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -375,7 +375,7 @@ func TestPageAPI_SaveOrgPages(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages/1234", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/menus/1234", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -387,17 +387,17 @@ func TestPageAPI_SaveOrgPages(t *testing.T) {
 	}
 }
 
-func TestPageAPI_UpdateRolesOrgPages(t *testing.T) {
+func TestMenuAPI_UpdateRolesOrgMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.PUT("/pages", api.UpdateRolesOfOrgPages)
-	body := encoding.JSONMarshal([]model.OrgPageInfo{{Role: accesscontrol.RoleAdmin}})
+	r.PUT("/menus", api.UpdateRolesOfOrgMenus)
+	body := encoding.JSONMarshal([]model.OrgMenuInfo{{Role: accesscontrol.RoleAdmin}})
 
 	cases := []struct {
 		name    string
@@ -414,20 +414,20 @@ func TestPageAPI_UpdateRolesOrgPages(t *testing.T) {
 			},
 		},
 		{
-			name: "update role for org pages failure",
+			name: "update role for org menus failure",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().UpdateRolesOfOrgPages(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				menuSrv.EXPECT().UpdateRolesOfOrgMenus(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "update role for org pages successfully",
+			name: "update role for org menus successfully",
 			body: bytes.NewBuffer(body),
 			prepare: func() {
-				pageSrv.EXPECT().UpdateRolesOfOrgPages(gomock.Any(), gomock.Any()).Return(nil)
+				menuSrv.EXPECT().UpdateRolesOfOrgMenus(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -437,7 +437,7 @@ func TestPageAPI_UpdateRolesOrgPages(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/pages", tt.body)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/menus", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -449,34 +449,34 @@ func TestPageAPI_UpdateRolesOrgPages(t *testing.T) {
 	}
 }
 
-func TestPageAPI_GetPageTreeByCurrentOrg(t *testing.T) {
+func TestMenuAPI_GetMenuTreeByCurrentOrg(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.GET("/pages", api.GetPageTreeByCurrentOrg)
+	r.GET("/menus", api.GetMenuTreeByCurrentOrg)
 	cases := []struct {
 		name    string
 		prepare func()
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "get org page failure",
+			name: "get org menu failure",
 			prepare: func() {
-				pageSrv.EXPECT().GetPageTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
+				menuSrv.EXPECT().GetMenuTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "get org page successfully",
+			name: "get org menu successfully",
 			prepare: func() {
-				pageSrv.EXPECT().GetPageTreeByCurrentOrg(gomock.Any()).Return(nil, nil)
+				menuSrv.EXPECT().GetMenuTreeByCurrentOrg(gomock.Any()).Return(nil, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -486,7 +486,7 @@ func TestPageAPI_GetPageTreeByCurrentOrg(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/pages", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/menus", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {
@@ -498,34 +498,34 @@ func TestPageAPI_GetPageTreeByCurrentOrg(t *testing.T) {
 	}
 }
 
-func TestPageAPI_GetOrgPages(t *testing.T) {
+func TestMenuAPI_GetOrgMenus(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	r := gin.New()
-	api := NewPageAPI(&deps.API{
-		PageSrv: pageSrv,
+	api := NewMenuAPI(&deps.API{
+		MenuSrv: menuSrv,
 	})
-	r.GET("/pages/:uid", api.GetOrgPages)
+	r.GET("/menus/:uid", api.GetOrgMenus)
 	cases := []struct {
 		name    string
 		prepare func()
 		assert  func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "get org pages failure",
+			name: "get org menus failure",
 			prepare: func() {
-				pageSrv.EXPECT().GetOrgPages(gomock.Any(), "123").Return(nil, fmt.Errorf("err"))
+				menuSrv.EXPECT().GetOrgMenus(gomock.Any(), "123").Return(nil, fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			name: "get org pages successfully",
+			name: "get org menus successfully",
 			prepare: func() {
-				pageSrv.EXPECT().GetOrgPages(gomock.Any(), "123").Return(nil, nil)
+				menuSrv.EXPECT().GetOrgMenus(gomock.Any(), "123").Return(nil, nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -535,7 +535,7 @@ func TestPageAPI_GetOrgPages(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/pages/123", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/menus/123", http.NoBody)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
 			if tt.prepare != nil {

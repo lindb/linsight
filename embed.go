@@ -31,8 +31,8 @@ var RBACAPI string
 //go:embed accesscontrol/abac_resource.conf
 var ABACResource string
 
-//go:embed config/pages.json
-var Pages string
+//go:embed config/menus.json
+var Menus string
 
 //go:embed config/integrations.json
 var Integrationss string

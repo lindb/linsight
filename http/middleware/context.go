@@ -21,20 +21,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
-	"github.com/lindb/linsight/model"
-
-	"github.com/gin-gonic/gin"
 )
-
-func getUserToken(c *gin.Context, deps *depspkg.API) (*model.UserToken, error) {
-	token, err := c.Cookie(deps.Config.Cookie.Name)
-	if err != nil {
-		return nil, err
-	}
-	return deps.AuthenticateSrv.LookupToken(c.Request.Context(), token)
-}
 
 // InitContext initializes the signed context.
 func InitContext(deps *depspkg.API) gin.HandlerFunc {
@@ -46,20 +37,46 @@ func InitContext(deps *depspkg.API) gin.HandlerFunc {
 }
 
 func initSignedUser(c *gin.Context, deps *depspkg.API) {
-	userToken, err := getUserToken(c, deps)
+	token, err := c.Cookie(deps.Config.Cookie.Name)
 	if err != nil {
-		// FIXME: add log
 		fmt.Println(err)
 		return
 	}
-	if userToken == nil {
-		return
-	}
-	signedUser, err := deps.UserSrv.GetSignedUser(c.Request.Context(), userToken.UserID)
-	if err != nil {
-		// FIXME: add log
-		fmt.Println(err)
-		return
+	signedUser := deps.UserCacheSrv.GetSignedUser(c.Request.Context(), token)
+	fmt.Println(signedUser)
+	if signedUser == nil {
+		// evict cache after  user information changed
+		userToken, err := deps.AuthenticateSrv.LookupToken(c.Request.Context(), token)
+		if err != nil {
+			// FIXME: add log
+			fmt.Println(err)
+			return
+		}
+		if userToken == nil {
+			return
+		}
+		signedUser, err = deps.UserSrv.GetSignedUser(c.Request.Context(), userToken.UserID)
+		if err != nil {
+			// FIXME: add log
+			fmt.Println(err)
+			return
+		}
+		if signedUser != nil {
+			// create token based signed in user info
+			userToken, err = deps.AuthenticateSrv.CreateToken(c.Request.Context(), signedUser.User, c.ClientIP(), c.Request.UserAgent())
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+
+			newToken := userToken.Token
+			// FIXME: need modify/config
+			cookieCfg := deps.Config.Cookie
+			signedUser.Token = newToken // set token
+			c.SetCookie(cookieCfg.Name, newToken, int(cookieCfg.MaxAge.Duration().Seconds()), "/", "", false, true)
+			// cache signed user using new token
+			deps.UserCacheSrv.StoreSignedUser(c.Request.Context(), newToken, signedUser)
+		}
 	}
 	if signedUser == nil {
 		return

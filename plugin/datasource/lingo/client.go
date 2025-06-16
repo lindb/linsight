@@ -79,7 +79,7 @@ func NewClient(datasource *model.Datasource, cfg json.RawMessage) (p plugin.Data
 
 // DataQuery queries trace data from LinGo.
 func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error) {
-	data, _ := req.Request.MarshalJSON()
+	data, _ := req.Params.MarshalJSON()
 	traceQueryReq := &GetTraceRequest{}
 	if err := jsonUnmarshalFn(data, &traceQueryReq); err != nil {
 		return nil, err

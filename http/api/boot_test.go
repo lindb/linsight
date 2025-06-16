@@ -38,7 +38,7 @@ func TestBootAPI_Boot(t *testing.T) {
 	defer ctrl.Finish()
 
 	datasourceSrv := service.NewMockDatasourceService(ctrl)
-	pageSrv := service.NewMockPageService(ctrl)
+	menuSrv := service.NewMockMenuService(ctrl)
 	userSrv := service.NewMockUserService(ctrl)
 	integrationSrv := service.NewMockIntegrationService(ctrl)
 
@@ -46,7 +46,7 @@ func TestBootAPI_Boot(t *testing.T) {
 
 	api := NewBootAPI(&deps.API{
 		DatasourceSrv:  datasourceSrv,
-		PageSrv:        pageSrv,
+		MenuSrv:        menuSrv,
 		UserSrv:        userSrv,
 		IntegrationSrv: integrationSrv,
 	})
@@ -83,7 +83,7 @@ func TestBootAPI_Boot(t *testing.T) {
 			prepare: func() {
 				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, fmt.Errorf("err"))
-				pageSrv.EXPECT().GetPageTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
+				menuSrv.EXPECT().GetMenuTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
 				integrationSrv.EXPECT().GetIntegrations(gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
 		},
@@ -105,7 +105,7 @@ func TestBootAPI_Boot(t *testing.T) {
 			prepare: func() {
 				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, nil)
-				pageSrv.EXPECT().GetPageTreeByCurrentOrg(gomock.Any()).Return(model.Pages{}, nil)
+				menuSrv.EXPECT().GetMenuTreeByCurrentOrg(gomock.Any()).Return(model.Menus{}, nil)
 				integrationSrv.EXPECT().GetIntegrations(gomock.Any()).Return(nil, nil)
 			},
 		},

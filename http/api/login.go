@@ -18,6 +18,8 @@
 package api
 
 import (
+	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/lindb/common/pkg/http"
 
@@ -61,6 +63,14 @@ func (api *LoginAPI) Login(c *gin.Context) {
 	// FIXME: need modify/config
 	cookieCfg := api.deps.Config.Cookie
 	c.SetCookie(cookieCfg.Name, token.Token, int(cookieCfg.MaxAge.Duration().Seconds()), "/", "", false, true)
+	signedUser, err := api.deps.UserSrv.GetSignedUser(c.Request.Context(), token.UserID)
+	if err == nil {
+		// FIXME: add log
+		fmt.Println(err)
+		signedUser.Token = token.Token
+		api.deps.UserCacheSrv.StoreSignedUser(c.Request.Context(), token.Token, signedUser)
+		return
+	}
 	http.OK(c, "Signed in!")
 }
 

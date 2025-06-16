@@ -21,7 +21,7 @@ package model
 type BootData struct {
 	Home          string            `json:"home,omitempty"`
 	User          SignedUser        `json:"user"`
-	NavTree       Pages             `json:"navTree,omitempty"`
+	Menus         Menus             `json:"navTree,omitempty"`
 	Datasources   []Datasource      `json:"datasources,omitempty"`
 	Integrations  []Integration     `json:"integrations,omitempty"`
 	Notifications []*ReceiverPlugin `json:"notifications,omitempty"`

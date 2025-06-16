@@ -4,7 +4,7 @@
     "label": "Explore",
     "path": "/explore",
     "icon": "explore",
-    "page": "/explore",
+    "page": "explore",
     "role": "Viewer"
   },
   {
@@ -18,14 +18,14 @@
         "label": "Dashboard List",
         "path": "/dashboards",
         "icon": "list",
-        "page": "/dashboards",
+        "page": "dashboard_list",
         "role": "Viewer"
       },
       {
         "uid": "newdatabase",
         "label": "New Dashboard",
-        "path": "/dashboard/new",
-        "page": "/dashboard/*",
+        "path": "/dashboard/*",
+        "page": "dashboard",
         "icon": "dashboard-add",
         "role": "Editor"
       },
@@ -33,32 +33,39 @@
         "uid": "charts",
         "label": "Chart Repository",
         "path": "/charts",
-        "page": "/charts",
+        "page": "charts",
         "icon": "repo",
         "role": "Viewer"
       }
     ]
   },
   {
+    "uid": "apm",
+    "label": "APM",
+    "path": "/apm",
+    "icon": "tracing",
+    "page": "apm",
+    "role": "Viewer"
+  },
+  {
     "uid": "setting",
     "label": "Setting",
-    "path": "/setting",
     "icon": "setting",
     "role": "Admin",
     "children": [
       {
         "uid": "datasource",
         "label": "Datasource",
-        "path": "/setting/datasources",
-        "page": "/setting/datasources/*",
+        "path": "/setting/datasources/*",
+        "page": "setting_datasources",
         "icon": "datasource",
         "role": "Admin"
       },
       {
         "uid": "user",
         "label": "User",
-        "path": "/setting/users",
-        "page": "/setting/users/*",
+        "path": "/setting/users/*",
+        "page": "setting_users",
         "icon": "user",
         "role": "Lin"
       },
@@ -66,33 +73,25 @@
         "uid": "team",
         "label": "Team",
         "path": "/setting/orgs/teams",
-        "page": "/setting/orgs/teams/*",
+        "page": "setting_orgs_teams",
         "icon": "team",
         "role": "Admin"
       },
       {
         "uid": "organization",
         "label": "Organization",
-        "path": "/setting/orgs",
-        "page": "/setting/orgs/*",
+        "path": "/setting/orgs/*",
+        "page": "setting_orgs",
         "icon": "org",
         "role": "Lin"
       },
       {
-        "uid": "page",
-        "label": "Page",
-        "path": "/setting/pages",
-        "page": "/setting/pages/*",
+        "uid": "menu",
+        "label": "Menu",
+        "path": "/setting/menus",
+        "page": "setting_menus",
         "icon": "menu",
         "role": "Lin"
-      },
-      {
-        "uid": "org_page",
-        "label": "Org. Page",
-        "path": "/setting/orgs/pages",
-        "page": "/setting/orgs/pages/*",
-        "icon": "menu",
-        "role": "Admin"
       }
     ]
   }

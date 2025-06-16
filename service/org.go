@@ -154,7 +154,7 @@ func (srv *orgService) GetOrgListForSignedUser(ctx context.Context) (rs []model.
 	conditions := []string{}
 	params := []any{}
 	signedUser := util.GetUser(ctx)
-	// if role is Lin can return all orgs, else return orgs which has admin role
+	// NOTE: if role is Lin can return all orgs, else return orgs which has admin role
 	if signedUser.Role != accesscontrol.RoleLin {
 		conditions = append(conditions, "id in (select ou.org_id from org_users ou where ou.user_id=?)")
 		params = append(params, signedUser.User.ID)

@@ -95,6 +95,7 @@ type LoginUser struct {
 
 // SignedUser represents the signed user information.
 type SignedUser struct {
+	Token      string                 `json:"-"`
 	User       *User                  `json:"-"`
 	UID        string                 `json:"uid"`
 	UserName   string                 `json:"userName"`

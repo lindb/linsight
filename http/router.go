@@ -34,7 +34,7 @@ type Router struct {
 
 	loginAPI           *api.LoginAPI
 	bootAPI            *api.BootAPI
-	pageAPI            *api.PageAPI
+	menuAPI            *api.MenuAPI
 	integrationAPI     *api.IntegerationAPI
 	orgAPI             *api.OrgAPI
 	teamAPI            *api.TeamAPI
@@ -57,7 +57,7 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		deps:               deps,
 		loginAPI:           api.NewLoginAPI(deps),
 		bootAPI:            api.NewBootAPI(deps),
-		pageAPI:            api.NewPageAPI(deps),
+		menuAPI:            api.NewMenuAPI(deps),
 		integrationAPI:     api.NewIntegrationAPI(deps),
 		orgAPI:             api.NewOrgAPI(deps),
 		userAPI:            api.NewUserAPI(deps),
@@ -87,25 +87,25 @@ func (r *Router) RegisterRouters() {
 	router.GET("/integrations", middleware.Authenticate(r.deps), r.integrationAPI.GetIntegrations)
 	router.GET("/tags", middleware.Authenticate(r.deps), r.tagAPI.FindTags)
 
-	router.GET("/pages",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.pageAPI.LoadPageTree)...)
-	router.POST("/pages",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.CreatePage)...)
-	router.PUT("/pages",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.UpdatePage)...)
-	router.PUT("/pages/sort",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.SortPages)...)
-	router.DELETE("/pages/:uid",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.DeletePageByUID)...)
-	router.PUT("/orgs/:uid/pages",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.pageAPI.SaveOrgPages)...)
-	router.GET("/orgs/:uid/pages",
-		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.pageAPI.GetOrgPages)...)
+	router.GET("/menus",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.menuAPI.LoadMenuTree)...)
+	router.POST("/menus",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.menuAPI.CreateMenu)...)
+	router.PUT("/menus",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.menuAPI.UpdateMenu)...)
+	router.PUT("/menus/sort",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.menuAPI.SortMenus)...)
+	router.DELETE("/menus/:uid",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.menuAPI.DeleteMenuByUID)...)
+	router.PUT("/orgs/:uid/menus",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Write, r.menuAPI.SaveOrgMenus)...)
+	router.GET("/orgs/:uid/menus",
+		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.menuAPI.GetOrgMenus)...)
 
-	router.GET("/orgs/pages",
-		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.pageAPI.GetPageTreeByCurrentOrg)...)
-	router.PUT("/orgs/pages/roles",
-		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.pageAPI.UpdateRolesOfOrgPages)...)
+	router.GET("/orgs/menus",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Read, r.menuAPI.GetMenuTreeByCurrentOrg)...)
+	router.PUT("/orgs/menus/roles",
+		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.menuAPI.UpdateRolesOfOrgMenus)...)
 
 	router.GET("/orgs",
 		middleware.Authorize(r.deps, accesscontrol.LinAccessResource, accesscontrol.Read, r.orgAPI.SearchOrg)...)

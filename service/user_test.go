@@ -35,7 +35,7 @@ func TestUserService_GetPreference(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	t.Run("get user's preference successfully", func(t *testing.T) {
 		mockDB.EXPECT().Get(gomock.Any(), "user_id=?", int64(10)).Return(nil)
 		pref, err := srv.GetPreference(ctx)
@@ -49,7 +49,7 @@ func TestUserService_SavePreference(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -105,7 +105,7 @@ func TestUserSerivce_ChangePassword(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -160,7 +160,7 @@ func TestUserSerivce_ResetPassword(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -204,7 +204,7 @@ func TestUserService_GetUserByUID(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	t.Run("get user successfully", func(t *testing.T) {
 		mockDB.EXPECT().Get(gomock.Any(), "uid=?", "1234").Return(nil)
 		user, err := srv.GetUserByUID(ctx, "1234")
@@ -218,7 +218,7 @@ func TestUserService_SearchUser(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 
 	cases := []struct {
 		name    string
@@ -286,7 +286,7 @@ func TestUserService_CreateUser(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -325,7 +325,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -373,7 +373,7 @@ func TestUserService_GetSignedUser(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -459,7 +459,7 @@ func TestUserService_DisableUser(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	mockDB.EXPECT().UpdateSingle(gomock.Any(), "is_disabled", true, "uid=?", "1234").Return(nil)
 	err := srv.DisableUser(ctx, "1234")
 	assert.NoError(t, err)
@@ -470,7 +470,7 @@ func TestUserService_EnableUser(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	mockDB.EXPECT().UpdateSingle(gomock.Any(), "is_disabled", false, "uid=?", "1234").Return(nil)
 	err := srv.EnableUser(ctx, "1234")
 	assert.NoError(t, err)
@@ -485,7 +485,7 @@ func TestUserSerivce_AddOrg(t *testing.T) {
 		return fn(mockDB)
 	}).AnyTimes()
 	orgSrv := NewMockOrgService(ctrl)
-	srv := NewUserService(mockDB, orgSrv)
+	srv := NewUserService(mockDB, orgSrv, nil)
 
 	cases := []struct {
 		name    string
@@ -572,7 +572,7 @@ func TestUserSerivce_RemoveOrg(t *testing.T) {
 		return fn(mockDB)
 	}).AnyTimes()
 	orgSrv := NewMockOrgService(ctrl)
-	srv := NewUserService(mockDB, orgSrv)
+	srv := NewUserService(mockDB, orgSrv, nil)
 
 	cases := []struct {
 		name    string
@@ -640,7 +640,7 @@ func TestUserSerivce_UpdateOrg(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 	orgSrv := NewMockOrgService(ctrl)
-	srv := NewUserService(mockDB, orgSrv)
+	srv := NewUserService(mockDB, orgSrv, nil)
 
 	cases := []struct {
 		name    string
@@ -682,7 +682,7 @@ func TestUserSerivce_GetOrgListByUserUID(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 
 	cases := []struct {
 		name    string
@@ -731,7 +731,7 @@ func TestUserSerivce_SwitchOrg(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 
 	cases := []struct {
 		name    string
@@ -790,7 +790,7 @@ func TestUserService_GetUserByName(t *testing.T) {
 
 	mockDB := db.NewMockDB(ctrl)
 
-	srv := NewUserService(mockDB, nil)
+	srv := NewUserService(mockDB, nil, nil)
 	t.Run("get user failure", func(t *testing.T) {
 		mockDB.EXPECT().Get(gomock.Any(), "user_name=? or email=?", "1234", "1234").Return(fmt.Errorf("err"))
 		user, err := srv.GetUserByName(ctx, "1234")
