@@ -205,12 +205,6 @@ func (srv *dashboardService) GetDashboardByUID(ctx context.Context, uid string) 
 	if err != nil {
 		return nil, err
 	}
-	isStarred, err := srv.starSrv.IsStarred(ctx, rs.UID, model.DashboardResource)
-	if err != nil {
-		// TODO: ignore check star err:
-		return nil, err
-	}
-	rs.IsStarred = isStarred
 	return rs, nil
 }
 
@@ -316,6 +310,15 @@ func (srv *dashboardService) GetProvisioningDashboard(ctx context.Context, dashb
 // toggleStar toggles the dashboard star.
 func (srv *dashboardService) toggleStar(ctx context.Context, uid string, star bool) error {
 	dashboard, err := srv.getDashboardByUID(ctx, uid)
+	if err != nil {
+		return err
+	}
+	user := util.GetUser(ctx)
+	// update dashboard star field
+	err = srv.db.Updates(&model.Dashboard{}, map[string]any{
+		"is_starred": star,
+		"updated_by": user.User.ID,
+	}, "uid=? and org_id=?", dashboard.UID, user.Org.ID)
 	if err != nil {
 		return err
 	}

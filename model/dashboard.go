@@ -93,7 +93,7 @@ type Dashboard struct {
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
 
 	// FIXME: need remove
-	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
+	IsStarred bool `json:"isStarred,omitempty" gorm:"is_starred"`
 
 	TagList []string `json:"-" gorm:"-"`
 }
