@@ -42,7 +42,7 @@ var httpLogger = logger.GetLogger("HTTP", "Static")
 // handleStatic handles static resource request.
 func handleStatic(e *gin.Engine) {
 	// server static file
-	staticFS, err := fsSubFn(linsight.StaticFS, "web/static")
+	staticFS, err := fsSubFn(linsight.StaticFS, "web")
 	if err != nil {
 		panic(err)
 	} else {

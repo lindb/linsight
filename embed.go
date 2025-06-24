@@ -17,12 +17,14 @@
 
 package linsight
 
-import "embed"
+import (
+	"embed"
+)
 
-//go:embed web/static
+//go:embed web
 var StaticFS embed.FS
 
-//go:embed web/static/index.html
+//go:embed web/index.html
 var IndexFile string
 
 //go:embed accesscontrol/rbac_api.conf

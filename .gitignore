@@ -22,11 +22,8 @@ cpu_profile
 *mock.go
 *mock_test.go
 
-web/node_modules/
-web/build/*
-web/static/*
-web/yarn-error.log
-web/package-lock.json
+/web/**
+!/web/index.html
 
 # Test binary, built with `go test -c`
 *.test
