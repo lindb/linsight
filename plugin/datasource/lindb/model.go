@@ -53,7 +53,10 @@ type DatasourceConfig struct {
 
 // DataQueryRequest represents data query request for LinDB.
 type DataQueryRequest struct {
-	SQL       string   `json:"sql"`
+	SQL      string `json:"sql"`
+	Database string `json:"db"`
+
+	// Form query
 	Namespace string   `json:"namespace"`
 	Metric    string   `json:"metric"`
 	Fields    []string `json:"fields"`

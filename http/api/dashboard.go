@@ -48,7 +48,7 @@ func NewDashboardAPI(deps *depspkg.API) *DashboardAPI {
 }
 
 // CreateDashboard creates a new dashboard.
-func (api *DashboardAPI) CreateDashboard(c *gin.Context) { //nolint:dupl
+func (api *DashboardAPI) CreateDashboard(c *gin.Context) {
 	var dashboardJSON datatypes.JSON
 	if err := c.ShouldBind(&dashboardJSON); err != nil {
 		httppkg.Error(c, err)
@@ -68,16 +68,25 @@ func (api *DashboardAPI) CreateDashboard(c *gin.Context) { //nolint:dupl
 		httppkg.Error(c, err)
 		return
 	}
+	if err := api.deps.DashboardVersionSrv.CreateDashboardVersion(ctx, &model.DashboardVersion{
+		DashboardUID: uid,
+		Message:      "initial version",
+		Config:       dashboardJSON,
+	}); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
 	httppkg.OK(c, uid)
 }
 
 // UpdateDashboard updates an existing dashboard.
 func (api *DashboardAPI) UpdateDashboard(c *gin.Context) {
-	var dashboardJSON datatypes.JSON
-	if err := c.ShouldBind(&dashboardJSON); err != nil {
+	var saveDashbaord model.SaveDashboardRequest
+	if err := c.ShouldBind(&saveDashbaord); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
+	dashboardJSON := saveDashbaord.Dashboard
 	dashboard := &model.Dashboard{
 		Config: dashboardJSON,
 	}
@@ -88,6 +97,14 @@ func (api *DashboardAPI) UpdateDashboard(c *gin.Context) {
 		return
 	}
 	if err := api.saveDashbardMeta(ctx, dashboard); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	if err := api.deps.DashboardVersionSrv.CreateDashboardVersion(ctx, &model.DashboardVersion{
+		DashboardUID: dashboard.UID,
+		Message:      saveDashbaord.Message,
+		Config:       dashboardJSON,
+	}); err != nil {
 		httppkg.Error(c, err)
 		return
 	}

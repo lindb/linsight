@@ -84,6 +84,7 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.Tag{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.ResourceTag{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Dashboard{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.DashboardVersion{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.DashboardProvisioning{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Chart{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Link{}))

@@ -92,12 +92,17 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 	dataQueryReq := DataQueryRequest{}
 	var err error
 	var sql string
+	database := cli.cfg.Database
 	if err0 := jsonUnmarshalFn(data, &dataQueryReq); err0 != nil {
 		return nil, err0
 	}
 	if dataQueryReq.SQL != "" {
 		sql = dataQueryReq.SQL
 	}
+	if dataQueryReq.Database != "" {
+		database = dataQueryReq.Database
+	}
+
 	fmt.Printf("......req=%v,dataQueryReq=%v\n", string(data), dataQueryReq)
 	if dataQueryReq.SQL == "" && dataQueryReq.Metric != "" {
 		sql, err = buildDataQuerySQLFn(&dataQueryReq, cli.formatTime(timeRange.Start), cli.formatTime(timeRange.End))
@@ -111,7 +116,7 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 	}
 	// send request
 	resp, err := cli.cli.R().
-		SetBody(map[string]any{"sql": sql, "db": cli.cfg.Database, "timeRange": timeRange}).
+		SetBody(map[string]any{"sql": sql, "db": database, "timeRange": timeRange}).
 		SetHeader("Accept", "application/json").
 		Put("/api/v1/exec")
 	if err != nil {

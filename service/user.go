@@ -268,6 +268,7 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 			"theme":      pref.Theme,
 			"collapsed":  pref.Collapsed,
 			"home_page":  pref.HomePage,
+			"locale":     pref.Locale,
 			"updated_by": userID,
 		}, "user_id=?", userID)
 	}

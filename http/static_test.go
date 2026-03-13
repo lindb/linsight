@@ -26,9 +26,8 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-
 	httppkg "github.com/lindb/common/pkg/http"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/model"
@@ -106,7 +105,6 @@ func TestStaticHandler(t *testing.T) {
 		},
 	}
 	for _, tt := range cases {
-		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
 			ctx := tt.ctx
 			if ctx == nil {

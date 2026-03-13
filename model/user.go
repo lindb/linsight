@@ -57,6 +57,7 @@ type Preference struct {
 	HomePage  string `json:"homePage" gorm:"column:home_page"`
 	Theme     string `json:"theme" gorm:"column:theme"`
 	Collapsed bool   `json:"collapsed" gorm:"column:collapsed"`
+	Locale    string `json:"locale" gorm:"column:locale"`
 }
 
 // UserToken represents user's login token and history.

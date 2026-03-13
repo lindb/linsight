@@ -37,9 +37,10 @@ type API struct {
 	AuthenticateSrv service.AuthenticateService
 	AuthorizeSrv    service.AuthorizeService
 
-	TagSrv       service.TagService
-	DashboardSrv service.DashboardService
-	ChartSrv     service.ChartService
+	TagSrv              service.TagService
+	DashboardSrv        service.DashboardService
+	DashboardVersionSrv service.DashboardVersionService
+	ChartSrv            service.ChartService
 
 	NotificationSrv service.NotificationService
 	AlertRuleSrv    service.AlertRuleService

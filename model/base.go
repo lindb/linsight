@@ -17,8 +17,6 @@
 
 package model
 
-import "time"
-
 type ResourceType int
 
 const (
@@ -28,9 +26,9 @@ const (
 
 // BaseModel represents base model information.
 type BaseModel struct {
-	ID        int64     `json:"-" gorm:"column:id"`
-	CreatedAt time.Time `json:"createdAt,omitempty" gorm:"column:created_at"`
-	UpdatedAt time.Time `json:"updatedAt,omitempty" gorm:"column:updated_at"`
+	ID        int64 `json:"-" gorm:"column:id"`
+	CreatedAt int64 `json:"createdAt,omitempty" gorm:"column:created_at;autoCreateTime:milli"`
+	UpdatedAt int64 `json:"updatedAt,omitempty" gorm:"column:updated_at;autoUpdateTime:milli"`
 
 	CreatedBy int64 `json:"-" gorm:"column:created_by"`
 	UpdatedBy int64 `json:"-" gorm:"column:updated_by"`

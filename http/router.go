@@ -43,8 +43,9 @@ type Router struct {
 	datasourceAPI      *api.DatasourceAPI
 	datasourceQueryAPI *api.DatasourceQueryAPI
 
-	dashboardAPI *api.DashboardAPI
-	chartAPI     *api.ChartAPI
+	dashboardAPI        *api.DashboardAPI
+	dashboardVersionAPI *api.DashboardVersionAPI
+	chartAPI            *api.ChartAPI
 
 	notificationAPI *api.NotificationAPI
 	alertRuleAPI    *api.AlertRuleAPI
@@ -66,8 +67,9 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		datasourceAPI:      api.NewDatasourceAPI(deps),
 		datasourceQueryAPI: api.NewDatasourceQueryAPI(deps),
 
-		dashboardAPI: api.NewDashboardAPI(deps),
-		chartAPI:     api.NewChartAPI(deps),
+		dashboardAPI:        api.NewDashboardAPI(deps),
+		dashboardVersionAPI: api.NewDashboardVersionAPI(deps),
+		chartAPI:            api.NewChartAPI(deps),
 
 		notificationAPI: api.NewNotificationAPI(deps),
 		alertRuleAPI:    api.NewAlertRuleAPI(deps),
@@ -197,6 +199,12 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.dashboardAPI.StarDashboard)...)
 	router.DELETE("/dashboards/:uid/star",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.dashboardAPI.UnstarDashboard)...)
+
+	// dashboard version api
+	router.GET("/dashboards/:uid/versions",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.dashboardVersionAPI.GetDashboardVersions)...)
+	router.GET("/dashboards/:uid/versions/:version",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.dashboardVersionAPI.GetDashboardVersion)...)
 
 	// chart repo api
 	router.POST("/charts",

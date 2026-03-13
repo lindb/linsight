@@ -125,6 +125,23 @@ type DashboardProvisioning struct {
 	Checksum       string `gorm:"column:check_sum"`
 }
 
+// DashboardVersion represents dashboard version information.
+type DashboardVersion struct {
+	BaseModel
+
+	DashboardUID string `json:"dashboardUID,omitempty" gorm:"column:dashboard_uid;index:u_idx_dashboard_version,unique"`
+	Version      int    `json:"version" gorm:"column:version;index:u_idx_dashboard_version,unique"`
+	Message      string `json:"message" gorm:"column:message"`
+
+	Config datatypes.JSON `json:"config" gorm:"column:config"`
+}
+
+// SaveDashboardRequest represents save dashboard request.
+type SaveDashboardRequest struct {
+	Dashboard datatypes.JSON `json:"dashboard"`
+	Message   string         `json:"message"`
+}
+
 // SaveProvisioningDashboardRequest represents save provisioning dashboard request.
 type SaveProvisioningDashboardRequest struct {
 	Org          *Org

@@ -67,7 +67,7 @@ func (api *DatasourceAPI) UpdateDatasource(c *gin.Context) {
 	httppkg.OK(c, "Data source updated")
 }
 
-// DeleteDatasource deletes data source by uid.
+// DeleteDatasourceByUID deletes data source by uid.
 func (api *DatasourceAPI) DeleteDatasourceByUID(c *gin.Context) {
 	uid := c.Param(constant.UID)
 	if err := api.deps.DatasourceSrv.DeleteDatasourceByUID(c.Request.Context(), uid); err != nil {
@@ -77,12 +77,12 @@ func (api *DatasourceAPI) DeleteDatasourceByUID(c *gin.Context) {
 	httppkg.OK(c, "Data source deleted")
 }
 
-// GetDatasource returns data source by uid.
+// GetDatasourceByUID returns data source by uid.
 func (api *DatasourceAPI) GetDatasourceByUID(c *gin.Context) {
 	uid := c.Param(constant.UID)
 	ds, err := api.deps.DatasourceSrv.GetDatasourceByUID(c.Request.Context(), uid)
 	if err != nil {
-		//TODO: check not found???
+		// TODO: check not found???
 		httppkg.Error(c, err)
 		return
 	}

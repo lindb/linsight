@@ -99,6 +99,7 @@ func (srv *datasourceService) UpdateDatasource(ctx context.Context, datasource *
 			map[string]any{
 				"name":       datasource.Name,
 				"is_default": datasource.IsDefault,
+				"category":   datasource.Category,
 				"url":        datasource.URL,
 				"config":     datasource.Config,
 				"time_zone":  datasource.TimeZone,
