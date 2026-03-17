@@ -1,0 +1,2019 @@
+openapi: 3.0.3
+info:
+  title: LinSight API
+  description: |
+    LinSight is an open-source observability platform providing unified metrics, logs, traces, and dashboards.
+
+    ## Authentication
+    Most endpoints require cookie-based session authentication. Call `POST /api/v1/login` first to obtain a session cookie.
+
+    ## Role Hierarchy
+    Lin (super admin) > Admin > Editor > Viewer > Anonymous
+  version: "1.0.0"
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:9000
+    description: Local development server
+
+tags:
+  - name: Auth
+    description: Login and logout
+  - name: Boot
+    description: Bootstrap application data
+  - name: Users
+    description: User management (requires Lin role)
+  - name: Orgs
+    description: Organization management (requires Lin role)
+  - name: Teams
+    description: Team management (requires Admin role)
+  - name: Menus
+    description: Menu management (requires Lin or Admin role)
+  - name: Datasources
+    description: Datasource management
+  - name: Dashboards
+    description: Dashboard management
+  - name: Charts
+    description: Chart repository management
+  - name: Query
+    description: Data and metadata queries
+  - name: Tags
+    description: Tag lookup
+  - name: Integrations
+    description: Integration listing
+
+security:
+  - cookieAuth: []
+
+paths:
+  # ─── Auth ────────────────────────────────────────────────────────────────────
+  /api/v1/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticate with username and password. On success a session cookie is set.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginUser'
+      responses:
+        '200':
+          description: Login successful – returns signed user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignedUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/logout:
+    get:
+      tags: [Auth]
+      summary: Logout
+      description: Invalidate the current session.
+      responses:
+        '200':
+          description: Logout successful
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Boot ────────────────────────────────────────────────────────────────────
+  /api/v1/boot:
+    get:
+      tags: [Boot]
+      summary: Get boot data
+      description: Returns all bootstrap data needed to initialize the frontend (user info, nav tree, datasources, integrations).
+      responses:
+        '200':
+          description: Boot data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BootData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Integrations ────────────────────────────────────────────────────────────
+  /api/v1/integrations:
+    get:
+      tags: [Integrations]
+      summary: Get integrations
+      description: Returns all available integrations.
+      responses:
+        '200':
+          description: List of integrations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Integration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Tags ────────────────────────────────────────────────────────────────────
+  /api/v1/tags:
+    get:
+      tags: [Tags]
+      summary: Find tags
+      description: Returns all tags for the current organization.
+      responses:
+        '200':
+          description: List of tag strings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── Menus ───────────────────────────────────────────────────────────────────
+  /api/v1/menus:
+    get:
+      tags: [Menus]
+      summary: Load menu tree (Lin)
+      description: Returns the full menu tree. Requires Lin (super admin) role.
+      responses:
+        '200':
+          description: Menu tree
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Menu'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Menus]
+      summary: Create menu (Lin)
+      description: Create a new menu item. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Menu'
+      responses:
+        '200':
+          description: Menu created successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Menus]
+      summary: Update menu (Lin)
+      description: Update an existing menu item. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Menu'
+      responses:
+        '200':
+          description: Menu updated successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/menus/sort:
+    put:
+      tags: [Menus]
+      summary: Sort menus (Lin)
+      description: Update menu sort order. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Menu'
+      responses:
+        '200':
+          description: Sort order updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/menus/{uid}:
+    delete:
+      tags: [Menus]
+      summary: Delete menu by UID (Lin)
+      description: Delete a menu item by its UID. Requires Lin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Menu deleted successfully
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/orgs/{uid}/menus:
+    get:
+      tags: [Menus]
+      summary: Get org menus (Lin)
+      description: Get menus configured for a specific organization. Requires Lin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: List of org menu info
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrgMenuInfo'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Menus]
+      summary: Save org menus (Lin)
+      description: Assign menus to a specific organization. Requires Lin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrgMenuInfo'
+      responses:
+        '200':
+          description: Org menus saved
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/orgs/menus:
+    get:
+      tags: [Menus]
+      summary: Get menu tree for current org (Admin)
+      description: Returns the menu tree for the currently signed-in organization. Requires Admin role.
+      responses:
+        '200':
+          description: Menu tree for current org
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Menu'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/orgs/menus/roles:
+    put:
+      tags: [Menus]
+      summary: Update roles of org menus (Admin)
+      description: Update roles assigned to menus for the current organization. Requires Admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrgMenuInfo'
+      responses:
+        '200':
+          description: Roles updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ─── Orgs ────────────────────────────────────────────────────────────────────
+  /api/v1/orgs:
+    get:
+      tags: [Orgs]
+      summary: Search organizations (Lin)
+      description: Search organizations with pagination. Requires Lin role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of organizations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Orgs]
+      summary: Create organization (Lin)
+      description: Create a new organization. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Org'
+      responses:
+        '200':
+          description: Organization created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Orgs]
+      summary: Update organization (Lin)
+      description: Update an existing organization. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Org'
+      responses:
+        '200':
+          description: Organization updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/orgs/{uid}:
+    get:
+      tags: [Orgs]
+      summary: Get organization by UID (Lin)
+      description: Returns a single organization by UID. Requires Lin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Organization detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Org'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Orgs]
+      summary: Delete organization by UID (Lin)
+      description: Delete an organization by UID. Requires Lin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Organization deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/org/users:
+    get:
+      tags: [Orgs]
+      summary: Get user list for signed org (Admin)
+      description: Returns users in the currently signed-in organization. Requires Admin role.
+      responses:
+        '200':
+          description: List of users in current org
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrgUserInfo'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/user/orgs:
+    get:
+      tags: [Orgs]
+      summary: Get org list for signed user (Admin)
+      description: Returns all organizations the current signed-in user belongs to. Requires Admin role.
+      responses:
+        '200':
+          description: List of orgs for current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserOrgInfo'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ─── Teams ───────────────────────────────────────────────────────────────────
+  /api/v1/org/teams:
+    get:
+      tags: [Teams]
+      summary: Search teams (Admin)
+      description: Search teams in current organization with pagination. Requires Admin role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Teams]
+      summary: Create team (Admin)
+      description: Create a new team. Requires Admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Team'
+      responses:
+        '200':
+          description: Team created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Teams]
+      summary: Update team (Admin)
+      description: Update an existing team. Requires Admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Team'
+      responses:
+        '200':
+          description: Team updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/org/teams/{uid}:
+    get:
+      tags: [Teams]
+      summary: Get team by UID (Admin)
+      description: Returns a single team by UID. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Team detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Teams]
+      summary: Delete team by UID (Admin)
+      description: Delete a team by UID. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Team deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/org/teams/{uid}/members:
+    get:
+      tags: [Teams]
+      summary: Get team members (Admin)
+      description: Returns members of a team. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: user
+          in: query
+          schema:
+            type: string
+        - name: permissions
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/PermissionType'
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: List of team members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeamMemberInfo'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Teams]
+      summary: Add team members (Admin)
+      description: Add new members to a team. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddTeamMember'
+      responses:
+        '200':
+          description: Members added
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Teams]
+      summary: Update team member (Admin)
+      description: Update a team member's permission. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTeamMember'
+      responses:
+        '200':
+          description: Member updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/org/teams/{uid}/members/remove:
+    put:
+      tags: [Teams]
+      summary: Remove team members (Admin)
+      description: Remove one or more members from a team. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemoveTeamMember'
+      responses:
+        '200':
+          description: Members removed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ─── Users ───────────────────────────────────────────────────────────────────
+  /api/v1/users:
+    get:
+      tags: [Users]
+      summary: Search users (Lin)
+      description: Search users with pagination. Requires Lin role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: query
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Users]
+      summary: Create user (Lin)
+      description: Create a new user. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '200':
+          description: User created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Users]
+      summary: Update user (Lin)
+      description: Update an existing user. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: User updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/users/{uid}:
+    get:
+      tags: [Users]
+      summary: Get user by UID (Admin)
+      description: Returns a single user by UID. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/users/{uid}/orgs:
+    get:
+      tags: [Users]
+      summary: Get org list by user UID
+      description: Returns organizations the specified user belongs to.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: List of orgs for specified user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserOrgInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Users]
+      summary: Add org to user (Admin)
+      description: Add an organization membership to a user. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserOrgInfo'
+      responses:
+        '200':
+          description: Org added to user
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Users]
+      summary: Update user org (Admin)
+      description: Update a user's organization role. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserOrgInfo'
+      responses:
+        '200':
+          description: User org updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/users/{uid}/orgs/{orgUid}:
+    delete:
+      tags: [Users]
+      summary: Remove user from org (Admin)
+      description: Remove a user from an organization. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+        - name: orgUid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User removed from org
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/user/orgs/switch/{orgUid}:
+    put:
+      tags: [Users]
+      summary: Switch current org
+      description: Switch the signed-in user's active organization.
+      parameters:
+        - name: orgUid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Org switched successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/users/{uid}/disable:
+    put:
+      tags: [Users]
+      summary: Disable user by UID (Lin)
+      description: Disable a user account. Requires Lin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: User disabled
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/users/{uid}/enable:
+    put:
+      tags: [Users]
+      summary: Enable user by UID (Lin)
+      description: Re-enable a disabled user account. Requires Lin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: User enabled
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/user/preference:
+    get:
+      tags: [Users]
+      summary: Get user preference
+      description: Returns the preference settings of the currently signed-in user.
+      responses:
+        '200':
+          description: User preference
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preference'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      tags: [Users]
+      summary: Save user preference
+      description: Save preference settings for the currently signed-in user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preference'
+      responses:
+        '200':
+          description: Preference saved
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/user/password/change:
+    put:
+      tags: [Users]
+      summary: Change password
+      description: Change the password of the currently signed-in user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeUserPassword'
+      responses:
+        '200':
+          description: Password changed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/user/password/reset:
+    put:
+      tags: [Users]
+      summary: Reset user password (Lin)
+      description: Reset another user's password. Requires Lin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetUserPassword'
+      responses:
+        '200':
+          description: Password reset
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ─── Datasources ─────────────────────────────────────────────────────────────
+  /api/v1/datasource:
+    post:
+      tags: [Datasources]
+      summary: Create datasource (Admin)
+      description: Create a new datasource. Requires Admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Datasource'
+      responses:
+        '200':
+          description: Datasource created
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Datasources]
+      summary: Update datasource (Admin)
+      description: Update an existing datasource. Requires Admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Datasource'
+      responses:
+        '200':
+          description: Datasource updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/datasources:
+    get:
+      tags: [Datasources]
+      summary: Get datasources (Viewer)
+      description: Returns all datasources for the current organization. Requires Viewer role.
+      responses:
+        '200':
+          description: List of datasources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Datasource'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/datasources/{uid}:
+    get:
+      tags: [Datasources]
+      summary: Get datasource by UID (Viewer)
+      description: Returns a datasource by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Datasource detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Datasource'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Datasources]
+      summary: Delete datasource by UID (Admin)
+      description: Delete a datasource by UID. Requires Admin role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Datasource deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Dashboards ──────────────────────────────────────────────────────────────
+  /api/v1/dashboards:
+    get:
+      tags: [Dashboards]
+      summary: Search dashboards (Viewer)
+      description: Search dashboards with filtering and pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: title
+          in: query
+          schema:
+            type: string
+        - name: ownership
+          in: query
+          description: "0=Any, 1=Mine, 2=Shared"
+          schema:
+            type: integer
+            enum: [0, 1, 2]
+            default: 0
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: starred
+          in: query
+          description: "Filter by star status: omit for all, true for starred only, false for unstarred only"
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated list of dashboards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Dashboards]
+      summary: Create dashboard (Editor)
+      description: Create a new dashboard. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveDashboardRequest'
+      responses:
+        '200':
+          description: Dashboard created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+                description: New dashboard UID
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Dashboards]
+      summary: Update dashboard (Editor)
+      description: Update an existing dashboard. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SaveDashboardRequest'
+      responses:
+        '200':
+          description: Dashboard updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/dashboards/{uid}:
+    get:
+      tags: [Dashboards]
+      summary: Get dashboard by UID (Viewer)
+      description: Returns a dashboard with its metadata. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Dashboard with metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardDetail'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Dashboards]
+      summary: Delete dashboard by UID (Editor)
+      description: Delete a dashboard by UID. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Dashboard deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/dashboards/{uid}/star:
+    put:
+      tags: [Dashboards]
+      summary: Star dashboard (Viewer)
+      description: Star (bookmark) a dashboard for the current user. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Dashboard starred
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [Dashboards]
+      summary: Unstar dashboard (Viewer)
+      description: Remove the star from a dashboard. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Dashboard unstarred
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/dashboards/{uid}/versions:
+    get:
+      tags: [Dashboards]
+      summary: Get dashboard versions (Viewer)
+      description: Returns the version history of a dashboard. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: List of dashboard versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DashboardVersion'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/dashboards/{uid}/versions/{version}:
+    get:
+      tags: [Dashboards]
+      summary: Get specific dashboard version (Viewer)
+      description: Returns a specific version of a dashboard. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Dashboard version detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardVersion'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Charts ──────────────────────────────────────────────────────────────────
+  /api/v1/charts:
+    get:
+      tags: [Charts]
+      summary: Search charts (Viewer)
+      description: Search charts in the library with filtering and pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: title
+          in: query
+          schema:
+            type: string
+        - name: ownership
+          in: query
+          description: "0=Any, 1=Mine, 2=Shared"
+          schema:
+            type: integer
+            enum: [0, 1, 2]
+            default: 0
+        - name: tags
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Paginated list of charts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChartListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Charts]
+      summary: Create chart (Viewer)
+      description: Create a new chart in the library. Requires Viewer role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Chart'
+      responses:
+        '200':
+          description: Chart created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+                description: New chart UID
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [Charts]
+      summary: Update chart (Viewer)
+      description: Update an existing chart. Requires Viewer role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Chart'
+      responses:
+        '200':
+          description: Chart updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/charts/{uid}:
+    get:
+      tags: [Charts]
+      summary: Get chart by UID (Viewer)
+      description: Returns a chart by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Chart detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chart'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Charts]
+      summary: Delete chart by UID (Viewer)
+      description: Delete a chart from the library. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Chart deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/charts/{uid}/dashboards:
+    get:
+      tags: [Charts]
+      summary: Get dashboards using chart (Viewer)
+      description: Returns the count of dashboards that reference this chart. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Number of dashboards using this chart
+          content:
+            application/json:
+              schema:
+                type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/charts/{uid}/dashboards/{dashboardUID}:
+    delete:
+      tags: [Charts]
+      summary: Unlink chart from dashboard (Viewer)
+      description: Remove the link between a chart and a dashboard. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+        - name: dashboardUID
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chart unlinked from dashboard
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Query ───────────────────────────────────────────────────────────────────
+  /api/v1/data/query:
+    put:
+      tags: [Query]
+      summary: Data query (Viewer)
+      description: Execute a data query against one or more datasources. Requires Viewer role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/metadata/query:
+    put:
+      tags: [Query]
+      summary: Metadata query (Viewer)
+      description: Execute a metadata query against a datasource. Requires Viewer role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Metadata query results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ─── Components ──────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: linsight-session
+
+  parameters:
+    UIDPath:
+      name: uid
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Unique identifier
+
+  responses:
+    BadRequest:
+      description: Bad request – validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Unauthorized – not logged in
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Forbidden – insufficient role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # ── Shared ──────────────────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+      required: [error]
+
+    BaseModel:
+      type: object
+      properties:
+        createdAt:
+          type: integer
+          format: int64
+          description: Creation timestamp in milliseconds
+        updatedAt:
+          type: integer
+          format: int64
+          description: Last update timestamp in milliseconds
+
+    PagingParam:
+      type: object
+      properties:
+        offset:
+          type: integer
+          default: 0
+          description: Number of records to skip
+        limit:
+          type: integer
+          default: 20
+          description: Maximum number of records to return
+
+    RoleType:
+      type: string
+      description: User role in an organization
+      enum: [Lin, Admin, Editor, Viewer, Anonymous]
+
+    PermissionType:
+      type: string
+      description: Team member permission
+      enum: [Unknown, Member, Admin]
+
+    Ownership:
+      type: integer
+      description: "Ownership filter: 0=Any, 1=Mine, 2=Shared"
+      enum: [0, 1, 2]
+
+    # ── Auth / User ─────────────────────────────────────────────────────────────
+    LoginUser:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          description: Login username
+        password:
+          type: string
+          format: password
+          description: Login password
+
+    User:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            userName:
+              type: string
+            email:
+              type: string
+              format: email
+            isDisabled:
+              type: boolean
+
+    CreateUserRequest:
+      type: object
+      required: [userName, email, password]
+      properties:
+        name:
+          type: string
+        userName:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    Preference:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            homePage:
+              type: string
+            theme:
+              type: string
+              enum: [light, dark]
+              default: light
+            collapsed:
+              type: boolean
+              default: true
+            locale:
+              type: string
+
+    SignedUser:
+      type: object
+      properties:
+        uid:
+          type: string
+        userName:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        isDisabled:
+          type: boolean
+        org:
+          $ref: '#/components/schemas/Org'
+        role:
+          $ref: '#/components/schemas/RoleType'
+        preference:
+          $ref: '#/components/schemas/Preference'
+
+    ChangeUserPassword:
+      type: object
+      required: [oldPassword, newPassword]
+      properties:
+        oldPassword:
+          type: string
+          format: password
+        newPassword:
+          type: string
+          format: password
+
+    ResetUserPassword:
+      type: object
+      required: [userUid, password]
+      properties:
+        userUid:
+          type: string
+        password:
+          type: string
+          format: password
+
+    UserOrgInfo:
+      type: object
+      properties:
+        userUid:
+          type: string
+        orgUid:
+          type: string
+        orgName:
+          type: string
+        role:
+          $ref: '#/components/schemas/RoleType'
+
+    UserListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
+    # ── Org ─────────────────────────────────────────────────────────────────────
+    Org:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+
+    OrgUserInfo:
+      type: object
+      properties:
+        userUid:
+          type: string
+        userName:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
+    OrgListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Org'
+
+    # ── Team ────────────────────────────────────────────────────────────────────
+    Team:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+
+    AddTeamMember:
+      type: object
+      required: [userUids, permission]
+      properties:
+        userUids:
+          type: array
+          items:
+            type: string
+        permission:
+          $ref: '#/components/schemas/PermissionType'
+
+    UpdateTeamMember:
+      type: object
+      required: [userUid, permission]
+      properties:
+        userUid:
+          type: string
+        permission:
+          $ref: '#/components/schemas/PermissionType'
+
+    RemoveTeamMember:
+      type: object
+      required: [userUids]
+      properties:
+        userUids:
+          type: array
+          items:
+            type: string
+
+    TeamMemberInfo:
+      type: object
+      properties:
+        userUid:
+          type: string
+        name:
+          type: string
+        userName:
+          type: string
+        permission:
+          $ref: '#/components/schemas/PermissionType'
+
+    TeamListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+
+    # ── Menu ────────────────────────────────────────────────────────────────────
+    Menu:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            label:
+              type: string
+            path:
+              type: string
+            icon:
+              type: string
+            page:
+              type: string
+            pageConfig:
+              type: object
+              additionalProperties: true
+              description: Page configuration as arbitrary JSON
+            role:
+              $ref: '#/components/schemas/RoleType'
+            order:
+              type: integer
+            parentUID:
+              type: string
+            children:
+              type: array
+              items:
+                $ref: '#/components/schemas/Menu'
+
+    OrgMenuInfo:
+      type: object
+      required: [role]
+      properties:
+        menuUid:
+          type: string
+        role:
+          $ref: '#/components/schemas/RoleType'
+
+    # ── Datasource ──────────────────────────────────────────────────────────────
+    Datasource:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            type:
+              type: string
+              enum: [lindb, lingo]
+              description: Datasource type
+            category:
+              type: string
+              enum: [Metric, Log, Trace]
+              description: Data category
+            url:
+              type: string
+              format: uri
+            timeZone:
+              type: string
+            config:
+              type: object
+              additionalProperties: true
+              description: Datasource-specific configuration as JSON
+            isDefault:
+              type: boolean
+
+    # ── Dashboard ───────────────────────────────────────────────────────────────
+    Dashboard:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            title:
+              type: string
+            description:
+              type: string
+            integration:
+              type: string
+            version:
+              type: integer
+            tags:
+              type: array
+              items:
+                type: string
+            isStarred:
+              type: boolean
+
+    DashboardMeta:
+      type: object
+      properties:
+        canEdit:
+          type: boolean
+        provisioned:
+          type: boolean
+
+    DashboardDetail:
+      type: object
+      description: Dashboard with its JSON config and metadata
+      properties:
+        dashboard:
+          type: object
+          additionalProperties: true
+          description: Full dashboard configuration JSON
+        meta:
+          $ref: '#/components/schemas/DashboardMeta'
+
+    DashboardVersion:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            dashboardUID:
+              type: string
+            version:
+              type: integer
+            message:
+              type: string
+            config:
+              type: object
+              additionalProperties: true
+              description: Dashboard configuration snapshot as JSON
+
+    SaveDashboardRequest:
+      type: object
+      properties:
+        dashboard:
+          type: object
+          additionalProperties: true
+          description: Full dashboard configuration JSON
+        message:
+          type: string
+          description: Optional commit message for version history
+
+    DashboardListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Dashboard'
+
+    # ── Chart ───────────────────────────────────────────────────────────────────
+    Chart:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            title:
+              type: string
+            description:
+              type: string
+            integration:
+              type: string
+            type:
+              type: string
+              description: Chart visualization type (e.g. timeseries, bar, etc.)
+            version:
+              type: integer
+            model:
+              type: object
+              additionalProperties: true
+              description: Chart model/config as JSON
+            isStarred:
+              type: boolean
+
+    ChartInfo:
+      type: object
+      properties:
+        uid:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        integration:
+          type: string
+        dashboards:
+          type: integer
+          description: Number of dashboards referencing this chart
+        model:
+          type: object
+          additionalProperties: true
+
+    ChartListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChartInfo'
+
+    # ── Query ───────────────────────────────────────────────────────────────────
+    QueryRequest:
+      type: object
+      properties:
+        range:
+          $ref: '#/components/schemas/TimeRange'
+        queries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Query'
+
+    TimeRange:
+      type: object
+      properties:
+        start:
+          type: integer
+          format: int64
+          description: Start time in milliseconds since epoch
+        end:
+          type: integer
+          format: int64
+          description: End time in milliseconds since epoch
+
+    Query:
+      type: object
+      required: [datasource]
+      properties:
+        datasource:
+          $ref: '#/components/schemas/TargetDatasource'
+        params:
+          type: object
+          additionalProperties: true
+          description: Query parameters specific to the datasource
+        refId:
+          type: string
+          description: Reference ID for correlating results
+
+    TargetDatasource:
+      type: object
+      required: [uid]
+      properties:
+        uid:
+          type: string
+          description: Datasource UID to query
+
+    QueryResponse:
+      type: object
+      properties:
+        results:
+          type: object
+          additionalProperties: true
+          description: Query results keyed by refId
+
+    # ── Integration ─────────────────────────────────────────────────────────────
+    Integration:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            category:
+              type: string
+            title:
+              type: string
+            desc:
+              type: string
+            icon:
+              type: string
+            docUrl:
+              type: string
+              format: uri
+
+    # ── Boot ────────────────────────────────────────────────────────────────────
+    BootData:
+      type: object
+      properties:
+        home:
+          type: string
+          description: Home page path
+        user:
+          $ref: '#/components/schemas/SignedUser'
+        navTree:
+          type: array
+          items:
+            $ref: '#/components/schemas/Menu'
+          description: Navigation menu tree for current org
+        datasources:
+          type: array
+          items:
+            $ref: '#/components/schemas/Datasource'
+        integrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Integration'

@@ -82,6 +82,7 @@ provisioning/  → Dashboard provisioning from files
 4. Register dependency in `http/deps/api.go`
 5. Register route in `http/router.go`
 6. Add access control policy if needed in `accesscontrol/`
+7. **Sync `openapi.yaml`** — update the OpenAPI spec to reflect any new/changed routes, request bodies, response schemas, or parameters
 
 ## Configuration
 
