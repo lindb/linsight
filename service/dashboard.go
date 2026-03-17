@@ -169,12 +169,24 @@ func (srv *dashboardService) SearchDashboards(ctx context.Context,
 	if len(req.Tags) > 0 {
 		tags := util.RemoveDuplicates(req.Tags)
 		// ref: http://howto.philippkeller.com/2005/04/24/Tags-Database-schemas/
-		tagFilter := `uid in 
-		(select rt.resource_uid from resource_tags rt,tags t 
+		tagFilter := `uid in
+		(select rt.resource_uid from resource_tags rt,tags t
 		where t.id=rt.tag_id and rt.org_id=? and rt.type=? and t.term in ? group by rt.resource_uid having count(rt.resource_uid)=?)
 		`
 		conditions = append(conditions, tagFilter)
 		params = append(params, signedUser.Org.ID, model.DashboardResource, tags, len(tags))
+	}
+	if req.Starred != nil {
+		if *req.Starred {
+			// filter starred dashboards only
+			conditions = append(conditions,
+				`uid in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
+		} else {
+			// filter unstarred dashboards only
+			conditions = append(conditions,
+				`uid not in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
+		}
+		params = append(params, signedUser.User.ID, signedUser.Org.ID, model.DashboardResource)
 	}
 	offset := 0
 	limit := 20
@@ -205,6 +217,12 @@ func (srv *dashboardService) GetDashboardByUID(ctx context.Context, uid string) 
 	if err != nil {
 		return nil, err
 	}
+	// populate IsStarred field dynamically from the stars table
+	starred, err := srv.starSrv.IsStarred(ctx, rs.UID, model.DashboardResource)
+	if err != nil {
+		return nil, err
+	}
+	rs.IsStarred = starred
 	return rs, nil
 }
 
@@ -313,20 +331,10 @@ func (srv *dashboardService) toggleStar(ctx context.Context, uid string, star bo
 	if err != nil {
 		return err
 	}
-	user := util.GetUser(ctx)
-	// update dashboard star field
-	err = srv.db.Updates(&model.Dashboard{}, map[string]any{
-		"is_starred": star,
-		"updated_by": user.User.ID,
-	}, "uid=? and org_id=?", dashboard.UID, user.Org.ID)
-	if err != nil {
-		return err
-	}
 	if star {
 		return srv.starSrv.Star(ctx, dashboard.UID, model.DashboardResource)
-	} else {
-		return srv.starSrv.Unstar(ctx, dashboard.UID, model.DashboardResource)
 	}
+	return srv.starSrv.Unstar(ctx, dashboard.UID, model.DashboardResource)
 }
 
 // getDashboardByUID returns the dashboard by uid.

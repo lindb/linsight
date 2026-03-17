@@ -92,8 +92,9 @@ type Dashboard struct {
 
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
 
-	// FIXME: need remove
-	IsStarred bool `json:"isStarred,omitempty" gorm:"is_starred"`
+	// IsStarred indicates whether the current user has starred this dashboard.
+	// This field is NOT persisted to DB; it is populated dynamically from the stars table.
+	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
 
 	TagList []string `json:"-" gorm:"-"`
 }
@@ -222,4 +223,6 @@ type SearchDashboardRequest struct {
 	Title     string    `form:"title" json:"title"`
 	Ownership Ownership `form:"ownership" json:"ownership"`
 	Tags      []string  `form:"tags" json:"tags"`
+	// Starred filters by star status: nil=all, true=starred only, false=unstarred only
+	Starred *bool `form:"starred" json:"starred"`
 }

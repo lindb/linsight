@@ -1,6 +1,6 @@
 module github.com/lindb/linsight
 
-go 1.24
+go 1.26
 
 require (
 	github.com/caarlos0/env/v7 v7.1.0

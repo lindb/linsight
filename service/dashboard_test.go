@@ -244,13 +244,19 @@ func TestDashboardService_Star(t *testing.T) {
 	starSrv := NewMockStarService(ctrl)
 	srv := NewDashboardService(starSrv, nil, mockDB)
 
+	// get dashboard failure
 	mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
 	err := srv.StarDashboard(ctx, "1234")
 	assert.Error(t, err)
+
 	mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil).AnyTimes()
+
+	// star failure
 	starSrv.EXPECT().Star(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 	err = srv.StarDashboard(ctx, "1234")
 	assert.Error(t, err)
+
+	// unstar successfully (no redundant DB update)
 	starSrv.EXPECT().Unstar(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	err = srv.UnstarDashboard(ctx, "1234")
 	assert.NoError(t, err)
@@ -263,13 +269,26 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 	mockDB := db.NewMockDB(ctrl)
 	srv := NewDashboardService(nil, nil, mockDB)
 
+	boolTrue := true
+	boolFalse := false
+
 	cases := []struct {
 		name    string
+		req     *model.SearchDashboardRequest
 		prepare func()
 		wantErr bool
 	}{
 		{
 			name: "count failure",
+			req: &model.SearchDashboardRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				Tags:      []string{"tag"},
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(),
@@ -279,6 +298,15 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 		},
 		{
 			name: "count 0",
+			req: &model.SearchDashboardRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				Tags:      []string{"tag"},
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(),
@@ -288,6 +316,15 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 		},
 		{
 			name: "find failure",
+			req: &model.SearchDashboardRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				Tags:      []string{"tag"},
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(),
@@ -300,6 +337,15 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 		},
 		{
 			name: "find successfully",
+			req: &model.SearchDashboardRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				Tags:      []string{"tag"},
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(),
@@ -310,21 +356,41 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "filter starred only",
+			req: &model.SearchDashboardRequest{
+				Starred: &boolTrue,
+			},
+			prepare: func() {
+				// params: org_id, user_id, org_id, DashboardResource
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 0, 20, "id desc", gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "filter unstarred only",
+			req: &model.SearchDashboardRequest{
+				Starred: &boolFalse,
+			},
+			prepare: func() {
+				// params: org_id, user_id, org_id, DashboardResource
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(5), nil)
+				mockDB.EXPECT().FindForPaging(gomock.Any(), 0, 20, "id desc", gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, _, err := srv.SearchDashboards(ctx, &model.SearchDashboardRequest{
-				Title:     "title",
-				Ownership: model.Mine,
-				Tags:      []string{"tag"},
-				PagingParam: model.PagingParam{
-					Limit:  10,
-					Offset: 20,
-				},
-			})
+			_, _, err := srv.SearchDashboards(ctx, tt.req)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
