@@ -135,6 +135,10 @@ type DashboardVersion struct {
 	Message      string `json:"message" gorm:"column:message"`
 
 	Config datatypes.JSON `json:"config" gorm:"column:config"`
+
+	// UpdatedByName is the display name of the user who created this version.
+	// This field is NOT persisted; it is populated by JOIN with the users table when listing versions.
+	UpdatedByName string `json:"updatedByName,omitempty" gorm:"column:updated_by_name;->"`
 }
 
 // SaveDashboardRequest represents save dashboard request.

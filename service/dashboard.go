@@ -78,27 +78,24 @@ func NewDashboardService(starSrv StarService, tagSrv TagService, db dbpkg.DB) Da
 
 // CreateDashboard creates a dashboard.
 func (srv *dashboardService) CreateDashboard(ctx context.Context, dashboard *model.Dashboard) (string, error) {
+	user := util.GetUser(ctx)
 	err := srv.db.Transaction(func(tx dbpkg.DB) error {
 		dashboard.UID = uuid.GenerateShortUUID()
 		// set dashboard org/user info
-		user := util.GetUser(ctx)
 		dashboard.OrgID = user.Org.ID
 		userID := user.User.ID
 		dashboard.CreatedBy = userID
 		dashboard.UpdatedBy = userID
-		if err := tx.Create(dashboard); err != nil {
-			return err
-		}
-		if len(dashboard.TagList) > 0 {
-			// save tags
-			if err := srv.tagSrv.SaveTags(user.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource); err != nil {
-				return err
-			}
-		}
-		return nil
+		return tx.Create(dashboard)
 	})
 	if err != nil {
 		return "", err
+	}
+	// save tags in a separate transaction to avoid nested transaction lock on DB
+	if len(dashboard.TagList) > 0 {
+		if err := srv.tagSrv.SaveTags(user.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource); err != nil {
+			return "", err
+		}
 	}
 	return dashboard.UID, nil
 }
@@ -109,17 +106,9 @@ func (srv *dashboardService) UpdateDashboard(ctx context.Context, dashboard *mod
 	if err != nil {
 		return err
 	}
-	return srv.db.Transaction(func(tx dbpkg.DB) error {
-		user := util.GetUser(ctx)
+	user := util.GetUser(ctx)
+	if err := srv.db.Transaction(func(tx dbpkg.DB) error {
 		userID := user.User.ID
-
-		if len(dashboard.TagList) > 0 {
-			// save tags
-			if err := srv.tagSrv.SaveTags(user.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource); err != nil {
-				return err
-			}
-		}
-
 		// update datasource
 		dashboardFromDB.Title = dashboard.Title
 		dashboardFromDB.Desc = dashboard.Desc
@@ -128,7 +117,16 @@ func (srv *dashboardService) UpdateDashboard(ctx context.Context, dashboard *mod
 		dashboardFromDB.Tags = dashboard.Tags
 		dashboardFromDB.UpdatedBy = userID
 		return tx.Update(dashboardFromDB, "uid=? and org_id=?", dashboard.UID, user.Org.ID)
-	})
+	}); err != nil {
+		return err
+	}
+	// save tags in a separate transaction to avoid nested transaction lock on DB
+	if len(dashboard.TagList) > 0 {
+		if err := srv.tagSrv.SaveTags(user.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DeleteDashboardByUID deletes the dashboard by uid.
@@ -263,19 +261,19 @@ func (srv *dashboardService) GetDashboardsByChartUID(ctx context.Context, chartU
 
 // SaveProvisioningDashboard saves provision dashboard from external.
 func (srv *dashboardService) SaveProvisioningDashboard(ctx context.Context, req *model.SaveProvisioningDashboardRequest) error {
-	return srv.db.Transaction(func(tx dbpkg.DB) error {
-		dashboard := req.Dashboard
-		dashboard.ReadMeta()
-		// check dashboard data if valid
-		if dashboard.Title == "" {
-			return constant.ErrDashboardTitleEmpty
-		}
-		if dashboard.UID == "" {
-			return constant.ErrDashboardUIDEmpty
-		}
+	dashboard := req.Dashboard
+	dashboard.ReadMeta()
+	// check dashboard data if valid
+	if dashboard.Title == "" {
+		return constant.ErrDashboardTitleEmpty
+	}
+	if dashboard.UID == "" {
+		return constant.ErrDashboardUIDEmpty
+	}
 
-		// persist provisioning dashboard data
-		req.Provisioning.DashboardUID = dashboard.UID
+	// persist provisioning dashboard data
+	req.Provisioning.DashboardUID = dashboard.UID
+	err := srv.db.Transaction(func(tx dbpkg.DB) error {
 		exist, err := tx.Exist(&model.Dashboard{}, "uid=? and org_id=?", dashboard.UID, req.Org.ID)
 		if err != nil {
 			return err
@@ -286,26 +284,24 @@ func (srv *dashboardService) SaveProvisioningDashboard(ctx context.Context, req 
 				"uid=? and org_id=?", dashboard.UID, req.Org.ID); err != nil {
 				return err
 			}
-			if err := tx.Updates(&model.DashboardProvisioning{},
+			return tx.Updates(&model.DashboardProvisioning{},
 				req.Provisioning, "dashboard_uid=? and org_id=?",
-				dashboard.UID, req.Org.ID); err != nil {
-				return err
-			}
-		} else {
-			// create dashboard
-			if err := tx.Create(dashboard); err != nil {
-				return err
-			}
-			if err := tx.Create(req.Provisioning); err != nil {
-				return err
-			}
+				dashboard.UID, req.Org.ID)
 		}
-		if len(dashboard.TagList) > 0 {
-			// save tags
-			return srv.tagSrv.SaveTags(req.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource)
+		// create dashboard
+		if err := tx.Create(dashboard); err != nil {
+			return err
 		}
-		return nil
+		return tx.Create(req.Provisioning)
 	})
+	if err != nil {
+		return err
+	}
+	// save tags in a separate transaction to avoid nested transaction lock on DB
+	if len(dashboard.TagList) > 0 {
+		return srv.tagSrv.SaveTags(req.Org.ID, dashboard.TagList, dashboard.UID, model.DashboardResource)
+	}
+	return nil
 }
 
 // RemoveProvisioningDashboard removes provision dashboard if not exist.

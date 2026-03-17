@@ -151,6 +151,7 @@ func TestDashboardService_UpdateDashboard(t *testing.T) {
 			name: "update tags failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, "1234", model.DashboardResource).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -159,7 +160,6 @@ func TestDashboardService_UpdateDashboard(t *testing.T) {
 			name: "update dashboard failure",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, "1234", model.DashboardResource).Return(nil)
 				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
@@ -168,8 +168,8 @@ func TestDashboardService_UpdateDashboard(t *testing.T) {
 			name: "update dashboard successfully",
 			prepare: func() {
 				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, "1234", model.DashboardResource).Return(nil)
 				mockDB.EXPECT().Update(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
+				tagSrv.EXPECT().SaveTags(int64(12), []string{"tag"}, "1234", model.DashboardResource).Return(nil)
 			},
 			wantErr: false,
 		},
