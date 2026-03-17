@@ -329,9 +329,7 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", gomock.Any(), gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
@@ -350,9 +348,7 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 20, 10, "id desc", gomock.Any(), gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -365,8 +361,7 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 				// params: org_id, user_id, org_id, DashboardResource
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 0, 20, "id desc", gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -379,8 +374,7 @@ func TestDashboardService_SerachDashboards(t *testing.T) {
 				// params: org_id, user_id, org_id, DashboardResource
 				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(),
 					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(5), nil)
-				mockDB.EXPECT().FindForPaging(gomock.Any(), 0, 20, "id desc", gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},

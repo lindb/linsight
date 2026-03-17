@@ -38,3 +38,5 @@ cpu_profile
 # vendor/
 test.md
 linsight
+
+.claude/settings.local.json

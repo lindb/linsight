@@ -93,8 +93,8 @@ type Dashboard struct {
 	Config datatypes.JSON `json:"-" gorm:"column:config"`
 
 	// IsStarred indicates whether the current user has starred this dashboard.
-	// This field is NOT persisted to DB; it is populated dynamically from the stars table.
-	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
+	// This field is NOT persisted to DB; it is populated dynamically via LEFT JOIN on the stars table.
+	IsStarred bool `json:"isStarred,omitempty" gorm:"column:is_starred;->"`
 
 	TagList []string `json:"-" gorm:"-"`
 }

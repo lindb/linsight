@@ -66,6 +66,8 @@ accesscontrol/ → RBAC + ABAC via Casbin
 provisioning/  → Dashboard provisioning from files
 ```
 
+> **⚠️ Must sync `openapi.yaml`**: Whenever you add, modify, or delete any API endpoint (routes, request parameters, response schemas), you **MUST** update `openapi.yaml` accordingly. The spec must always exactly match the actual implementation.
+
 ### Key Patterns
 
 - **Dependency injection**: `http/deps/api.go` holds all service dependencies injected into handlers
@@ -74,7 +76,7 @@ provisioning/  → Dashboard provisioning from files
 - **Authentication**: Cookie-based sessions with token table in DB; password uses salted hashing
 - **Database**: Defaults to SQLite (`linsight.db`). Configured via `linsight.toml` or env vars
 
-### Adding a New API Endpoint
+### Adding or Modifying an API Endpoint
 
 1. Add model in `model/`
 2. Add service logic in `service/`
@@ -82,7 +84,7 @@ provisioning/  → Dashboard provisioning from files
 4. Register dependency in `http/deps/api.go`
 5. Register route in `http/router.go`
 6. Add access control policy if needed in `accesscontrol/`
-7. **Sync `openapi.yaml`** — update the OpenAPI spec to reflect any new/changed routes, request bodies, response schemas, or parameters
+7. **Always sync `openapi.yaml`** — whenever you add, modify, or remove a route, request body, response schema, or parameter, you **MUST** update `openapi.yaml`. This applies to both **new endpoints and updates to existing ones**. The response schema must exactly match what the handler actually returns.
 
 ## Configuration
 

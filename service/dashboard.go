@@ -155,21 +155,21 @@ func (srv *dashboardService) DeleteDashboardByUID(ctx context.Context, uid strin
 func (srv *dashboardService) SearchDashboards(ctx context.Context,
 	req *model.SearchDashboardRequest,
 ) (rs []model.Dashboard, total int64, err error) {
-	conditions := []string{"org_id=?"}
+	conditions := []string{"d.org_id=?"}
 	signedUser := util.GetUser(ctx)
 	params := []any{signedUser.Org.ID}
 	if req.Title != "" {
-		conditions = append(conditions, "title like ?")
+		conditions = append(conditions, "d.title like ?")
 		params = append(params, req.Title+"%")
 	}
 	if req.Ownership == model.Mine {
-		conditions = append(conditions, "created_by=?")
+		conditions = append(conditions, "d.created_by=?")
 		params = append(params, signedUser.User.ID)
 	}
 	if len(req.Tags) > 0 {
 		tags := util.RemoveDuplicates(req.Tags)
 		// ref: http://howto.philippkeller.com/2005/04/24/Tags-Database-schemas/
-		tagFilter := `uid in
+		tagFilter := `d.uid in
 		(select rt.resource_uid from resource_tags rt,tags t
 		where t.id=rt.tag_id and rt.org_id=? and rt.type=? and t.term in ? group by rt.resource_uid having count(rt.resource_uid)=?)
 		`
@@ -180,11 +180,11 @@ func (srv *dashboardService) SearchDashboards(ctx context.Context,
 		if *req.Starred {
 			// filter starred dashboards only
 			conditions = append(conditions,
-				`uid in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
+				`d.uid in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
 		} else {
 			// filter unstarred dashboards only
 			conditions = append(conditions,
-				`uid not in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
+				`d.uid not in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
 		}
 		params = append(params, signedUser.User.ID, signedUser.Org.ID, model.DashboardResource)
 	}
@@ -198,14 +198,28 @@ func (srv *dashboardService) SearchDashboards(ctx context.Context,
 	}
 	where := strings.Join(conditions, " and ")
 	// TODO: refactor set select columns
-	count, err := srv.db.Count(&model.Dashboard{}, where, params...)
+	count, err := srv.db.Count(&model.Dashboard{}, strings.ReplaceAll(where, "d.", ""), params...)
 	if err != nil {
 		return nil, 0, err
 	}
 	if count == 0 {
 		return nil, 0, nil
 	}
-	if err := srv.db.FindForPaging(&rs, offset, limit, "id desc", where, params...); err != nil {
+	// use LEFT JOIN to populate is_starred in a single query, avoiding N+1
+	joinSQL := `SELECT d.*,
+		CASE WHEN s.resource_uid IS NOT NULL THEN 1 ELSE 0 END AS is_starred
+	FROM dashboards d
+	LEFT JOIN stars s
+		ON s.resource_uid = d.uid
+		AND s.user_id     = ?
+		AND s.org_id      = ?
+		AND s.resource_type = ?
+	WHERE ` + where + `
+	ORDER BY d.id DESC
+	LIMIT ? OFFSET ?`
+	joinParams := append([]any{signedUser.User.ID, signedUser.Org.ID, model.DashboardResource}, params...)
+	joinParams = append(joinParams, limit, offset)
+	if err := srv.db.ExecRaw(&rs, joinSQL, joinParams...); err != nil {
 		return nil, 0, err
 	}
 	return rs, count, nil

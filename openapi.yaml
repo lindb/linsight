@@ -63,11 +63,7 @@ paths:
               $ref: '#/components/schemas/LoginUser'
       responses:
         '200':
-          description: Login successful – returns signed user information
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SignedUser'
+          description: Login successful – session cookie is set, no response body
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
