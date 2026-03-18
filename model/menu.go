@@ -76,8 +76,9 @@ type Menu struct {
 	Page       string         `json:"page,omitempty" gorm:"column:page"`
 	PageConfig datatypes.JSON `json:"pageConfig,omitempty" gorm:"column:page_config"`
 	// default role
-	Role  accesscontrol.RoleType `json:"role" gorm:"column:role"`
-	Order int                    `json:"order" gorm:"column:order"`
+	Role   accesscontrol.RoleType `json:"role" gorm:"column:role"`
+	Order  int                    `json:"order" gorm:"column:order"`
+	Hidden bool                   `json:"hidden" gorm:"column:hidden"`
 
 	ParentUID string  `json:"parentUID,omitempty" gorm:"column:parent_uid"`
 	Children  []*Menu `json:"children,omitempty" gorm:"-"`

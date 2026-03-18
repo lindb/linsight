@@ -117,6 +117,7 @@ func (srv *menService) UpdateMenu(ctx context.Context, menu *model.Menu) error {
 		"order":       menu.Order,
 		"page_config": menu.PageConfig,
 		"parent_uid":  menu.ParentUID,
+		"hidden":      menu.Hidden,
 		"updated_by":  user.User.ID,
 	}, "uid=?", menu.UID)
 }
@@ -177,8 +178,8 @@ func (srv *menService) SortMenus(ctx context.Context, menus model.Menus) error {
 func (srv *menService) GetMenuTreeByCurrentOrg(ctx context.Context) (model.Menus, error) {
 	var menus model.Menus
 	user := util.GetUser(ctx)
-	sql := `select  
-		c.uid,c.label,c.path,c.icon,c.page,c.page_config,c.parent_uid,oc.role,c.'order' 
+	sql := `select
+		c.uid,c.label,c.path,c.icon,c.page,c.page_config,c.parent_uid,c.hidden,oc.role,c.'order'
 	from menus c, org_menus oc where c.id=oc.menu_id and oc.org_id=?
 	`
 	if err := srv.db.ExecRaw(&menus, sql, user.Org.ID); err != nil {

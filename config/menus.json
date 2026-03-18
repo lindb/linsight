@@ -22,9 +22,18 @@
         "role": "Viewer"
       },
       {
+        "uid": "viewdatabase",
+        "label": "View Dashboard",
+        "path": "/dashboard/*",
+        "page": "dashboard",
+        "icon": "dashboard",
+        "role": "Viewer",
+        "hidden": true
+      },
+      {
         "uid": "newdatabase",
         "label": "New Dashboard",
-        "path": "/dashboard/*",
+        "path": "/dashboard/new",
         "page": "dashboard",
         "icon": "dashboard-add",
         "role": "Editor"
