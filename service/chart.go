@@ -41,6 +41,10 @@ type ChartService interface {
 	DeleteChartByUID(ctx context.Context, uid string) error
 	// GetChartByUID returns the chart by uid.
 	GetChartByUID(ctx context.Context, uid string) (*model.Chart, error)
+	// StarChart stars the chart by uid.
+	StarChart(ctx context.Context, uid string) error
+	// UnstarChart unstars the chart by uid.
+	UnstarChart(ctx context.Context, uid string) error
 	// LinkChartsToDashboard links charts to specific dashboard.
 	LinkChartsToDashboard(ctx context.Context, dashboard *model.Dashboard) error
 	// UnlinkChartFromDashboard unlinks chart from specific dashboard.
@@ -49,13 +53,15 @@ type ChartService interface {
 
 // chartService implements ChartService interface.
 type chartService struct {
-	db dbpkg.DB
+	db      dbpkg.DB
+	starSrv StarService
 }
 
 // NewChartService creates a ChartService instance.
-func NewChartService(db dbpkg.DB) ChartService {
+func NewChartService(starSrv StarService, db dbpkg.DB) ChartService {
 	return &chartService{
-		db: db,
+		db:      db,
+		starSrv: starSrv,
 	}
 }
 
@@ -95,29 +101,38 @@ func (srv *chartService) UpdateChart(ctx context.Context, chart *model.Chart) er
 func (srv *chartService) SearchCharts(ctx context.Context,
 	req *model.SearchChartRequest,
 ) (rs []model.ChartInfo, total int64, err error) {
-	conditions := []string{"org_id=?"}
+	conditions := []string{"c.org_id=?"}
 	signedUser := util.GetUser(ctx)
 	params := []any{signedUser.Org.ID}
-	sql := `select c.uid,c.title,c.desc,c.type,c.integration,c.model,
-		(select count(1) from links l where l.source_uid=c.uid) as dashboards  
-	from charts c where c.org_id=?`
 	if req.Title != "" {
-		conditions = append(conditions, "title like ?")
+		conditions = append(conditions, "c.title like ?")
 		params = append(params, req.Title+"%")
-		sql += " title like ? "
 	}
 	if req.Ownership == model.Mine {
-		conditions = append(conditions, "created_by=?")
+		conditions = append(conditions, "c.created_by=?")
 		params = append(params, signedUser.User.ID)
-		sql += " created_by=? "
 	}
-	where := strings.Join(conditions, " and ")
-	count, err := srv.db.Count(&model.Chart{}, where, params...)
-	if err != nil {
-		return nil, 0, err
+	if len(req.Tags) > 0 {
+		tags := util.RemoveDuplicates(req.Tags)
+		// ref: http://howto.philippkeller.com/2005/04/24/Tags-Database-schemas/
+		tagFilter := `c.uid in
+		(select rt.resource_uid from resource_tags rt,tags t
+		where t.id=rt.tag_id and rt.org_id=? and rt.type=? and t.term in ? group by rt.resource_uid having count(rt.resource_uid)=?)
+		`
+		conditions = append(conditions, tagFilter)
+		params = append(params, signedUser.Org.ID, model.ChartResource, tags, len(tags))
 	}
-	if count == 0 {
-		return nil, 0, nil
+	if req.Starred != nil {
+		if *req.Starred {
+			// filter starred charts only
+			conditions = append(conditions,
+				`c.uid in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
+		} else {
+			// filter unstarred charts only
+			conditions = append(conditions,
+				`c.uid not in (select resource_uid from stars where user_id=? and org_id=? and resource_type=?)`)
+		}
+		params = append(params, signedUser.User.ID, signedUser.Org.ID, model.ChartResource)
 	}
 	offset := 0
 	limit := 20
@@ -127,9 +142,31 @@ func (srv *chartService) SearchCharts(ctx context.Context,
 	if req.Limit > 0 {
 		limit = req.Limit
 	}
-	sql += " order by c.id desc limit ? offset ?"
-	params = append(params, limit, offset)
-	if err := srv.db.ExecRaw(&rs, sql, params...); err != nil {
+	where := strings.Join(conditions, " and ")
+	// COUNT uses the same conditions but without table alias prefix
+	count, err := srv.db.Count(&model.Chart{}, strings.ReplaceAll(where, "c.", ""), params...)
+	if err != nil {
+		return nil, 0, err
+	}
+	if count == 0 {
+		return nil, 0, nil
+	}
+	// use LEFT JOIN to populate is_starred and dashboards count in a single query
+	joinSQL := `SELECT c.uid, c.title, c.desc, c.type, c.integration, c.model,
+		CASE WHEN s.resource_uid IS NOT NULL THEN 1 ELSE 0 END AS is_starred,
+		(SELECT count(1) FROM links l WHERE l.source_uid=c.uid) AS dashboards
+	FROM charts c
+	LEFT JOIN stars s
+		ON s.resource_uid = c.uid
+		AND s.user_id     = ?
+		AND s.org_id      = ?
+		AND s.resource_type = ?
+	WHERE ` + where + `
+	ORDER BY c.id DESC
+	LIMIT ? OFFSET ?`
+	joinParams := append([]any{signedUser.User.ID, signedUser.Org.ID, model.ChartResource}, params...)
+	joinParams = append(joinParams, limit, offset)
+	if err := srv.db.ExecRaw(&rs, joinSQL, joinParams...); err != nil {
 		return nil, 0, err
 	}
 	return rs, count, nil
@@ -153,6 +190,28 @@ func (srv *chartService) GetChartByUID(ctx context.Context, uid string) (*model.
 		return nil, err
 	}
 	return rs, nil
+}
+
+// StarChart stars the chart by uid.
+func (srv *chartService) StarChart(ctx context.Context, uid string) error {
+	return srv.toggleStar(ctx, uid, true)
+}
+
+// UnstarChart unstars the chart by uid.
+func (srv *chartService) UnstarChart(ctx context.Context, uid string) error {
+	return srv.toggleStar(ctx, uid, false)
+}
+
+// toggleStar toggles the chart star.
+func (srv *chartService) toggleStar(ctx context.Context, uid string, star bool) error {
+	chart, err := srv.GetChartByUID(ctx, uid)
+	if err != nil {
+		return err
+	}
+	if star {
+		return srv.starSrv.Star(ctx, chart.UID, model.ChartResource)
+	}
+	return srv.starSrv.Unstar(ctx, chart.UID, model.ChartResource)
 }
 
 // LinkChartsToDashboard links charts to specific dashboard.

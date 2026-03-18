@@ -221,6 +221,10 @@ func (r *Router) RegisterRouters() {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.GetDashboardsByChartUID)...)
 	router.DELETE("/charts/:uid/dashboards/:dashboardUID",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.chartAPI.UnlinkChartFromDashboard)...)
+	router.PUT("/charts/:uid/star",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.chartAPI.StarChart)...)
+	router.DELETE("/charts/:uid/star",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, r.chartAPI.UnstarChart)...)
 
 	router.PUT("/data/query",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.datasourceQueryAPI.DataQuery)...)

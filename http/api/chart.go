@@ -154,6 +154,28 @@ func (api *ChartAPI) UnlinkChartFromDashboard(c *gin.Context) {
 	httppkg.OK(c, "Unlinked chart from dashboard")
 }
 
+// StarChart stars the chart by given uid.
+func (api *ChartAPI) StarChart(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	err := api.deps.ChartSrv.StarChart(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "star success")
+}
+
+// UnstarChart unstars the chart by given uid.
+func (api *ChartAPI) UnstarChart(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	err := api.deps.ChartSrv.UnstarChart(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "unstar success")
+}
+
 // saveChartMeta saves chart metadata.
 func (api *ChartAPI) saveChartMeta(ctx context.Context, chart *model.Chart) error {
 	// connect integration

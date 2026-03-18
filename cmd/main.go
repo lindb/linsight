@@ -189,7 +189,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DatasourceSrv:       service.NewDatasourceService(db),
 		DashboardSrv:        service.NewDashboardService(starSrv, tagSrv, db),
 		DashboardVersionSrv: service.NewDashboardVersionService(db),
-		ChartSrv:            service.NewChartService(db),
+		ChartSrv:            service.NewChartService(starSrv, db),
 
 		NotificationSrv: service.NewNotificationService(db),
 		AlertRuleSrv:    service.NewAlertRuleService(db),

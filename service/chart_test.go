@@ -34,7 +34,7 @@ func TestChartService_CreateChart(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewChartService(mockDB)
+	srv := NewChartService(nil, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -73,15 +73,27 @@ func TestChartService_SerachCharts(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewChartService(mockDB)
+	srv := NewChartService(nil, mockDB)
+
+	boolTrue := true
+	boolFalse := false
 
 	cases := []struct {
 		name    string
+		req     *model.SearchChartRequest
 		prepare func()
 		wantErr bool
 	}{
 		{
 			name: "count failure",
+			req: &model.SearchChartRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), fmt.Errorf("err"))
@@ -90,6 +102,14 @@ func TestChartService_SerachCharts(t *testing.T) {
 		},
 		{
 			name: "count 0",
+			req: &model.SearchChartRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(0), nil)
@@ -98,21 +118,71 @@ func TestChartService_SerachCharts(t *testing.T) {
 		},
 		{
 			name: "find failure",
+			req: &model.SearchChartRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any(), 10, 20).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
 			name: "find successfully",
+			req: &model.SearchChartRequest{
+				Title:     "title",
+				Ownership: model.Mine,
+				PagingParam: model.PagingParam{
+					Limit:  10,
+					Offset: 20,
+				},
+			},
 			prepare: func() {
 				mockDB.EXPECT().Count(gomock.Any(), "org_id=? and title like ? and created_by=?",
 					gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
-				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(),
-					gomock.Any(), gomock.Any(), gomock.Any(), 10, 20).Return(nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "filter by tags",
+			req: &model.SearchChartRequest{
+				Tags: []string{"tag"},
+			},
+			prepare: func() {
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(5), nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "filter starred only",
+			req: &model.SearchChartRequest{
+				Starred: &boolTrue,
+			},
+			prepare: func() {
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(10), nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "filter unstarred only",
+			req: &model.SearchChartRequest{
+				Starred: &boolFalse,
+			},
+			prepare: func() {
+				mockDB.EXPECT().Count(gomock.Any(), gomock.Any(),
+					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(int64(5), nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: false,
 		},
@@ -122,14 +192,7 @@ func TestChartService_SerachCharts(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.prepare()
-			_, _, err := srv.SearchCharts(ctx, &model.SearchChartRequest{
-				Title:     "title",
-				Ownership: model.Mine,
-				PagingParam: model.PagingParam{
-					Limit:  10,
-					Offset: 20,
-				},
-			})
+			_, _, err := srv.SearchCharts(ctx, tt.req)
 			if tt.wantErr != (err != nil) {
 				t.Fatal(tt.name)
 			}
@@ -142,7 +205,7 @@ func TestChartService_UpdateChart(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewChartService(mockDB)
+	srv := NewChartService(nil, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -194,7 +257,7 @@ func TestChartService_DeleteChartByUID(t *testing.T) {
 		return fn(mockDB)
 	}).AnyTimes()
 
-	srv := NewChartService(mockDB)
+	srv := NewChartService(nil, mockDB)
 	t.Run("delete successfully", func(t *testing.T) {
 		mockDB.EXPECT().Delete(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
 		err := srv.DeleteChartByUID(ctx, "1234")
@@ -207,7 +270,7 @@ func TestChartService_GetChartByUID(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewChartService(mockDB)
+	srv := NewChartService(nil, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -249,7 +312,7 @@ func TestChartService_LinkChartsToDashboard(t *testing.T) {
 	mockDB.EXPECT().Transaction(gomock.Any()).DoAndReturn(func(fn func(tx db.DB) error) error {
 		return fn(mockDB)
 	}).AnyTimes()
-	srv := NewChartService(mockDB)
+	srv := NewChartService(nil, mockDB)
 	cases := []struct {
 		name      string
 		dashboard *model.Dashboard
@@ -324,10 +387,46 @@ func TestChartService_UnlinkChartFromDashboard(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	srv := NewChartService(mockDB)
+	srv := NewChartService(nil, mockDB)
 	mockDB.EXPECT().Delete(gomock.Any(), "org_id=? and kind=? and source_uid=? and target_uid=?",
 		int64(12), model.DashboardLink, "123", "abc",
 	).Return(nil)
 	err := srv.UnlinkChartFromDashboard(ctx, "123", "abc")
+	assert.NoError(t, err)
+}
+
+func TestChartService_Star(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := db.NewMockDB(ctrl)
+	starSrv := NewMockStarService(ctrl)
+	srv := NewChartService(starSrv, mockDB)
+
+	// get chart failure
+	mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+	err := srv.StarChart(ctx, "1234")
+	assert.Error(t, err)
+
+	mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil).AnyTimes()
+
+	// star failure
+	starSrv.EXPECT().Star(gomock.Any(), gomock.Any(), model.ChartResource).Return(fmt.Errorf("err"))
+	err = srv.StarChart(ctx, "1234")
+	assert.Error(t, err)
+
+	// star successfully
+	starSrv.EXPECT().Star(gomock.Any(), gomock.Any(), model.ChartResource).Return(nil)
+	err = srv.StarChart(ctx, "1234")
+	assert.NoError(t, err)
+
+	// unstar failure
+	starSrv.EXPECT().Unstar(gomock.Any(), gomock.Any(), model.ChartResource).Return(fmt.Errorf("err"))
+	err = srv.UnstarChart(ctx, "1234")
+	assert.Error(t, err)
+
+	// unstar successfully
+	starSrv.EXPECT().Unstar(gomock.Any(), gomock.Any(), model.ChartResource).Return(nil)
+	err = srv.UnstarChart(ctx, "1234")
 	assert.NoError(t, err)
 }

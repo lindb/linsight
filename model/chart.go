@@ -37,7 +37,9 @@ type Chart struct {
 
 	Model datatypes.JSON `json:"model,omitempty" gorm:"column:model"`
 
-	IsStarred bool `json:"isStarred,omitempty" gorm:"-"`
+	// IsStarred indicates whether the current user has starred this chart.
+	// This field is NOT persisted to DB; it is populated dynamically via LEFT JOIN on the stars table.
+	IsStarred bool `json:"isStarred,omitempty" gorm:"column:is_starred;->"`
 }
 
 // ReadMeta reads metadata from config json.
@@ -56,6 +58,8 @@ type SearchChartRequest struct {
 	Title     string    `form:"title" json:"title"`
 	Ownership Ownership `form:"ownership" json:"ownership"`
 	Tags      []string  `form:"tags" json:"tags"`
+	// Starred filters by star status: nil=all, true=starred only, false=unstarred only
+	Starred *bool `form:"starred" json:"starred"`
 }
 
 // ChartInfo represents chart basic information without config json.
@@ -67,4 +71,5 @@ type ChartInfo struct {
 	Integration string         `json:"integration,omitempty"`
 	Dashboards  int            `json:"dashboards"`
 	Model       datatypes.JSON `json:"model,omitempty"`
+	IsStarred   bool           `json:"isStarred,omitempty"`
 }
