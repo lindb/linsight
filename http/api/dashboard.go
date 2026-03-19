@@ -137,14 +137,13 @@ func (api *DashboardAPI) GetDashboardByUID(c *gin.Context) {
 		return
 	}
 	dashboardMap[constant.UID] = uid
-	// TODO: modify
-	dashboardMap["isStarred"] = dashboard.IsStarred
 	provisioningDashboard, err := api.deps.DashboardSrv.GetProvisioningDashboard(ctx, uid)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	meta := model.NewDashboardMeta()
+	meta.IsStarred = dashboard.IsStarred
 	if provisioningDashboard != nil {
 		meta.Provisioned = true
 		if !provisioningDashboard.AllowUIUpdates {

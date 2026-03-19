@@ -103,6 +103,7 @@ type Dashboard struct {
 type DashboardMeta struct {
 	CanEdit     bool `json:"canEdit"`
 	Provisioned bool `json:"provisioned"`
+	IsStarred   bool `json:"isStarred,omitempty"`
 }
 
 // NewDashboardMeta creates a dashboard metadata.
@@ -110,6 +111,7 @@ func NewDashboardMeta() DashboardMeta {
 	return DashboardMeta{
 		CanEdit:     true,
 		Provisioned: false,
+		IsStarred:   false,
 	}
 }
 

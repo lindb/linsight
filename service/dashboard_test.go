@@ -192,8 +192,8 @@ func TestDashboardService_GetDashboardByUID(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockDB := db.NewMockDB(ctrl)
-	starSrv := NewMockStarService(ctrl)
-	srv := NewDashboardService(starSrv, nil, mockDB)
+	// no starSrv needed — GetDashboardByUID now uses a single LEFT JOIN via ExecRaw
+	srv := NewDashboardService(nil, nil, mockDB)
 	cases := []struct {
 		name    string
 		prepare func()
@@ -202,23 +202,28 @@ func TestDashboardService_GetDashboardByUID(t *testing.T) {
 		{
 			name: "get dashboard failure",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(fmt.Errorf("err"))
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
 			},
 			wantErr: true,
 		},
 		{
-			name: "get star failure",
+			name: "get dashboard not found",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				starSrv.EXPECT().IsStarred(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, fmt.Errorf("err"))
+				// ExecRaw succeeds but returns empty slice → ErrRecordNotFound
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			},
 			wantErr: true,
 		},
 		{
 			name: "get dashboard successfully",
 			prepare: func() {
-				mockDB.EXPECT().Get(gomock.Any(), "uid=? and org_id=?", "1234", int64(12)).Return(nil)
-				starSrv.EXPECT().IsStarred(gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil)
+				mockDB.EXPECT().ExecRaw(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(result any, query string, args ...any) error {
+						// populate one result to simulate a found dashboard
+						rs := result.(*[]model.Dashboard)
+						*rs = append(*rs, model.Dashboard{})
+						return nil
+					})
 			},
 			wantErr: false,
 		},

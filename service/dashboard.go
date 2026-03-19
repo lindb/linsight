@@ -224,18 +224,32 @@ func (srv *dashboardService) SearchDashboards(ctx context.Context,
 }
 
 // GetDashboardByUID returns the dashboard by uid.
+// Uses a LEFT JOIN against the stars table to populate IsStarred in a single query,
+// consistent with SearchDashboards.
 func (srv *dashboardService) GetDashboardByUID(ctx context.Context, uid string) (*model.Dashboard, error) {
-	rs, err := srv.getDashboardByUID(ctx, uid)
-	if err != nil {
+	signedUser := util.GetUser(ctx)
+	// use LEFT JOIN to populate is_starred in a single query, avoiding a second DB round-trip
+	joinSQL := `SELECT d.*,
+		CASE WHEN s.resource_uid IS NOT NULL THEN 1 ELSE 0 END AS is_starred
+	FROM dashboards d
+	LEFT JOIN stars s
+		ON s.resource_uid = d.uid
+		AND s.user_id     = ?
+		AND s.org_id      = ?
+		AND s.resource_type = ?
+	WHERE d.uid = ? AND d.org_id = ?
+	LIMIT 1`
+	var results []model.Dashboard
+	if err := srv.db.ExecRaw(&results, joinSQL,
+		signedUser.User.ID, signedUser.Org.ID, model.DashboardResource,
+		uid, signedUser.Org.ID,
+	); err != nil {
 		return nil, err
 	}
-	// populate IsStarred field dynamically from the stars table
-	starred, err := srv.starSrv.IsStarred(ctx, rs.UID, model.DashboardResource)
-	if err != nil {
-		return nil, err
+	if len(results) == 0 {
+		return nil, gorm.ErrRecordNotFound
 	}
-	rs.IsStarred = starred
-	return rs, nil
+	return &results[0], nil
 }
 
 // StarDashboard stars the dashboard by uid.
