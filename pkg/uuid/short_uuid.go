@@ -21,7 +21,7 @@ import (
 	"github.com/teris-io/shortid"
 )
 
-var allowedChars = shortid.DefaultABC
+const allowedChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func init() {
 	gen, _ := shortid.New(1, allowedChars, 1)
