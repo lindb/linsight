@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 
 	_ "github.com/lindb/linsight/alerting"
+	"github.com/lindb/linsight/alerting/manager"
 	"github.com/lindb/linsight/alerting/schedule"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
@@ -126,6 +127,7 @@ func runServer(_ *cobra.Command, _ []string) error {
 					AlertRuleSrv:    apiDeps.AlertRuleSrv,
 					NotificationSrv: apiDeps.NotificationSrv,
 					DatasourceMgr:   apiDeps.DatasourceMgr,
+					AlertMgr:        apiDeps.AlertMgr,
 				},
 			)
 			sche.Run()
@@ -175,6 +177,26 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	userSrv := service.NewUserService(db, orgSrv, cache)
 	starSrv := service.NewStarService(db)
 	tagSrv := service.NewTagService(db)
+
+	// new alerting services
+	alertEventSrv := service.NewAlertEventService(db)
+	alertRouteSrv := service.NewAlertRouteService(db)
+	alertReceiverSrv := service.NewAlertReceiverService(db)
+	alertSilenceSrv := service.NewAlertSilenceService(db)
+	alertInhibitRuleSrv := service.NewAlertInhibitRuleService(db)
+	notificationTemplateSrv := service.NewNotificationTemplateService(db)
+
+	// alertmanager
+	alertMgr := manager.NewAlertManager(&manager.Deps{
+		AlertEventSrv:           alertEventSrv,
+		AlertRouteSrv:           alertRouteSrv,
+		AlertReceiverSrv:        alertReceiverSrv,
+		AlertSilenceSrv:         alertSilenceSrv,
+		AlertInhibitRuleSrv:     alertInhibitRuleSrv,
+		NotificationTemplateSrv: notificationTemplateSrv,
+		ExternalURL:             "", // TODO: configure public URL in server config
+	})
+
 	return &deps.API{
 		Config:              cfg,
 		OrgSrv:              orgSrv,
@@ -193,6 +215,15 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 
 		NotificationSrv: service.NewNotificationService(db),
 		AlertRuleSrv:    service.NewAlertRuleService(db),
+
+		AlertEventSrv:           alertEventSrv,
+		AlertRouteSrv:           alertRouteSrv,
+		AlertReceiverSrv:        alertReceiverSrv,
+		AlertSilenceSrv:         alertSilenceSrv,
+		AlertInhibitRuleSrv:     alertInhibitRuleSrv,
+		NotificationTemplateSrv: notificationTemplateSrv,
+
+		AlertMgr: alertMgr,
 
 		DatasourceMgr: datasource.NewDatasourceManager(),
 	}

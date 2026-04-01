@@ -1,16 +1,36 @@
+// Licensed to LinDB under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. LinDB licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package schedule
 
 import (
 	"context"
-	"fmt"
 	"runtime/pprof"
 	"sync"
+	"time"
 
 	"go.uber.org/atomic"
+
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/model"
 )
 
+// RuleExecWorker executes a single alert rule on a goroutine using a lock-free channel design.
 type RuleExecWorker interface {
 	Run()
 	UpdateRule(rule *model.AlertRule) bool
@@ -23,13 +43,14 @@ type ruleExecWorker struct {
 	cancel  context.CancelFunc
 	deps    *Deps
 	rawRule *model.AlertRule
-	// two chan/one goroutine = lock free
+	// two channels / one goroutine = lock free
 	evalSignal chan int64
 	updateCh   chan *model.AlertRule
 
 	rule *AlertRule
 
-	running *atomic.Bool
+	running    *atomic.Bool
+	workerLog  logger.Logger
 }
 
 func newRuleExecWorker(ctx context.Context, rule *model.AlertRule, deps *Deps) RuleExecWorker {
@@ -43,6 +64,7 @@ func newRuleExecWorker(ctx context.Context, rule *model.AlertRule, deps *Deps) R
 		evalSignal: make(chan int64),
 		updateCh:   make(chan *model.AlertRule),
 		running:    atomic.NewBool(true),
+		workerLog:  logger.GetLogger("Alerting", "RuleWorker"),
 	}
 }
 
@@ -51,21 +73,21 @@ func (w *ruleExecWorker) Run() {
 		for {
 			select {
 			case tick := <-w.evalSignal:
-				// check rule state
+				// skip paused or deleted rules
 				if w.rawRule.State == model.RulePause || w.rawRule.State == model.RuleDelete {
 					continue
 				}
-				// check if need ready to exec
+				// throttle: only execute on the appropriate tick multiple
 				if tick%int64(w.rawRule.Interval.Seconds()/w.deps.Opts.Interval.Seconds()) != 0 {
 					continue
 				}
-				// TODO: time shuffle
 				if err := w.exec(); err != nil {
-					// TODO: update rule state
-					fmt.Println(err)
+					w.workerLog.Error("rule exec failure",
+						logger.String("rule", w.rawRule.UID),
+						logger.Error(err))
 				}
 			case newRule := <-w.updateCh:
-				// update alert rule
+				// hot-reload rule config
 				w.rawRule = newRule
 				w.rule.Update(newRule)
 			case <-ctx.Done():
@@ -78,7 +100,7 @@ func (w *ruleExecWorker) Run() {
 func (w *ruleExecWorker) UpdateRule(rule *model.AlertRule) bool {
 	select {
 	case <-w.updateCh:
-	//TODO: add metric
+		// drain stale update
 	default:
 	}
 
@@ -93,7 +115,7 @@ func (w *ruleExecWorker) UpdateRule(rule *model.AlertRule) bool {
 func (w *ruleExecWorker) EvalRule(tick int64) bool {
 	select {
 	case <-w.evalSignal:
-	//TODO: add metric
+		// drain stale signal
 	default:
 	}
 
@@ -112,31 +134,30 @@ func (w *ruleExecWorker) Stop() {
 }
 
 func (w *ruleExecWorker) exec() error {
-	err := w.rule.Perpare()
-	if err != nil {
+	if err := w.rule.Perpare(); err != nil {
 		return err
 	}
 
-	// fetch alert data
+	// fetch metric data from datasource
 	seriesList, err := w.rule.FetchData()
 	if err != nil {
 		return err
 	}
 
-	// eval alert conditions
-	alerts, err := w.rule.Eval(context.TODO(), seriesList)
+	// evaluate conditions and drive the state machine
+	events, err := w.rule.EvalAndTrack(context.TODO(), seriesList, time.Now())
 	if err != nil {
 		return err
 	}
 
-	// notifiy
-	err = w.deps.notificationMgr.Notifiy(w.rule, alerts)
-	if err != nil {
-		return err
+	// delegate notification routing to the AlertManager
+	if len(events) > 0 && w.deps.AlertMgr != nil {
+		w.deps.AlertMgr.ProcessEvents(w.rawRule.OrgID, events)
 	}
 	return nil
 }
 
+// WorkerManager creates and tracks RuleExecWorkers per rule UID.
 type WorkerManager interface {
 	GetOrCreateWorker(ctx context.Context, rule *model.AlertRule) RuleExecWorker
 }
@@ -149,6 +170,7 @@ type workerManager struct {
 	lock sync.RWMutex
 }
 
+// NewWorkerManager creates a WorkerManager.
 func NewWorkerManager(orgID int64, deps *Deps) WorkerManager {
 	return &workerManager{
 		orgID:   orgID,
@@ -166,7 +188,7 @@ func (mgr *workerManager) GetOrCreateWorker(ctx context.Context, rule *model.Ale
 		return worker
 	}
 
-	// run new rule exec worker
+	// start a new worker goroutine for this rule
 	worker = newRuleExecWorker(ctx, rule, mgr.deps)
 	worker.Run()
 

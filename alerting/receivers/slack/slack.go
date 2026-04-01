@@ -6,12 +6,12 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"html/template"
 
 	"github.com/slack-go/slack"
 
 	"github.com/lindb/common/pkg/encoding"
 
+	"github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/alerting/types"
 	"github.com/lindb/linsight/model"
 )
@@ -25,7 +25,6 @@ var config string
 func init() {
 	types.Register(&types.ReceiverPluginDefine{
 		Define: &model.ReceiverPlugin{
-
 			Type:    "Slack",
 			Setting: json.RawMessage(setting),
 			Config:  json.RawMessage(config),
@@ -34,29 +33,32 @@ func init() {
 	})
 }
 
+// Setting holds global Slack plugin configuration (bot token).
 type Setting struct {
 	Token string `json:"token"`
 }
+
+// Config holds per-channel Slack configuration.
 type Config struct {
-	Channel string
+	Channel     string `json:"channel"`
+	TemplateUID string `json:"templateUID"` // optional: override notification body template
 }
 
 type notifer struct {
 	setting Setting
 	cfg     Config
-
-	cli *slack.Client
+	cli     *slack.Client
 }
 
-func newSlackNotifer(setting, cfg json.RawMessage) (types.Notifier, error) {
-	settingJSON, _ := setting.MarshalJSON()
+func newSlackNotifer(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
+	sRaw, _ := settingJSON.MarshalJSON()
 	var settingData Setting
-	if err := encoding.JSONUnmarshal(settingJSON, &settingData); err != nil {
+	if err := encoding.JSONUnmarshal(sRaw, &settingData); err != nil {
 		return nil, err
 	}
-	cfgJSON, _ := cfg.MarshalJSON()
+	cRaw, _ := cfgJSON.MarshalJSON()
 	var cfgData Config
-	if err := encoding.JSONUnmarshal(cfgJSON, &cfgData); err != nil {
+	if err := encoding.JSONUnmarshal(cRaw, &cfgData); err != nil {
 		return nil, err
 	}
 	return &notifer{
@@ -66,44 +68,72 @@ func newSlackNotifer(setting, cfg json.RawMessage) (types.Notifier, error) {
 	}, nil
 }
 
-func (n *notifer) Notify(ctx context.Context, alerts []*model.Alert) error {
-	tmplStr := `Metric:{{.MetricName}}
-Field:{{.Field}}
-Value:{{.Value}}
-Tags:
-{{- range $key, $value := .Tags }}
-{{ $key }}:{{ $value }}
-{{- end }}`
+func (n *notifer) Notify(ctx context.Context, data *template.NotificationData) error {
+	renderer := template.NewRenderer()
+
 	var attachments []slack.Attachment
-	for _, alert := range alerts {
-		tmpl, err := template.New("fruits").Parse(tmplStr)
+	for _, alert := range data.FiringAlerts {
+		// render body using the default template
+		body, err := renderer.RenderDefaultBody(&template.NotificationData{
+			Alerts:            []*model.AlertEvent{alert},
+			FiringAlerts:      []*model.AlertEvent{alert},
+			CommonLabels:      data.CommonLabels,
+			CommonAnnotations: data.CommonAnnotations,
+			GroupLabels:       data.GroupLabels,
+			ReceiverName:      data.ReceiverName,
+			Status:            "firing",
+			ExternalURL:       data.ExternalURL,
+		})
 		if err != nil {
-			return err
+			body = fmt.Sprintf("[%s] value=%.2f", alert.RuleTitle, alert.Value)
 		}
+
+		// render title
+		title, err := renderer.RenderDefaultTitle(data)
+		if err != nil {
+			title = fmt.Sprintf("[FIRING] %s", alert.RuleTitle)
+		}
+
+		var titleLink string
+		if data.ExternalURL != "" && alert.GeneratorURL != "" {
+			titleLink = data.ExternalURL + alert.GeneratorURL
+		} else {
+			titleLink = alert.GeneratorURL
+		}
+
 		var buf bytes.Buffer
-		err = tmpl.Execute(&buf, alert.Series)
-		if err != nil {
-			panic(err)
-		}
-		msg := buf.String()
-		fmt.Println(msg)
-		attachments = append(attachments,
-			slack.Attachment{
-				Color:      "danger",
-				Title:      "Memory Usage > 90%",
-				TitleLink:  "http://localhost:3000/explore?left=%7B%22targets%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22request%22%3A%7B%22namespace%22%3A%22default-ns%22%2C%22metric%22%3A%22lindb.monitor.system.mem_stat%22%2C%22fields%22%3A%5B%22usage%22%5D%2C%22groupBy%22%3A%5B%22node%22%5D%7D%7D%5D%2C%22type%22%3A%22timeseries%22%2C%22fieldConfig%22%3A%7B%22defaults%22%3A%7B%22unit%22%3A%22short%22%7D%7D%2C%22datasource%22%3A%7B%22uid%22%3A%22YJi4skUVz%22%2C%22type%22%3A%22lindb%22%7D%7D",
-				Text:       msg,
-				MarkdownIn: []string{"text"},
-				Ts:         json.Number(fmt.Sprintf("%d", alert.Series.Timestamp)),
-			},
-		)
+		buf.WriteString(body)
+
+		attachments = append(attachments, slack.Attachment{
+			Color:      "danger",
+			Title:      title,
+			TitleLink:  titleLink,
+			Text:       buf.String(),
+			MarkdownIn: []string{"text"},
+			Ts:         json.Number(fmt.Sprintf("%d", alert.StartsAt/1000)),
+		})
 	}
-	_, _, err := n.cli.PostMessage(
+
+	for _, alert := range data.ResolvedAlerts {
+		title, _ := renderer.RenderDefaultTitle(data)
+		if title == "" {
+			title = fmt.Sprintf("[RESOLVED] %s", alert.RuleTitle)
+		}
+		attachments = append(attachments, slack.Attachment{
+			Color:      "good",
+			Title:      title,
+			Text:       fmt.Sprintf("Alert resolved at %d", alert.EndsAt),
+			MarkdownIn: []string{"text"},
+		})
+	}
+
+	if len(attachments) == 0 {
+		return nil
+	}
+
+	_, _, err := n.cli.PostMessageContext(ctx,
 		n.cfg.Channel,
 		slack.MsgOptionAttachments(attachments...),
 	)
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }

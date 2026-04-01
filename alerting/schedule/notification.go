@@ -1,21 +1,36 @@
+// Licensed to LinDB under one or more contributor
+// license agreements. See the NOTICE file distributed with
+// this work for additional information regarding copyright
+// ownership. LinDB licenses this file to you under
+// the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 package schedule
 
 import (
-	"context"
-	"encoding/json"
 	"sync"
 
 	"github.com/lindb/common/pkg/logger"
 
-	"github.com/lindb/linsight/alerting/types"
 	"github.com/lindb/linsight/model"
 )
 
+// NotificationManager is kept for backward compatibility with the schedule bootstrapping code.
+// Actual notification routing is now handled by alerting/manager.AlertManager.
+// This manager only handles loading the global notification settings used by legacy notification plugins.
 type NotificationManager interface {
 	LoadNotificationSettings()
-	GetNotificationSetting(notifiyType string) (*model.NotificationSetting, bool)
-
-	Notifiy(rule *AlertRule, alerts []*model.Alert) error
+	GetNotificationSetting(notifyType string) (*model.NotificationSetting, bool)
 }
 
 type notificationManager struct {
@@ -28,6 +43,7 @@ type notificationManager struct {
 	logger logger.Logger
 }
 
+// NewNotificationManager creates a NotificationManager instance.
 func NewNotificationManager(orgID int64, deps *Deps) NotificationManager {
 	return &notificationManager{
 		orgID:                orgID,
@@ -40,7 +56,9 @@ func NewNotificationManager(orgID int64, deps *Deps) NotificationManager {
 func (mgr *notificationManager) LoadNotificationSettings() {
 	notificationSettings, err := mgr.deps.NotificationSrv.GetNotificationSettingsByOrg(mgr.orgID)
 	if err != nil {
-		mgr.logger.Error("load notification settings failure", logger.Any("org", mgr.orgID), logger.Error(err))
+		mgr.logger.Error("load notification settings failure",
+			logger.Any("org", mgr.orgID),
+			logger.Error(err))
 		return
 	}
 
@@ -55,45 +73,10 @@ func (mgr *notificationManager) LoadNotificationSettings() {
 	mgr.lock.Unlock()
 }
 
-func (mgr *notificationManager) GetNotificationSetting(notifiyType string) (*model.NotificationSetting, bool) {
+func (mgr *notificationManager) GetNotificationSetting(notifyType string) (*model.NotificationSetting, bool) {
 	mgr.lock.RLock()
 	defer mgr.lock.RUnlock()
 
-	s, ok := mgr.notificationSettings[notifiyType]
+	s, ok := mgr.notificationSettings[notifyType]
 	return s, ok
-}
-
-func (mgr *notificationManager) Notifiy(rule *AlertRule, alerts []*model.Alert) error {
-	if len(alerts) == 0 {
-		return nil
-	}
-
-	notifications := rule.GetNotifications()
-	for _, nUID := range notifications {
-		notification, err := mgr.deps.NotificationSrv.GetNotificationByOrgAndUID(mgr.orgID, nUID)
-		if err != nil {
-			return err
-		}
-		receivers, err := notification.ToReceviers()
-		if err != nil {
-			return err
-		}
-		for _, receiver := range receivers {
-			n, ok := mgr.GetNotificationSetting(receiver.Type)
-			if !ok {
-				mgr.logger.Warn("notification setting not found", logger.Any("org", mgr.orgID), logger.Any("type", receiver.Type))
-				continue
-			}
-
-			d, _ := n.Config.MarshalJSON()
-			slack, _ := types.GetReceiverPlugin(receiver.Type)
-			cli, err := slack.NewFn(json.RawMessage(d), receiver.Config)
-			if err != nil {
-				return err
-			}
-			cli.Notify(context.TODO(), alerts)
-		}
-	}
-
-	return nil
 }

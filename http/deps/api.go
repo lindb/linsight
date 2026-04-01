@@ -18,11 +18,13 @@
 package deps
 
 import (
+	"github.com/lindb/linsight/alerting/manager"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/plugin/datasource"
 	"github.com/lindb/linsight/service"
 )
 
+// API holds all service dependencies injected into HTTP handlers.
 type API struct {
 	Config *config.Server
 
@@ -44,6 +46,16 @@ type API struct {
 
 	NotificationSrv service.NotificationService
 	AlertRuleSrv    service.AlertRuleService
+
+	// new alerting services
+	AlertEventSrv           service.AlertEventService
+	AlertRouteSrv           service.AlertRouteService
+	AlertReceiverSrv        service.AlertReceiverService
+	AlertSilenceSrv         service.AlertSilenceService
+	AlertInhibitRuleSrv     service.AlertInhibitRuleService
+	NotificationTemplateSrv service.NotificationTemplateService
+
+	AlertMgr manager.AlertManager
 
 	DatasourceMgr datasource.Manager
 }
