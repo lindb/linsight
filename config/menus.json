@@ -57,6 +57,70 @@
     "role": "Viewer"
   },
   {
+    "uid": "alerting",
+    "label": "Alerting",
+    "icon": "alert",
+    "role": "Viewer",
+    "children": [
+      {
+        "uid": "alerting_rules",
+        "label": "Alert Rules",
+        "path": "/alerting/rules/*",
+        "page": "alerting_rules",
+        "icon": "rule",
+        "role": "Viewer"
+      },
+      {
+        "uid": "alerting_events",
+        "label": "Alert Events",
+        "path": "/alerting/events/*",
+        "page": "alerting_events",
+        "icon": "alert",
+        "role": "Viewer"
+      },
+      {
+        "uid": "alerting_silences",
+        "label": "Silences",
+        "path": "/alerting/silences/*",
+        "page": "alerting_silences",
+        "icon": "mute",
+        "role": "Editor"
+      },
+      {
+        "uid": "alerting_receivers",
+        "label": "Receivers",
+        "path": "/alerting/receivers/*",
+        "page": "alerting_receivers",
+        "icon": "notification",
+        "role": "Editor"
+      },
+      {
+        "uid": "alerting_routes",
+        "label": "Routes",
+        "path": "/alerting/routes/*",
+        "page": "alerting_routes",
+        "icon": "route",
+        "role": "Editor"
+      },
+      {
+        "uid": "alerting_inhibit_rules",
+        "label": "Inhibit Rules",
+        "path": "/alerting/inhibit-rules/*",
+        "page": "alerting_inhibit_rules",
+        "icon": "inhibit",
+        "role": "Editor"
+      },
+      {
+        "uid": "alerting_templates",
+        "label": "Templates",
+        "path": "/alerting/templates/*",
+        "page": "alerting_templates",
+        "icon": "template",
+        "role": "Editor"
+      }
+    ]
+  },
+  {
     "uid": "setting",
     "label": "Setting",
     "icon": "setting",

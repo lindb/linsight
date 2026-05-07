@@ -43,6 +43,22 @@ tags:
     description: Tag lookup
   - name: Integrations
     description: Integration listing
+  - name: AlertRules
+    description: Alert rule management (Editor/Viewer)
+  - name: AlertEvents
+    description: Alert event query (Viewer)
+  - name: AlertRoutes
+    description: Alert routing tree management (Editor/Viewer)
+  - name: AlertReceivers
+    description: Alert receiver management (Editor/Viewer)
+  - name: AlertSilences
+    description: Alert silence management (Editor/Viewer)
+  - name: AlertInhibitRules
+    description: Alert inhibit rule management (Editor/Viewer)
+  - name: NotificationTemplates
+    description: Notification template management (Editor/Viewer)
+  - name: NotificationSettings
+    description: Global notification channel settings (Admin)
 
 security:
   - cookieAuth: []
@@ -1385,6 +1401,795 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  # ─── Notification Settings ────────────────────────────────────────────────────
+  /api/v1/alerting/notification/settings:
+    get:
+      tags: [NotificationSettings]
+      summary: Get all notification settings (Admin)
+      description: Returns global notification channel settings (e.g. SMTP, Slack token). Requires Admin role.
+      responses:
+        '200':
+          description: List of notification settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationSetting'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [NotificationSettings]
+      summary: Save notification setting (Admin)
+      description: Create or update a global notification channel setting. Requires Admin role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSetting'
+      responses:
+        '200':
+          description: Notification setting saved
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/notification/settings/{type}:
+    delete:
+      tags: [NotificationSettings]
+      summary: Delete notification setting (Admin)
+      description: Delete a global notification channel setting by type. Requires Admin role.
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notification channel type (e.g. Slack, Email)
+      responses:
+        '200':
+          description: Notification setting deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Alert Rules ──────────────────────────────────────────────────────────────
+  /api/v1/alerting/rules:
+    get:
+      tags: [AlertRules]
+      summary: Search alert rules (Viewer)
+      description: Search alert rules with optional title filter and pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: title
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of alert rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRuleListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AlertRules]
+      summary: Create alert rule (Editor)
+      description: Create a new alert rule. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRule'
+      responses:
+        '200':
+          description: Alert rule created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+                description: New alert rule UID
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AlertRules]
+      summary: Update alert rule (Editor)
+      description: Update an existing alert rule. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRule'
+      responses:
+        '200':
+          description: Alert rule updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/rules/{uid}:
+    get:
+      tags: [AlertRules]
+      summary: Get alert rule by UID (Viewer)
+      description: Returns a single alert rule by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert rule detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRule'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [AlertRules]
+      summary: Delete alert rule by UID (Editor)
+      description: Delete an alert rule by UID. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert rule deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Alert Events ─────────────────────────────────────────────────────────────
+  /api/v1/alerting/events:
+    get:
+      tags: [AlertEvents]
+      summary: Search alert events (Viewer)
+      description: Search alert events with optional rule UID and state filters. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: ruleUID
+          in: query
+          schema:
+            type: string
+          description: Filter by alert rule UID
+        - name: state
+          in: query
+          schema:
+            type: integer
+            description: "1=Pending, 2=Firing, 3=Resolved, 4=NoData, 5=Error"
+            enum: [1, 2, 3, 4, 5]
+      responses:
+        '200':
+          description: Paginated list of alert events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertEventListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/events/{uid}:
+    get:
+      tags: [AlertEvents]
+      summary: Get alert event by UID (Viewer)
+      description: Returns a single alert event by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert event detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertEvent'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Alert Routes ─────────────────────────────────────────────────────────────
+  /api/v1/alerting/routes:
+    get:
+      tags: [AlertRoutes]
+      summary: Get alert route tree (Viewer)
+      description: Returns all route nodes for the current organization. Requires Viewer role.
+      responses:
+        '200':
+          description: List of alert route nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AlertRoutes]
+      summary: Create alert route (Editor)
+      description: Create a new route node. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRoute'
+      responses:
+        '200':
+          description: Alert route created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AlertRoutes]
+      summary: Update alert route (Editor)
+      description: Update an existing route node. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRoute'
+      responses:
+        '200':
+          description: Alert route updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/routes/search:
+    get:
+      tags: [AlertRoutes]
+      summary: Search alert routes (Viewer)
+      description: Search route nodes by name with pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of alert routes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRouteListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/routes/{uid}:
+    get:
+      tags: [AlertRoutes]
+      summary: Get alert route by UID (Viewer)
+      description: Returns a single route node by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert route detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRoute'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [AlertRoutes]
+      summary: Delete alert route by UID (Editor)
+      description: Delete a route node by UID. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert route deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Alert Receivers ──────────────────────────────────────────────────────────
+  /api/v1/alerting/receivers:
+    get:
+      tags: [AlertReceivers]
+      summary: Search alert receivers (Viewer)
+      description: Search receivers with optional name filter and pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of alert receivers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertReceiverListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AlertReceivers]
+      summary: Create alert receiver (Editor)
+      description: Create a new receiver. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertReceiver'
+      responses:
+        '200':
+          description: Alert receiver created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AlertReceivers]
+      summary: Update alert receiver (Editor)
+      description: Update an existing receiver. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertReceiver'
+      responses:
+        '200':
+          description: Alert receiver updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/receivers/test:
+    put:
+      tags: [AlertReceivers]
+      summary: Test alert receiver (Editor)
+      description: Send a test notification through all enabled channels of a receiver. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [receiverUID]
+              properties:
+                receiverUID:
+                  type: string
+                  description: UID of the receiver to test
+      responses:
+        '200':
+          description: Test notification sent
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/receivers/{uid}:
+    get:
+      tags: [AlertReceivers]
+      summary: Get alert receiver by UID (Viewer)
+      description: Returns a single receiver by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert receiver detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertReceiver'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [AlertReceivers]
+      summary: Delete alert receiver by UID (Editor)
+      description: Delete a receiver by UID. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert receiver deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Alert Silences ───────────────────────────────────────────────────────────
+  /api/v1/alerting/silences:
+    get:
+      tags: [AlertSilences]
+      summary: Search alert silences (Viewer)
+      description: Search silences with pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated list of alert silences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertSilenceListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AlertSilences]
+      summary: Create alert silence (Editor)
+      description: Create a new silence to suppress matching alerts. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertSilence'
+      responses:
+        '200':
+          description: Alert silence created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AlertSilences]
+      summary: Update alert silence (Editor)
+      description: Update an existing silence (e.g. extend or shorten duration). Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertSilence'
+      responses:
+        '200':
+          description: Alert silence updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/silences/{uid}:
+    get:
+      tags: [AlertSilences]
+      summary: Get alert silence by UID (Viewer)
+      description: Returns a single silence by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert silence detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertSilence'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [AlertSilences]
+      summary: Delete alert silence by UID (Editor)
+      description: Immediately expire a silence. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert silence deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Alert Inhibit Rules ──────────────────────────────────────────────────────
+  /api/v1/alerting/inhibit-rules:
+    get:
+      tags: [AlertInhibitRules]
+      summary: Search alert inhibit rules (Viewer)
+      description: Search inhibit rules with optional name filter and pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of inhibit rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertInhibitRuleListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AlertInhibitRules]
+      summary: Create alert inhibit rule (Editor)
+      description: Create a new inhibit rule. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertInhibitRule'
+      responses:
+        '200':
+          description: Alert inhibit rule created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AlertInhibitRules]
+      summary: Update alert inhibit rule (Editor)
+      description: Update an existing inhibit rule. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertInhibitRule'
+      responses:
+        '200':
+          description: Alert inhibit rule updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/inhibit-rules/{uid}:
+    get:
+      tags: [AlertInhibitRules]
+      summary: Get alert inhibit rule by UID (Viewer)
+      description: Returns a single inhibit rule by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert inhibit rule detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertInhibitRule'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [AlertInhibitRules]
+      summary: Delete alert inhibit rule by UID (Editor)
+      description: Delete an inhibit rule by UID. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert inhibit rule deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Notification Templates ───────────────────────────────────────────────────
+  /api/v1/alerting/templates:
+    get:
+      tags: [NotificationTemplates]
+      summary: Search notification templates (Viewer)
+      description: Search templates with optional name filter and pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of notification templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplateListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [NotificationTemplates]
+      summary: Create notification template (Editor)
+      description: Create a new Go template for alert notifications. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationTemplate'
+      responses:
+        '200':
+          description: Notification template created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [NotificationTemplates]
+      summary: Update notification template (Editor)
+      description: Update an existing notification template. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationTemplate'
+      responses:
+        '200':
+          description: Notification template updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/templates/preview:
+    post:
+      tags: [NotificationTemplates]
+      summary: Preview notification template (Editor)
+      description: Render a template string against sample data and return the result. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, template]
+              properties:
+                type:
+                  $ref: '#/components/schemas/TemplateType'
+                template:
+                  type: string
+                  description: Go template string to render
+      responses:
+        '200':
+          description: Rendered template output
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/templates/{uid}:
+    get:
+      tags: [NotificationTemplates]
+      summary: Get notification template by UID (Viewer)
+      description: Returns a single notification template by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Notification template detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplate'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [NotificationTemplates]
+      summary: Delete notification template by UID (Editor)
+      description: Delete a notification template by UID. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Notification template deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 # ─── Components ──────────────────────────────────────────────────────────────
 components:
   securitySchemes:
@@ -2013,3 +2818,393 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Integration'
+
+    # ── Alerting shared ──────────────────────────────────────────────────────────
+    AlertEventState:
+      type: integer
+      description: "Alert event lifecycle state: 1=Pending, 2=Firing, 3=Resolved, 4=NoData, 5=Error"
+      enum: [1, 2, 3, 4, 5]
+
+    MatchType:
+      type: string
+      description: "Label matcher operator"
+      enum: ["=", "!=", "=~", "!~"]
+
+    TemplateType:
+      type: string
+      description: "Notification template type"
+      enum: [title, body, html]
+
+    LabelMatcher:
+      type: object
+      required: [name, value, type]
+      properties:
+        name:
+          type: string
+          description: Label key to match
+        value:
+          type: string
+          description: Match value or regex pattern
+        type:
+          $ref: '#/components/schemas/MatchType'
+
+    # ── Alert Rule ───────────────────────────────────────────────────────────────
+    AlertRule:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            title:
+              type: string
+            integration:
+              type: string
+            version:
+              type: integer
+            state:
+              type: integer
+              description: "Rule state: 1=Enable, 2=Running, 3=Firing, 4=Pause, 5=Delete"
+              enum: [1, 2, 3, 4, 5]
+            interval:
+              type: integer
+              format: int64
+              description: Evaluation interval in nanoseconds
+            for:
+              type: integer
+              format: int64
+              description: Duration condition must hold before firing (nanoseconds). 0 = fire immediately.
+            data:
+              type: object
+              additionalProperties: true
+              description: Data query configuration as JSON
+            conditions:
+              type: array
+              description: Alert condition expressions
+              items:
+                $ref: '#/components/schemas/AlertCondition'
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+              description: Static labels attached to all alert events from this rule
+            annotations:
+              type: object
+              additionalProperties:
+                type: string
+              description: Go-template annotations (e.g. summary, description)
+
+    AlertCondition:
+      type: object
+      properties:
+        severity:
+          type: integer
+          description: "1=Alert, 2=Warning"
+          enum: [1, 2]
+        expr:
+          type: string
+          description: Boolean expression string evaluated by the expr engine
+
+    AlertRuleListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertRule'
+
+    # ── Alert Event ──────────────────────────────────────────────────────────────
+    AlertEvent:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            ruleUID:
+              type: string
+            ruleTitle:
+              type: string
+            fingerprint:
+              type: string
+              description: FNV-64a hash of the label set; uniquely identifies an alert instance
+            state:
+              $ref: '#/components/schemas/AlertEventState'
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+              description: Complete label set (rule labels + series tags + system labels)
+            annotations:
+              type: object
+              additionalProperties:
+                type: string
+              description: Rendered annotations
+            value:
+              type: number
+              format: double
+              description: Metric value that triggered the alert
+            startsAt:
+              type: integer
+              format: int64
+              description: Unix milliseconds when the alert first became active (Firing)
+            endsAt:
+              type: integer
+              format: int64
+              description: Unix milliseconds when the alert resolved; 0 if still active
+            pendingSince:
+              type: integer
+              format: int64
+              description: Unix milliseconds when the condition first became true
+            notifiedAt:
+              type: integer
+              format: int64
+              description: Unix milliseconds of the last notification sent
+            generatorURL:
+              type: string
+              description: URL linking back to the triggering query
+
+    AlertEventListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertEvent'
+
+    # ── Alert Route ──────────────────────────────────────────────────────────────
+    AlertRoute:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            parentUID:
+              type: string
+              description: UID of the parent route node; empty for root routes
+            matchers:
+              type: array
+              items:
+                $ref: '#/components/schemas/LabelMatcher'
+              description: All matchers must match for this route to apply
+            receiverUID:
+              type: string
+              description: UID of the receiver to send notifications to
+            continue:
+              type: boolean
+              description: If true, continue matching sibling routes after this one matches
+            groupBy:
+              type: array
+              items:
+                type: string
+              description: Label names used to group alerts into notification batches
+            groupWait:
+              type: integer
+              format: int64
+              description: Wait duration (nanoseconds) before sending the first notification for a new group. Default 30s.
+            groupInterval:
+              type: integer
+              format: int64
+              description: Wait duration (nanoseconds) before sending a notification for a group with new alerts. Default 5m.
+            repeatInterval:
+              type: integer
+              format: int64
+              description: Wait duration (nanoseconds) before re-sending a notification for unchanged alerts. Default 4h.
+            sortOrder:
+              type: integer
+              description: Route evaluation priority (lower = higher priority)
+
+    AlertRouteListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertRoute'
+
+    # ── Alert Receiver ───────────────────────────────────────────────────────────
+    ReceiverChannel:
+      type: object
+      required: [type, enabled]
+      properties:
+        type:
+          type: string
+          description: Channel type
+          enum: [Slack, Email, Webhook]
+        config:
+          type: object
+          additionalProperties: true
+          description: Channel-specific configuration as JSON (e.g. channel name for Slack, addresses for Email)
+        enabled:
+          type: boolean
+          description: Whether this channel is active
+
+    AlertReceiver:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            channels:
+              type: array
+              items:
+                $ref: '#/components/schemas/ReceiverChannel'
+              description: One or more notification channels sent simultaneously
+            templateUID:
+              type: string
+              description: Optional UID of a NotificationTemplate to use for rendering
+
+    AlertReceiverListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        receivers:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertReceiver'
+
+    # ── Alert Silence ────────────────────────────────────────────────────────────
+    AlertSilence:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          required: [matchers, startsAt, endsAt, comment]
+          properties:
+            uid:
+              type: string
+            matchers:
+              type: array
+              items:
+                $ref: '#/components/schemas/LabelMatcher'
+              description: All matchers must match for an alert to be silenced
+            startsAt:
+              type: integer
+              format: int64
+              description: Unix milliseconds when the silence begins
+            endsAt:
+              type: integer
+              format: int64
+              description: Unix milliseconds when the silence expires
+            createdByName:
+              type: string
+              description: Name of the user who created this silence
+            comment:
+              type: string
+              description: Reason for the silence (required)
+
+    AlertSilenceListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        silences:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertSilence'
+
+    # ── Alert Inhibit Rule ───────────────────────────────────────────────────────
+    AlertInhibitRule:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            sourceMatchers:
+              type: array
+              items:
+                $ref: '#/components/schemas/LabelMatcher'
+              description: Matchers that identify the source (triggering) alert
+            targetMatchers:
+              type: array
+              items:
+                $ref: '#/components/schemas/LabelMatcher'
+              description: Matchers that identify the target (suppressed) alert
+            equalLabels:
+              type: array
+              items:
+                type: string
+              description: Source and target alerts must share the same values for these labels
+            enabled:
+              type: boolean
+
+    AlertInhibitRuleListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertInhibitRule'
+
+    # ── Notification Template ────────────────────────────────────────────────────
+    NotificationTemplate:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          required: [name, type, template]
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            type:
+              $ref: '#/components/schemas/TemplateType'
+            template:
+              type: string
+              description: |
+                Go template string. Available variables:
+                  .Alerts, .FiringAlerts, .ResolvedAlerts – alert event lists
+                  .CommonLabels, .CommonAnnotations – shared label/annotation maps
+                  .GroupLabels – labels used to form this notification group
+                  .ReceiverName – name of the target receiver
+                  .Status – "firing" or "resolved"
+                  .ExternalURL – base URL for generating links
+
+    NotificationTemplateListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        templates:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTemplate'
+
+    # ── Notification Setting ─────────────────────────────────────────────────────
+    NotificationSetting:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          required: [type]
+          properties:
+            type:
+              type: string
+              description: Channel type identifier (e.g. Slack, Email)
+            config:
+              type: object
+              additionalProperties: true
+              description: Channel-specific global configuration as JSON (e.g. Slack bot token, SMTP credentials)

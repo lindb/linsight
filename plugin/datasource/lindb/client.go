@@ -35,6 +35,9 @@ import (
 	"github.com/lindb/linsight/plugin"
 )
 
+// contentTypeArrow is the MIME type for Apache Arrow IPC stream format.
+const contentTypeArrow = "application/vnd.apache.arrow.stream"
+
 //go:generate mockgen -destination=./lincli/client_mock.go -package=lincli github.com/lindb/client_go Client
 //go:generate mockgen -destination=./lincli/dataquery_mock.go -package=lincli github.com/lindb/client_go/api DataQuery
 
@@ -44,6 +47,7 @@ var (
 	buildDataQuerySQLFn     = buildDataQuerySQL
 	buildMetadataQuerySQLFn = buildMetadataQuerySQL
 	loadLocationFn          = time.LoadLocation
+	decodeArrowFn           = decodeArrowToResultSet
 )
 
 // client implements plugin.DatasourcePlugin for LinDB.
@@ -88,9 +92,11 @@ func NewClient(datasource *model.Datasource, cfg json.RawMessage) (p plugin.Data
 
 // DataQuery queries metric data.
 func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error) {
-	data, _ := req.Params.MarshalJSON()
+	data, err := req.Params.MarshalJSON()
+	if err != nil {
+		return nil, errors.New("data query: marshal params: " + err.Error())
+	}
 	dataQueryReq := DataQueryRequest{}
-	var err error
 	var sql string
 	database := cli.cfg.Database
 	if err0 := jsonUnmarshalFn(data, &dataQueryReq); err0 != nil {
@@ -103,7 +109,6 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 		database = dataQueryReq.Database
 	}
 
-	fmt.Printf("......req=%v,dataQueryReq=%v\n", string(data), dataQueryReq)
 	if dataQueryReq.SQL == "" && dataQueryReq.Metric != "" {
 		sql, err = buildDataQuerySQLFn(&dataQueryReq, cli.formatTime(timeRange.Start), cli.formatTime(timeRange.End))
 		if err != nil {
@@ -117,33 +122,45 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 	// send request
 	resp, err := cli.cli.R().
 		SetBody(map[string]any{"sql": sql, "db": database, "timeRange": timeRange}).
-		SetHeader("Accept", "application/json").
+		SetHeader("Accept", contentTypeArrow).
 		Put("/api/v1/exec")
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode() == http.StatusOK {
-		// if success, unmarshal response
-		data := resp.Body()
-		if len(data) > 0 {
-			return json.RawMessage(data), nil
+		body := resp.Body()
+		if len(body) == 0 {
+			return nil, errors.New("no data found")
 		}
-		return nil, errors.New("no data found")
+		// Decode Arrow IPC stream and convert to the standard ResultSet JSON format.
+		rs, decodeErr := decodeArrowFn(body)
+		if decodeErr != nil {
+			return nil, decodeErr
+		}
+		// rs is nil only when body is empty, which is already guarded above.
+		// Retained as a safety net against future changes to decodeArrowFn.
+		if rs == nil {
+			return nil, errors.New("no data found")
+		}
+		rsJSON, marshalErr := json.Marshal(rs)
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		return json.RawMessage(rsJSON), nil
 	}
-	return nil, errors.New("query error")
-
-	// query := cli.client.DataQuery()
-	// rs, err := query.DataQuery(ctx, cli.cfg.Database, sql)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// cli.logger.Info("data query", logger.String("database", cli.cfg.Database), logger.String("sql", sql))
-	// return rs, nil
+	// Include the response body in the error so callers can see the actual LinDB error message.
+	if body := resp.Body(); len(body) > 0 {
+		return nil, fmt.Errorf("lindb query failed with status %d: %s", resp.StatusCode(), body)
+	}
+	return nil, fmt.Errorf("lindb query failed with status %d", resp.StatusCode())
 }
 
 // MetadataQuery queries metric metadata.
 func (cli *client) MetadataQuery(ctx context.Context, req *model.Query) (any, error) {
-	data, _ := req.Params.MarshalJSON()
+	data, err := req.Params.MarshalJSON()
+	if err != nil {
+		return nil, errors.New("metadata query: marshal params: " + err.Error())
+	}
 	dataQueryReq := &MetadataQueryRequest{}
 	if err := jsonUnmarshalFn(data, &dataQueryReq); err != nil {
 		return nil, err
