@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	resty "github.com/go-resty/resty/v2"
+	ljson "github.com/lindb/arrow/pkg/json"
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/common/pkg/logger"
 	"github.com/lindb/common/pkg/timeutil"
@@ -196,7 +197,7 @@ func TestClient_DataQuery(t *testing.T) {
 				jsonUnmarshalFn = encoding.JSONUnmarshal
 				buildDataQuerySQLFn = buildDataQuerySQL
 				buildMetadataQuerySQLFn = buildMetadataQuerySQL
-				decodeArrowFn = decodeArrowToResultSet
+				decodeArrowFn = ljson.DecodeArrowToResultSet
 			}()
 			tt.prepare()
 			_, err := cli.DataQuery(context.TODO(), &model.Query{

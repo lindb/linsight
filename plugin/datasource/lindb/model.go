@@ -74,56 +74,6 @@ type MetadataQueryRequest struct {
 	Where     []Expr       `json:"where"`
 }
 
-// DataType represents the data type of a result column.
-// Values align with LinDB spi/types DataType constants.
-type DataType uint16
-
-const (
-	// DTString represents string data type (tag / dimension columns).
-	// Aligns with LinDB spi/types DTString = 1.
-	DTString DataType = 1
-	// DTTimeSeries represents time series data type (metric field columns).
-	// Values 2–5 in LinDB spi/types (Int, Float, Duration, Timestamp) are intentionally
-	// omitted here — the plugin only deals with String tags and TimeSeries fields.
-	// Aligns with LinDB spi/types DTTimeSeries = 6.
-	DTTimeSeries DataType = 6
-)
-
-// TimeRange represents a time range with start and end timestamps in milliseconds.
-type TimeRange struct {
-	Start int64 `json:"start"`
-	End   int64 `json:"end"`
-}
-
-// TimeSeries represents time series data for one field in a result row.
-// Its structure mirrors LinDB spi/types.TimeSeries.
-type TimeSeries struct {
-	Values      []float64 `json:"values,omitempty"`
-	TimeRange   TimeRange `json:"timeRange"`
-	Interval    int64     `json:"interval,omitempty"`
-	NumOfPoints int       `json:"numOfPoints,omitempty"`
-}
-
-// ColumnMetadata describes one column in a query result schema.
-// The JSON tag for DataType is "type" to match the LinDB wire format
-// (LinDB spi/types ColumnMetadata uses json:"type").
-type ColumnMetadata struct {
-	Name     string   `json:"name"`
-	DataType DataType `json:"type"`
-}
-
-// Schema describes the columns of a query result set.
-type Schema struct {
-	Columns []ColumnMetadata `json:"columns,omitempty"`
-}
-
-// ResultSet is the query result returned by the LinDB datasource plugin.
-// It mirrors the structure of LinDB sql/execution/model.ResultSet.
-type ResultSet struct {
-	Schema *Schema `json:"schema,omitempty"`
-	Rows   [][]any `json:"rows,omitempty"`
-}
-
 // Expr represents where condition express.
 type Expr struct {
 	Key   string   `json:"key"`

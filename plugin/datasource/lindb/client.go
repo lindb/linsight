@@ -26,6 +26,7 @@ import (
 	"time"
 
 	resty "github.com/go-resty/resty/v2"
+	ljson "github.com/lindb/arrow/pkg/json"
 	lincli "github.com/lindb/client_go"
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/common/pkg/logger"
@@ -34,6 +35,10 @@ import (
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/plugin"
 )
+
+// decodeArrowFn is the Arrow IPC → ResultSet decoder, exposed as a variable
+// so tests can substitute a mock without changing call sites.
+var decodeArrowFn = ljson.DecodeArrowToResultSet
 
 // contentTypeArrow is the MIME type for Apache Arrow IPC stream format.
 const contentTypeArrow = "application/vnd.apache.arrow.stream"
@@ -47,7 +52,6 @@ var (
 	buildDataQuerySQLFn     = buildDataQuerySQL
 	buildMetadataQuerySQLFn = buildMetadataQuerySQL
 	loadLocationFn          = time.LoadLocation
-	decodeArrowFn           = decodeArrowToResultSet
 )
 
 // client implements plugin.DatasourcePlugin for LinDB.

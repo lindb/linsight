@@ -3,7 +3,6 @@ module github.com/lindb/linsight
 go 1.26
 
 require (
-	github.com/apache/arrow-go/v18 v18.5.1
 	github.com/caarlos0/env/v7 v7.1.0
 	github.com/casbin/casbin/v2 v2.64.0
 	github.com/casbin/gorm-adapter/v3 v3.14.0
@@ -25,6 +24,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
+	github.com/apache/arrow-go/v18 v18.5.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
