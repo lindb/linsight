@@ -2863,13 +2863,27 @@ components:
       type: object
       properties:
         start:
-          type: integer
-          format: int64
-          description: Start time in milliseconds since epoch
+          oneOf:
+            - type: integer
+              format: int64
+              description: Start time in milliseconds since epoch
+            - type: string
+              description: >
+                Relative time expression (e.g. "now", "now-5m", "now-1h",
+                "now-1d", "now-1w", "now-1M", "now-1y") or a plain integer
+                string representing milliseconds since epoch
+          example: "now-15m"
         end:
-          type: integer
-          format: int64
-          description: End time in milliseconds since epoch
+          oneOf:
+            - type: integer
+              format: int64
+              description: End time in milliseconds since epoch
+            - type: string
+              description: >
+                Relative time expression (e.g. "now", "now-5m", "now-1h",
+                "now-1d", "now-1w", "now-1M", "now-1y") or a plain integer
+                string representing milliseconds since epoch
+          example: "now"
 
     Query:
       type: object
