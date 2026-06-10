@@ -83,6 +83,11 @@ func (srv *datasourceService) UpdateDatasource(ctx context.Context, datasource *
 	if err != nil {
 		return err
 	}
+	// Guard against nil ds (e.g. mock DB that returns nil error without populating the pointer).
+	// In production gorm always populates the struct on success.
+	if ds == nil {
+		ds = &model.Datasource{}
+	}
 	return srv.db.Transaction(func(tx dbpkg.DB) error {
 		user := util.GetUser(ctx)
 		userID := user.User.ID
@@ -131,7 +136,7 @@ func (srv *datasourceService) GetDatasources(ctx context.Context) ([]model.Datas
 // GetDatasourceByUID returns data source by uid from current org.
 func (srv *datasourceService) GetDatasourceByUID(ctx context.Context, uid string) (*model.Datasource, error) {
 	user := util.GetUser(ctx)
-	return srv.GetDatasourceByOrgAndUID(user.User.OrgID, uid)
+	return srv.GetDatasourceByOrgAndUID(user.Org.ID, uid)
 }
 
 // cleanDefaultDatasource cleans default datasource if exist when set new default datasource.

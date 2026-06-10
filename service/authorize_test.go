@@ -183,7 +183,7 @@ func TestAuthorizeService_CheckResourceACL(t *testing.T) {
 		logger:   logger.GetLogger("Service", "AuthTest"),
 	}
 	t.Run("check failure", func(t *testing.T) {
-		enforcer.EXPECT().Enforce("Admin", "123", "Component", "abc", "write").Return(false, fmt.Errorf("err"))
+		enforcer.EXPECT().Enforce("Admin", "123", "menu", "abc", "write").Return(false, fmt.Errorf("err"))
 		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
@@ -194,7 +194,7 @@ func TestAuthorizeService_CheckResourceACL(t *testing.T) {
 		assert.False(t, ok)
 	})
 	t.Run("can access", func(t *testing.T) {
-		enforcer.EXPECT().Enforce("Admin", "123", "Component", "abc", "write").Return(true, nil)
+		enforcer.EXPECT().Enforce("Admin", "123", "menu", "abc", "write").Return(true, nil)
 		ok := srv.CheckResourceACL(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
@@ -251,8 +251,8 @@ func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
 		logger:   logger.GetLogger("Service", "AuthTest"),
 	}
 	t.Run("add failure", func(t *testing.T) {
-		enforcer.EXPECT().HasPolicy("Admin", "123", "Component", "abc", "write").Return(false)
-		enforcer.EXPECT().AddPolicy("Admin", "123", "Component", "abc", "write").Return(false, fmt.Errorf("err"))
+		enforcer.EXPECT().HasPolicy("Admin", "123", "menu", "abc", "write").Return(false)
+		enforcer.EXPECT().AddPolicy("Admin", "123", "menu", "abc", "write").Return(false, fmt.Errorf("err"))
 		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
@@ -263,8 +263,8 @@ func TestAuthorizeService_AddResourcePolicy(t *testing.T) {
 		assert.Error(t, err)
 	})
 	t.Run("add ok", func(t *testing.T) {
-		enforcer.EXPECT().HasPolicy("Admin", "123", "Component", "abc", "write").Return(false)
-		enforcer.EXPECT().AddPolicy("Admin", "123", "Component", "abc", "write").Return(false, nil)
+		enforcer.EXPECT().HasPolicy("Admin", "123", "menu", "abc", "write").Return(false)
+		enforcer.EXPECT().AddPolicy("Admin", "123", "menu", "abc", "write").Return(false, nil)
 		err := srv.AddResourcePolicy(&modelpkg.ResourceACLParam{
 			Role:     accesscontrol.RoleAdmin,
 			OrgID:    123,
@@ -286,7 +286,7 @@ func TestAuthorizeService_UpdateResourcesRole(t *testing.T) {
 		logger:   logger.GetLogger("Service", "AuthTest"),
 	}
 	enforcer.EXPECT().UpdateFilteredPolicies(
-		[][]string{{"Admin", "123", "Component", "abc", "write"}},
+		[][]string{{"Admin", "123", "menu", "abc", "write"}},
 		1, "123", accesscontrol.Menu.String(), "abc", "write").Return(false, fmt.Errorf("err"))
 	err := srv.UpdateResourceRole(&modelpkg.ResourceACLParam{
 		OrgID:    123,

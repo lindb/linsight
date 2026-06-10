@@ -172,7 +172,9 @@ func (srv *userService) UpdateUser(ctx context.Context, user *model.User) error 
 	if err != nil {
 		return err
 	}
-	defer srv.cache.EvictSignedUser(ctx)
+	if srv.cache != nil {
+		defer srv.cache.EvictSignedUser(ctx)
+	}
 
 	signedUser := util.GetUser(ctx)
 	// FIXME: check UserName if exist
@@ -231,14 +233,18 @@ func (srv *userService) SearchUser(ctx context.Context, req *model.SearchUserReq
 
 // DisableUser disables user.
 func (srv *userService) DisableUser(ctx context.Context, uid string) error {
-	defer srv.cache.EvictSignedUser(ctx)
+	if srv.cache != nil {
+		defer srv.cache.EvictSignedUser(ctx)
+	}
 	// TODO: need check user if login
 	return srv.setUserDisableState(ctx, uid, true)
 }
 
 // EnableUser enbles user.
 func (srv *userService) EnableUser(ctx context.Context, uid string) error {
-	defer srv.cache.EvictSignedUser(ctx)
+	if srv.cache != nil {
+		defer srv.cache.EvictSignedUser(ctx)
+	}
 	return srv.setUserDisableState(ctx, uid, false)
 }
 
@@ -257,7 +263,9 @@ func (srv *userService) SavePreference(ctx context.Context, pref *model.Preferen
 	if err != nil {
 		return err
 	}
-	defer srv.cache.EvictSignedUser(ctx)
+	if srv.cache != nil {
+		defer srv.cache.EvictSignedUser(ctx)
+	}
 	if prefFormDB == nil {
 		pref.UserID = userID
 		pref.CreatedBy = userID
@@ -353,7 +361,9 @@ func (srv *userService) RemoveOrg(ctx context.Context, userOrg *model.UserOrgInf
 	if err != nil {
 		return err
 	}
-	defer srv.cache.EvictSignedUser(ctx)
+	if srv.cache != nil {
+		defer srv.cache.EvictSignedUser(ctx)
+	}
 
 	return srv.db.Transaction(func(tx dbpkg.DB) error {
 		if err := tx.Delete(&model.OrgUser{}, "org_id=? and user_id=?", org.ID, user.ID); err != nil {
@@ -379,7 +389,9 @@ func (srv *userService) UpdateOrg(ctx context.Context, userOrg *model.UserOrgInf
 	if err != nil {
 		return err
 	}
-	defer srv.cache.EvictSignedUser(ctx)
+	if srv.cache != nil {
+		defer srv.cache.EvictSignedUser(ctx)
+	}
 
 	signedUser := util.GetUser(ctx)
 	userID := signedUser.User.ID
@@ -407,7 +419,9 @@ func (srv *userService) SwitchOrg(ctx context.Context, orgUID string) error {
 		return errors.New("organization not exist")
 	}
 
-	defer srv.cache.EvictSignedUser(ctx)
+	if srv.cache != nil {
+		defer srv.cache.EvictSignedUser(ctx)
+	}
 	return srv.db.UpdateSingle(&model.User{}, "org_id", org.ID, "id=?", signedUser.User.ID)
 }
 

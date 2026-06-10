@@ -71,17 +71,11 @@ func TestBootAPI_Boot(t *testing.T) {
 		prepare func()
 	}{
 		{
-			name: "get signed user fail",
-			ctx:  context.WithValue(context.TODO(), constant.LinSightSignedKey, signedUser),
-			prepare: func() {
-				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
-			},
-		},
-		{
 			name: "user belong one org but get resource fail",
 			ctx:  context.WithValue(context.TODO(), constant.LinSightSignedKey, signedUser),
 			prepare: func() {
-				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
+				// boot.go reads signedUser from context directly (middleware sets it);
+				// GetSignedUser is no longer called in the Boot handler.
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, fmt.Errorf("err"))
 				menuSrv.EXPECT().GetMenuTreeByCurrentOrg(gomock.Any()).Return(nil, fmt.Errorf("err"))
 				integrationSrv.EXPECT().GetIntegrations(gomock.Any()).Return(nil, fmt.Errorf("err"))
@@ -103,7 +97,6 @@ func TestBootAPI_Boot(t *testing.T) {
 				Preference: &model.DefaultUserPreference,
 			}),
 			prepare: func() {
-				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				datasourceSrv.EXPECT().GetDatasources(gomock.Any()).Return(nil, nil)
 				menuSrv.EXPECT().GetMenuTreeByCurrentOrg(gomock.Any()).Return(model.Menus{}, nil)
 				integrationSrv.EXPECT().GetIntegrations(gomock.Any()).Return(nil, nil)
@@ -120,8 +113,6 @@ func TestBootAPI_Boot(t *testing.T) {
 				},
 			}),
 			prepare: func() {
-				signedUser.Org = nil
-				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(signedUser, nil)
 				integrationSrv.EXPECT().GetIntegrations(gomock.Any()).Return(nil, nil)
 			},
 		},

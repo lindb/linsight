@@ -47,13 +47,15 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 	defer ctrl.Finish()
 
 	dashboardSrv := service.NewMockDashboardService(ctrl)
+	dashboardVersionSrv := service.NewMockDashboardVersionService(ctrl)
 	chartSrv := service.NewMockChartService(ctrl)
 	integrationSrv := service.NewMockIntegrationService(ctrl)
 	r := gin.New()
 	api := NewDashboardAPI(&deps.API{
-		DashboardSrv:   dashboardSrv,
-		ChartSrv:       chartSrv,
-		IntegrationSrv: integrationSrv,
+		DashboardSrv:        dashboardSrv,
+		DashboardVersionSrv: dashboardVersionSrv,
+		ChartSrv:            chartSrv,
+		IntegrationSrv:      integrationSrv,
 	})
 	r.POST("/dashboard", api.CreateDashboard)
 	body := encoding.JSONMarshal(&model.Dashboard{Title: "test"})
@@ -111,6 +113,7 @@ func TestDashboardAPI_CreateDashboard(t *testing.T) {
 				dashboardSrv.EXPECT().CreateDashboard(gomock.Any(), gomock.Any()).Return("1234", nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
 				integrationSrv.EXPECT().DisconnectSource(gomock.Any(), gomock.Any(), model.DashboardResource).Return(nil)
+				dashboardVersionSrv.EXPECT().CreateDashboardVersion(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -138,17 +141,21 @@ func TestDashboardAPI_UpdateDashboard(t *testing.T) {
 	defer ctrl.Finish()
 
 	dashboardSrv := service.NewMockDashboardService(ctrl)
+	dashboardVersionSrv := service.NewMockDashboardVersionService(ctrl)
 	chartSrv := service.NewMockChartService(ctrl)
 	integrationSrv := service.NewMockIntegrationService(ctrl)
 	r := gin.New()
 	api := NewDashboardAPI(&deps.API{
-		DashboardSrv:   dashboardSrv,
-		ChartSrv:       chartSrv,
-		IntegrationSrv: integrationSrv,
+		DashboardSrv:        dashboardSrv,
+		DashboardVersionSrv: dashboardVersionSrv,
+		ChartSrv:            chartSrv,
+		IntegrationSrv:      integrationSrv,
 	})
 	r.PUT("/dashboard", api.UpdateDashboard)
-	body := encoding.JSONMarshal(&model.Dashboard{
-		Integration: "abc",
+	// UpdateDashboard expects SaveDashboardRequest{dashboard: <json>, message: <str>}
+	// so we wrap the dashboard JSON in a SaveDashboardRequest to ensure ReadMeta picks up Integration.
+	body := encoding.JSONMarshal(&model.SaveDashboardRequest{
+		Dashboard: datatypes.JSON(`{"integration":"abc"}`),
 	})
 
 	cases := []struct {
@@ -204,6 +211,7 @@ func TestDashboardAPI_UpdateDashboard(t *testing.T) {
 				dashboardSrv.EXPECT().UpdateDashboard(gomock.Any(), gomock.Any()).Return(nil)
 				chartSrv.EXPECT().LinkChartsToDashboard(gomock.Any(), gomock.Any()).Return(nil)
 				integrationSrv.EXPECT().ConnectSource(gomock.Any(), "abc", gomock.Any(), model.DashboardResource).Return(nil)
+				dashboardVersionSrv.EXPECT().CreateDashboardVersion(gomock.Any(), gomock.Any()).Return(nil)
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)

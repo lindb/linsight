@@ -43,11 +43,13 @@ func TestLoginAPI_Login(t *testing.T) {
 	defer ctrl.Finish()
 
 	authSrv := service.NewMockAuthenticateService(ctrl)
+	userSrv := service.NewMockUserService(ctrl)
 	r := gin.New()
 	cfg := config.NewDefaultServer()
 	api := NewLoginAPI(&deps.API{
 		Config:          cfg,
 		AuthenticateSrv: authSrv,
+		UserSrv:         userSrv,
 	})
 	r.POST("/login", api.Login)
 	body := encoding.JSONMarshal(&model.LoginUser{
@@ -94,6 +96,8 @@ func TestLoginAPI_Login(t *testing.T) {
 			prepare: func() {
 				authSrv.EXPECT().Authenticate(gomock.Any(), gomock.Any()).Return(&model.User{}, nil)
 				authSrv.EXPECT().CreateToken(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&model.UserToken{}, nil)
+				// GetSignedUser returning an error causes the handler to fall through to http.OK.
+				userSrv.EXPECT().GetSignedUser(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
 			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				r := resp.Result()
