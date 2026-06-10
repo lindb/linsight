@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"time"
 
+	ljson "github.com/lindb/arrow/pkg/json"
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/common/pkg/logger"
 
@@ -78,7 +79,9 @@ func NewClient(datasource *model.Datasource, cfg json.RawMessage) (p plugin.Data
 }
 
 // DataQuery queries trace data from LinGo.
-func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error) {
+// LinGo is a trace datasource and does not produce a metrics ResultSet;
+// the response body is drained to avoid connection leaks, then nil is returned.
+func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (*ljson.ResultSet, error) {
 	data, _ := req.Params.MarshalJSON()
 	traceQueryReq := &GetTraceRequest{}
 	if err := jsonUnmarshalFn(data, &traceQueryReq); err != nil {
@@ -98,11 +101,12 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 		_ = resp.Body.Close()
 	}()
 
-	d, err := readAllFn(resp.Body)
-	if err != nil {
+	// Drain the body to allow connection reuse.
+	if _, err := readAllFn(resp.Body); err != nil {
 		return nil, err
 	}
-	return json.RawMessage(d), nil
+	// Trace datasource does not produce a metrics ResultSet.
+	return nil, nil
 }
 
 func (cli *client) MetadataQuery(ctx context.Context, req *model.Query) (any, error) {

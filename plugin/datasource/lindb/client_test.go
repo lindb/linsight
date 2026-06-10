@@ -87,7 +87,6 @@ func TestClient_DataQuery(t *testing.T) {
 		cfg:      &DatasourceConfig{},
 		location: time.Local,
 		logger:   logger.GetLogger("Test", "LinDB"),
-		client:   mockCli,
 		cli:      restyCli,
 	}
 
@@ -145,7 +144,6 @@ func TestClient_DataQuery(t *testing.T) {
 			cfg:      &DatasourceConfig{},
 			location: time.Local,
 			logger:   logger.GetLogger("Test", "LinDB"),
-			client:   mockCli,
 			cli:      mockRestyCli,
 		}
 		buildDataQuerySQLFn = func(_ *DataQueryRequest, _, _ string) (string, error) {
@@ -174,7 +172,6 @@ func TestClient_DataQuery(t *testing.T) {
 			cfg:      &DatasourceConfig{},
 			location: time.Local,
 			logger:   logger.GetLogger("Test", "LinDB"),
-			client:   mockCli,
 			cli:      mockRestyCli,
 		}
 		buildDataQuerySQLFn = func(_ *DataQueryRequest, _, _ string) (string, error) {
@@ -220,86 +217,14 @@ func mustMarshalJSON(v any) json.RawMessage {
 }
 
 func TestClient_MetadataQuery(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockCli := lincli.NewMockClient(ctrl)
-	dq := lincli.NewMockDataQuery(ctrl)
-	mockCli.EXPECT().DataQuery().Return(dq).AnyTimes()
 	cli := &client{
 		cfg:    &DatasourceConfig{},
 		logger: logger.GetLogger("Test", "LinDB"),
-		client: mockCli,
 	}
-
-	cases := []struct {
-		name    string
-		prepare func()
-		wantErr bool
-	}{
-		{
-			name: "unmarshal query request failure",
-			prepare: func() {
-				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
-					return fmt.Errorf("err")
-				}
-			},
-			wantErr: true,
-		},
-		{
-			name: "build sql failure",
-			prepare: func() {
-				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
-					return nil
-				}
-				buildMetadataQuerySQLFn = func(_ *MetadataQueryRequest) (string, error) {
-					return "", fmt.Errorf("err")
-				}
-			},
-			wantErr: true,
-		},
-		{
-			name: "metadata query failure",
-			prepare: func() {
-				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
-					return nil
-				}
-				buildMetadataQuerySQLFn = func(_ *MetadataQueryRequest) (string, error) {
-					return "sql", nil
-				}
-				dq.EXPECT().MetadataQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("err"))
-			},
-			wantErr: true,
-		},
-		{
-			name: "metadata query successfully",
-			prepare: func() {
-				jsonUnmarshalFn = func(_ []byte, _ interface{}) error {
-					return nil
-				}
-				buildMetadataQuerySQLFn = func(_ *MetadataQueryRequest) (string, error) {
-					return "metadata_sql", nil
-				}
-				dq.EXPECT().MetadataQuery(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range cases {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				jsonUnmarshalFn = encoding.JSONUnmarshal
-				buildDataQuerySQLFn = buildDataQuerySQL
-				buildMetadataQuerySQLFn = buildMetadataQuerySQL
-			}()
-			tt.prepare()
-			_, err := cli.MetadataQuery(context.TODO(), &model.Query{
-				Params: json.RawMessage{},
-			})
-			if tt.wantErr != (err != nil) {
-				t.Fatal(tt.name)
-			}
+	// MetadataQuery is not yet implemented; verify it panics rather than silently failing.
+	assert.Panics(t, func() {
+		_, _ = cli.MetadataQuery(context.TODO(), &model.Query{
+			Params: json.RawMessage{},
 		})
-	}
+	})
 }

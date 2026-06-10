@@ -11,6 +11,7 @@ require (
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/golang/mock v1.4.4
 	github.com/lindb/arrow v0.0.0-20260202064253-f208202478a7
+	github.com/lindb/client_go v0.0.0-00010101000000-000000000000
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.11.1
@@ -88,8 +89,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
-	github.com/lindb/client_go v0.0.2
-	github.com/lindb/common v0.0.4
+	github.com/lindb/common v0.0.9
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/microsoft/go-mssqldb v0.17.0 // indirect
@@ -119,3 +119,7 @@ require (
 )
 
 replace github.com/lindb/arrow => ../arrow
+
+replace github.com/lindb/common => ../common
+
+replace github.com/lindb/client_go => ../client_go

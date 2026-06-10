@@ -21,6 +21,8 @@ import (
 	"context"
 	"encoding/json"
 
+	ljson "github.com/lindb/arrow/pkg/json"
+
 	"github.com/lindb/linsight/model"
 )
 
@@ -31,8 +33,8 @@ type NewDatasourcePlugin func(datasource *model.Datasource, cfg json.RawMessage)
 
 // DatasourcePlugin represents datasource plugin.
 type DatasourcePlugin interface {
-	// DataQuery queries data.
-	DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (any, error)
+	// DataQuery queries metric data and returns an Arrow row-oriented ResultSet.
+	DataQuery(ctx context.Context, req *model.Query, timeRange model.TimeRange) (*ljson.ResultSet, error)
 	// MetadataQuery queries metadata.
 	MetadataQuery(ctx context.Context, req *model.Query) (any, error)
 }

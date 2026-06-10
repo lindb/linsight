@@ -19,15 +19,17 @@ package schedule
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/lindb/common/models"
+	ljson "github.com/lindb/arrow/pkg/json"
 
 	"github.com/lindb/linsight/model"
 )
 
+// Querier fetches raw datasource results for an alert rule's queries.
+// It returns the Arrow-format ResultSet directly; callers are responsible
+// for interpreting schema columns and row values.
 type Querier interface {
-	Query(queries []*model.Query, timerange model.TimeRange) (map[string]*models.ResultSet, error)
+	Query(queries []*model.Query, timerange model.TimeRange) (map[string]*ljson.ResultSet, error)
 }
 
 type querier struct {
@@ -42,9 +44,9 @@ func NewQuerier(rule *model.AlertRule, deps *Deps) Querier {
 	}
 }
 
-func (q *querier) Query(queries []*model.Query, timerange model.TimeRange) (map[string]*models.ResultSet, error) {
+func (q *querier) Query(queries []*model.Query, timerange model.TimeRange) (map[string]*ljson.ResultSet, error) {
 	ctx := context.TODO()
-	rs := make(map[string]*models.ResultSet)
+	rs := make(map[string]*ljson.ResultSet)
 	for _, query := range queries {
 		ds, err := q.deps.DatasourceSrv.GetDatasourceByOrgAndUID(q.rule.OrgID, query.Datasource.UID)
 		if err != nil {
@@ -58,14 +60,8 @@ func (q *querier) Query(queries []*model.Query, timerange model.TimeRange) (map[
 		if err != nil {
 			return nil, err
 		}
-		// fmt.Println(string(encoding.JSONMarshal(resp)))
-
-		// TODO: add refID maybe empty,go?
-		resultset, ok := resp.(*models.ResultSet)
-		if ok {
-			rs[query.RefID] = resultset
-		} else {
-			fmt.Println("wrong result set type")
+		if resp != nil {
+			rs[query.RefID] = resp
 		}
 	}
 	return rs, nil
