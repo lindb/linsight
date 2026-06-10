@@ -43,6 +43,8 @@ tags:
     description: Tag lookup
   - name: Integrations
     description: Integration listing
+  - name: AlertRuleGroups
+    description: Alert rule group management (Editor/Viewer)
   - name: AlertRules
     description: Alert rule management (Editor/Viewer)
   - name: AlertEvents
@@ -1456,12 +1458,99 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  # ─── Alert Rule Groups ────────────────────────────────────────────────────────
+  /api/v1/alerting/rule-groups:
+    get:
+      tags: [AlertRuleGroups]
+      summary: Search alert rule groups (Viewer)
+      description: Search alert rule groups by name prefix with pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter by group name prefix
+      responses:
+        '200':
+          description: Paginated list of alert rule groups
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRuleGroupListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AlertRuleGroups]
+      summary: Update alert rule group (Editor)
+      description: Update an existing alert rule group (name, description, interval). Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRuleGroup'
+      responses:
+        '200':
+          description: Alert rule group updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/rule-groups/{uid}:
+    get:
+      tags: [AlertRuleGroups]
+      summary: Get alert rule group by UID (Viewer)
+      description: Returns a single alert rule group by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert rule group detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRuleGroup'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [AlertRuleGroups]
+      summary: Delete alert rule group by UID (Editor)
+      description: Delete an alert rule group by UID. Returns an error if the group still has rules. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Alert rule group deleted
+        '400':
+          description: Group has rules and cannot be deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ─── Alert Rules ──────────────────────────────────────────────────────────────
   /api/v1/alerting/rules:
     get:
       tags: [AlertRules]
       summary: Search alert rules (Viewer)
-      description: Search alert rules with optional title filter and pagination. Requires Viewer role.
+      description: Search alert rules grouped by rule group. Supports filters by title, group name, and datasource UID. Requires Viewer role.
       parameters:
         - name: offset
           in: query
@@ -1477,25 +1566,35 @@ paths:
           in: query
           schema:
             type: string
+        - name: groupName
+          in: query
+          schema:
+            type: string
+          description: Filter by group name prefix
+        - name: datasourceUID
+          in: query
+          schema:
+            type: string
+          description: Filter by datasource UID
       responses:
         '200':
-          description: Paginated list of alert rules
+          description: Paginated list of rule groups (each group contains its matching rules)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AlertRuleListResponse'
+                $ref: '#/components/schemas/AlertRuleGroupWithRulesListResponse'
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
       tags: [AlertRules]
       summary: Create alert rule (Editor)
-      description: Create a new alert rule. Requires Editor role.
+      description: Create a new alert rule. The group is looked up by name; if not found it is created automatically using the provided interval. Requires Editor role.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AlertRule'
+              $ref: '#/components/schemas/CreateAlertRuleRequest'
       responses:
         '200':
           description: Alert rule created – returns new UID
@@ -1526,10 +1625,36 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/alerting/rules/{uid}:
-    get:
+  /api/v1/alerting/rules/dry-run:
+    post:
       tags: [AlertRules]
-      summary: Get alert rule by UID (Viewer)
+      summary: Dry-run alert rule evaluation (Editor)
+      description: |
+        Executes the full evaluation pipeline (prepare → fetch → eval) for the given rule
+        without persisting any state or delivering any notifications.
+        Useful for debugging rule configuration (data query, conditions, labels).
+        Pipeline errors are returned inside the response body (stage + error fields)
+        rather than as HTTP error codes so the caller always receives a structured result.
+        Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRule'
+      responses:
+        '200':
+          description: Dry-run result (check stage/error fields for pipeline failures)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertRuleDryRunResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/rules/{uid}:
       description: Returns a single alert rule by UID. Requires Viewer role.
       parameters:
         - $ref: '#/components/parameters/UIDPath'
@@ -2856,6 +2981,12 @@ components:
           properties:
             uid:
               type: string
+            groupUID:
+              type: string
+              description: UID of the rule group this rule belongs to
+            datasourceUID:
+              type: string
+              description: UID of the datasource used for alert evaluation
             title:
               type: string
             integration:
@@ -2869,7 +3000,7 @@ components:
             interval:
               type: integer
               format: int64
-              description: Evaluation interval in nanoseconds
+              description: Evaluation interval in nanoseconds (back-filled from group at runtime)
             for:
               type: integer
               format: int64
@@ -2907,6 +3038,7 @@ components:
 
     AlertRuleListResponse:
       type: object
+      description: Deprecated – use AlertRuleGroupWithRulesListResponse
       properties:
         total:
           type: integer
@@ -2915,6 +3047,131 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AlertRule'
+
+    # ── Alert Rule Group schemas ──────────────────────────────────────────────
+    AlertRuleGroup:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          required: [name, interval]
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+              description: Group name (unique within org)
+            interval:
+              type: integer
+              format: int64
+              description: Evaluation interval shared by all rules in this group (nanoseconds)
+
+    CreateAlertRuleGroupParam:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Group name; used as find-or-create key within the org
+        interval:
+          type: integer
+          format: int64
+          description: Required when the group does not yet exist
+
+    CreateAlertRuleRequest:
+      allOf:
+        - $ref: '#/components/schemas/AlertRule'
+        - type: object
+          required: [group]
+          properties:
+            group:
+              $ref: '#/components/schemas/CreateAlertRuleGroupParam'
+
+    GroupWithRules:
+      allOf:
+        - $ref: '#/components/schemas/AlertRuleGroup'
+        - type: object
+          properties:
+            rules:
+              type: array
+              items:
+                $ref: '#/components/schemas/AlertRule'
+
+    AlertRuleGroupListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertRuleGroup'
+
+    AlertRuleGroupWithRulesListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+          description: Total number of matching groups (pagination is at group level)
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupWithRules'
+
+    # ── Alert Rule Dry-Run ───────────────────────────────────────────────────────
+    AlertRuleDryRunResult:
+      type: object
+      description: |
+        Result of a single dry-run evaluation cycle. When a pipeline stage fails,
+        `stage` and `error` are populated and `series`/`events` are absent.
+        When all stages succeed, `series` contains the raw datasource data and
+        `events` contains the alert events that *would* have been produced.
+      properties:
+        stage:
+          type: string
+          description: "Pipeline stage where the error occurred: prepare | fetch | eval"
+          enum: [prepare, fetch, eval]
+        error:
+          type: string
+          description: Error message from the failed stage
+        series:
+          type: array
+          description: Raw series returned by the datasource query
+          items:
+            $ref: '#/components/schemas/AlertSeries'
+        events:
+          type: array
+          description: Alert events produced by the in-memory state machine (not persisted)
+          items:
+            $ref: '#/components/schemas/AlertEvent'
+
+    AlertSeries:
+      type: object
+      description: A single time-series data point returned by the datasource during rule evaluation
+      properties:
+        refId:
+          type: string
+          description: Query reference ID
+        metric:
+          type: string
+          description: Metric name
+        field:
+          type: string
+          description: Field name within the metric
+        tags:
+          type: object
+          additionalProperties:
+            type: string
+          description: Tag/label key-value pairs
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix milliseconds of the data point
+        value:
+          type: number
+          format: double
+          description: Numeric value of the data point
 
     # ── Alert Event ──────────────────────────────────────────────────────────────
     AlertEvent:

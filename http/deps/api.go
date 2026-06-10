@@ -19,6 +19,7 @@ package deps
 
 import (
 	"github.com/lindb/linsight/alerting/manager"
+	"github.com/lindb/linsight/alerting/schedule"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/plugin/datasource"
 	"github.com/lindb/linsight/service"
@@ -44,8 +45,9 @@ type API struct {
 	DashboardVersionSrv service.DashboardVersionService
 	ChartSrv            service.ChartService
 
-	NotificationSrv service.NotificationService
-	AlertRuleSrv    service.AlertRuleService
+	NotificationSrv      service.NotificationService
+	AlertRuleGroupSrv    service.AlertRuleGroupService
+	AlertRuleSrv         service.AlertRuleService
 
 	// new alerting services
 	AlertEventSrv           service.AlertEventService
@@ -58,4 +60,6 @@ type API struct {
 	AlertMgr manager.AlertManager
 
 	DatasourceMgr datasource.Manager
+
+	DryRunner schedule.DryRunner
 }

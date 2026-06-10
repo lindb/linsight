@@ -72,6 +72,7 @@ type AlertEvent struct {
 	RuleTitle    string          `json:"ruleTitle" gorm:"column:rule_title"`
 	Fingerprint  string          `json:"fingerprint" gorm:"column:fingerprint;index:idx_alert_event_fp"`
 	State        AlertEventState `json:"state" gorm:"column:state;index:idx_alert_event_state"`
+	Severity     Severity        `json:"severity" gorm:"column:severity"`
 	Labels       datatypes.JSON  `json:"labels,omitempty" gorm:"column:labels"`
 	Annotations  datatypes.JSON  `json:"annotations,omitempty" gorm:"column:annotations"`
 	Value        float64         `json:"value" gorm:"column:value"`
@@ -328,11 +329,49 @@ type Recevier struct {
 	Config json.RawMessage `json:"config"`
 }
 
+// AlertRuleGroup represents a named group of alert rules sharing the same evaluation interval.
+// Within the same org, the (org_id, name) pair must be unique.
+type AlertRuleGroup struct {
+	BaseModel
+
+	OrgID    int64         `json:"-"        gorm:"column:org_id;index:u_idx_alert_rule_group_org_name,unique"`
+	UID      string        `json:"uid"      gorm:"column:uid;index:u_idx_alert_rule_group_uid,unique"`
+	Name     string        `json:"name"     gorm:"column:name;index:u_idx_alert_rule_group_org_name,unique"`
+	Interval time.Duration `json:"interval" gorm:"column:interval"`
+}
+
+// CreateAlertRuleGroupParam carries group metadata when creating a rule.
+// If a group with the same name already exists in the org, it is reused; otherwise a new group is created.
+type CreateAlertRuleGroupParam struct {
+	Name     string        `json:"name"`     // required; used as find-or-create key
+	Interval time.Duration `json:"interval"` // required only when the group does not yet exist
+}
+
+// CreateAlertRuleRequest combines an AlertRule with the group it should belong to.
+type CreateAlertRuleRequest struct {
+	AlertRule
+	Group CreateAlertRuleGroupParam `json:"group"` // always required
+}
+
+// GroupWithRules is the unit returned by SearchAlertRules: one group together with its matching rules.
+type GroupWithRules struct {
+	AlertRuleGroup
+	Rules []AlertRule `json:"rules"`
+}
+
+// SearchAlertRuleGroupRequest holds parameters for querying alert rule groups.
+type SearchAlertRuleGroupRequest struct {
+	PagingParam
+	Name string `form:"name" json:"name"`
+}
+
 type AlertRule struct {
 	BaseModel
 
 	OrgID         int64          `json:"-" gorm:"column:org_id"`
 	UID           string         `json:"uid" gorm:"column:uid;index:u_idx_alert_rule_uid,unique"`
+	GroupUID      string         `json:"groupUID"      gorm:"column:group_uid;index:idx_alert_rule_group_uid"`
+	DatasourceUID string         `json:"datasourceUID" gorm:"column:datasource_uid;index:idx_alert_rule_datasource_uid"`
 	Title         string         `json:"title" gorm:"column:Title"`
 	Integration   string         `json:"integration" gorm:"column:integration"`
 	Version       int            `json:"version" gorm:"column:version"`
@@ -370,11 +409,33 @@ func (r *AlertRule) ToConditions() ([]Condition, error) {
 	return rs, nil
 }
 
-func (r *AlertRule) ToDataQuery() (req *QueryRequest, err error) {
+func (r *AlertRule) ToDataQuery() (*QueryRequest, error) {
 	data, err := r.Data.MarshalJSON()
 	if err != nil {
 		return nil, err
 	}
+
+	// Unwrap one level of string encoding when the column value was stored double-encoded
+	// (e.g. the frontend serialised the queries array to a JSON string before sending it).
+	if len(data) > 0 && data[0] == '"' {
+		var inner string
+		if err := encoding.JSONUnmarshal(data, &inner); err != nil {
+			return nil, err
+		}
+		data = []byte(inner)
+	}
+
+	// Legacy / frontend format: just the queries array "[{...}]" without a Range wrapper.
+	// Wrap it in a QueryRequest so the rest of the pipeline stays unchanged.
+	if len(data) > 0 && data[0] == '[' {
+		var queries []*Query
+		if err := encoding.JSONUnmarshal(data, &queries); err != nil {
+			return nil, err
+		}
+		return &QueryRequest{Queries: queries}, nil
+	}
+
+	var req *QueryRequest
 	if err := encoding.JSONUnmarshal(data, &req); err != nil {
 		return nil, err
 	}
@@ -388,7 +449,9 @@ type Condition struct {
 
 type SearchAlertRuleRequest struct {
 	PagingParam
-	Title string `form:"title" json:"title"`
+	Title         string `form:"title"         json:"title"`
+	GroupName     string `form:"groupName"     json:"groupName"`
+	DatasourceUID string `form:"datasourceUID" json:"datasourceUID"`
 }
 
 type Alert struct {
@@ -418,15 +481,35 @@ type Series struct {
 	Tags       map[string]string
 	Timestamp  int64
 	Value      float64
+	Severity   Severity // set during Eval when a condition matches; not persisted
 }
 
 func (s *Series) ToMap() map[string]any {
-	return map[string]any{
+	// Fixed fields available in every expression environment.
+	env := map[string]any{
 		"refId":     s.RefID,
-		"metric":    s.MetricName,
-		"tags":      s.Tags,
-		"labels":    s.Tags,
+		"field":     s.Field,
+		"value":     s.Value,
 		"timestamp": s.Timestamp,
-		s.Field:     s.Value,
+		// Also expose value under the field name so expressions can reference it
+		// either as "value > 80" or as "<fieldName> > 80".
+		s.Field: s.Value,
 	}
+	// Flatten all tags as top-level labels for clean expression access,
+	// e.g. host == "server1" or region != "us-east".
+	for k, v := range s.Tags {
+		env[k] = v
+	}
+	return env
+}
+
+// AlertRuleDryRunResult captures the full output of a single dry-run evaluation cycle.
+// When a pipeline stage fails, Stage and Error are set; Series and Events are empty.
+// When all stages succeed, Series contains the raw datasource data and Events contains
+// the alert events that would have been produced (but were NOT persisted).
+type AlertRuleDryRunResult struct {
+	Stage  string        `json:"stage,omitempty"`  // prepare / fetch / eval — set only on failure
+	Error  string        `json:"error,omitempty"`  // error message — set only on failure
+	Series []*Series     `json:"series,omitempty"` // raw series returned by the datasource
+	Events []*AlertEvent `json:"events,omitempty"` // alert events from the in-memory state machine
 }

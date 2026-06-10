@@ -48,6 +48,7 @@ type Router struct {
 	chartAPI            *api.ChartAPI
 
 	notificationAPI         *api.NotificationAPI
+	alertRuleGroupAPI       *api.AlertRuleGroupAPI
 	alertRuleAPI            *api.AlertRuleAPI
 	alertEventAPI           *api.AlertEventAPI
 	alertRouteAPI           *api.AlertRouteAPI
@@ -78,6 +79,7 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		chartAPI:            api.NewChartAPI(deps),
 
 		notificationAPI:         api.NewNotificationAPI(deps),
+		alertRuleGroupAPI:       api.NewAlertRuleGroupAPI(deps),
 		alertRuleAPI:            api.NewAlertRuleAPI(deps),
 		alertEventAPI:           api.NewAlertEventAPI(deps),
 		alertRouteAPI:           api.NewAlertRouteAPI(deps),
@@ -279,6 +281,18 @@ func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRuleAPI.GetAlertRuleByUID)...)
 	router.GET("/alerting/rules",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRuleAPI.SearchAlertRules)...)
+	router.POST("/alerting/rules/dry-run",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertRuleAPI.DryRunAlertRule)...)
+
+	// alert rule groups (created implicitly via rules; no POST endpoint)
+	router.GET("/alerting/rule-groups",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRuleGroupAPI.SearchAlertRuleGroups)...)
+	router.PUT("/alerting/rule-groups",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertRuleGroupAPI.UpdateAlertRuleGroup)...)
+	router.GET("/alerting/rule-groups/:uid",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRuleGroupAPI.GetAlertRuleGroupByUID)...)
+	router.DELETE("/alerting/rule-groups/:uid",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertRuleGroupAPI.DeleteAlertRuleGroupByUID)...)
 
 	// alert events
 	router.GET("/alerting/events",

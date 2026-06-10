@@ -41,13 +41,13 @@ func NewAlertRuleAPI(deps *depspkg.API) *AlertRuleAPI {
 
 // CreateAlertRule creates a new alert rule.
 func (api *AlertRuleAPI) CreateAlertRule(c *gin.Context) { //nolint:dupl
-	rule := &model.AlertRule{}
-	if err := c.ShouldBind(&rule); err != nil {
+	req := &model.CreateAlertRuleRequest{}
+	if err := c.ShouldBind(req); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	ctx := c.Request.Context()
-	uid, err := api.deps.AlertRuleSrv.CreateAlertRule(ctx, rule)
+	uid, err := api.deps.AlertRuleSrv.CreateAlertRule(ctx, req)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
@@ -84,8 +84,8 @@ func (api *AlertRuleAPI) SearchAlertRules(c *gin.Context) {
 		return
 	}
 	httppkg.OK(c, gin.H{
-		"total": total,
-		"rules": rules,
+		"total":  total,
+		"groups": rules,
 	})
 }
 
@@ -108,4 +108,22 @@ func (api *AlertRuleAPI) GetAlertRuleByUID(c *gin.Context) {
 		return
 	}
 	httppkg.OK(c, rule)
+}
+
+// DryRunAlertRule executes the full evaluation pipeline for the given rule without
+// persisting any state or delivering any notifications.
+// The response always contains a structured result; pipeline errors are reported
+// inside AlertRuleDryRunResult.Stage / Error rather than as HTTP errors.
+func (api *AlertRuleAPI) DryRunAlertRule(c *gin.Context) {
+	rule := &model.AlertRule{}
+	if err := c.ShouldBind(rule); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	result, err := api.deps.DryRunner.Run(c.Request.Context(), rule)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, result)
 }

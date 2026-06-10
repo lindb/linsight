@@ -73,6 +73,8 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(orgUser)
 	migrator.AddMigration(dbpkg.NewMigration(&model.NotificationSetting{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Notification{}))
+	// AlertRuleGroup must be migrated before AlertRule (foreign key group_uid)
+	migrator.AddMigration(dbpkg.NewMigration(&model.AlertRuleGroup{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertRule{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Alert{}))
 	// new alerting tables (kept separate from legacy tables for smooth migration)
