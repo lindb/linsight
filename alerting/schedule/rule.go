@@ -24,6 +24,7 @@ import (
 
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
+	ljson "github.com/lindb/arrow/pkg/json"
 	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/common/pkg/logger"
 
@@ -32,11 +33,12 @@ import (
 
 // AlertRule wraps a model.AlertRule with compiled conditions and cached query parameters.
 type AlertRule struct {
-	conditions   []*vm.Program
-	queryParams  *model.QueryRequest
-	rule         *model.AlertRule
-	querier      Querier
-	stateMgr     RuleStateManager
+	conditions  []*vm.Program
+	severities  []model.Severity // parallel to conditions; tracks which severity each program corresponds to
+	queryParams *model.QueryRequest
+	rule        *model.AlertRule
+	querier     Querier
+	stateMgr    RuleStateManager
 
 	deps           *Deps
 	currentVersion int
@@ -80,28 +82,53 @@ func (r *AlertRule) Perpare() error {
 		return conditions[i].Severity < conditions[j].Severity
 	})
 
-	r.conditions = make([]*vm.Program, len(conditions))
 	r.queryParams = dataQuery
 
-	for idx := range conditions {
-		condition := conditions[idx]
-		var str string
-		if err := encoding.JSONUnmarshal(condition.Expr, &str); err != nil {
-			return err
-		}
-		r.ruleLogger.Debug("compile condition", logger.String("rule", rule.UID), logger.String("expr", str))
-		program, err := expr.Compile(str)
+	if len(conditions) == 0 {
+		// No conditions configured — treat every series as a match (passthrough).
+		// Compile a synthetic "always-true" program to reuse the existing Eval path.
+		passthrough, err := expr.Compile("true")
 		if err != nil {
 			return err
 		}
-		r.conditions[idx] = program
+		r.conditions = []*vm.Program{passthrough}
+		r.severities = []model.Severity{model.AlertSeverity}
+		r.ruleLogger.Info("conditions compiled, passthrough enabled (no conditions configured)",
+			logger.String("rule", rule.UID),
+			logger.Int32("version", int32(rule.Version)))
+	} else {
+		r.conditions = make([]*vm.Program, len(conditions))
+		r.severities = make([]model.Severity, len(conditions))
+
+		for idx := range conditions {
+			condition := conditions[idx]
+			r.severities[idx] = condition.Severity
+			var str string
+			if err := encoding.JSONUnmarshal(condition.Expr, &str); err != nil {
+				return err
+			}
+			r.ruleLogger.Info("condition compiled",
+				logger.String("rule", rule.UID),
+				logger.Int32("version", int32(rule.Version)),
+				logger.Int32("severity", int32(condition.Severity)),
+				logger.String("expr", str))
+			program, err := expr.Compile(str)
+			if err != nil {
+				return err
+			}
+			r.conditions[idx] = program
+		}
 	}
 
 	r.currentVersion = rule.Version
 	return nil
 }
 
-// FetchData queries the datasource and returns one Series per field per metric series.
+// FetchData queries the datasource and returns a flat list of Series data points.
+// Each row in the Arrow ResultSet is processed as follows:
+//   - "string" columns become Tags (group-by dimensions)
+//   - "time_series" columns expand to one Series per data point (timestamp = start + i*interval)
+//   - all other columns (aggregation scalars) become a single Series at the query start time
 func (r *AlertRule) FetchData() (rs []*model.Series, err error) {
 	resp, err := r.querier.Query(r.queryParams.Queries, r.queryParams.Range)
 	if err != nil {
@@ -109,20 +136,72 @@ func (r *AlertRule) FetchData() (rs []*model.Series, err error) {
 	}
 
 	for refID, resultSet := range resp {
-		for _, s := range resultSet.Series {
-			for fn, f := range s.Fields {
-				ts, val := getValue(f)
-				rs = append(rs, &model.Series{
-					RefID:      refID,
-					MetricName: resultSet.MetricName,
-					Field:      fn,
-					Tags:       s.Tags,
-					Timestamp:  ts,
-					Value:      val,
-				})
+		if resultSet == nil || resultSet.Schema == nil {
+			continue
+		}
+		cols := resultSet.Schema.Columns
+		for _, row := range resultSet.Rows {
+			if len(row) != len(cols) {
+				continue
+			}
+			// Collect tag values from string columns (group-by dimensions).
+			tags := make(map[string]string)
+			for i, col := range cols {
+				if col.DataType == "string" {
+					if v, ok := row[i].(string); ok {
+						tags[col.Name] = v
+					}
+				}
+			}
+			// Extract metric values from non-tag columns.
+			for i, col := range cols {
+				if col.DataType == "string" {
+					continue
+				}
+				switch col.DataType {
+				case "time_series":
+					ts, ok := row[i].(*ljson.TimeSeries)
+					if !ok {
+						continue
+					}
+					for j, v := range ts.Values {
+						timestamp := ts.TimeRange.Start + int64(j)*ts.Interval
+						rs = append(rs, &model.Series{
+							RefID:     refID,
+							Field:     col.Name,
+							Tags:      tags,
+							Timestamp: timestamp,
+							Value:     v,
+						})
+					}
+				default:
+					// Aggregation (scalar) column — single data point at query start time.
+					var val float64
+					switch v := row[i].(type) {
+					case float64:
+						val = v
+					case float32:
+						val = float64(v)
+					case int64:
+						val = float64(v)
+					default:
+						continue
+					}
+					rs = append(rs, &model.Series{
+						RefID:     refID,
+						Field:     col.Name,
+						Tags:      tags,
+						Timestamp: r.queryParams.Range.Start,
+						Value:     val,
+					})
+				}
 			}
 		}
 	}
+	r.ruleLogger.Info("data fetched",
+		logger.String("rule", r.rule.UID),
+		logger.Int32("queries", int32(len(r.queryParams.Queries))),
+		logger.Int32("series", int32(len(rs))))
 	return
 }
 
@@ -138,11 +217,16 @@ func (r *AlertRule) Eval(ctx context.Context, seriesList []*model.Series) (match
 			}
 			result, ok := output.(bool)
 			if ok && result {
+				series.Severity = r.severities[idx] // record the severity of the matched condition
 				matchingSeries = append(matchingSeries, series)
 				break // one matching condition is sufficient per series
 			}
 		}
 	}
+	r.ruleLogger.Info("conditions evaluated",
+		logger.String("rule", r.rule.UID),
+		logger.Int32("total", int32(len(seriesList))),
+		logger.Int32("matched", int32(len(matchingSeries))))
 	return matchingSeries, nil
 }
 
@@ -154,4 +238,9 @@ func (r *AlertRule) EvalAndTrack(ctx context.Context, seriesList []*model.Series
 	}
 	events := r.stateMgr.Eval(r.rule, matchingSeries, evalTime)
 	return events, nil
+}
+
+// ActiveAlerts returns the number of fingerprints currently in Pending or Firing state.
+func (r *AlertRule) ActiveAlerts() int {
+	return r.stateMgr.ActiveCount()
 }

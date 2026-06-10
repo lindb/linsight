@@ -23,9 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"go.uber.org/atomic"
-
 	"github.com/lindb/common/pkg/logger"
+	"go.uber.org/atomic"
 
 	"github.com/lindb/linsight/model"
 )
@@ -49,8 +48,8 @@ type ruleExecWorker struct {
 
 	rule *AlertRule
 
-	running    *atomic.Bool
-	workerLog  logger.Logger
+	running   *atomic.Bool
+	workerLog logger.Logger
 }
 
 func newRuleExecWorker(ctx context.Context, rule *model.AlertRule, deps *Deps) RuleExecWorker {
@@ -128,7 +127,7 @@ func (w *ruleExecWorker) EvalRule(tick int64) bool {
 }
 
 func (w *ruleExecWorker) Stop() {
-	if w.running.CAS(true, false) {
+	if w.running.CompareAndSwap(true, false) {
 		w.cancel()
 	}
 }
@@ -137,17 +136,34 @@ func (w *ruleExecWorker) exec() error {
 	if err := w.rule.Perpare(); err != nil {
 		return err
 	}
+	w.workerLog.Info("rule prepared",
+		logger.String("rule", w.rawRule.UID),
+		logger.Int32("version", int32(w.rawRule.Version)))
 
 	// fetch metric data from datasource
 	seriesList, err := w.rule.FetchData()
 	if err != nil {
 		return err
 	}
+	w.workerLog.Info("rule data fetched",
+		logger.String("rule", w.rawRule.UID),
+		logger.Int32("series", int32(len(seriesList))))
 
 	// evaluate conditions and drive the state machine
-	events, err := w.rule.EvalAndTrack(context.TODO(), seriesList, time.Now())
+	evalTime := time.Now()
+	events, err := w.rule.EvalAndTrack(context.TODO(), seriesList, evalTime)
 	if err != nil {
 		return err
+	}
+	w.workerLog.Info("rule evaluated",
+		logger.String("rule", w.rawRule.UID),
+		logger.Int32("events", int32(len(events))),
+		logger.Int32("active", int32(w.rule.ActiveAlerts())))
+	for _, ev := range events {
+		w.workerLog.Info("alert event",
+			logger.String("rule", w.rawRule.UID),
+			logger.String("fingerprint", ev.Fingerprint),
+			logger.Int32("state", int32(ev.State)))
 	}
 
 	// delegate notification routing to the AlertManager

@@ -78,6 +78,12 @@ func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string
 		return fmt.Errorf("decode receiver channels: %w", err)
 	}
 
+	d.logger.Info("dispatching notification",
+		logger.String("receiver", receiver.Name),
+		logger.String("status", status),
+		logger.Int32("events", int32(len(events))),
+		logger.Int32("channels", int32(len(channels))))
+
 	// load custom template if configured
 	var notifTmpl *model.NotificationTemplate
 	if receiver.TemplateUID != "" {
@@ -141,5 +147,11 @@ func (d *dispatcher) renderAndSend(ch model.ReceiverChannel, data *template.Noti
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	return notifier.Notify(ctx, data)
+	if err := notifier.Notify(ctx, data); err != nil {
+		return err
+	}
+	d.logger.Info("notification sent",
+		logger.String("type", ch.Type),
+		logger.String("receiver", data.ReceiverName))
+	return nil
 }

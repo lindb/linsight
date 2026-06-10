@@ -37,6 +37,9 @@ type AlertManager interface {
 	ProcessEvents(orgID int64, events []*model.AlertEvent)
 	// ReloadConfig reloads routes, silences and inhibit rules from the database.
 	ReloadConfig(orgID int64)
+	// StartRepeatTicker runs a background loop that periodically calls MaybeRepeat on all
+	// alert groups so that steady-state Firing alerts get re-notified after RepeatInterval.
+	StartRepeatTicker(ctx context.Context)
 }
 
 // Deps holds all service dependencies needed by the AlertManager.
@@ -78,6 +81,9 @@ func NewAlertManager(deps *Deps) AlertManager {
 
 func (m *alertManager) ProcessEvents(orgID int64, events []*model.AlertEvent) {
 	now := time.Now().UnixMilli()
+	m.logger.Info("processing alert events",
+		logger.Int64("org", orgID),
+		logger.Int32("count", int32(len(events))))
 
 	// persist / update alert events in the database
 	for _, ev := range events {
@@ -91,19 +97,27 @@ func (m *alertManager) ProcessEvents(orgID int64, events []*model.AlertEvent) {
 	for _, ev := range events {
 		// check silence
 		if m.isSilenced(ev, silences, now) {
-			m.logger.Debug("alert event silenced", logger.String("fingerprint", ev.Fingerprint))
 			continue
 		}
 
 		// check inhibition
 		if m.isInhibited(ev, inhibits, events) {
-			m.logger.Debug("alert event inhibited", logger.String("fingerprint", ev.Fingerprint))
 			continue
 		}
 
 		// route to receiver(s)
 		matched := m.matchRoutes(ev, routes)
+		if len(matched) == 0 {
+			m.logger.Info("no route matched",
+				logger.String("fingerprint", ev.Fingerprint),
+				logger.String("rule", ev.RuleUID))
+		}
 		for _, route := range matched {
+			m.logger.Info("alert event routed",
+				logger.String("fingerprint", ev.Fingerprint),
+				logger.String("rule", ev.RuleUID),
+				logger.String("routeUID", route.UID),
+				logger.String("receiverUID", route.ReceiverUID))
 			groupKey := m.buildGroupKey(orgID, route, ev)
 			m.groupMu.Lock()
 			grp, ok := m.groups[groupKey]
@@ -164,6 +178,10 @@ func (m *alertManager) isSilenced(ev *model.AlertEvent, silences []*model.AlertS
 			continue
 		}
 		if matchAll(labels, matchers) {
+			m.logger.Info("alert event silenced",
+				logger.String("fingerprint", ev.Fingerprint),
+				logger.String("rule", ev.RuleUID),
+				logger.String("silenceUID", s.UID))
 			return true
 		}
 	}
@@ -214,6 +232,10 @@ func (m *alertManager) isInhibited(ev *model.AlertEvent, inhibits []*model.Alert
 				}
 			}
 			if inhibit {
+				m.logger.Info("alert event inhibited",
+					logger.String("fingerprint", ev.Fingerprint),
+					logger.String("rule", ev.RuleUID),
+					logger.String("inhibitRuleUID", rule.UID))
 				return true
 			}
 		}
@@ -299,6 +321,27 @@ func extractMatchers(raw interface{ MarshalJSON() ([]byte, error) }) []model.Lab
 	var ms []model.LabelMatcher
 	_ = json.Unmarshal(data, &ms)
 	return ms
+}
+
+// StartRepeatTicker runs a 1-minute background loop that calls MaybeRepeat on every alert group.
+// This ensures steady-state Firing alerts are re-notified once RepeatInterval has elapsed,
+// even when no new state-change events are produced by the rule evaluator.
+func (m *alertManager) StartRepeatTicker(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			now := time.Now().UnixMilli()
+			m.groupMu.Lock()
+			for _, grp := range m.groups {
+				grp.MaybeRepeat(now)
+			}
+			m.groupMu.Unlock()
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // CleanupGroups removes completed groups to prevent memory leaks.

@@ -25,6 +25,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lindb/common/pkg/logger"
+
 	"github.com/lindb/linsight/model"
 )
 
@@ -33,6 +35,8 @@ import (
 type RuleStateManager interface {
 	// Eval processes the current matching series for a rule and returns all state-changed AlertEvents.
 	Eval(rule *model.AlertRule, matchingSeries []*model.Series, evalTime time.Time) []*model.AlertEvent
+	// ActiveCount returns the number of fingerprints currently in Pending or Firing state.
+	ActiveCount() int
 }
 
 // fingerprintState holds persistent state for a single alert fingerprint.
@@ -44,12 +48,14 @@ type fingerprintState struct {
 type ruleStateManager struct {
 	states map[string]*fingerprintState // key: fingerprint
 	mu     sync.Mutex
+	logger logger.Logger
 }
 
 // NewRuleStateManager creates a RuleStateManager instance.
 func NewRuleStateManager() RuleStateManager {
 	return &ruleStateManager{
 		states: make(map[string]*fingerprintState),
+		logger: logger.GetLogger("Alerting", "RuleState"),
 	}
 }
 
@@ -78,6 +84,7 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 				RuleUID:      rule.UID,
 				RuleTitle:    rule.Title,
 				Fingerprint:  fp,
+				Severity:     series.Severity,
 				Labels:       marshalLabels(labels),
 				Annotations:  renderAnnotations(rule, series),
 				Value:        series.Value,
@@ -95,9 +102,15 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 			st = &fingerprintState{event: ev}
 			m.states[fp] = st
 			changed = append(changed, ev)
+			m.logger.Info("alert state transition",
+				logger.String("rule", rule.UID),
+				logger.String("fingerprint", fp),
+				logger.String("transition", "new→"+stateLabel(ev.State)),
+				logger.Int32("severity", int32(ev.Severity)))
 		} else {
 			ev := st.event
 			ev.Value = series.Value
+			ev.Severity = series.Severity // severity may change if the rule is updated
 			ev.Annotations = renderAnnotations(rule, series)
 
 			switch ev.State {
@@ -107,6 +120,11 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 					ev.State = model.AlertEventFiring
 					ev.StartsAt = nowMs
 					changed = append(changed, ev)
+					m.logger.Info("alert state transition",
+						logger.String("rule", rule.UID),
+						logger.String("fingerprint", fp),
+						logger.String("transition", "pending→firing"),
+						logger.Int32("severity", int32(ev.Severity)))
 				}
 			case model.AlertEventResolved:
 				// condition is true again after being resolved — re-open
@@ -119,6 +137,11 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 					ev.StartsAt = nowMs
 				}
 				changed = append(changed, ev)
+				m.logger.Info("alert state transition",
+					logger.String("rule", rule.UID),
+					logger.String("fingerprint", fp),
+					logger.String("transition", "resolved→"+stateLabel(ev.State)),
+					logger.Int32("severity", int32(ev.Severity)))
 			}
 		}
 		st.seenLastEval = true
@@ -134,10 +157,21 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 			ev.State = model.AlertEventResolved
 			ev.EndsAt = nowMs
 			changed = append(changed, ev)
+			m.logger.Info("alert state transition",
+				logger.String("rule", rule.UID),
+				logger.String("fingerprint", fp),
+				logger.String("transition", "firing→resolved"),
+				logger.Int32("severity", int32(ev.Severity)))
 		}
 		// clean up resolved states after recording
 		delete(m.states, fp)
 	}
+
+	m.logger.Info("state machine evaluated",
+		logger.String("rule", rule.UID),
+		logger.Int32("matched", int32(len(matchingSeries))),
+		logger.Int32("changed", int32(len(changed))),
+		logger.Int32("tracked", int32(len(m.states))))
 
 	return changed
 }
@@ -159,6 +193,7 @@ func buildLabels(rule *model.AlertRule, series *model.Series) map[string]string 
 	// 3. system labels (highest priority)
 	labels["alertname"] = rule.Title
 	labels["__rule_uid__"] = rule.UID
+	labels["__severity__"] = fmt.Sprintf("%d", series.Severity) // include severity so different levels get distinct fingerprints
 	if series.MetricName != "" {
 		labels["__metric__"] = series.MetricName
 	}
@@ -201,4 +236,31 @@ func computeFingerprint(labels map[string]string) string {
 func marshalLabels(labels map[string]string) []byte {
 	data, _ := json.Marshal(labels)
 	return data
+}
+
+// ActiveCount returns the number of fingerprints currently in Pending or Firing state.
+func (m *ruleStateManager) ActiveCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	n := 0
+	for _, st := range m.states {
+		if st.event.State == model.AlertEventFiring || st.event.State == model.AlertEventPending {
+			n++
+		}
+	}
+	return n
+}
+
+// stateLabel returns a human-readable name for an AlertEventState.
+func stateLabel(s model.AlertEventState) string {
+	switch s {
+	case model.AlertEventPending:
+		return "pending"
+	case model.AlertEventFiring:
+		return "firing"
+	case model.AlertEventResolved:
+		return "resolved"
+	default:
+		return fmt.Sprintf("state(%d)", s)
+	}
 }

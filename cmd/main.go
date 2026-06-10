@@ -132,6 +132,9 @@ func runServer(_ *cobra.Command, _ []string) error {
 			)
 			sche.Run()
 
+			// start the repeat-notification ticker so steady-state Firing alerts are re-notified
+			go apiDeps.AlertMgr.StartRepeatTicker(ctx)
+
 			provisionSrv := provisionservice.NewProvisionService(&provisioningdeps.ProvisioningDeps{
 				BaseDir:      cfg.Provisioning,
 				OrgSrv:       apiDeps.OrgSrv,
@@ -213,8 +216,9 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DashboardVersionSrv: service.NewDashboardVersionService(db),
 		ChartSrv:            service.NewChartService(starSrv, db),
 
-		NotificationSrv: service.NewNotificationService(db),
-		AlertRuleSrv:    service.NewAlertRuleService(db),
+		NotificationSrv:   service.NewNotificationService(db),
+		AlertRuleGroupSrv: service.NewAlertRuleGroupService(db),
+		AlertRuleSrv:      service.NewAlertRuleService(db, service.NewAlertRuleGroupService(db)),
 
 		AlertEventSrv:           alertEventSrv,
 		AlertRouteSrv:           alertRouteSrv,
@@ -226,6 +230,16 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AlertMgr: alertMgr,
 
 		DatasourceMgr: datasource.NewDatasourceManager(),
+
+		// DryRunner uses its own Deps; AlertMgr/NotificationSrv are not needed for dry-run.
+		DryRunner: schedule.NewDryRunner(&schedule.Deps{
+			Opts: &schedule.Options{
+				Interval:        time.Second * 10,
+				MinEvalInterval: time.Second * 10,
+			},
+			DatasourceSrv: service.NewDatasourceService(db),
+			DatasourceMgr: datasource.NewDatasourceManager(),
+		}),
 	}
 }
 
@@ -240,5 +254,8 @@ func loadConfig() (*config.Server, error) {
 		// if not set config file, using default config
 		cfg = config.NewDefaultServer()
 	}
+
+	// TODO: remove this after add default config file, just for debug
+	cfg.Logger.Level = "debug"
 	return cfg, nil
 }

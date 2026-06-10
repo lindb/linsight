@@ -92,6 +92,12 @@ func (g *alertGroup) scheduleNotification(now int64) {
 		return
 	}
 
+	g.logger.Info("scheduling notification",
+		logger.String("group", g.key),
+		logger.Int64("org", g.orgID),
+		logger.String("receiverUID", g.route.ReceiverUID),
+		logger.Int32("events", int32(len(events))))
+
 	d := newDispatcher(g.deps, g.route.ReceiverUID, g.orgID)
 	if err := d.dispatch(events, g.buildGroupLabels()); err != nil {
 		g.logger.Error("dispatch notification failure",
