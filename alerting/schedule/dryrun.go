@@ -77,7 +77,7 @@ func (d *dryRunner) Run(ctx context.Context, rule *model.AlertRule) (*model.Aler
 	}
 
 	return &model.AlertRuleDryRunResult{
-		Series: seriesList,
-		Events: events,
+		DataPoints: seriesList,
+		Events:     events,
 	}, nil
 }

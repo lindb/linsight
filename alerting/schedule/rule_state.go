@@ -33,8 +33,8 @@ import (
 // RuleStateManager tracks alert event state for every fingerprint in a rule evaluation cycle.
 // It drives the Pending → Firing → Resolved state machine.
 type RuleStateManager interface {
-	// Eval processes the current matching series for a rule and returns all state-changed AlertEvents.
-	Eval(rule *model.AlertRule, matchingSeries []*model.Series, evalTime time.Time) []*model.AlertEvent
+	// Eval processes the current matching data points for a rule and returns all state-changed AlertEvents.
+	Eval(rule *model.AlertRule, matching []*model.DataPoint, evalTime time.Time) []*model.AlertEvent
 	// ActiveCount returns the number of fingerprints currently in Pending or Firing state.
 	ActiveCount() int
 }
@@ -60,8 +60,8 @@ func NewRuleStateManager() RuleStateManager {
 }
 
 // Eval runs the state machine for a single evaluation cycle.
-// matchingSeries contains the series that satisfied at least one alert condition.
-func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.Series, evalTime time.Time) []*model.AlertEvent {
+// matching contains the data points that satisfied at least one alert condition.
+func (m *ruleStateManager) Eval(rule *model.AlertRule, matching []*model.DataPoint, evalTime time.Time) []*model.AlertEvent {
 	nowMs := evalTime.UnixMilli()
 	var changed []*model.AlertEvent
 
@@ -73,8 +73,8 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 		st.seenLastEval = false
 	}
 
-	for _, series := range matchingSeries {
-		labels := buildLabels(rule, series)
+	for _, dp := range matching {
+		labels := buildLabels(rule, dp)
 		fp := computeFingerprint(labels)
 
 		st, exists := m.states[fp]
@@ -84,10 +84,10 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 				RuleUID:      rule.UID,
 				RuleTitle:    rule.Title,
 				Fingerprint:  fp,
-				Severity:     series.Severity,
+				Severity:     dp.Severity,
 				Labels:       marshalLabels(labels),
-				Annotations:  renderAnnotations(rule, series),
-				Value:        series.Value,
+				Annotations:  renderAnnotations(rule, dp),
+				Value:        dp.Value,
 				PendingSince: nowMs,
 				GeneratorURL: fmt.Sprintf("/explore?ruleUID=%s", rule.UID),
 			}
@@ -109,9 +109,9 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 				logger.Int32("severity", int32(ev.Severity)))
 		} else {
 			ev := st.event
-			ev.Value = series.Value
-			ev.Severity = series.Severity // severity may change if the rule is updated
-			ev.Annotations = renderAnnotations(rule, series)
+			ev.Value = dp.Value
+			ev.Severity = dp.Severity // severity may change if the rule is updated
+			ev.Annotations = renderAnnotations(rule, dp)
 
 			switch ev.State {
 			case model.AlertEventPending:
@@ -169,15 +169,15 @@ func (m *ruleStateManager) Eval(rule *model.AlertRule, matchingSeries []*model.S
 
 	m.logger.Info("state machine evaluated",
 		logger.String("rule", rule.UID),
-		logger.Int32("matched", int32(len(matchingSeries))),
+		logger.Int32("matched", int32(len(matching))),
 		logger.Int32("changed", int32(len(changed))),
 		logger.Int32("tracked", int32(len(m.states))))
 
 	return changed
 }
 
-// buildLabels merges rule-level labels, series tags and system labels into a single map.
-func buildLabels(rule *model.AlertRule, series *model.Series) map[string]string {
+// buildLabels merges rule-level labels, data-point labels and system labels into a single map.
+func buildLabels(rule *model.AlertRule, dp *model.DataPoint) map[string]string {
 	labels := make(map[string]string)
 
 	// 1. rule static labels (lowest priority)
@@ -185,25 +185,22 @@ func buildLabels(rule *model.AlertRule, series *model.Series) map[string]string 
 		_ = json.Unmarshal(rule.Labels, &labels)
 	}
 
-	// 2. series tags
-	for k, v := range series.Tags {
+	// 2. data-point dimension labels
+	for k, v := range dp.Labels {
 		labels[k] = v
 	}
 
 	// 3. system labels (highest priority)
 	labels["alertname"] = rule.Title
 	labels["__rule_uid__"] = rule.UID
-	labels["__severity__"] = fmt.Sprintf("%d", series.Severity) // include severity so different levels get distinct fingerprints
-	if series.MetricName != "" {
-		labels["__metric__"] = series.MetricName
-	}
+	labels["__severity__"] = fmt.Sprintf("%d", dp.Severity) // include severity so different levels get distinct fingerprints
 
 	return labels
 }
 
-// renderAnnotations evaluates rule annotation templates with the current series context.
+// renderAnnotations evaluates rule annotation templates with the current data-point context.
 // The resulting JSON is stored on the AlertEvent.
-func renderAnnotations(rule *model.AlertRule, series *model.Series) []byte {
+func renderAnnotations(rule *model.AlertRule, dp *model.DataPoint) []byte {
 	if len(rule.Annotations) == 0 {
 		return nil
 	}

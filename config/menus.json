@@ -67,7 +67,7 @@
         "label": "Alert Rules",
         "path": "/alerting/rules/*",
         "page": "alerting_rules",
-        "icon": "rule",
+        "icon": "alert-rule",
         "role": "Viewer"
       },
       {
@@ -83,7 +83,7 @@
         "label": "Silences",
         "path": "/alerting/silences/*",
         "page": "alerting_silences",
-        "icon": "mute",
+        "icon": "silence",
         "role": "Editor"
       },
       {
@@ -115,7 +115,7 @@
         "label": "Templates",
         "path": "/alerting/templates/*",
         "page": "alerting_templates",
-        "icon": "template",
+        "icon": "message-template",
         "role": "Editor"
       }
     ]

@@ -456,10 +456,10 @@ type SearchAlertRuleRequest struct {
 
 type Alert struct {
 	BaseModel
-	OrgID   int64   `json:"-" gorm:"column:org_id"`
-	UID     string  `json:"uid" gorm:"column:uid"`
-	RuleUID string  `json:"rule_uid" gorm:"column:rule_uid;index:u_idx_alert_uid,unique"`
-	Series  *Series `gorm:"-"`
+	OrgID     int64       `json:"-" gorm:"column:org_id"`
+	UID       string      `json:"uid" gorm:"column:uid"`
+	RuleUID   string      `json:"rule_uid" gorm:"column:rule_uid;index:u_idx_alert_uid,unique"`
+	DataPoint *DataPoint  `gorm:"-"`
 }
 
 type ReceiverPlugin struct {
@@ -474,42 +474,47 @@ type SearchNotificationRequest struct {
 	Name string `form:"name" json:"name"`
 }
 
-type Series struct {
-	RefID      string
-	MetricName string
-	Field      string
-	Tags       map[string]string
-	Timestamp  int64
-	Value      float64
-	Severity   Severity // set during Eval when a condition matches; not persisted
+// DataPoint represents a single evaluated data point extracted from a datasource result row.
+// All numeric columns from the same row are merged into Values so that multi-field
+// alert conditions (e.g. "cpu_usage > 80 && memory_usage > 90") can be evaluated atomically.
+type DataPoint struct {
+	RefID     string
+	Labels    map[string]string  // GROUP-BY dimensions → fingerprint + AlertEvent.Labels
+	Values    map[string]float64 // all numeric columns from the same row
+	Fields    map[string]any     // non-dimension, non-numeric columns (bool, JSON, etc.); reserved for log/event alerting
+	Timestamp int64              // for time_series: point timestamp; for scalar: Range.End
+	Value     float64            // representative value: Values["value"] ?? first numeric col
+	Severity  Severity           // set during Eval when a condition matches; not persisted
 }
 
-func (s *Series) ToMap() map[string]any {
-	// Fixed fields available in every expression environment.
+func (dp *DataPoint) ToMap() map[string]any {
 	env := map[string]any{
-		"refId":     s.RefID,
-		"field":     s.Field,
-		"value":     s.Value,
-		"timestamp": s.Timestamp,
-		// Also expose value under the field name so expressions can reference it
-		// either as "value > 80" or as "<fieldName> > 80".
-		s.Field: s.Value,
+		"refId":     dp.RefID,
+		"value":     dp.Value,
+		"timestamp": dp.Timestamp,
 	}
-	// Flatten all tags as top-level labels for clean expression access,
-	// e.g. host == "server1" or region != "us-east".
-	for k, v := range s.Tags {
+	// Lowest priority: dimension labels
+	for k, v := range dp.Labels {
+		env[k] = v
+	}
+	// Medium priority: non-dimension content fields
+	for k, v := range dp.Fields {
+		env[k] = v
+	}
+	// Highest priority: numeric values (override same-named label/field)
+	for k, v := range dp.Values {
 		env[k] = v
 	}
 	return env
 }
 
 // AlertRuleDryRunResult captures the full output of a single dry-run evaluation cycle.
-// When a pipeline stage fails, Stage and Error are set; Series and Events are empty.
-// When all stages succeed, Series contains the raw datasource data and Events contains
+// When a pipeline stage fails, Stage and Error are set; DataPoints and Events are empty.
+// When all stages succeed, DataPoints contains the raw datasource data and Events contains
 // the alert events that would have been produced (but were NOT persisted).
 type AlertRuleDryRunResult struct {
-	Stage  string        `json:"stage,omitempty"`  // prepare / fetch / eval — set only on failure
-	Error  string        `json:"error,omitempty"`  // error message — set only on failure
-	Series []*Series     `json:"series,omitempty"` // raw series returned by the datasource
-	Events []*AlertEvent `json:"events,omitempty"` // alert events from the in-memory state machine
+	Stage      string        `json:"stage,omitempty"`      // prepare / fetch / eval — set only on failure
+	Error      string        `json:"error,omitempty"`      // error message — set only on failure
+	DataPoints []*DataPoint  `json:"dataPoints,omitempty"` // raw data points returned by the datasource
+	Events     []*AlertEvent `json:"events,omitempty"`     // alert events from the in-memory state machine
 }

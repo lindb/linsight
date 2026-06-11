@@ -147,7 +147,7 @@ func (w *ruleExecWorker) exec() error {
 	}
 	w.workerLog.Info("rule data fetched",
 		logger.String("rule", w.rawRule.UID),
-		logger.Int32("series", int32(len(seriesList))))
+		logger.Int32("dataPoints", int32(len(seriesList))))
 
 	// evaluate conditions and drive the state machine
 	evalTime := time.Now()
