@@ -21,11 +21,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	html "html/template"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 
+	"github.com/lindb/common/pkg/encoding"
 	"github.com/lindb/linsight/model"
 )
 
@@ -47,23 +49,21 @@ Value: {{ .Value }}
 
 // NotificationData contains the data injected into notification templates.
 type NotificationData struct {
-	Alerts            []*model.AlertEvent       // all alerts in the group
-	FiringAlerts      []*model.AlertEvent       // currently firing alerts
-	ResolvedAlerts    []*model.AlertEvent        // recently resolved alerts
-	CommonLabels      map[string]string          // labels shared by all alerts
-	CommonAnnotations map[string]string          // annotations shared by all alerts
-	GroupLabels       map[string]string          // labels used to form this group
-	ReceiverName      string                     // name of the target receiver
-	Status            string                     // "firing" or "resolved"
-	ExternalURL       string                     // base URL for generating links
+	Alerts            []*model.AlertEvent `json:"alerts"`            // all alerts in the group
+	FiringAlerts      []*model.AlertEvent `json:"firingAlerts"`      // currently firing alerts
+	ResolvedAlerts    []*model.AlertEvent `json:"resolvedAlerts"`    // recently resolved alerts
+	CommonLabels      map[string]string   `json:"commonLabels"`      // labels shared by all alerts
+	CommonAnnotations map[string]string   `json:"commonAnnotations"` // annotations shared by all alerts
+	GroupLabels       map[string]string   `json:"groupLabels"`       // labels used to form this group
+	ReceiverName      string              `json:"receiverName"`      // name of the target receiver
+	Status            string              `json:"status"`            // "firing" or "resolved"
+	ExternalURL       string              `json:"externalURL"`       // base URL for generating links
 }
 
 // Renderer provides Go template rendering for notifications.
 type Renderer interface {
-	// RenderText renders a text/template string with the given data.
-	RenderText(tmplStr string, data *NotificationData) (string, error)
-	// RenderHTML renders an html/template string with the given data (for email bodies).
-	RenderHTML(tmplStr string, data *NotificationData) (string, error)
+	// Render renders a text/template string with the given data.
+	Render(tmplStr string, data *NotificationData) (string, error)
 	// RenderDefaultTitle renders the built-in title template.
 	RenderDefaultTitle(data *NotificationData) (string, error)
 	// RenderDefaultBody renders the built-in body template.
@@ -77,12 +77,8 @@ func NewRenderer() Renderer {
 	return &renderer{}
 }
 
-func (r *renderer) RenderText(tmplStr string, data *NotificationData) (string, error) {
+func (r *renderer) Render(tmplStr string, data *NotificationData) (string, error) {
 	return renderText(tmplStr, data)
-}
-
-func (r *renderer) RenderHTML(tmplStr string, data *NotificationData) (string, error) {
-	return renderHTML(tmplStr, data)
 }
 
 func (r *renderer) RenderDefaultTitle(data *NotificationData) (string, error) {
@@ -94,19 +90,12 @@ func (r *renderer) RenderDefaultBody(data *NotificationData) (string, error) {
 }
 
 // RenderWithContext renders a template string respecting context cancellation.
-func RenderWithContext(ctx context.Context, r Renderer, tmplType model.TemplateType, tmplStr string, data *NotificationData) (string, error) {
+func RenderWithContext(ctx context.Context, r Renderer, tmplStr string, data *NotificationData) (string, error) {
 	resultCh := make(chan string, 1)
 	errCh := make(chan error, 1)
 
 	go func() {
-		var result string
-		var err error
-		switch tmplType {
-		case model.TemplateHTMLType:
-			result, err = r.RenderHTML(tmplStr, data)
-		default:
-			result, err = r.RenderText(tmplStr, data)
-		}
+		result, err := r.Render(tmplStr, data)
 		if err != nil {
 			errCh <- err
 			return
@@ -149,6 +138,41 @@ func BuildNotificationData(events []*model.AlertEvent, receiverName, status, ext
 	data.CommonAnnotations = computeCommonAnnotations(events)
 
 	return data
+}
+
+// BuildNotificationDataFromPayload deserializes example payload JSON into NotificationData.
+// When FiringAlerts/ResolvedAlerts are absent but Alerts is non-empty, it auto-derives them
+// by inspecting each AlertEvent.State. CommonLabels and CommonAnnotations are also derived
+// from the Alerts list when they are not provided.
+func BuildNotificationDataFromPayload(payloadJSON string) (*NotificationData, error) {
+	if payloadJSON == "" {
+		return &NotificationData{}, nil
+	}
+	data := &NotificationData{}
+	if err := encoding.JSONUnmarshal([]byte(payloadJSON), data); err != nil {
+		return nil, fmt.Errorf("parse notification payload: %w", err)
+	}
+
+	// auto-derive sub-lists when not explicitly provided in the payload
+	if len(data.FiringAlerts) == 0 && len(data.ResolvedAlerts) == 0 && len(data.Alerts) > 0 {
+		for _, ev := range data.Alerts {
+			if ev.State == model.AlertEventFiring || ev.State == model.AlertEventPending {
+				data.FiringAlerts = append(data.FiringAlerts, ev)
+			} else if ev.State == model.AlertEventResolved {
+				data.ResolvedAlerts = append(data.ResolvedAlerts, ev)
+			}
+		}
+	}
+
+	// auto-derive common labels/annotations when not set
+	if len(data.CommonLabels) == 0 && len(data.Alerts) > 0 {
+		data.CommonLabels = computeCommonLabels(data.Alerts)
+	}
+	if len(data.CommonAnnotations) == 0 && len(data.Alerts) > 0 {
+		data.CommonAnnotations = computeCommonAnnotations(data.Alerts)
+	}
+
+	return data, nil
 }
 
 // computeCommonLabels returns labels that are identical across all given events.
@@ -197,6 +221,22 @@ func computeCommonAnnotations(events []*model.AlertEvent) map[string]string {
 	return common
 }
 
+// toTitleCase capitalises the first letter of each word.
+func toTitleCase(s string) string {
+	prevSpace := true
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			prevSpace = true
+			return r
+		}
+		if prevSpace {
+			prevSpace = false
+			return unicode.ToTitle(r)
+		}
+		return r
+	}, s)
+}
+
 // templateFuncMap returns template helper functions shared across all templates.
 func templateFuncMap() template.FuncMap {
 	return template.FuncMap{
@@ -204,6 +244,38 @@ func templateFuncMap() template.FuncMap {
 		"upper": strings.ToUpper,
 		// lower converts a string to lower case
 		"lower": strings.ToLower,
+		// title converts a string to title case (first letter of each word capitalised)
+		"title": toTitleCase,
+		// trimSpace removes leading and trailing white space from a string
+		"trimSpace": strings.TrimSpace,
+		// join concatenates string slice elements separated by sep
+		"join": func(sep string, elems []string) string {
+			return strings.Join(elems, sep)
+		},
+		// match reports whether the string s contains any match for the regexp pattern
+		"match": func(pattern, s string) bool {
+			ok, _ := regexp.MatchString(pattern, s)
+			return ok
+		},
+		// reReplaceAll returns a copy of s with all matches of pattern replaced by repl
+		"reReplaceAll": func(pattern, repl, s string) string {
+			return regexp.MustCompile(pattern).ReplaceAllString(s, repl)
+		},
+		// humanizeDuration converts a duration in milliseconds to a human-readable string (e.g. "2h3m4s")
+		"humanizeDuration": func(ms int64) string {
+			d := time.Duration(ms) * time.Millisecond
+			d = d.Round(time.Second)
+			h := int(d.Hours())
+			m := int(d.Minutes()) % 60
+			s := int(d.Seconds()) % 60
+			if h > 0 {
+				return fmt.Sprintf("%dh%dm%ds", h, m, s)
+			}
+			if m > 0 {
+				return fmt.Sprintf("%dm%ds", m, s)
+			}
+			return fmt.Sprintf("%ds", s)
+		},
 		// timeFormat formats a unix millisecond timestamp
 		"timeFormat": func(ms int64) string {
 			return time.UnixMilli(ms).Format("2006-01-02 15:04:05")
@@ -217,6 +289,11 @@ func templateFuncMap() template.FuncMap {
 			}
 			return "{" + strings.Join(parts, ", ") + "}"
 		},
+		// labelsGet retrieves a single label value by key
+		"labelsGet": func(labelsJSON interface{}, key string) string {
+			m := parseJSONMapFromAny(labelsJSON)
+			return m[key]
+		},
 		// annotationsGet retrieves a single annotation value by key
 		"annotationsGet": func(annotationsJSON interface{}, key string) string {
 			m := parseJSONMapFromAny(annotationsJSON)
@@ -225,17 +302,9 @@ func templateFuncMap() template.FuncMap {
 	}
 }
 
-// htmlTemplateFuncMap adapts the text funcmap for use with html/template.
-func htmlTemplateFuncMap() html.FuncMap {
-	tf := templateFuncMap()
-	hf := make(html.FuncMap, len(tf))
-	for k, v := range tf {
-		hf[k] = v
-	}
-	return hf
-}
-
 func renderText(tmplStr string, data *NotificationData) (string, error) {
+	// Use ParseFiles-style approach: assign template name so {{define}} blocks register correctly.
+	// Using template.New + Parse lets root content and any {{define}} blocks coexist in one string.
 	tmpl, err := template.New("notification").Funcs(templateFuncMap()).Parse(tmplStr)
 	if err != nil {
 		return "", fmt.Errorf("parse template: %w", err)
@@ -243,18 +312,6 @@ func renderText(tmplStr string, data *NotificationData) (string, error) {
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("execute template: %w", err)
-	}
-	return buf.String(), nil
-}
-
-func renderHTML(tmplStr string, data *NotificationData) (string, error) {
-	tmpl, err := html.New("notification").Funcs(htmlTemplateFuncMap()).Parse(tmplStr)
-	if err != nil {
-		return "", fmt.Errorf("parse html template: %w", err)
-	}
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("execute html template: %w", err)
 	}
 	return buf.String(), nil
 }

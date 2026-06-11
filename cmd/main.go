@@ -188,6 +188,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	alertSilenceSrv := service.NewAlertSilenceService(db)
 	alertInhibitRuleSrv := service.NewAlertInhibitRuleService(db)
 	notificationTemplateSrv := service.NewNotificationTemplateService(db)
+	notificationTemplateExampleSrv := service.NewNotificationTemplateExampleService(db)
 
 	// alertmanager
 	alertMgr := manager.NewAlertManager(&manager.Deps{
@@ -224,8 +225,9 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AlertRouteSrv:           alertRouteSrv,
 		AlertReceiverSrv:        alertReceiverSrv,
 		AlertSilenceSrv:         alertSilenceSrv,
-		AlertInhibitRuleSrv:     alertInhibitRuleSrv,
-		NotificationTemplateSrv: notificationTemplateSrv,
+		AlertInhibitRuleSrv:            alertInhibitRuleSrv,
+		NotificationTemplateSrv:        notificationTemplateSrv,
+		NotificationTemplateExampleSrv: notificationTemplateExampleSrv,
 
 		AlertMgr: alertMgr,
 

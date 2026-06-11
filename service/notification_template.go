@@ -71,7 +71,6 @@ func (srv *notificationTemplateService) UpdateNotificationTemplate(ctx context.C
 	}
 	user := util.GetUser(ctx)
 	fromDB.Name = tmpl.Name
-	fromDB.Type = tmpl.Type
 	fromDB.Template = tmpl.Template
 	fromDB.UpdatedBy = user.User.ID
 	return srv.db.Update(fromDB, "uid=? and org_id=?", tmpl.UID, user.Org.ID)

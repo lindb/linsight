@@ -59,6 +59,8 @@ tags:
     description: Alert inhibit rule management (Editor/Viewer)
   - name: NotificationTemplates
     description: Notification template management (Editor/Viewer)
+  - name: NotificationTemplateExamples
+    description: Notification template example payload management (Editor/Viewer)
   - name: NotificationSettings
     description: Global notification channel settings (Admin)
 
@@ -2261,13 +2263,21 @@ paths:
           application/json:
             schema:
               type: object
-              required: [type, template]
+              required: [template]
               properties:
-                type:
-                  $ref: '#/components/schemas/TemplateType'
                 template:
                   type: string
                   description: Go template string to render
+                payload:
+                  type: string
+                  description: |
+                    Optional inline JSON of NotificationData used as render context.
+                    Takes priority over exampleUID. Must be valid JSON matching NotificationData shape.
+                exampleUID:
+                  type: string
+                  description: |
+                    Optional UID of a stored NotificationTemplateExample whose payload is used as render context.
+                    Only used when payload is not provided.
       responses:
         '200':
           description: Rendered template output
@@ -2310,6 +2320,107 @@ paths:
       responses:
         '200':
           description: Notification template deleted
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── Notification Template Examples ──────────────────────────────────────────
+  /api/v1/alerting/template-examples:
+    get:
+      tags: [NotificationTemplateExamples]
+      summary: Search notification template examples (Viewer)
+      description: Search example payloads with optional name filter and pagination. Requires Viewer role.
+      parameters:
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated list of notification template examples
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplateExampleListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [NotificationTemplateExamples]
+      summary: Create notification template example (Editor)
+      description: Create a new example payload for template preview. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationTemplateExample'
+      responses:
+        '200':
+          description: Example created – returns new UID
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [NotificationTemplateExamples]
+      summary: Update notification template example (Editor)
+      description: Update an existing example payload. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationTemplateExample'
+      responses:
+        '200':
+          description: Example updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/template-examples/{uid}:
+    get:
+      tags: [NotificationTemplateExamples]
+      summary: Get notification template example by UID (Viewer)
+      description: Returns a single example by UID. Requires Viewer role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Notification template example detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTemplateExample'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [NotificationTemplateExamples]
+      summary: Delete notification template example by UID (Editor)
+      description: Delete an example by UID. Requires Editor role.
+      parameters:
+        - $ref: '#/components/parameters/UIDPath'
+      responses:
+        '200':
+          description: Example deleted
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -2969,11 +3080,6 @@ components:
       description: "Label matcher operator"
       enum: ["=", "!=", "=~", "!~"]
 
-    TemplateType:
-      type: string
-      description: "Notification template type"
-      enum: [title, body, html]
-
     LabelMatcher:
       type: object
       required: [name, value, type]
@@ -3435,14 +3541,12 @@ components:
       allOf:
         - $ref: '#/components/schemas/BaseModel'
         - type: object
-          required: [name, type, template]
+          required: [name, template]
           properties:
             uid:
               type: string
             name:
               type: string
-            type:
-              $ref: '#/components/schemas/TemplateType'
             template:
               type: string
               description: |
@@ -3464,6 +3568,38 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NotificationTemplate'
+
+    # ── Notification Template Example ────────────────────────────────────────────
+    NotificationTemplateExample:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          required: [name, payload]
+          properties:
+            uid:
+              type: string
+            name:
+              type: string
+            payload:
+              type: string
+              description: |
+                JSON-serialised NotificationData used as template render context.
+                Matches the shape of NotificationData:
+                  alerts, firingAlerts, resolvedAlerts – alert event arrays
+                  commonLabels, commonAnnotations, groupLabels – string maps
+                  receiverName, status, externalURL – string fields
+                FiringAlerts/ResolvedAlerts are auto-derived from Alerts by state when omitted.
+
+    NotificationTemplateExampleListResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+        examples:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTemplateExample'
 
     # ── Notification Setting ─────────────────────────────────────────────────────
     NotificationSetting:

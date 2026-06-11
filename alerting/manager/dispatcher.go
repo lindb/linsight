@@ -135,7 +135,7 @@ func (d *dispatcher) renderAndSend(ch model.ReceiverChannel, data *template.Noti
 	if notifTmpl != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), templateRenderTimeout)
 		defer cancel()
-		rendered, renderErr := template.RenderWithContext(ctx, d.renderer, notifTmpl.Type, notifTmpl.Template, data)
+		rendered, renderErr := template.RenderWithContext(ctx, d.renderer, notifTmpl.Template, data)
 		if renderErr != nil {
 			d.logger.Warn("template render failure, using default",
 				logger.String("templateUID", notifTmpl.UID),

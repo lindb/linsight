@@ -365,4 +365,16 @@ func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {
 		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationTemplateAPI.DeleteNotificationTemplateByUID)...)
 	router.POST("/alerting/templates/preview",
 		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationTemplateAPI.PreviewNotificationTemplate)...)
+
+	// notification template examples
+	router.GET("/alerting/template-examples",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.notificationTemplateAPI.SearchNotificationTemplateExamples)...)
+	router.GET("/alerting/template-examples/:uid",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.notificationTemplateAPI.GetNotificationTemplateExampleByUID)...)
+	router.POST("/alerting/template-examples",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationTemplateAPI.CreateNotificationTemplateExample)...)
+	router.PUT("/alerting/template-examples",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationTemplateAPI.UpdateNotificationTemplateExample)...)
+	router.DELETE("/alerting/template-examples/:uid",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationTemplateAPI.DeleteNotificationTemplateExampleByUID)...)
 }

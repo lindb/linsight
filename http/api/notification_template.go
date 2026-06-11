@@ -109,43 +109,142 @@ func (api *NotificationTemplateAPI) SearchNotificationTemplates(c *gin.Context) 
 	})
 }
 
-// PreviewNotificationTemplate renders a template string with sample data and returns the result.
+// PreviewNotificationTemplate renders a template string with the provided payload data and returns the result.
+// Priority for data source: inline Payload > ExampleUID (loaded from DB) > hardcoded sample data (fallback).
 func (api *NotificationTemplateAPI) PreviewNotificationTemplate(c *gin.Context) {
 	req := &struct {
-		Type     model.TemplateType `json:"type"`
-		Template string             `json:"template"`
+		Template   string `json:"template"`
+		Payload    string `json:"payload"`    // optional: inline JSON NotificationData
+		ExampleUID string `json:"exampleUID"` // optional: UID of a stored NotificationTemplateExample
 	}{}
 	if err := c.ShouldBind(req); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 
-	// build sample data for rendering preview
-	sampleData := &template.NotificationData{
-		Status:       "firing",
-		ReceiverName: "preview",
-		CommonLabels: map[string]string{
-			"alertname": "HighCPUUsage",
-			"instance":  "web-server-01",
-			"severity":  "critical",
-		},
-		CommonAnnotations: map[string]string{
-			"summary": "CPU usage is above 90%",
-		},
-		GroupLabels: map[string]string{
-			"alertname": "HighCPUUsage",
-		},
-		ExternalURL: "http://localhost:3000",
+	var data *template.NotificationData
+	var buildErr error
+
+	switch {
+	case req.Payload != "":
+		// highest priority: inline payload supplied by the caller
+		data, buildErr = template.BuildNotificationDataFromPayload(req.Payload)
+		if buildErr != nil {
+			httppkg.Error(c, buildErr)
+			return
+		}
+
+	case req.ExampleUID != "":
+		// load the stored example from DB and build data from its payload
+		ex, err := api.deps.NotificationTemplateExampleSrv.GetNotificationTemplateExampleByUID(c.Request.Context(), req.ExampleUID)
+		if err != nil {
+			httppkg.Error(c, err)
+			return
+		}
+		data, buildErr = template.BuildNotificationDataFromPayload(ex.Payload)
+		if buildErr != nil {
+			httppkg.Error(c, buildErr)
+			return
+		}
+
+	default:
+		// backward-compatible fallback: use hardcoded sample data
+		data = &template.NotificationData{
+			Status:       "firing",
+			ReceiverName: "preview",
+			CommonLabels: map[string]string{
+				"alertname": "HighCPUUsage",
+				"instance":  "web-server-01",
+				"severity":  "critical",
+			},
+			CommonAnnotations: map[string]string{
+				"summary": "CPU usage is above 90%",
+			},
+			GroupLabels: map[string]string{
+				"alertname": "HighCPUUsage",
+			},
+			ExternalURL: "http://localhost:3000",
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
 	renderer := template.NewRenderer()
-	result, err := template.RenderWithContext(ctx, renderer, req.Type, req.Template, sampleData)
+	result, err := template.RenderWithContext(ctx, renderer, req.Template, data)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	httppkg.OK(c, gin.H{"result": result})
+}
+
+// ---- NotificationTemplateExample handlers ----
+
+// CreateNotificationTemplateExample creates a new template example.
+func (api *NotificationTemplateAPI) CreateNotificationTemplateExample(c *gin.Context) {
+	ex := &model.NotificationTemplateExample{}
+	if err := c.ShouldBind(ex); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	uid, err := api.deps.NotificationTemplateExampleSrv.CreateNotificationTemplateExample(c.Request.Context(), ex)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, uid)
+}
+
+// UpdateNotificationTemplateExample updates an existing template example.
+func (api *NotificationTemplateAPI) UpdateNotificationTemplateExample(c *gin.Context) {
+	ex := &model.NotificationTemplateExample{}
+	if err := c.ShouldBind(ex); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	if err := api.deps.NotificationTemplateExampleSrv.UpdateNotificationTemplateExample(c.Request.Context(), ex); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Notification template example updated")
+}
+
+// DeleteNotificationTemplateExampleByUID removes a template example.
+func (api *NotificationTemplateAPI) DeleteNotificationTemplateExampleByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	if err := api.deps.NotificationTemplateExampleSrv.DeleteNotificationTemplateExampleByUID(c.Request.Context(), uid); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "Notification template example deleted")
+}
+
+// GetNotificationTemplateExampleByUID returns a template example by UID.
+func (api *NotificationTemplateAPI) GetNotificationTemplateExampleByUID(c *gin.Context) {
+	uid := c.Param(constant.UID)
+	ex, err := api.deps.NotificationTemplateExampleSrv.GetNotificationTemplateExampleByUID(c.Request.Context(), uid)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, ex)
+}
+
+// SearchNotificationTemplateExamples queries template examples with optional filters.
+func (api *NotificationTemplateAPI) SearchNotificationTemplateExamples(c *gin.Context) {
+	req := &model.SearchNotificationTemplateExampleRequest{}
+	if err := c.ShouldBind(req); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	examples, total, err := api.deps.NotificationTemplateExampleSrv.SearchNotificationTemplateExamples(c.Request.Context(), req)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, gin.H{
+		"total":    total,
+		"examples": examples,
+	})
 }

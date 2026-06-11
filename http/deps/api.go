@@ -55,7 +55,8 @@ type API struct {
 	AlertReceiverSrv        service.AlertReceiverService
 	AlertSilenceSrv         service.AlertSilenceService
 	AlertInhibitRuleSrv     service.AlertInhibitRuleService
-	NotificationTemplateSrv service.NotificationTemplateService
+	NotificationTemplateSrv        service.NotificationTemplateService
+	NotificationTemplateExampleSrv service.NotificationTemplateExampleService
 
 	AlertMgr manager.AlertManager
 

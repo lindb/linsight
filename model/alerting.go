@@ -46,15 +46,6 @@ const (
 	MatchNotRegexp MatchType = "!~"
 )
 
-// TemplateType represents the kind of notification template.
-type TemplateType string
-
-const (
-	TemplateTitleType TemplateType = "title"
-	TemplateBodyType  TemplateType = "body"
-	TemplateHTMLType  TemplateType = "html"
-)
-
 // LabelMatcher defines a single label matching rule for routing/silencing/inhibiting.
 type LabelMatcher struct {
 	Name  string    `json:"name"`  // label key
@@ -232,14 +223,25 @@ func (r *AlertInhibitRule) ToTargetMatchers() ([]LabelMatcher, error) {
 }
 
 // NotificationTemplate stores a reusable Go template string for rendering alert notifications.
+// Templates may contain named {{define "name"}} blocks that callers can invoke with {{template "name" .}}.
 type NotificationTemplate struct {
 	BaseModel
 
-	OrgID    int64        `json:"-" gorm:"column:org_id"`
-	UID      string       `json:"uid" gorm:"column:uid;index:u_idx_notif_tmpl_uid,unique"`
-	Name     string       `json:"name" gorm:"column:name"`
-	Type     TemplateType `json:"type" gorm:"column:type"`
-	Template string       `json:"template" gorm:"column:template;type:text"`
+	OrgID    int64  `json:"-" gorm:"column:org_id"`
+	UID      string `json:"uid" gorm:"column:uid;index:u_idx_notif_tmpl_uid,unique"`
+	Name     string `json:"name" gorm:"column:name"`
+	Template string `json:"template" gorm:"column:template;type:text"`
+}
+
+// NotificationTemplateExample stores a reusable sample alert payload used to preview or test notification templates.
+// The Payload field holds a JSON-serialised NotificationData value.
+type NotificationTemplateExample struct {
+	BaseModel
+
+	OrgID   int64  `json:"-" gorm:"column:org_id"`
+	UID     string `json:"uid" gorm:"column:uid;index:u_idx_notif_tmpl_example_uid,unique"`
+	Name    string `json:"name" gorm:"column:name"`
+	Payload string `json:"payload" gorm:"column:payload;type:text"` // JSON of template.NotificationData
 }
 
 // SearchAlertEventRequest holds parameters for querying alert events.
@@ -274,6 +276,12 @@ type SearchAlertInhibitRuleRequest struct {
 
 // SearchNotificationTemplateRequest holds parameters for querying notification templates.
 type SearchNotificationTemplateRequest struct {
+	PagingParam
+	Name string `form:"name" json:"name"`
+}
+
+// SearchNotificationTemplateExampleRequest holds parameters for querying notification template examples.
+type SearchNotificationTemplateExampleRequest struct {
 	PagingParam
 	Name string `form:"name" json:"name"`
 }

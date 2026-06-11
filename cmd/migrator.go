@@ -84,6 +84,7 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertSilence{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertInhibitRule{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.NotificationTemplate{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.NotificationTemplateExample{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.UserToken{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Datasource{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Integration{}))
@@ -118,6 +119,15 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(user)
 	if err = migrator.Run(); err != nil {
 		panic(err)
+	}
+
+	// Drop the legacy 'type' column from notification_templates if it still exists.
+	// GORM AutoMigrate never removes columns, so we need to clean it up explicitly.
+	rawDB := db.RawDB()
+	if rawDB.Migrator().HasColumn("notification_templates", "type") {
+		if err = rawDB.Exec("ALTER TABLE notification_templates DROP COLUMN `type`").Error; err != nil {
+			log.Warn("failed to drop legacy type column from notification_templates", logger.Error(err))
+		}
 	}
 	return nil
 }
