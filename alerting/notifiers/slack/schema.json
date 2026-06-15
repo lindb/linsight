@@ -1,0 +1,7 @@
+{
+  "fields": [
+    {"type": "input", "key": "token",       "label": "Token",       "required": true},
+    {"type": "input", "key": "channel",     "label": "Channel",     "required": true},
+    {"type": "input", "key": "templateUID", "label": "Template UID"}
+  ]
+}

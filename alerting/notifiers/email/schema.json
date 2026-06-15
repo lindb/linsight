@@ -1,0 +1,50 @@
+{
+  "sections": [
+    {
+      "key": "channel",
+      "label": "Recipients",
+      "fields": [
+        {
+          "type": "textarea",
+          "key": "addresses",
+          "label": "Addresses",
+          "required": true,
+          "placeholder": "One address per line"
+        }
+      ]
+    },
+    {
+      "key": "smtp",
+      "label": "SMTP Server",
+      "defaultOpen": false,
+      "fields": [
+        {
+          "type": "input",
+          "key": "host",
+          "label": "SMTP Host",
+          "required": true
+        },
+        {
+          "type": "number",
+          "key": "port",
+          "label": "SMTP Port",
+          "defaultValue": 587
+        },
+        { "type": "input", "key": "username", "label": "Username" },
+        { "type": "input", "key": "password", "label": "Password" },
+        {
+          "type": "input",
+          "key": "from",
+          "label": "From Address",
+          "required": true
+        },
+        {
+          "type": "switch",
+          "key": "startTLS",
+          "label": "Enable StartTLS",
+          "defaultValue": false
+        }
+      ]
+    }
+  ]
+}

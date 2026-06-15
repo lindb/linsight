@@ -33,20 +33,19 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
-//go:embed setting.json
-var setting string
-
-//go:embed config.json
-var config string
+//go:embed schema.json
+var schema string
 
 func init() {
-	types.Register(&types.ReceiverPluginDefine{
-		Define: &model.ReceiverPlugin{
-			Type:    "Slack",
-			Setting: json.RawMessage(setting),
-			Config:  json.RawMessage(config),
+	types.Register(&types.NotifierDef{
+		Plugin: &model.NotifierPlugin{
+			Type:         "Slack",
+			DisplayName:  "Slack",
+			Description:  "Send alert notifications via Slack",
+			ConfigSchema: json.RawMessage(schema),
 		},
-		NewFn: newSlackNotifer,
+		NewFn:      newSlackNotifer,
+		SummaryKey: "channel", // show target Slack channel in the contact-point overview
 	})
 }
 

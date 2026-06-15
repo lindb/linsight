@@ -184,7 +184,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	// new alerting services
 	alertEventSrv := service.NewAlertEventService(db)
 	alertRouteSrv := service.NewAlertRouteService(db)
-	alertReceiverSrv := service.NewAlertReceiverService(db)
+	contactPointSrv := service.NewContactPointService(db)
+	contactPointStatusSrv := service.NewContactPointStatusService(db) // tracks per-channel delivery health
 	alertSilenceSrv := service.NewAlertSilenceService(db)
 	alertInhibitRuleSrv := service.NewAlertInhibitRuleService(db)
 	notificationTemplateSrv := service.NewNotificationTemplateService(db)
@@ -194,10 +195,12 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	alertMgr := manager.NewAlertManager(&manager.Deps{
 		AlertEventSrv:           alertEventSrv,
 		AlertRouteSrv:           alertRouteSrv,
-		AlertReceiverSrv:        alertReceiverSrv,
+		ContactPointSrv:         contactPointSrv,
 		AlertSilenceSrv:         alertSilenceSrv,
 		AlertInhibitRuleSrv:     alertInhibitRuleSrv,
 		NotificationTemplateSrv: notificationTemplateSrv,
+		NotificationSrv:         service.NewNotificationService(db),
+		ContactPointStatusSrv:   contactPointStatusSrv, // persist per-channel delivery outcomes
 		ExternalURL:             "", // TODO: configure public URL in server config
 	})
 
@@ -223,7 +226,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 
 		AlertEventSrv:           alertEventSrv,
 		AlertRouteSrv:           alertRouteSrv,
-		AlertReceiverSrv:        alertReceiverSrv,
+		ContactPointSrv:         contactPointSrv,
+		ContactPointStatusSrv:   contactPointStatusSrv,
 		AlertSilenceSrv:         alertSilenceSrv,
 		AlertInhibitRuleSrv:            alertInhibitRuleSrv,
 		NotificationTemplateSrv:        notificationTemplateSrv,

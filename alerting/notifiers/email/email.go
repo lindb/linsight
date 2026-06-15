@@ -33,16 +33,19 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
-//go:embed setting.json
-var setting string
+//go:embed schema.json
+var schema string
 
 func init() {
-	types.Register(&types.ReceiverPluginDefine{
-		Define: &model.ReceiverPlugin{
-			Type:    "Email",
-			Setting: json.RawMessage(setting),
+	types.Register(&types.NotifierDef{
+		Plugin: &model.NotifierPlugin{
+			Type:         "Email",
+			DisplayName:  "Email",
+			Description:  "Send alert notifications via email",
+			ConfigSchema: json.RawMessage(schema),
 		},
-		NewFn: newEmailNotifier,
+		NewFn:      newEmailNotifier,
+		SummaryKey: "addresses", // show recipient list in the contact-point overview
 	})
 }
 

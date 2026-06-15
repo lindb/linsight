@@ -53,9 +53,9 @@ func newDispatcher(deps *Deps, receiverUID string, orgID int64) *dispatcher {
 
 // dispatch builds notification data and sends it through all enabled channels of the receiver.
 func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string]string) error {
-	receiver, err := d.deps.AlertReceiverSrv.GetAlertReceiverByOrgAndUID(d.orgID, d.receiverUID)
+	receiver, err := d.deps.ContactPointSrv.GetContactPointByOrgAndUID(d.orgID, d.receiverUID)
 	if err != nil {
-		return fmt.Errorf("get receiver %s: %w", d.receiverUID, err)
+		return fmt.Errorf("get contact point %s: %w", d.receiverUID, err)
 	}
 
 	// determine notification status
@@ -106,23 +106,30 @@ func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string
 	return nil
 }
 
-func (d *dispatcher) renderAndSend(ch model.ReceiverChannel, data *template.NotificationData, notifTmpl *model.NotificationTemplate) error {
-	pluginDef, ok := types.GetReceiverPlugin(ch.Type)
+func (d *dispatcher) renderAndSend(ch model.NotificationChannel, data *template.NotificationData, notifTmpl *model.NotificationTemplate) error {
+	pluginDef, ok := types.GetNotifierDef(ch.Type)
 	if !ok {
-		return fmt.Errorf("receiver plugin %q not registered", ch.Type)
+		return fmt.Errorf("notifier plugin %q not registered", ch.Type)
 	}
 
-	// get the global setting for this channel type
-	notificationSetting, err := d.deps.NotificationTemplateSrv.GetTemplateByOrgAndUID(d.orgID, ch.Type)
+	// get the global setting for this channel type from NotificationSrv
+	// (previously this incorrectly used NotificationTemplateSrv which serves template strings, not SMTP/Slack config)
+	settings, err := d.deps.NotificationSrv.GetNotificationSettingsByOrg(d.orgID)
 	if err != nil {
-		// setting may not exist — pass empty JSON
-		notificationSetting = nil
+		settings = nil
 	}
 
 	var settingJSON json.RawMessage
-	if notificationSetting != nil {
-		settingJSON = json.RawMessage(notificationSetting.Template)
-	} else {
+	for _, s := range settings {
+		if s.Type == ch.Type {
+			data, e := s.Config.MarshalJSON()
+			if e == nil {
+				settingJSON = json.RawMessage(data)
+			}
+			break
+		}
+	}
+	if len(settingJSON) == 0 {
 		settingJSON = json.RawMessage("{}")
 	}
 
@@ -147,8 +154,27 @@ func (d *dispatcher) renderAndSend(ch model.ReceiverChannel, data *template.Noti
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := notifier.Notify(ctx, data); err != nil {
-		return err
+
+	start := time.Now()
+	notifyErr := notifier.Notify(ctx, data)
+	durationMs := time.Since(start).Milliseconds()
+
+	// Persist delivery outcome so the contact-point list can show health and last-sent info.
+	deliveryStatus, errMsg := "ok", ""
+	if notifyErr != nil {
+		deliveryStatus, errMsg = "error", notifyErr.Error()
+	}
+	// Only record status when the channel has a stable UID (legacy channels without UIDs are skipped).
+	if ch.UID != "" {
+		_ = d.deps.ContactPointStatusSrv.UpsertChannelStatus(
+			d.orgID, d.receiverUID, ch.UID, ch.Type,
+			deliveryStatus, errMsg,
+			time.Now().UnixMilli(), durationMs,
+		)
+	}
+
+	if notifyErr != nil {
+		return notifyErr
 	}
 	d.logger.Info("notification sent",
 		logger.String("type", ch.Type),

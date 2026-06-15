@@ -1,0 +1,7 @@
+{
+  "fields": [
+    {"type": "input", "key": "url",        "label": "URL",                  "required": true},
+    {"type": "input", "key": "method",     "label": "HTTP Method",          "defaultValue": "POST"},
+    {"type": "input", "key": "authHeader", "label": "Authorization Header"}
+  ]
+}

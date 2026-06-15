@@ -20,6 +20,7 @@ package webhook
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -31,22 +32,21 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
+//go:embed schema.json
+var schema string
+
 func init() {
-	types.Register(&types.ReceiverPluginDefine{
-		Define: &model.ReceiverPlugin{
-			Type:   "Webhook",
-			Config: json.RawMessage(defaultConfig),
+	types.Register(&types.NotifierDef{
+		Plugin: &model.NotifierPlugin{
+			Type:         "Webhook",
+			DisplayName:  "Webhook",
+			Description:  "Send alert notifications to a custom HTTP endpoint",
+			ConfigSchema: json.RawMessage(schema),
 		},
-		NewFn: newWebhookNotifier,
+		NewFn:      newWebhookNotifier,
+		SummaryKey: "url", // show destination URL in the contact-point overview
 	})
 }
-
-// defaultConfig describes the webhook config form schema.
-const defaultConfig = `[
-  {"type":"Input","props":{"field":"url","label":"URL","rules":[{"required":true,"message":"URL is required"}]}},
-  {"type":"Input","props":{"field":"method","label":"HTTP Method","default":"POST"}},
-  {"type":"Input","props":{"field":"authHeader","label":"Authorization Header (optional)"}}
-]`
 
 // Config holds per-receiver webhook configuration.
 type Config struct {

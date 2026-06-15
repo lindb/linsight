@@ -87,10 +87,10 @@
         "role": "Editor"
       },
       {
-        "uid": "alerting_receivers",
-        "label": "Receivers",
-        "path": "/alerting/receivers/*",
-        "page": "alerting_receivers",
+        "uid": "alerting_contact_points",
+        "label": "Contact Points",
+        "path": "/alerting/contact-points/*",
+        "page": "alerting_contact_points",
         "icon": "notification",
         "role": "Editor"
       },

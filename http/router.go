@@ -52,7 +52,7 @@ type Router struct {
 	alertRuleAPI            *api.AlertRuleAPI
 	alertEventAPI           *api.AlertEventAPI
 	alertRouteAPI           *api.AlertRouteAPI
-	alertReceiverAPI        *api.AlertReceiverAPI
+	contactPointAPI         *api.ContactPointAPI
 	alertSilenceAPI         *api.AlertSilenceAPI
 	alertInhibitAPI         *api.AlertInhibitAPI
 	notificationTemplateAPI *api.NotificationTemplateAPI
@@ -83,7 +83,7 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		alertRuleAPI:            api.NewAlertRuleAPI(deps),
 		alertEventAPI:           api.NewAlertEventAPI(deps),
 		alertRouteAPI:           api.NewAlertRouteAPI(deps),
-		alertReceiverAPI:        api.NewAlertReceiverAPI(deps),
+		contactPointAPI:         api.NewContactPointAPI(deps),
 		alertSilenceAPI:         api.NewAlertSilenceAPI(deps),
 		alertInhibitAPI:         api.NewAlertInhibitAPI(deps),
 		notificationTemplateAPI: api.NewNotificationTemplateAPI(deps),
@@ -257,17 +257,12 @@ func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {
 	router.DELETE("/alerting/notification/settings/:type",
 		middleware.Authorize(r.deps, accesscontrol.AdminAccessResource, accesscontrol.Write, r.notificationAPI.DeleteNotificationSettting)...)
 
-	router.POST("/alerting/notifications",
-		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationAPI.CreateNotification)...)
-	router.PUT("/alerting/notifications",
-		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationAPI.UpdateNotification)...)
-	router.GET("/alerting/notifications",
-		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.notificationAPI.SearchNotifications)...)
-	router.GET("/alerting/notifications/:uid",
-		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.notificationAPI.GetNotificationByUID)...)
-
 	router.PUT("/alerting/notifications/test",
 		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.notificationAPI.Test)...)
+
+	// notifier plugin definitions (replaces the removed boot-data Notifications field)
+	router.GET("/alerting/notifiers",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.contactPointAPI.GetNotifierPlugins)...)
 
 	// alert rules
 	router.POST("/alerting/rules",
@@ -314,19 +309,21 @@ func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {
 	router.DELETE("/alerting/routes/:uid",
 		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertRouteAPI.DeleteAlertRouteByUID)...)
 
-	// alert receivers
-	router.GET("/alerting/receivers",
-		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertReceiverAPI.SearchAlertReceivers)...)
-	router.GET("/alerting/receivers/:uid",
-		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertReceiverAPI.GetAlertReceiverByUID)...)
-	router.POST("/alerting/receivers",
-		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertReceiverAPI.CreateAlertReceiver)...)
-	router.PUT("/alerting/receivers",
-		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertReceiverAPI.UpdateAlertReceiver)...)
-	router.DELETE("/alerting/receivers/:uid",
-		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertReceiverAPI.DeleteAlertReceiverByUID)...)
-	router.PUT("/alerting/receivers/test",
-		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertReceiverAPI.TestAlertReceiver)...)
+	// contact points
+	router.GET("/alerting/contact-points",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.contactPointAPI.SearchContactPoints)...)
+	router.GET("/alerting/contact-points/:uid",
+		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.contactPointAPI.GetContactPointByUID)...)
+	router.POST("/alerting/contact-points",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.contactPointAPI.CreateContactPoint)...)
+	router.PUT("/alerting/contact-points",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.contactPointAPI.UpdateContactPoint)...)
+	router.DELETE("/alerting/contact-points/:uid",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.contactPointAPI.DeleteContactPointByUID)...)
+	router.PUT("/alerting/contact-points/test",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.contactPointAPI.TestContactPoint)...)
+	router.POST("/alerting/contact-points/test/channel",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.contactPointAPI.TestNotificationChannel)...)
 
 	// alert silences
 	router.GET("/alerting/silences",

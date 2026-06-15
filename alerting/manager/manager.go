@@ -46,10 +46,12 @@ type AlertManager interface {
 type Deps struct {
 	AlertEventSrv           service.AlertEventService
 	AlertRouteSrv           service.AlertRouteService
-	AlertReceiverSrv        service.AlertReceiverService
+	ContactPointSrv         service.ContactPointService
 	AlertSilenceSrv         service.AlertSilenceService
 	AlertInhibitRuleSrv     service.AlertInhibitRuleService
 	NotificationTemplateSrv service.NotificationTemplateService
+	NotificationSrv         service.NotificationService
+	ContactPointStatusSrv   service.ContactPointStatusService // records per-channel delivery outcomes
 	ExternalURL             string
 }
 

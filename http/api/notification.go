@@ -19,16 +19,23 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 
 	httppkg "github.com/lindb/common/pkg/http"
 
+	"github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/alerting/types"
-	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
 )
+
+// testReceiverRequest holds the minimal fields needed for a test notification send.
+type testReceiverRequest struct {
+	Type   string          `json:"type"`
+	Config json.RawMessage `json:"config"`
+}
 
 type NotificationAPI struct {
 	deps *depspkg.API
@@ -40,13 +47,18 @@ func NewNotificationAPI(deps *depspkg.API) *NotificationAPI {
 	}
 }
 
+// Test sends a test notification through the given receiver configuration.
 func (api *NotificationAPI) Test(c *gin.Context) {
-	receiver := &model.Recevier{}
+	receiver := &testReceiverRequest{}
 	if err := c.ShouldBind(receiver); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	receiverDefine, _ := types.GetReceiverPlugin(receiver.Type)
+	notifierDef, ok := types.GetNotifierDef(receiver.Type)
+	if !ok {
+		httppkg.Error(c, fmt.Errorf("unknown notifier type: %s", receiver.Type))
+		return
+	}
 	settings, err := api.deps.NotificationSrv.GetAllNotificationSettings(c.Request.Context())
 	if err != nil {
 		httppkg.Error(c, err)
@@ -59,16 +71,27 @@ func (api *NotificationAPI) Test(c *gin.Context) {
 			break
 		}
 	}
-	notifier, err := receiverDefine.NewFn(json.RawMessage(setting.Config.String()), receiver.Config)
+	notifier, err := notifierDef.NewFn(json.RawMessage(setting.Config.String()), receiver.Config)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	notifier.Notify(c.Request.Context(), nil)
+	// build a minimal test payload so notifiers do not receive nil data
+	testData := &template.NotificationData{
+		Status:       "firing",
+		ReceiverName: receiver.Type,
+		CommonLabels: map[string]string{"alertname": "TestAlert"},
+		GroupLabels:  map[string]string{"alertname": "TestAlert"},
+	}
+	if err := notifier.Notify(c.Request.Context(), testData); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
 
 	httppkg.OK(c, "ok")
 }
 
+// GetAllNotificationSettings returns all notification settings for the current org.
 func (api *NotificationAPI) GetAllNotificationSettings(c *gin.Context) {
 	settings, err := api.deps.NotificationSrv.GetAllNotificationSettings(c.Request.Context())
 	if err != nil {
@@ -78,6 +101,7 @@ func (api *NotificationAPI) GetAllNotificationSettings(c *gin.Context) {
 	httppkg.OK(c, settings)
 }
 
+// SaveNotificationSetting creates or updates a notification setting.
 func (api *NotificationAPI) SaveNotificationSetting(c *gin.Context) {
 	setting := &model.NotificationSetting{}
 	if err := c.ShouldBind(setting); err != nil {
@@ -91,6 +115,7 @@ func (api *NotificationAPI) SaveNotificationSetting(c *gin.Context) {
 	httppkg.OK(c, "Notification setting saved")
 }
 
+// DeleteNotificationSettting removes a notification setting by type.
 func (api *NotificationAPI) DeleteNotificationSettting(c *gin.Context) {
 	notificationType := c.Param("type")
 	if err := api.deps.NotificationSrv.DeleteNotificationSetting(c.Request.Context(), notificationType); err != nil {
@@ -98,61 +123,4 @@ func (api *NotificationAPI) DeleteNotificationSettting(c *gin.Context) {
 		return
 	}
 	httppkg.OK(c, "Notification setting deleted")
-}
-
-func (api *NotificationAPI) CreateNotification(c *gin.Context) {
-	var notification model.Notification
-	if err := c.ShouldBind(&notification); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	ctx := c.Request.Context()
-	uid, err := api.deps.NotificationSrv.CreateNotification(ctx, &notification)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, uid)
-}
-
-func (api *NotificationAPI) UpdateNotification(c *gin.Context) {
-	var notification model.Notification
-	if err := c.ShouldBind(&notification); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	ctx := c.Request.Context()
-	err := api.deps.NotificationSrv.UpdateNotification(ctx, &notification)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, "Notification updated")
-}
-
-func (api *NotificationAPI) SearchNotifications(c *gin.Context) {
-	req := &model.SearchNotificationRequest{}
-	if err := c.ShouldBind(req); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	notifications, total, err := api.deps.NotificationSrv.FindNotifications(c.Request.Context(), req)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, gin.H{
-		"total":         total,
-		"notifications": notifications,
-	})
-}
-
-func (api *NotificationAPI) GetNotificationByUID(c *gin.Context) {
-	uid := c.Param(constant.UID)
-	notification, err := api.deps.NotificationSrv.GetNotificationByUID(c.Request.Context(), uid)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, notification)
 }

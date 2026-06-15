@@ -72,7 +72,6 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	)
 	migrator.AddMigration(orgUser)
 	migrator.AddMigration(dbpkg.NewMigration(&model.NotificationSetting{}))
-	migrator.AddMigration(dbpkg.NewMigration(&model.Notification{}))
 	// AlertRuleGroup must be migrated before AlertRule (foreign key group_uid)
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertRuleGroup{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertRule{}))
@@ -80,7 +79,8 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	// new alerting tables (kept separate from legacy tables for smooth migration)
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertEvent{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertRoute{}))
-	migrator.AddMigration(dbpkg.NewMigration(&model.AlertReceiver{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.ContactPoint{}))
+	migrator.AddMigration(dbpkg.NewMigration(&model.ContactPointStatus{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertSilence{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertInhibitRule{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.NotificationTemplate{}))
@@ -121,9 +121,17 @@ func runMigration(_ *cobra.Command, _ []string) error {
 		panic(err)
 	}
 
+	// Rename alert_receivers → contact_points if the old table still exists.
+	// GORM AutoMigrate creates new tables by struct name; it never renames existing ones.
+	rawDB := db.RawDB()
+	if rawDB.Migrator().HasTable("alert_receivers") && !rawDB.Migrator().HasTable("contact_points") {
+		if err = rawDB.Exec("ALTER TABLE alert_receivers RENAME TO contact_points").Error; err != nil {
+			log.Warn("failed to rename alert_receivers to contact_points", logger.Error(err))
+		}
+	}
+
 	// Drop the legacy 'type' column from notification_templates if it still exists.
 	// GORM AutoMigrate never removes columns, so we need to clean it up explicitly.
-	rawDB := db.RawDB()
 	if rawDB.Migrator().HasColumn("notification_templates", "type") {
 		if err = rawDB.Exec("ALTER TABLE notification_templates DROP COLUMN `type`").Error; err != nil {
 			log.Warn("failed to drop legacy type column from notification_templates", logger.Error(err))

@@ -19,10 +19,9 @@ package model
 
 // BootData represents Linsight boot data.
 type BootData struct {
-	Home          string            `json:"home,omitempty"`
-	User          SignedUser        `json:"user"`
-	NavTree       Menus             `json:"navTree,omitempty"`
-	Datasources   []Datasource      `json:"datasources,omitempty"`
-	Integrations  []Integration     `json:"integrations,omitempty"`
-	Notifications []*ReceiverPlugin `json:"notifications,omitempty"`
+	Home         string        `json:"home,omitempty"`
+	User         SignedUser    `json:"user"`
+	NavTree      Menus         `json:"navTree,omitempty"`
+	Datasources  []Datasource  `json:"datasources,omitempty"`
+	Integrations []Integration `json:"integrations,omitempty"`
 }

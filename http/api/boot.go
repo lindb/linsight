@@ -22,7 +22,6 @@ import (
 	httppkg "github.com/lindb/common/pkg/http"
 	"github.com/lindb/common/pkg/logger"
 
-	"github.com/lindb/linsight/alerting/types"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/pkg/util"
@@ -48,9 +47,8 @@ func (api *BootAPI) Boot(c *gin.Context) {
 	ctx := c.Request.Context()
 	signedUser := util.GetUser(ctx)
 	boot := &model.BootData{
-		Home:          signedUser.Preference.HomePage,
-		User:          *signedUser,
-		Notifications: types.GetReceiverPlugins(),
+		Home: signedUser.Preference.HomePage,
+		User: *signedUser,
 	}
 	if signedUser.Org != nil {
 		// if user belong a org, get datasource/nav for org level.

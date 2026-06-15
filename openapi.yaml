@@ -51,8 +51,8 @@ tags:
     description: Alert event query (Viewer)
   - name: AlertRoutes
     description: Alert routing tree management (Editor/Viewer)
-  - name: AlertReceivers
-    description: Alert receiver management (Editor/Viewer)
+  - name: ContactPoints
+    description: Contact point management (Editor/Viewer)
   - name: AlertSilences
     description: Alert silence management (Editor/Viewer)
   - name: AlertInhibitRules
@@ -1860,12 +1860,12 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  # ─── Alert Receivers ──────────────────────────────────────────────────────────
-  /api/v1/alerting/receivers:
+  # ─── Contact Points ──────────────────────────────────────────────────────────
+  /api/v1/alerting/contact-points:
     get:
-      tags: [AlertReceivers]
-      summary: Search alert receivers (Viewer)
-      description: Search receivers with optional name filter and pagination. Requires Viewer role.
+      tags: [ContactPoints]
+      summary: Search contact points (Viewer)
+      description: Search contact points with optional name filter and pagination. Requires Viewer role.
       parameters:
         - name: offset
           in: query
@@ -1883,26 +1883,26 @@ paths:
             type: string
       responses:
         '200':
-          description: Paginated list of alert receivers
+          description: Paginated list of contact points
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AlertReceiverListResponse'
+                $ref: '#/components/schemas/ContactPointListResponse'
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
-      tags: [AlertReceivers]
-      summary: Create alert receiver (Editor)
-      description: Create a new receiver. Requires Editor role.
+      tags: [ContactPoints]
+      summary: Create contact point (Editor)
+      description: Create a new contact point. Requires Editor role.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AlertReceiver'
+              $ref: '#/components/schemas/ContactPoint'
       responses:
         '200':
-          description: Alert receiver created – returns new UID
+          description: Contact point created – returns new UID
           content:
             application/json:
               schema:
@@ -1912,39 +1912,39 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
     put:
-      tags: [AlertReceivers]
-      summary: Update alert receiver (Editor)
-      description: Update an existing receiver. Requires Editor role.
+      tags: [ContactPoints]
+      summary: Update contact point (Editor)
+      description: Update an existing contact point. Requires Editor role.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AlertReceiver'
+              $ref: '#/components/schemas/ContactPoint'
       responses:
         '200':
-          description: Alert receiver updated
+          description: Contact point updated
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/alerting/receivers/test:
+  /api/v1/alerting/contact-points/test:
     put:
-      tags: [AlertReceivers]
-      summary: Test alert receiver (Editor)
-      description: Send a test notification through all enabled channels of a receiver. Requires Editor role.
+      tags: [ContactPoints]
+      summary: Test contact point (Editor)
+      description: Send a test notification through all enabled channels of a saved contact point. Requires Editor role.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [receiverUID]
+              required: [contactPointUID]
               properties:
-                receiverUID:
+                contactPointUID:
                   type: string
-                  description: UID of the receiver to test
+                  description: UID of the contact point to test
       responses:
         '200':
           description: Test notification sent
@@ -1953,37 +1953,73 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/alerting/receivers/{uid}:
+  /api/v1/alerting/contact-points/test/channel:
+    post:
+      tags: [ContactPoints]
+      summary: Test notification channel inline (Editor)
+      description: Send a test notification for a single channel config without saving the contact point first. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationChannel'
+      responses:
+        '200':
+          description: Test notification sent
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/contact-points/{uid}:
     get:
-      tags: [AlertReceivers]
-      summary: Get alert receiver by UID (Viewer)
-      description: Returns a single receiver by UID. Requires Viewer role.
+      tags: [ContactPoints]
+      summary: Get contact point by UID (Viewer)
+      description: Returns a single contact point by UID. Requires Viewer role.
       parameters:
         - $ref: '#/components/parameters/UIDPath'
       responses:
         '200':
-          description: Alert receiver detail
+          description: Contact point detail
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AlertReceiver'
+                $ref: '#/components/schemas/ContactPoint'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      tags: [AlertReceivers]
-      summary: Delete alert receiver by UID (Editor)
-      description: Delete a receiver by UID. Requires Editor role.
+      tags: [ContactPoints]
+      summary: Delete contact point by UID (Editor)
+      description: Delete a contact point by UID. Requires Editor role.
       parameters:
         - $ref: '#/components/parameters/UIDPath'
       responses:
         '200':
-          description: Alert receiver deleted
+          description: Contact point deleted
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /api/v1/alerting/notifiers:
+    get:
+      tags: [ContactPoints]
+      summary: List all registered notifier plugin definitions (Viewer)
+      description: Returns the list of all registered notifier plugins with their setting and config JSON schemas. Requires Viewer role.
+      responses:
+        '200':
+          description: List of notifier plugin definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotifierPlugin'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   # ─── Alert Silences ───────────────────────────────────────────────────────────
   /api/v1/alerting/silences:
@@ -3411,11 +3447,14 @@ components:
           items:
             $ref: '#/components/schemas/AlertRoute'
 
-    # ── Alert Receiver ───────────────────────────────────────────────────────────
-    ReceiverChannel:
+    # ── Contact Point ─────────────────────────────────────────────────────────────
+    NotificationChannel:
       type: object
       required: [type, enabled]
       properties:
+        uid:
+          type: string
+          description: Stable per-channel identifier; auto-generated by the service on create/update. Used as the unique key for ContactPointStatus.
         type:
           type: string
           description: Channel type
@@ -3428,7 +3467,7 @@ components:
           type: boolean
           description: Whether this channel is active
 
-    AlertReceiver:
+    ContactPoint:
       allOf:
         - $ref: '#/components/schemas/BaseModel'
         - type: object
@@ -3440,22 +3479,87 @@ components:
             channels:
               type: array
               items:
-                $ref: '#/components/schemas/ReceiverChannel'
+                $ref: '#/components/schemas/NotificationChannel'
               description: One or more notification channels sent simultaneously
             templateUID:
               type: string
               description: Optional UID of a NotificationTemplate to use for rendering
 
-    AlertReceiverListResponse:
+    ContactPointListResponse:
       type: object
       properties:
         total:
           type: integer
           format: int64
-        receivers:
+        contactPoints:
           type: array
           items:
-            $ref: '#/components/schemas/AlertReceiver'
+            $ref: '#/components/schemas/ContactPointVO'
+
+    ChannelStatusVO:
+      type: object
+      description: >
+        Per-channel delivery health enrichment returned by the contact-point list.
+        Each entry is keyed by the channel's stable UID (channel.uid), so multiple
+        channels of the same type within one contact point each get their own status record.
+      properties:
+        type:
+          type: string
+          description: Notifier plugin type (e.g. "Email", "Slack", "Webhook")
+        enabled:
+          type: boolean
+          description: Whether this channel is active
+        summary:
+          type: string
+          description: Primary config value shown in the list (e.g. webhook URL, recipient addresses, Slack channel)
+        status:
+          type: string
+          enum: [ok, error, unknown]
+          description: Last delivery status; "unknown" means the channel has never been used
+        lastSentAt:
+          type: integer
+          format: int64
+          description: Unix timestamp (ms) of the last delivery attempt; omitted when never sent
+        durationMs:
+          type: integer
+          format: int64
+          description: Round-trip delivery duration in milliseconds; omitted when never sent
+        errorMsg:
+          type: string
+          description: Error detail; populated only when status is "error"
+
+    ContactPointVO:
+      description: >
+        A ContactPoint enriched with per-channel delivery health information.
+        Returned by the search/list endpoint.
+      allOf:
+        - $ref: '#/components/schemas/ContactPoint'
+        - type: object
+          properties:
+            channelStatus:
+              type: array
+              items:
+                $ref: '#/components/schemas/ChannelStatusVO'
+              description: Health and summary for each channel; one entry per channel in the channels array
+
+    NotifierPlugin:
+      type: object
+      description: Metadata for a registered notifier plugin.
+      properties:
+        type:
+          type: string
+          description: Unique plugin type identifier (e.g. "Email", "Slack")
+        displayName:
+          type: string
+          description: Human-readable name shown in the UI
+        description:
+          type: string
+          description: Short description of what this notifier does
+        configSchema:
+          type: object
+          description: >
+            Complete form-schema definition for this plugin's configuration form.
+            Uses either {"fields": [...]} for a flat form or {"sections": [...]} for grouped fields.
 
     # ── Alert Silence ────────────────────────────────────────────────────────────
     AlertSilence:

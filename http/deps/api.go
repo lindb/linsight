@@ -50,11 +50,12 @@ type API struct {
 	AlertRuleSrv         service.AlertRuleService
 
 	// new alerting services
-	AlertEventSrv           service.AlertEventService
-	AlertRouteSrv           service.AlertRouteService
-	AlertReceiverSrv        service.AlertReceiverService
-	AlertSilenceSrv         service.AlertSilenceService
-	AlertInhibitRuleSrv     service.AlertInhibitRuleService
+	AlertEventSrv                  service.AlertEventService
+	AlertRouteSrv                  service.AlertRouteService
+	ContactPointSrv                service.ContactPointService
+	ContactPointStatusSrv          service.ContactPointStatusService // delivery health per channel
+	AlertSilenceSrv                service.AlertSilenceService
+	AlertInhibitRuleSrv            service.AlertInhibitRuleService
 	NotificationTemplateSrv        service.NotificationTemplateService
 	NotificationTemplateExampleSrv service.NotificationTemplateExampleService
 

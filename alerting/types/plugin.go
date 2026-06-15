@@ -21,27 +21,34 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
-type ReceiverPluginDefine struct {
-	Define *model.ReceiverPlugin
-	NewFn  NewNotifier
+// NotifierDef is the runtime definition of a notifier plugin.
+// Plugin holds the frontend metadata (JSON schemas); NewFn is the factory for creating notifier instances.
+// SummaryKey is the config JSON field whose value is surfaced in the contact-point list (e.g. "addresses", "channel", "url").
+type NotifierDef struct {
+	Plugin     *model.NotifierPlugin
+	NewFn      NewNotifier
+	SummaryKey string // config JSON key shown as primary info in the contact-point list
 }
 
 var (
-	receiverMap = make(map[string]*ReceiverPluginDefine)
+	notifierDefs = make(map[string]*NotifierDef)
 )
 
-func Register(receiver *ReceiverPluginDefine) {
-	receiverMap[receiver.Define.Type] = receiver
+// Register adds a notifier plugin definition to the global registry.
+func Register(def *NotifierDef) {
+	notifierDefs[def.Plugin.Type] = def
 }
 
-func GetReceiverPlugins() (rs []*model.ReceiverPlugin) {
-	for _, rp := range receiverMap {
-		rs = append(rs, rp.Define)
+// GetNotifierPlugins returns the frontend metadata for all registered notifier plugins.
+func GetNotifierPlugins() (rs []*model.NotifierPlugin) {
+	for _, d := range notifierDefs {
+		rs = append(rs, d.Plugin)
 	}
 	return rs
 }
 
-func GetReceiverPlugin(pluginType string) (*ReceiverPluginDefine, bool) {
-	plugin, ok := receiverMap[pluginType]
-	return plugin, ok
+// GetNotifierDef looks up a notifier plugin definition by its type string.
+func GetNotifierDef(pluginType string) (*NotifierDef, bool) {
+	def, ok := notifierDefs[pluginType]
+	return def, ok
 }
