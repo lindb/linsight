@@ -1,7 +1,13 @@
 {
   "fields": [
-    {"type": "input", "key": "url",        "label": "URL",                  "required": true},
-    {"type": "input", "key": "method",     "label": "HTTP Method",          "defaultValue": "POST"},
-    {"type": "input", "key": "authHeader", "label": "Authorization Header"}
+    {"type": "input",          "key": "url",        "label": "URL",                  "required": true},
+    {"type": "input",          "key": "method",     "label": "HTTP Method",          "defaultValue": "POST"},
+    {"type": "input",          "key": "authHeader", "label": "Authorization Header"},
+    {
+      "type":        "alert-template",
+      "key":         "content",
+      "label":       "Content",
+      "placeholder": "{\"status\": \"{{ .Status }}\", \"alerts\": {{ len .FiringAlerts }}, \"receiver\": \"{{ .ReceiverName }}\"}"
+    }
   ]
 }

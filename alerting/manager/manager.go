@@ -26,6 +26,7 @@ import (
 
 	"github.com/lindb/common/pkg/logger"
 
+	"github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/service"
 )
@@ -52,16 +53,17 @@ type Deps struct {
 	NotificationTemplateSrv service.NotificationTemplateService
 	NotificationSrv         service.NotificationService
 	ContactPointStatusSrv   service.ContactPointStatusService // records per-channel delivery outcomes
+	RenderingEngine         *template.RenderingEngine        // shared engine with TTL cache for org templates
 	ExternalURL             string
 }
 
 type alertManager struct {
 	deps    *Deps
-	groups  map[string]*alertGroup // key: orgID:receiverUID:groupKey
+	groups  map[string]*alertGroup // key: orgID:contactPointUID:groupKey
 	groupMu sync.Mutex
 
-	// cached config per org
-	orgRoutes   map[int64][]*model.AlertRoute
+	// cached config per org — orgRoutes stores the full routing tree (nil if not yet loaded)
+	orgRoutes   map[int64]*model.AlertRouteNode
 	orgSilences map[int64][]*model.AlertSilence
 	orgInhibits map[int64][]*model.AlertInhibitRule
 	cfgMu       sync.RWMutex
@@ -74,7 +76,7 @@ func NewAlertManager(deps *Deps) AlertManager {
 	return &alertManager{
 		deps:        deps,
 		groups:      make(map[string]*alertGroup),
-		orgRoutes:   make(map[int64][]*model.AlertRoute),
+		orgRoutes:   make(map[int64]*model.AlertRouteNode),
 		orgSilences: make(map[int64][]*model.AlertSilence),
 		orgInhibits: make(map[int64][]*model.AlertInhibitRule),
 		logger:      logger.GetLogger("Alerting", "AlertManager"),
@@ -94,7 +96,7 @@ func (m *alertManager) ProcessEvents(orgID int64, events []*model.AlertEvent) {
 		}
 	}
 
-	silences, inhibits, routes := m.getOrgConfig(orgID)
+	silences, inhibits, routeTree := m.getOrgConfig(orgID)
 
 	for _, ev := range events {
 		// check silence
@@ -108,7 +110,7 @@ func (m *alertManager) ProcessEvents(orgID int64, events []*model.AlertEvent) {
 		}
 
 		// route to receiver(s)
-		matched := m.matchRoutes(ev, routes)
+		matched := m.traverseRouteTree(ev, routeTree)
 		if len(matched) == 0 {
 			m.logger.Info("no route matched",
 				logger.String("fingerprint", ev.Fingerprint),
@@ -119,7 +121,7 @@ func (m *alertManager) ProcessEvents(orgID int64, events []*model.AlertEvent) {
 				logger.String("fingerprint", ev.Fingerprint),
 				logger.String("rule", ev.RuleUID),
 				logger.String("routeUID", route.UID),
-				logger.String("receiverUID", route.ReceiverUID))
+				logger.String("contactPointUID", route.ContactPointUID))
 			groupKey := m.buildGroupKey(orgID, route, ev)
 			m.groupMu.Lock()
 			grp, ok := m.groups[groupKey]
@@ -136,10 +138,10 @@ func (m *alertManager) ProcessEvents(orgID int64, events []*model.AlertEvent) {
 
 func (m *alertManager) ReloadConfig(orgID int64) {
 	now := time.Now().UnixMilli()
-	routes, err := m.deps.AlertRouteSrv.GetAlertRoutesByOrg(orgID)
+	routeTree, err := m.deps.AlertRouteSrv.GetAlertRouteTreeByOrg(orgID)
 	if err != nil {
 		m.logger.Error("reload routes failure", logger.Int64("org", orgID), logger.Error(err))
-		routes = nil
+		routeTree = nil
 	}
 
 	silences, err := m.deps.AlertSilenceSrv.GetActiveSilencesByOrg(orgID, now)
@@ -155,14 +157,14 @@ func (m *alertManager) ReloadConfig(orgID int64) {
 	}
 
 	m.cfgMu.Lock()
-	m.orgRoutes[orgID] = routes
+	m.orgRoutes[orgID] = routeTree
 	m.orgSilences[orgID] = silences
 	m.orgInhibits[orgID] = inhibits
 	m.cfgMu.Unlock()
 }
 
 // getOrgConfig returns a snapshot of the current configuration for an org.
-func (m *alertManager) getOrgConfig(orgID int64) ([]*model.AlertSilence, []*model.AlertInhibitRule, []*model.AlertRoute) {
+func (m *alertManager) getOrgConfig(orgID int64) ([]*model.AlertSilence, []*model.AlertInhibitRule, *model.AlertRouteNode) {
 	m.cfgMu.RLock()
 	defer m.cfgMu.RUnlock()
 	return m.orgSilences[orgID], m.orgInhibits[orgID], m.orgRoutes[orgID]
@@ -245,24 +247,81 @@ func (m *alertManager) isInhibited(ev *model.AlertEvent, inhibits []*model.Alert
 	return false
 }
 
-// matchRoutes returns all routes that match the given event.
-func (m *alertManager) matchRoutes(ev *model.AlertEvent, routes []*model.AlertRoute) []*model.AlertRoute {
+// traverseRouteTree applies the Alertmanager-style tree-traversal algorithm to find all
+// routes that should receive notifications for the given event.
+//
+// Traversal rules (mirrors Grafana / Alertmanager behaviour):
+//   - The root node (IsDefault=true) is entered unconditionally.
+//   - Child nodes are checked against the event's label matchers in sort_order.
+//   - If continue=false on a matched child, sibling evaluation stops after that child.
+//   - When no child matches, the current node itself becomes the fallback receiver.
+//   - Zero-value GroupWait/GroupInterval/RepeatInterval/GroupBy on a leaf are filled from ancestors.
+func (m *alertManager) traverseRouteTree(ev *model.AlertEvent, root *model.AlertRouteNode) []*model.AlertRoute {
+	if root == nil {
+		return nil
+	}
 	labels := parseEventLabels(ev)
-	var matched []*model.AlertRoute
+	return traverseNode(root, labels, nil)
+}
 
-	for _, route := range routes {
-		matchers, err := route.ToMatchers()
-		if err != nil {
-			continue
+// traverseNode is the recursive core of traverseRouteTree.
+// ancestors holds the route chain from root to the current node's parent (used for inheritance).
+func traverseNode(node *model.AlertRouteNode, labels map[string]string, ancestors []*model.AlertRoute) []*model.AlertRoute {
+	// Non-root nodes must match the event labels; root (IsDefault) always passes.
+	if !node.IsDefault {
+		matchers, err := node.ToMatchers()
+		if err != nil || !matchAll(labels, matchers) {
+			return nil
 		}
-		if matchAll(labels, matchers) {
-			matched = append(matched, route)
-			if !route.Continue {
+	}
+
+	newAncestors := append(ancestors, &node.AlertRoute) //nolint:gocritic // intentional accumulation per call stack frame
+
+	// Evaluate children in sort order
+	var result []*model.AlertRoute
+	childMatched := false
+	for _, child := range node.Children {
+		childResults := traverseNode(child, labels, newAncestors)
+		if len(childResults) > 0 {
+			result = append(result, childResults...)
+			childMatched = true
+			if !child.Continue {
+				// Stop checking siblings once the first non-continue match is found
 				break
 			}
 		}
 	}
-	return matched
+
+	// When no child matched, the current node is the fallback/leaf receiver.
+	// Inherit zero-value timing fields from ancestors so every dispatched route
+	// has meaningful GroupWait / GroupInterval / RepeatInterval / GroupBy values.
+	if !childMatched {
+		resolved := resolveInheritance(&node.AlertRoute, ancestors)
+		result = append(result, resolved)
+	}
+	return result
+}
+
+// resolveInheritance returns a copy of route with zero-value fields filled from the nearest
+// ancestor that defines them (walking from closest parent toward root).
+func resolveInheritance(route *model.AlertRoute, ancestors []*model.AlertRoute) *model.AlertRoute {
+	resolved := *route
+	for i := len(ancestors) - 1; i >= 0; i-- {
+		p := ancestors[i]
+		if resolved.GroupWait == 0 {
+			resolved.GroupWait = p.GroupWait
+		}
+		if resolved.GroupInterval == 0 {
+			resolved.GroupInterval = p.GroupInterval
+		}
+		if resolved.RepeatInterval == 0 {
+			resolved.RepeatInterval = p.RepeatInterval
+		}
+		if len(resolved.GroupBy) == 0 {
+			resolved.GroupBy = p.GroupBy
+		}
+	}
+	return &resolved
 }
 
 // buildGroupKey constructs the unique key for an alert group.

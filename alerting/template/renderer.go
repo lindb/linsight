@@ -19,7 +19,6 @@ package template
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"regexp"
 	"strings"
@@ -47,23 +46,52 @@ Value: {{ .Value }}
 	defaultTitleTemplate = `[{{ .Status | upper }}] {{ .CommonLabels.alertname }}{{ if .CommonLabels.instance }} ({{ .CommonLabels.instance }}){{ end }}`
 )
 
+// TemplateAlert is a template-friendly representation of a single alert event.
+// Labels and Annotations use plain string maps so templates can access them with
+// direct dot-notation (e.g. .Labels.alertname, .Annotations.summary) without
+// requiring the annotationsGet/labelsGet helper functions.
+type TemplateAlert struct {
+	UID          string                `json:"uid"`
+	RuleUID      string                `json:"ruleUID"`
+	RuleTitle    string                `json:"ruleTitle"`
+	Fingerprint  string                `json:"fingerprint"`
+	Status       string                `json:"status"`       // "firing" or "resolved"
+	State        model.AlertEventState `json:"state"`        // numeric state kept for backward compat
+	Severity     model.Severity        `json:"severity"`
+	Labels       map[string]string     `json:"labels"`
+	Annotations  map[string]string     `json:"annotations"`
+	Value        float64               `json:"value"`
+	StartsAt     int64                 `json:"startsAt"`     // unix milliseconds
+	EndsAt       int64                 `json:"endsAt"`       // unix milliseconds
+	PendingSince int64                 `json:"pendingSince"` // unix milliseconds
+	NotifiedAt   int64                 `json:"notifiedAt"`   // unix milliseconds
+	GeneratorURL string                `json:"generatorURL"`
+}
+
 // NotificationData contains the data injected into notification templates.
 type NotificationData struct {
-	Alerts            []*model.AlertEvent `json:"alerts"`            // all alerts in the group
-	FiringAlerts      []*model.AlertEvent `json:"firingAlerts"`      // currently firing alerts
-	ResolvedAlerts    []*model.AlertEvent `json:"resolvedAlerts"`    // recently resolved alerts
-	CommonLabels      map[string]string   `json:"commonLabels"`      // labels shared by all alerts
-	CommonAnnotations map[string]string   `json:"commonAnnotations"` // annotations shared by all alerts
-	GroupLabels       map[string]string   `json:"groupLabels"`       // labels used to form this group
-	ReceiverName      string              `json:"receiverName"`      // name of the target receiver
-	Status            string              `json:"status"`            // "firing" or "resolved"
-	ExternalURL       string              `json:"externalURL"`       // base URL for generating links
+	Alerts            []TemplateAlert   `json:"alerts"`            // all alerts in the group
+	FiringAlerts      []TemplateAlert   `json:"firingAlerts"`      // currently firing alerts
+	ResolvedAlerts    []TemplateAlert   `json:"resolvedAlerts"`    // recently resolved alerts
+	CommonLabels      map[string]string `json:"commonLabels"`      // labels shared by all alerts
+	CommonAnnotations map[string]string `json:"commonAnnotations"` // annotations shared by all alerts
+	GroupLabels       map[string]string `json:"groupLabels"`       // labels used to form this group
+	ReceiverName      string            `json:"receiverName"`      // name of the target receiver
+	Status            string            `json:"status"`            // "firing" or "resolved"
+	ExternalURL       string            `json:"externalURL"`       // base URL for generating links
+	// OrgTemplates holds the merged content of all org-level notification templates.
+	// It is populated by the alert engine before calling Notify so that notifiers can
+	// resolve {{define "NAME"}} named blocks via RenderNamed without changing the Notifier interface.
+	OrgTemplates string `json:"-"`
 }
 
 // Renderer provides Go template rendering for notifications.
 type Renderer interface {
 	// Render renders a text/template string with the given data.
 	Render(tmplStr string, data *NotificationData) (string, error)
+	// RenderNamed parses orgTemplates (which may contain multiple {{define "NAME"}} blocks)
+	// and executes the named block identified by name.
+	RenderNamed(orgTemplates, name string, data *NotificationData) (string, error)
 	// RenderDefaultTitle renders the built-in title template.
 	RenderDefaultTitle(data *NotificationData) (string, error)
 	// RenderDefaultBody renders the built-in body template.
@@ -77,8 +105,48 @@ func NewRenderer() Renderer {
 	return &renderer{}
 }
 
+// alertEventToTemplateAlert converts a model.AlertEvent (DB layer) to a TemplateAlert
+// (template layer). Labels and Annotations are decoded from datatypes.JSON to plain maps
+// so templates can access them with direct dot-notation.
+func alertEventToTemplateAlert(ev *model.AlertEvent) TemplateAlert {
+	status := "resolved"
+	if ev.State == model.AlertEventFiring || ev.State == model.AlertEventPending {
+		status = "firing"
+	}
+	return TemplateAlert{
+		UID:          ev.UID,
+		RuleUID:      ev.RuleUID,
+		RuleTitle:    ev.RuleTitle,
+		Fingerprint:  ev.Fingerprint,
+		Status:       status,
+		State:        ev.State,
+		Severity:     ev.Severity,
+		Labels:       parseJSONMap(ev.Labels),
+		Annotations:  parseJSONMap(ev.Annotations),
+		Value:        ev.Value,
+		StartsAt:     ev.StartsAt,
+		EndsAt:       ev.EndsAt,
+		PendingSince: ev.PendingSince,
+		NotifiedAt:   ev.NotifiedAt,
+		GeneratorURL: ev.GeneratorURL,
+	}
+}
+
 func (r *renderer) Render(tmplStr string, data *NotificationData) (string, error) {
 	return renderText(tmplStr, data)
+}
+
+func (r *renderer) RenderNamed(orgTemplates, name string, data *NotificationData) (string, error) {
+	// Parse all org templates so every {{define}} block is registered as a named sub-template.
+	tmpl, err := template.New("root").Funcs(templateFuncMap()).Parse(orgTemplates)
+	if err != nil {
+		return "", fmt.Errorf("parse org templates: %w", err)
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+		return "", fmt.Errorf("execute named template %q: %w", name, err)
+	}
+	return buf.String(), nil
 }
 
 func (r *renderer) RenderDefaultTitle(data *NotificationData) (string, error) {
@@ -89,34 +157,22 @@ func (r *renderer) RenderDefaultBody(data *NotificationData) (string, error) {
 	return renderText(defaultBodyTemplate, data)
 }
 
-// RenderWithContext renders a template string respecting context cancellation.
-func RenderWithContext(ctx context.Context, r Renderer, tmplStr string, data *NotificationData) (string, error) {
-	resultCh := make(chan string, 1)
-	errCh := make(chan error, 1)
-
-	go func() {
-		result, err := r.Render(tmplStr, data)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		resultCh <- result
-	}()
-
-	select {
-	case result := <-resultCh:
-		return result, nil
-	case err := <-errCh:
-		return "", err
-	case <-ctx.Done():
-		return "", fmt.Errorf("template rendering timed out: %w", ctx.Err())
-	}
-}
-
 // BuildNotificationData constructs NotificationData from a list of AlertEvents.
 func BuildNotificationData(events []*model.AlertEvent, receiverName, status, externalURL string, groupLabels map[string]string) *NotificationData {
+	// Convert DB-layer AlertEvents to template-friendly TemplateAlerts up front so that
+	// all downstream template code works with plain map[string]string labels/annotations.
+	alerts := make([]TemplateAlert, len(events))
+	for i, ev := range events {
+		alerts[i] = alertEventToTemplateAlert(ev)
+	}
+	return buildFromTemplateAlerts(alerts, receiverName, status, externalURL, groupLabels)
+}
+
+// buildFromTemplateAlerts constructs NotificationData directly from pre-converted TemplateAlerts.
+// It is used by both BuildNotificationData and BuildNotificationDataFromPayload.
+func buildFromTemplateAlerts(alerts []TemplateAlert, receiverName, status, externalURL string, groupLabels map[string]string) *NotificationData {
 	data := &NotificationData{
-		Alerts:            events,
+		Alerts:            alerts,
 		CommonLabels:      make(map[string]string),
 		CommonAnnotations: make(map[string]string),
 		GroupLabels:       groupLabels,
@@ -125,41 +181,87 @@ func BuildNotificationData(events []*model.AlertEvent, receiverName, status, ext
 		ExternalURL:       externalURL,
 	}
 
-	for _, ev := range events {
-		if ev.State == model.AlertEventFiring || ev.State == model.AlertEventPending {
-			data.FiringAlerts = append(data.FiringAlerts, ev)
-		} else if ev.State == model.AlertEventResolved {
-			data.ResolvedAlerts = append(data.ResolvedAlerts, ev)
+	for _, ta := range alerts {
+		switch ta.State {
+		// NoData and Error are operationally "active" conditions that need attention,
+		// so they belong in FiringAlerts alongside Firing and Pending.
+		case model.AlertEventFiring, model.AlertEventPending,
+			model.AlertEventNoData, model.AlertEventError:
+			data.FiringAlerts = append(data.FiringAlerts, ta)
+		case model.AlertEventResolved:
+			data.ResolvedAlerts = append(data.ResolvedAlerts, ta)
 		}
 	}
 
-	// compute common labels across all alerts
-	data.CommonLabels = computeCommonLabels(events)
-	data.CommonAnnotations = computeCommonAnnotations(events)
+	data.CommonLabels = computeCommonLabels(alerts)
+	data.CommonAnnotations = computeCommonAnnotations(alerts)
 
 	return data
 }
 
 // BuildNotificationDataFromPayload deserializes example payload JSON into NotificationData.
-// When FiringAlerts/ResolvedAlerts are absent but Alerts is non-empty, it auto-derives them
-// by inspecting each AlertEvent.State. CommonLabels and CommonAnnotations are also derived
-// from the Alerts list when they are not provided.
+// The payload may be either:
+//   - A JSON object matching NotificationData (full or partial). When FiringAlerts/ResolvedAlerts
+//     are absent but Alerts is non-empty, they are auto-derived from each TemplateAlert.State.
+//   - A JSON array of alert objects, supporting both Alertmanager format
+//     ("status":"firing" + map[string]string labels) and LinSight internal format
+//     ("state":2 int enum + map[string]string labels). In this case NotificationData
+//     fields are derived automatically.
+//
+// Timestamp fields (startsAt, endsAt, pendingSince, notifiedAt) accept both Unix millisecond
+// integers and ISO 8601 / RFC3339 strings (e.g. "2026-06-11T04:32:02.027Z").
+// CommonLabels and CommonAnnotations are always derived from Alerts when not provided.
 func BuildNotificationDataFromPayload(payloadJSON string) (*NotificationData, error) {
 	if payloadJSON == "" {
 		return &NotificationData{}, nil
 	}
-	data := &NotificationData{}
-	if err := encoding.JSONUnmarshal([]byte(payloadJSON), data); err != nil {
+
+	// Detect JSON shape: a leading '[' means the caller sent an alert array directly;
+	// anything else ('{' or 'n' for null) is treated as a NotificationData object.
+	if strings.HasPrefix(strings.TrimSpace(payloadJSON), "[") {
+		var payloads []*templateAlertPayload
+		if err := encoding.JSONUnmarshal([]byte(payloadJSON), &payloads); err != nil {
+			return nil, fmt.Errorf("parse notification payload: %w", err)
+		}
+		alerts := convertAlertPayloads(payloads)
+		// Derive overall status from the alert states.
+		status := "resolved"
+		for _, ta := range alerts {
+			if ta.State == model.AlertEventFiring || ta.State == model.AlertEventPending {
+				status = "firing"
+				break
+			}
+		}
+		return buildFromTemplateAlerts(alerts, "", status, "", nil), nil
+	}
+
+	ndp := &notificationDataPayload{}
+	if err := encoding.JSONUnmarshal([]byte(payloadJSON), ndp); err != nil {
 		return nil, fmt.Errorf("parse notification payload: %w", err)
 	}
+	data := ndp.toNotificationData()
 
 	// auto-derive sub-lists when not explicitly provided in the payload
 	if len(data.FiringAlerts) == 0 && len(data.ResolvedAlerts) == 0 && len(data.Alerts) > 0 {
-		for _, ev := range data.Alerts {
-			if ev.State == model.AlertEventFiring || ev.State == model.AlertEventPending {
-				data.FiringAlerts = append(data.FiringAlerts, ev)
-			} else if ev.State == model.AlertEventResolved {
-				data.ResolvedAlerts = append(data.ResolvedAlerts, ev)
+		for _, ta := range data.Alerts {
+			switch ta.State {
+			case model.AlertEventFiring, model.AlertEventPending,
+				model.AlertEventNoData, model.AlertEventError:
+				data.FiringAlerts = append(data.FiringAlerts, ta)
+			case model.AlertEventResolved:
+				data.ResolvedAlerts = append(data.ResolvedAlerts, ta)
+			}
+		}
+	}
+
+	// auto-derive top-level status when not explicitly set in the payload
+	if data.Status == "" && len(data.Alerts) > 0 {
+		data.Status = "resolved"
+		for _, ta := range data.Alerts {
+			if ta.State == model.AlertEventFiring || ta.State == model.AlertEventPending ||
+				ta.State == model.AlertEventNoData || ta.State == model.AlertEventError {
+				data.Status = "firing"
+				break
 			}
 		}
 	}
@@ -175,23 +277,22 @@ func BuildNotificationDataFromPayload(payloadJSON string) (*NotificationData, er
 	return data, nil
 }
 
-// computeCommonLabels returns labels that are identical across all given events.
-func computeCommonLabels(events []*model.AlertEvent) map[string]string {
-	if len(events) == 0 {
-		return nil
+// computeCommonLabels returns labels that are identical across all given alerts.
+// Returns an empty map (never nil) so callers can range over it safely.
+func computeCommonLabels(alerts []TemplateAlert) map[string]string {
+	if len(alerts) == 0 {
+		return make(map[string]string)
 	}
 
-	// seed from first event
-	first := parseJSONMap(events[0].Labels)
-	common := make(map[string]string, len(first))
-	for k, v := range first {
+	// seed from first alert; Labels is already map[string]string, no JSON decoding needed
+	common := make(map[string]string, len(alerts[0].Labels))
+	for k, v := range alerts[0].Labels {
 		common[k] = v
 	}
 
-	for _, ev := range events[1:] {
-		labels := parseJSONMap(ev.Labels)
+	for _, ta := range alerts[1:] {
 		for k := range common {
-			if labels[k] != common[k] {
+			if ta.Labels[k] != common[k] {
 				delete(common, k)
 			}
 		}
@@ -199,21 +300,22 @@ func computeCommonLabels(events []*model.AlertEvent) map[string]string {
 	return common
 }
 
-// computeCommonAnnotations returns annotations shared by all events.
-func computeCommonAnnotations(events []*model.AlertEvent) map[string]string {
-	if len(events) == 0 {
-		return nil
+// computeCommonAnnotations returns annotations shared by all alerts.
+// Returns an empty map (never nil) so callers can range over it safely.
+func computeCommonAnnotations(alerts []TemplateAlert) map[string]string {
+	if len(alerts) == 0 {
+		return make(map[string]string)
 	}
-	first := parseJSONMap(events[0].Annotations)
-	common := make(map[string]string, len(first))
-	for k, v := range first {
+
+	// seed from first alert; Annotations is already map[string]string, no JSON decoding needed
+	common := make(map[string]string, len(alerts[0].Annotations))
+	for k, v := range alerts[0].Annotations {
 		common[k] = v
 	}
 
-	for _, ev := range events[1:] {
-		annotations := parseJSONMap(ev.Annotations)
+	for _, ta := range alerts[1:] {
 		for k := range common {
-			if annotations[k] != common[k] {
+			if ta.Annotations[k] != common[k] {
 				delete(common, k)
 			}
 		}
@@ -257,9 +359,14 @@ func templateFuncMap() template.FuncMap {
 			ok, _ := regexp.MatchString(pattern, s)
 			return ok
 		},
-		// reReplaceAll returns a copy of s with all matches of pattern replaced by repl
+		// reReplaceAll returns a copy of s with all matches of pattern replaced by repl;
+		// returns s unchanged when pattern is not a valid regular expression.
 		"reReplaceAll": func(pattern, repl, s string) string {
-			return regexp.MustCompile(pattern).ReplaceAllString(s, repl)
+			re, err := regexp.Compile(pattern)
+			if err != nil {
+				return s
+			}
+			return re.ReplaceAllString(s, repl)
 		},
 		// humanizeDuration converts a duration in milliseconds to a human-readable string (e.g. "2h3m4s")
 		"humanizeDuration": func(ms int64) string {
@@ -280,7 +387,7 @@ func templateFuncMap() template.FuncMap {
 		"timeFormat": func(ms int64) string {
 			return time.UnixMilli(ms).Format("2006-01-02 15:04:05")
 		},
-		// labelsFormat formats a datatypes.JSON label map as a compact string
+		// labelsFormat formats a label map as a compact string
 		"labelsFormat": func(labelsJSON interface{}) string {
 			m := parseJSONMapFromAny(labelsJSON)
 			parts := make([]string, 0, len(m))
@@ -313,5 +420,74 @@ func renderText(tmplStr string, data *NotificationData) (string, error) {
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("execute template: %w", err)
 	}
+	return buf.String(), nil
+}
+
+// defineNameRe matches {{define "name"}} and {{- define `name`}} patterns (both double-quoted
+// and backtick-quoted names) to extract named block names in source order.
+// Templates() has no order guarantee, so regex over source is the only reliable approach.
+// Character class ["` + "`" + `] matches either delimiter; \x60 is the backtick (ASCII 96).
+var defineNameRe = regexp.MustCompile("\\{\\{-?\\s*define\\s+[\"\\x60]([^\"\\x60]+)[\"\\x60]")
+
+// renderWithOrgBlocks executes tmplStr with org-level {{define}} blocks available as
+// fallbacks. tmplStr's own definitions take precedence over same-named org blocks,
+// preventing "multiple definition" errors when previewing a template that is already
+// stored in the org template library.
+//
+// When tmplStr contains only {{define}} blocks (no root execution content), the first
+// user-defined block is auto-executed so that previewing org-template content — which
+// is stored entirely as named blocks — always produces visible output.
+func renderWithOrgBlocks(orgTemplates, tmplStr string, data *NotificationData) (string, error) {
+	funcs := templateFuncMap()
+
+	// Extract user-defined block names in source order before parsing, so the
+	// auto-execute fallback below honours the order the user wrote them.
+	var userDefinedNames []string
+	for _, m := range defineNameRe.FindAllStringSubmatch(tmplStr, -1) {
+		userDefinedNames = append(userDefinedNames, m[1])
+	}
+
+	// Parse user template first — it becomes the root execution context and its
+	// {{define}} blocks take priority over any same-named blocks in the org templates.
+	tmpl, err := template.New("notification").Funcs(funcs).Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("parse template: %w", err)
+	}
+
+	if strings.TrimSpace(orgTemplates) != "" {
+		orgTmpl, orgErr := template.New("org").Funcs(funcs).Parse(orgTemplates)
+		if orgErr != nil {
+			return "", fmt.Errorf("parse org templates: %w", orgErr)
+		}
+		// Inject org blocks as fallbacks; skip any already defined in the user template
+		// to avoid "multiple definition" panics when editing an existing org template.
+		for _, t := range orgTmpl.Templates() {
+			name := t.Name()
+			if name == "org" || t.Tree == nil || t.Tree.Root == nil {
+				continue
+			}
+			if tmpl.Lookup(name) == nil {
+				if _, addErr := tmpl.AddParseTree(name, t.Tree); addErr != nil {
+					return "", fmt.Errorf("merge org template %q: %w", name, addErr)
+				}
+			}
+		}
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("execute template: %w", err)
+	}
+
+	// When the user template is composed entirely of {{define}} blocks (a common
+	// pattern for org-level templates), the root body is empty and Execute produces
+	// no output. Auto-execute the first user-defined block so the preview is useful.
+	if strings.TrimSpace(buf.String()) == "" && len(userDefinedNames) > 0 {
+		buf.Reset()
+		if err := tmpl.ExecuteTemplate(&buf, userDefinedNames[0], data); err != nil {
+			return "", fmt.Errorf("execute template: %w", err)
+		}
+	}
+
 	return buf.String(), nil
 }

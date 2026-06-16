@@ -54,6 +54,9 @@ type Config struct {
 	Method     string            `json:"method"`     // HTTP method (default POST)
 	Headers    map[string]string `json:"headers"`    // optional extra headers
 	AuthHeader string            `json:"authHeader"` // optional Authorization header value
+	// Optional named template name ({{define "NAME"}} block from org templates) for the request body.
+	// Falls back to JSON-serialized NotificationData when empty or OrgTemplates is absent.
+	Content string `json:"content"`
 }
 
 type webhookNotifier struct {
@@ -81,7 +84,18 @@ func (n *webhookNotifier) Notify(ctx context.Context, data *template.Notificatio
 		return fmt.Errorf("webhook: URL not configured")
 	}
 
-	payload := encoding.JSONMarshal(data)
+	// Use named template block when configured; fall back to JSON-serialized data.
+	var payload []byte
+	if n.cfg.Content != "" && data.OrgTemplates != "" {
+		renderer := template.NewRenderer()
+		if rendered, err := renderer.RenderNamed(data.OrgTemplates, n.cfg.Content, data); err == nil {
+			payload = []byte(rendered)
+		} else {
+			payload = encoding.JSONMarshal(data)
+		}
+	} else {
+		payload = encoding.JSONMarshal(data)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, n.cfg.Method, n.cfg.URL, bytes.NewReader(payload))
 	if err != nil {

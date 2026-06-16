@@ -18,11 +18,11 @@
 package slack
 
 import (
-	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/slack-go/slack"
 
@@ -44,7 +44,7 @@ func init() {
 			Description:  "Send alert notifications via Slack",
 			ConfigSchema: json.RawMessage(schema),
 		},
-		NewFn:      newSlackNotifer,
+		NewFn:      newSlackNotifier,
 		SummaryKey: "channel", // show target Slack channel in the contact-point overview
 	})
 }
@@ -56,58 +56,75 @@ type Setting struct {
 
 // Config holds per-channel Slack configuration.
 type Config struct {
-	Channel     string `json:"channel"`
-	TemplateUID string `json:"templateUID"` // optional: override notification body template
+	Channel string `json:"channel"`
+	// Optional named template names ({{define "NAME"}} blocks from org templates).
+	// Empty value falls back to the built-in defaults.
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+	Footer string `json:"footer"`
 }
 
-type notifer struct {
+type notifier struct {
 	setting Setting
 	cfg     Config
 	cli     *slack.Client
 }
 
-func newSlackNotifer(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
-	sRaw, _ := settingJSON.MarshalJSON()
+func newSlackNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
 	var settingData Setting
-	if err := encoding.JSONUnmarshal(sRaw, &settingData); err != nil {
+	if err := encoding.JSONUnmarshal([]byte(settingJSON), &settingData); err != nil {
 		return nil, err
 	}
-	cRaw, _ := cfgJSON.MarshalJSON()
 	var cfgData Config
-	if err := encoding.JSONUnmarshal(cRaw, &cfgData); err != nil {
+	if err := encoding.JSONUnmarshal([]byte(cfgJSON), &cfgData); err != nil {
 		return nil, err
 	}
-	return &notifer{
+	return &notifier{
 		setting: settingData,
 		cfg:     cfgData,
 		cli:     slack.New(settingData.Token),
 	}, nil
 }
 
-func (n *notifer) Notify(ctx context.Context, data *template.NotificationData) error {
+func (n *notifier) Notify(ctx context.Context, data *template.NotificationData) error {
 	renderer := template.NewRenderer()
+
+	// renderOrDefault tries to render a named {{define}} block from org templates.
+	// Falls back to defaultFn when the name is empty or OrgTemplates is absent.
+	// Errors from both paths are returned so callers can decide whether to abort.
+	renderOrDefault := func(name string, defaultFn func() (string, error)) (string, error) {
+		if name != "" && data.OrgTemplates != "" {
+			return renderer.RenderNamed(data.OrgTemplates, name, data)
+		}
+		return defaultFn()
+	}
 
 	var attachments []slack.Attachment
 	for _, alert := range data.FiringAlerts {
-		// render body using the default template
-		body, err := renderer.RenderDefaultBody(&template.NotificationData{
-			Alerts:            []*model.AlertEvent{alert},
-			FiringAlerts:      []*model.AlertEvent{alert},
+		// Build a single-alert payload so named templates can reference .Alerts[0] etc.
+		alertData := &template.NotificationData{
+			Alerts:            []template.TemplateAlert{alert},
+			FiringAlerts:      []template.TemplateAlert{alert},
 			CommonLabels:      data.CommonLabels,
 			CommonAnnotations: data.CommonAnnotations,
 			GroupLabels:       data.GroupLabels,
 			ReceiverName:      data.ReceiverName,
 			Status:            "firing",
 			ExternalURL:       data.ExternalURL,
-		})
-		if err != nil {
-			body = fmt.Sprintf("[%s] value=%.2f", alert.RuleTitle, alert.Value)
+			OrgTemplates:      data.OrgTemplates,
 		}
 
-		// render title
-		title, err := renderer.RenderDefaultTitle(data)
+		title, err := renderOrDefault(n.cfg.Title, func() (string, error) {
+			return renderer.RenderDefaultTitle(alertData)
+		})
 		if err != nil {
-			title = fmt.Sprintf("[FIRING] %s", alert.RuleTitle)
+			return fmt.Errorf("render firing alert title: %w", err)
+		}
+		body, err := renderOrDefault(n.cfg.Body, func() (string, error) {
+			return renderer.RenderDefaultBody(alertData)
+		})
+		if err != nil {
+			return fmt.Errorf("render firing alert body: %w", err)
 		}
 
 		var titleLink string
@@ -117,30 +134,70 @@ func (n *notifer) Notify(ctx context.Context, data *template.NotificationData) e
 			titleLink = alert.GeneratorURL
 		}
 
-		var buf bytes.Buffer
-		buf.WriteString(body)
-
-		attachments = append(attachments, slack.Attachment{
+		att := slack.Attachment{
 			Color:      "danger",
 			Title:      title,
 			TitleLink:  titleLink,
-			Text:       buf.String(),
+			Text:       body,
 			MarkdownIn: []string{"text"},
-			Ts:         json.Number(fmt.Sprintf("%d", alert.StartsAt/1000)),
-		})
+		}
+		// Only attach a timestamp when the alert has actually started; StartsAt=0 would
+		// display as the 1970 epoch in Slack which is confusing.
+		if alert.StartsAt > 0 {
+			att.Ts = json.Number(fmt.Sprintf("%d", alert.StartsAt/1000))
+		}
+		if n.cfg.Footer != "" {
+			footer, err := renderOrDefault(n.cfg.Footer, func() (string, error) { return "", nil })
+			if err != nil {
+				return fmt.Errorf("render firing alert footer: %w", err)
+			}
+			att.Footer = footer
+		}
+		attachments = append(attachments, att)
 	}
 
 	for _, alert := range data.ResolvedAlerts {
-		title, _ := renderer.RenderDefaultTitle(data)
-		if title == "" {
-			title = fmt.Sprintf("[RESOLVED] %s", alert.RuleTitle)
+		resolvedData := &template.NotificationData{
+			Alerts:            []template.TemplateAlert{alert},
+			ResolvedAlerts:    []template.TemplateAlert{alert},
+			CommonLabels:      data.CommonLabels,
+			CommonAnnotations: data.CommonAnnotations,
+			GroupLabels:       data.GroupLabels,
+			ReceiverName:      data.ReceiverName,
+			Status:            "resolved",
+			ExternalURL:       data.ExternalURL,
+			OrgTemplates:      data.OrgTemplates,
 		}
-		attachments = append(attachments, slack.Attachment{
+		title, err := renderOrDefault(n.cfg.Title, func() (string, error) {
+			return renderer.RenderDefaultTitle(resolvedData)
+		})
+		if err != nil {
+			return fmt.Errorf("render resolved alert title: %w", err)
+		}
+
+		// Format resolution time only when it is meaningful.
+		var resolvedText string
+		if alert.EndsAt > 0 {
+			resolvedText = fmt.Sprintf("Alert resolved at %s",
+				time.UnixMilli(alert.EndsAt).Format("2006-01-02 15:04:05"))
+		} else {
+			resolvedText = "Alert resolved"
+		}
+
+		att := slack.Attachment{
 			Color:      "good",
 			Title:      title,
-			Text:       fmt.Sprintf("Alert resolved at %d", alert.EndsAt),
+			Text:       resolvedText,
 			MarkdownIn: []string{"text"},
-		})
+		}
+		if n.cfg.Footer != "" {
+			footer, err := renderOrDefault(n.cfg.Footer, func() (string, error) { return "", nil })
+			if err != nil {
+				return fmt.Errorf("render resolved alert footer: %w", err)
+			}
+			att.Footer = footer
+		}
+		attachments = append(attachments, att)
 	}
 
 	if len(attachments) == 0 {

@@ -18,8 +18,9 @@
 package api
 
 import (
-	"context"
-	"time"
+	"encoding/json"
+	"strings"
+	texttemplate "text/template"
 
 	"github.com/gin-gonic/gin"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
+	"github.com/lindb/linsight/pkg/util"
 )
 
 // NotificationTemplateAPI handles HTTP requests for notification template management.
@@ -53,6 +55,8 @@ func (api *NotificationTemplateAPI) CreateNotificationTemplate(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
+	// Invalidate cached org templates so the next render picks up the new template.
+	api.deps.RenderingEngine.Invalidate(util.GetUser(c.Request.Context()).Org.ID)
 	httppkg.OK(c, uid)
 }
 
@@ -67,6 +71,8 @@ func (api *NotificationTemplateAPI) UpdateNotificationTemplate(c *gin.Context) {
 		httppkg.Error(c, err)
 		return
 	}
+	// Invalidate cached org templates so the next render picks up the updated template.
+	api.deps.RenderingEngine.Invalidate(util.GetUser(c.Request.Context()).Org.ID)
 	httppkg.OK(c, "Notification template updated")
 }
 
@@ -77,6 +83,8 @@ func (api *NotificationTemplateAPI) DeleteNotificationTemplateByUID(c *gin.Conte
 		httppkg.Error(c, err)
 		return
 	}
+	// Invalidate cached org templates so the deletion is reflected immediately on the next render.
+	api.deps.RenderingEngine.Invalidate(util.GetUser(c.Request.Context()).Org.ID)
 	httppkg.OK(c, "Notification template deleted")
 }
 
@@ -109,13 +117,14 @@ func (api *NotificationTemplateAPI) SearchNotificationTemplates(c *gin.Context) 
 	})
 }
 
-// PreviewNotificationTemplate renders a template string with the provided payload data and returns the result.
-// Priority for data source: inline Payload > ExampleUID (loaded from DB) > hardcoded sample data (fallback).
+// PreviewNotificationTemplate renders a template string with org-level named blocks and optional
+// payload data, using the same pipeline as alert dispatch (org templates + req.Template merged).
+// If payload is supplied it is deserialized into NotificationData; otherwise hardcoded sample
+// data is used so callers can try templates without constructing a full payload.
 func (api *NotificationTemplateAPI) PreviewNotificationTemplate(c *gin.Context) {
 	req := &struct {
-		Template   string `json:"template"`
-		Payload    string `json:"payload"`    // optional: inline JSON NotificationData
-		ExampleUID string `json:"exampleUID"` // optional: UID of a stored NotificationTemplateExample
+		Template string          `json:"template"`
+		Payload  json.RawMessage `json:"payload"` // optional: JSON object of NotificationData
 	}{}
 	if err := c.ShouldBind(req); err != nil {
 		httppkg.Error(c, err)
@@ -123,60 +132,115 @@ func (api *NotificationTemplateAPI) PreviewNotificationTemplate(c *gin.Context) 
 	}
 
 	var data *template.NotificationData
-	var buildErr error
-
-	switch {
-	case req.Payload != "":
-		// highest priority: inline payload supplied by the caller
-		data, buildErr = template.BuildNotificationDataFromPayload(req.Payload)
-		if buildErr != nil {
-			httppkg.Error(c, buildErr)
-			return
-		}
-
-	case req.ExampleUID != "":
-		// load the stored example from DB and build data from its payload
-		ex, err := api.deps.NotificationTemplateExampleSrv.GetNotificationTemplateExampleByUID(c.Request.Context(), req.ExampleUID)
+	if len(req.Payload) > 0 {
+		var err error
+		data, err = template.BuildNotificationDataFromPayload(string(req.Payload))
 		if err != nil {
 			httppkg.Error(c, err)
 			return
 		}
-		data, buildErr = template.BuildNotificationDataFromPayload(ex.Payload)
-		if buildErr != nil {
-			httppkg.Error(c, buildErr)
+	} else {
+		// Try the org's designated default example first so users get a meaningful preview
+		// without having to manually construct a payload.
+		ex, err := api.deps.NotificationTemplateExampleSrv.GetDefaultNotificationTemplateExample(c.Request.Context())
+		if err != nil {
+			httppkg.Error(c, err)
 			return
 		}
-
-	default:
-		// backward-compatible fallback: use hardcoded sample data
-		data = &template.NotificationData{
-			Status:       "firing",
-			ReceiverName: "preview",
-			CommonLabels: map[string]string{
-				"alertname": "HighCPUUsage",
-				"instance":  "web-server-01",
-				"severity":  "critical",
-			},
-			CommonAnnotations: map[string]string{
-				"summary": "CPU usage is above 90%",
-			},
-			GroupLabels: map[string]string{
-				"alertname": "HighCPUUsage",
-			},
-			ExternalURL: "http://localhost:3000",
+		if ex != nil && ex.Payload != "" {
+			data, err = template.BuildNotificationDataFromPayload(ex.Payload)
+			if err != nil {
+				httppkg.Error(c, err)
+				return
+			}
+		} else {
+			// fallback: use hardcoded sample data so the preview always produces visible output
+			data = &template.NotificationData{
+				Status:       "firing",
+				ReceiverName: "preview",
+				CommonLabels: map[string]string{
+					"alertname": "HighCPUUsage",
+					"instance":  "web-server-01",
+					"severity":  "critical",
+				},
+				CommonAnnotations: map[string]string{
+					"summary": "CPU usage is above 90%",
+				},
+				GroupLabels: map[string]string{
+					"alertname": "HighCPUUsage",
+				},
+				ExternalURL: "http://localhost:3000",
+			}
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-	defer cancel()
-
-	renderer := template.NewRenderer()
-	result, err := template.RenderWithContext(ctx, renderer, req.Template, data)
+	// Use the shared rendering engine so org {{define}} blocks are available to req.Template,
+	// mirroring exactly the pipeline used during alert dispatch.
+	orgID := util.GetUser(c.Request.Context()).Org.ID
+	result, err := api.deps.RenderingEngine.Render(orgID, req.Template, data)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	httppkg.OK(c, gin.H{"result": result})
+}
+
+// TemplateDefinition represents a named {{define "NAME"}} block extracted from org notification templates.
+type TemplateDefinition struct {
+	Name    string `json:"name"`
+	Content string `json:"content"`
+}
+
+// GetTemplateDefinitions returns all named {{define}} blocks from all org-level notification templates.
+// The result can be used by a frontend picker so that users select a named template block
+// for per-channel fields (title / body / subject / content) instead of typing raw template strings.
+func (api *NotificationTemplateAPI) GetTemplateDefinitions(c *gin.Context) {
+	templates, err := api.deps.NotificationTemplateSrv.GetAllNotificationTemplates(c.Request.Context())
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+
+	// Merge all template bodies so every {{define}} block is parsed in one pass.
+	var sb strings.Builder
+	for _, t := range templates {
+		sb.WriteString(t.Template)
+		sb.WriteByte('\n')
+	}
+	merged := sb.String()
+	if strings.TrimSpace(merged) == "" {
+		httppkg.OK(c, []TemplateDefinition{})
+		return
+	}
+
+	// Parse the merged content; named sub-templates become enumerable via tmpl.Templates().
+	tmpl, err := texttemplate.New("root").Parse(merged)
+	if err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+
+	seen := make(map[string]struct{})
+	var defs []TemplateDefinition
+	for _, t := range tmpl.Templates() {
+		name := t.Name()
+		// Skip the anonymous root and any template without a parsed tree.
+		if name == "root" || t.Tree == nil || t.Tree.Root == nil {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		defs = append(defs, TemplateDefinition{
+			Name:    name,
+			Content: strings.TrimSpace(t.Tree.Root.String()),
+		})
+	}
+	if defs == nil {
+		defs = []TemplateDefinition{}
+	}
+	httppkg.OK(c, defs)
 }
 
 // ---- NotificationTemplateExample handlers ----

@@ -78,18 +78,27 @@ type AlertEvent struct {
 type AlertRoute struct {
 	BaseModel
 
-	OrgID          int64          `json:"-" gorm:"column:org_id"`
-	UID            string         `json:"uid" gorm:"column:uid;index:u_idx_alert_route_uid,unique"`
-	Name           string         `json:"name" gorm:"column:name"`
-	ParentUID      string         `json:"parentUID" gorm:"column:parent_uid"`
-	Matchers       datatypes.JSON `json:"matchers,omitempty" gorm:"column:matchers"`
-	ReceiverUID    string         `json:"receiverUID" gorm:"column:receiver_uid"`
-	Continue       bool           `json:"continue" gorm:"column:continue_match"`
-	GroupBy        datatypes.JSON `json:"groupBy,omitempty" gorm:"column:group_by"`
-	GroupWait      time.Duration  `json:"groupWait" gorm:"column:group_wait"`
-	GroupInterval  time.Duration  `json:"groupInterval" gorm:"column:group_interval"`
-	RepeatInterval time.Duration  `json:"repeatInterval" gorm:"column:repeat_interval"`
-	SortOrder      int            `json:"sortOrder" gorm:"column:sort_order"`
+	OrgID           int64          `json:"-" gorm:"column:org_id"`
+	UID             string         `json:"uid" gorm:"column:uid;index:u_idx_alert_route_uid,unique"`
+	Name            string         `json:"name" gorm:"column:name"`
+	IsDefault       bool           `json:"isDefault" gorm:"column:is_default;default:false"` // marks the root/catch-all policy (at most one per org)
+	ParentUID       string         `json:"parentUID" gorm:"column:parent_uid"`
+	Matchers        datatypes.JSON `json:"matchers,omitempty" gorm:"column:matchers"`
+	ContactPointUID string         `json:"contactPointUID" gorm:"column:contact_point_uid"` // renamed from receiver_uid
+	Continue        bool           `json:"continue" gorm:"column:continue_match"`
+	GroupBy         datatypes.JSON `json:"groupBy,omitempty" gorm:"column:group_by"`
+	GroupWait       time.Duration  `json:"groupWait" gorm:"column:group_wait"`
+	GroupInterval   time.Duration  `json:"groupInterval" gorm:"column:group_interval"`
+	RepeatInterval  time.Duration  `json:"repeatInterval" gorm:"column:repeat_interval"`
+	SortOrder       int            `json:"sortOrder" gorm:"column:sort_order"`
+}
+
+// AlertRouteNode is a response value object that wraps AlertRoute with its
+// children, enabling the service to return a true nested tree structure
+// instead of the flat DB representation.
+type AlertRouteNode struct {
+	AlertRoute
+	Children []*AlertRouteNode `json:"children,omitempty"`
 }
 
 func (r *AlertRoute) ToMatchers() ([]LabelMatcher, error) {
@@ -129,11 +138,12 @@ type NotificationChannel struct {
 type ContactPoint struct {
 	BaseModel
 
-	OrgID       int64          `json:"-" gorm:"column:org_id"`
-	UID         string         `json:"uid" gorm:"column:uid;index:u_idx_contact_point_uid,unique"`
-	Name        string         `json:"name" gorm:"column:name"`
-	Channels    datatypes.JSON `json:"channels,omitempty" gorm:"column:channels"`
-	TemplateUID string         `json:"templateUID" gorm:"column:template_uid"`
+	OrgID    int64          `json:"-" gorm:"column:org_id"`
+	UID      string         `json:"uid" gorm:"column:uid;index:u_idx_contact_point_uid,unique"`
+	Name     string         `json:"name" gorm:"column:name"`
+	Channels datatypes.JSON `json:"channels,omitempty" gorm:"column:channels"`
+	// Note: template_uid column is intentionally omitted; templates are resolved via named
+	// {{define}} blocks loaded from all org templates at dispatch time.
 }
 
 func (r *ContactPoint) ToChannels() ([]NotificationChannel, error) {
@@ -240,10 +250,11 @@ type NotificationTemplate struct {
 type NotificationTemplateExample struct {
 	BaseModel
 
-	OrgID   int64  `json:"-" gorm:"column:org_id"`
-	UID     string `json:"uid" gorm:"column:uid;index:u_idx_notif_tmpl_example_uid,unique"`
-	Name    string `json:"name" gorm:"column:name"`
-	Payload string `json:"payload" gorm:"column:payload;type:text"` // JSON of template.NotificationData
+	OrgID     int64  `json:"-" gorm:"column:org_id"`
+	UID       string `json:"uid" gorm:"column:uid;index:u_idx_notif_tmpl_example_uid,unique"`
+	Name      string `json:"name" gorm:"column:name"`
+	IsDefault bool   `json:"isDefault" gorm:"column:is_default;default:false"` // marks the org-wide default preview payload (at most one per org)
+	Payload   string `json:"payload" gorm:"column:payload;type:text"`          // JSON of template.NotificationData
 }
 
 // SearchAlertEventRequest holds parameters for querying alert events.

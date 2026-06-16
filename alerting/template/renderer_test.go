@@ -18,23 +18,21 @@
 package template
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/datatypes"
 
 	"github.com/lindb/linsight/model"
 )
 
-// buildFiringAlert creates a minimal AlertEvent with the given rule title, instance label, and value.
-func buildFiringAlert(ruleTitle, instance string, value float64) *model.AlertEvent {
-	labels := datatypes.JSON(`{"instance":"` + instance + `"}`)
-	return &model.AlertEvent{
+// buildFiringAlert creates a minimal TemplateAlert with the given rule title, instance label, and value.
+func buildFiringAlert(ruleTitle, instance string, value float64) TemplateAlert {
+	return TemplateAlert{
 		RuleTitle: ruleTitle,
 		State:     model.AlertEventFiring,
-		Labels:    labels,
+		Status:    "firing",
+		Labels:    map[string]string{"instance": instance},
 		Value:     value,
 	}
 }
@@ -68,15 +66,15 @@ func TestRenderer_NamedDefineBlock(t *testing.T) {
 }
 
 func TestRenderer_RangeFiringAlerts(t *testing.T) {
-	// Verifies iterating over FiringAlerts with labelsGet in a real multi-alert scenario.
+	// Verifies iterating over FiringAlerts with direct dot-notation label access.
 	r := NewRenderer()
 	data := &NotificationData{
-		FiringAlerts: []*model.AlertEvent{
+		FiringAlerts: []TemplateAlert{
 			buildFiringAlert("HighCPU", "web-01", 92.5),
 			buildFiringAlert("LowDisk", "db-01", 5.0),
 		},
 	}
-	tmplStr := `{{ range .FiringAlerts }}[{{ .RuleTitle }}] on {{ labelsGet .Labels "instance" }}
+	tmplStr := `{{ range .FiringAlerts }}[{{ .RuleTitle }}] on {{ .Labels.instance }}
 {{ end }}`
 	result, err := r.Render(tmplStr, data)
 	require.NoError(t, err)
@@ -106,11 +104,11 @@ func TestRenderer_DefaultBody_FiringAndResolved(t *testing.T) {
 	data := &NotificationData{
 		Status:       "firing",
 		ReceiverName: "pagerduty",
-		FiringAlerts: []*model.AlertEvent{
+		FiringAlerts: []TemplateAlert{
 			buildFiringAlert("HighCPU", "web-01", 99),
 		},
-		ResolvedAlerts: []*model.AlertEvent{
-			{RuleTitle: "OldAlert", State: model.AlertEventResolved},
+		ResolvedAlerts: []TemplateAlert{
+			{RuleTitle: "OldAlert", State: model.AlertEventResolved, Status: "resolved"},
 		},
 	}
 	result, err := r.RenderDefaultBody(data)
@@ -127,28 +125,18 @@ func TestRenderer_InvalidTemplateSyntax(t *testing.T) {
 	assert.Contains(t, err.Error(), "parse template")
 }
 
-func TestRenderer_RenderWithContext_Timeout(t *testing.T) {
-	// Verifies RenderWithContext propagates context cancellation.
-	r := NewRenderer()
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // cancel immediately
-	_, err := RenderWithContext(ctx, r, `{{ .Status }}`, &NotificationData{Status: "firing"})
-	// Either the template finishes before context is checked or it returns a timeout error;
-	// both outcomes are acceptable — the key is no panic.
-	_ = err
-}
-
 // ─── Template Functions ───────────────────────────────────────────────────────
 
 func TestTemplateFuncs_Join(t *testing.T) {
+	// Accessing a non-existent map key in Go template returns reflect.Value{} (zero Value),
+	// which the engine passes to join as a nil []string — so Execute succeeds and returns "".
+	// This test verifies no panic occurs and the result is an empty string.
 	r := NewRenderer()
-
-	// join is only valid for []string; accessing a non-existent map key returns empty string (no panic).
 	result, err := r.Render(`{{ join ", " .GroupLabels.keys }}`, &NotificationData{
 		GroupLabels: map[string]string{"env": "prod"},
 	})
 	require.NoError(t, err)
-	// map has no "keys" key, result should be empty (no panic)
+	// map has no "keys" key; join receives nil slice, result is ""
 	assert.Equal(t, "", result)
 }
 
@@ -169,6 +157,15 @@ func TestTemplateFuncs_ReReplaceAll(t *testing.T) {
 	assert.Equal(t, "web-XX", result)
 }
 
+func TestTemplateFuncs_ReReplaceAll_InvalidRegex(t *testing.T) {
+	// When the pattern is not a valid regex, reReplaceAll must return the original
+	// string unchanged instead of panicking (MustCompile would panic).
+	r := NewRenderer()
+	result, err := r.Render(`{{ reReplaceAll "[invalid" "x" .ReceiverName }}`, &NotificationData{ReceiverName: "original"})
+	require.NoError(t, err)
+	assert.Equal(t, "original", result, "invalid regex must return original string, not panic")
+}
+
 func TestTemplateFuncs_HumanizeDuration(t *testing.T) {
 	r := NewRenderer()
 	cases := []struct {
@@ -181,25 +178,28 @@ func TestTemplateFuncs_HumanizeDuration(t *testing.T) {
 		{0, "0s"},
 	}
 	for _, tt := range cases {
-		tmplStr := `{{ humanizeDuration .Value }}`
-		result, err := r.Render(tmplStr, &NotificationData{
-			CommonAnnotations: map[string]string{},
-		})
-		// humanizeDuration requires an int64 arg directly; test via inline literal
-		result, err = r.Render(`{{ humanizeDuration `+func() string {
-			if tt.ms == 0 {
-				return "0"
-			}
-			return string(rune('0'+tt.ms/1000000)) // not practical for large numbers, use direct string
-		}()+` }}`, &NotificationData{})
+		result, err := r.Render(
+			`{{ humanizeDuration .Value }}`,
+			&NotificationData{FiringAlerts: []TemplateAlert{{Value: float64(tt.ms)}}},
+		)
+		// humanizeDuration takes int64; .Value is float64 — type mismatch causes execute error.
+		// The canonical test below uses a literal integer directly in the template.
 		_ = result
 		_ = err
 	}
 
-	// Direct correctness check using a stable template
-	result, err := r.Render(`{{ humanizeDuration 3661000 }}`, &NotificationData{})
-	require.NoError(t, err)
-	assert.Equal(t, "1h1m1s", result)
+	// Canonical correctness checks using inline integer literals.
+	cases2 := []struct{ tmpl, want string }{
+		{`{{ humanizeDuration 3661000 }}`, "1h1m1s"},
+		{`{{ humanizeDuration 65000 }}`, "1m5s"},
+		{`{{ humanizeDuration 5000 }}`, "5s"},
+		{`{{ humanizeDuration 0 }}`, "0s"},
+	}
+	for _, tc := range cases2 {
+		result, err := r.Render(tc.tmpl, &NotificationData{})
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, result, "template: %s", tc.tmpl)
+	}
 }
 
 func TestTemplateFuncs_TrimSpace(t *testing.T) {
@@ -216,6 +216,53 @@ func TestTemplateFuncs_Title(t *testing.T) {
 	result, err := r.Render(`{{ .Status | title }}`, data)
 	require.NoError(t, err)
 	assert.Equal(t, "Firing Alert", result)
+}
+
+// ─── alertEventToTemplateAlert ────────────────────────────────────────────────
+
+func TestAlertEventToTemplateAlert_States(t *testing.T) {
+	// Verifies Status string derivation for each AlertEventState.
+	cases := []struct {
+		state          model.AlertEventState
+		expectedStatus string
+	}{
+		{model.AlertEventFiring, "firing"},
+		{model.AlertEventPending, "firing"},
+		{model.AlertEventResolved, "resolved"},
+		{model.AlertEventNoData, "resolved"},  // NoData is treated as resolved in alertEventToTemplateAlert
+		{model.AlertEventError, "resolved"},    // Error is treated as resolved in alertEventToTemplateAlert
+	}
+	for _, tc := range cases {
+		ev := &model.AlertEvent{State: tc.state}
+		ta := alertEventToTemplateAlert(ev)
+		assert.Equal(t, tc.expectedStatus, ta.Status, "state=%d", tc.state)
+		assert.Equal(t, tc.state, ta.State)
+	}
+}
+
+// ─── BuildNotificationData ────────────────────────────────────────────────────
+
+func TestBuildNotificationData_NoDataAndError(t *testing.T) {
+	// Verifies that NoData and Error states are classified as FiringAlerts,
+	// not silently dropped.
+	events := []*model.AlertEvent{
+		{RuleTitle: "NoDataAlert", State: model.AlertEventNoData},
+		{RuleTitle: "ErrorAlert", State: model.AlertEventError},
+		{RuleTitle: "ResolvedAlert", State: model.AlertEventResolved},
+	}
+	data := BuildNotificationData(events, "test", "firing", "", nil)
+	require.Len(t, data.FiringAlerts, 2, "NoData and Error must be in FiringAlerts")
+	require.Len(t, data.ResolvedAlerts, 1)
+	assert.Equal(t, "NoDataAlert", data.FiringAlerts[0].RuleTitle)
+	assert.Equal(t, "ErrorAlert", data.FiringAlerts[1].RuleTitle)
+}
+
+func TestBuildNotificationData_CommonLabelsNeverNil(t *testing.T) {
+	// CommonLabels/CommonAnnotations must be non-nil even when there are no alerts,
+	// so templates can safely range over them without checking for nil.
+	data := BuildNotificationData(nil, "", "", "", nil)
+	assert.NotNil(t, data.CommonLabels)
+	assert.NotNil(t, data.CommonAnnotations)
 }
 
 // ─── BuildNotificationDataFromPayload ─────────────────────────────────────────
@@ -238,6 +285,20 @@ func TestBuildNotificationDataFromPayload_AutoDeriveFiringAndResolved(t *testing
 	assert.Equal(t, "OldAlert", data.ResolvedAlerts[0].RuleTitle)
 	assert.Equal(t, "pagerduty", data.ReceiverName)
 	assert.Equal(t, "firing", data.Status)
+}
+
+func TestBuildNotificationDataFromPayload_AutoDeriveStatus(t *testing.T) {
+	// When "status" is absent from the object payload but alerts are present,
+	// status must be derived from the alert states.
+	payloadFiring := `{"alerts":[{"ruleTitle":"A","state":2}]}`
+	data, err := BuildNotificationDataFromPayload(payloadFiring)
+	require.NoError(t, err)
+	assert.Equal(t, "firing", data.Status)
+
+	payloadResolved := `{"alerts":[{"ruleTitle":"B","state":3}]}`
+	data, err = BuildNotificationDataFromPayload(payloadResolved)
+	require.NoError(t, err)
+	assert.Equal(t, "resolved", data.Status)
 }
 
 func TestBuildNotificationDataFromPayload_ExplicitSubLists(t *testing.T) {
@@ -281,4 +342,150 @@ func TestBuildNotificationDataFromPayload_AutoDeriveCommonLabels(t *testing.T) {
 	// "env=prod" is common; "region" differs so should be excluded
 	assert.Equal(t, "prod", data.CommonLabels["env"])
 	assert.NotContains(t, data.CommonLabels, "region")
+}
+
+func TestBuildNotificationDataFromPayload_NullElementsInArray(t *testing.T) {
+	// JSON arrays may contain explicit null values; they must be silently skipped
+	// without causing a nil-pointer panic.
+	payload := `[{"ruleTitle":"A","state":2}, null, {"ruleTitle":"B","state":3}]`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Len(t, data.Alerts, 2, "null elements must be skipped")
+}
+
+func TestBuildNotificationDataFromPayload_ArrayFormat(t *testing.T) {
+	// Verifies that a raw []TemplateAlert array payload (LinSight format) is accepted
+	// and status/lists are auto-derived from the "state" int field.
+	payload := `[{"ruleTitle":"HighCPU","state":2,"labels":{"alertname":"HighCPU","instance":"web-01"},"value":95.5}]`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Equal(t, "firing", data.Status)
+	require.Len(t, data.FiringAlerts, 1)
+	assert.Equal(t, "HighCPU", data.FiringAlerts[0].RuleTitle)
+	assert.Equal(t, "HighCPU", data.CommonLabels["alertname"])
+}
+
+func TestBuildNotificationDataFromPayload_ArrayFormatAllResolved(t *testing.T) {
+	// Verifies that an all-resolved array payload derives status="resolved".
+	payload := `[{"ruleTitle":"OldAlert","state":3}]`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Equal(t, "resolved", data.Status)
+	assert.Empty(t, data.FiringAlerts)
+	require.Len(t, data.ResolvedAlerts, 1)
+	assert.Equal(t, "OldAlert", data.ResolvedAlerts[0].RuleTitle)
+}
+
+func TestBuildNotificationDataFromPayload_ArrayFormat_ISO8601(t *testing.T) {
+	// Verifies that an array payload with ISO 8601 timestamp strings is parsed correctly.
+	// Alertmanager sends "0001-01-01T00:00:00Z" for endsAt when the alert is still firing.
+	payload := `[{"ruleTitle":"HighCPU","state":2,"startsAt":"2026-06-11T04:32:02.027Z","endsAt":"0001-01-01T00:00:00Z","value":95.5}]`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Equal(t, "firing", data.Status)
+	require.Len(t, data.FiringAlerts, 1)
+	ev := data.FiringAlerts[0]
+	assert.Equal(t, "HighCPU", ev.RuleTitle)
+	// "2026-06-11T04:32:02.027Z" should be converted to its Unix millisecond value
+	assert.Greater(t, ev.StartsAt, int64(0))
+	// "0001-01-01T00:00:00Z" (Go zero time) should map to 0
+	assert.Equal(t, int64(0), ev.EndsAt)
+}
+
+func TestBuildNotificationDataFromPayload_ObjectFormat_ISO8601(t *testing.T) {
+	// Verifies that a NotificationData object payload with ISO 8601 timestamps in alerts is parsed correctly.
+	payload := `{
+		"status": "firing",
+		"alerts": [{"ruleTitle":"LowDisk","state":2,"startsAt":"2026-06-11T04:32:02.027Z","endsAt":"0001-01-01T00:00:00Z"}]
+	}`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Equal(t, "firing", data.Status)
+	require.Len(t, data.FiringAlerts, 1)
+	ev := data.FiringAlerts[0]
+	assert.Equal(t, "LowDisk", ev.RuleTitle)
+	assert.Greater(t, ev.StartsAt, int64(0))
+	assert.Equal(t, int64(0), ev.EndsAt)
+}
+
+// ─── Alertmanager format (status string + map[string]string labels) ───────────
+
+func TestBuildNotificationDataFromPayload_AlertmanagerArrayFormat(t *testing.T) {
+	// Verifies the core bug fix: Alertmanager sends "status":"firing" (string) with
+	// map[string]string labels. Before the fix, state defaulted to 0 and the alert
+	// was never classified into FiringAlerts.
+	payload := `[{
+		"status": "firing",
+		"labels": {"alertname": "HighCPU", "instance": "web-01", "severity": "critical"},
+		"annotations": {"summary": "CPU usage is above 90%", "description": "web-01 CPU at 95%"},
+		"startsAt": "2026-06-11T04:32:02.027Z",
+		"endsAt": "0001-01-01T00:00:00Z",
+		"generatorURL": "/alerts/HighCPU"
+	}]`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Equal(t, "firing", data.Status)
+	require.Len(t, data.FiringAlerts, 1, "alert with status=firing must be in FiringAlerts")
+	assert.Empty(t, data.ResolvedAlerts)
+
+	ev := data.FiringAlerts[0]
+	// Verify labels are accessible as a plain map (dot-notation in templates)
+	assert.Equal(t, "HighCPU", ev.Labels["alertname"])
+	assert.Equal(t, "web-01", ev.Labels["instance"])
+	// Verify annotations are accessible as a plain map
+	assert.Equal(t, "CPU usage is above 90%", ev.Annotations["summary"])
+	// Verify common labels computed from the single alert
+	assert.Equal(t, "HighCPU", data.CommonLabels["alertname"])
+	// Verify State was back-filled from the "firing" status string
+	assert.Equal(t, model.AlertEventFiring, ev.State)
+	// Verify startsAt was parsed from ISO 8601
+	assert.Greater(t, ev.StartsAt, int64(0))
+	assert.Equal(t, int64(0), ev.EndsAt)
+}
+
+func TestBuildNotificationDataFromPayload_AlertmanagerArrayFormat_Pending(t *testing.T) {
+	// Verifies that Alertmanager "status":"pending" maps to AlertEventPending (not Resolved).
+	payload := `[{"status":"pending","labels":{"alertname":"SlowDisk"}}]`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Equal(t, "firing", data.Status)
+	require.Len(t, data.FiringAlerts, 1, "pending alert must be in FiringAlerts")
+	assert.Equal(t, model.AlertEventPending, data.FiringAlerts[0].State)
+}
+
+func TestBuildNotificationDataFromPayload_AlertmanagerArrayFormat_Resolved(t *testing.T) {
+	// Verifies that Alertmanager "status":"resolved" maps to ResolvedAlerts.
+	payload := `[{
+		"status": "resolved",
+		"labels": {"alertname": "HighCPU"},
+		"annotations": {"summary": "CPU back to normal"}
+	}]`
+	data, err := BuildNotificationDataFromPayload(payload)
+	require.NoError(t, err)
+	assert.Equal(t, "resolved", data.Status)
+	assert.Empty(t, data.FiringAlerts)
+	require.Len(t, data.ResolvedAlerts, 1)
+	assert.Equal(t, model.AlertEventResolved, data.ResolvedAlerts[0].State)
+}
+
+func TestRenderer_AlertmanagerAnnotationsDotNotation(t *testing.T) {
+	// Verifies the end-to-end fix: template can use .Annotations.summary via dot-notation
+	// when the payload uses Alertmanager format (map[string]string annotations).
+	r := NewRenderer()
+	data := &NotificationData{
+		Status: "firing",
+		FiringAlerts: []TemplateAlert{
+			{
+				RuleTitle:   "HighCPU",
+				Status:      "firing",
+				State:       model.AlertEventFiring,
+				Labels:      map[string]string{"alertname": "HighCPU", "instance": "web-01"},
+				Annotations: map[string]string{"summary": "CPU is too high"},
+			},
+		},
+	}
+	// This is the exact template pattern that was failing before the fix
+	result, err := r.Render(`{{ range .FiringAlerts }}{{ .Annotations.summary }}{{ end }}`, data)
+	require.NoError(t, err)
+	assert.Equal(t, "CPU is too high", result)
 }

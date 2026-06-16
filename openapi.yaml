@@ -1747,16 +1747,14 @@ paths:
     get:
       tags: [AlertRoutes]
       summary: Get alert route tree (Viewer)
-      description: Returns all route nodes for the current organization. Requires Viewer role.
+      description: Returns the nested routing tree for the current organization. The tree root has isDefault=true. Returns null when no default route has been created yet. Requires Viewer role.
       responses:
         '200':
-          description: List of alert route nodes
+          description: Alert routing tree root node (null when no default route exists)
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AlertRoute'
+                $ref: '#/components/schemas/AlertRouteNode'
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
@@ -2292,7 +2290,10 @@ paths:
     post:
       tags: [NotificationTemplates]
       summary: Preview notification template (Editor)
-      description: Render a template string against sample data and return the result. Requires Editor role.
+      description: >
+        Render a template string against notification data and return the result. Requires Editor role.
+        When payload is omitted, the org's default NotificationTemplateExample is used automatically;
+        if no default example has been configured, hardcoded sample data (firing / HighCPUUsage) is used as fallback.
       requestBody:
         required: true
         content:
@@ -2303,17 +2304,25 @@ paths:
               properties:
                 template:
                   type: string
-                  description: Go template string to render
+                  description: Go template string to render. Org-level {{define}} blocks are available via {{template "NAME" .}}.
                 payload:
-                  type: string
                   description: |
-                    Optional inline JSON of NotificationData used as render context.
-                    Takes priority over exampleUID. Must be valid JSON matching NotificationData shape.
-                exampleUID:
-                  type: string
-                  description: |
-                    Optional UID of a stored NotificationTemplateExample whose payload is used as render context.
-                    Only used when payload is not provided.
+                    Optional render context. Accepts two JSON shapes:
+                    - Object: a full or partial NotificationData (`{"status":"firing","alerts":[...], ...}`).
+                      FiringAlerts/ResolvedAlerts are auto-derived from Alerts when not provided.
+                    - Array: a raw `[]AlertEvent` list (`[{"ruleTitle":"...","state":2,...}]`).
+                      Status, FiringAlerts, ResolvedAlerts, and CommonLabels are all auto-derived.
+                    When omitted, the org's default NotificationTemplateExample payload is used;
+                    falls back to hardcoded sample data if no default example exists.
+                  oneOf:
+                    - type: object
+                      additionalProperties: true
+                      description: NotificationData object (full or partial).
+                    - type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                      description: Array of AlertEvent objects.
       responses:
         '200':
           description: Rendered template output
@@ -2326,6 +2335,34 @@ paths:
                     type: string
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/templates/definitions:
+    get:
+      tags: [NotificationTemplates]
+      summary: List all named template definitions (Viewer)
+      description: |
+        Parses all org-level notification templates and returns a deduplicated list of
+        every `{{define "NAME"}}` block. The `name` field can be used as the value for
+        per-channel fields (`title`, `body`, `subject`, `content`) so that the alert
+        engine resolves the block by name at dispatch time. Requires Viewer role.
+      responses:
+        '200':
+          description: List of named template definitions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: The {{define}} block name
+                    content:
+                      type: string
+                      description: Reconstructed template body (from AST)
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -3401,6 +3438,9 @@ components:
               type: string
             name:
               type: string
+            isDefault:
+              type: boolean
+              description: Marks the root/catch-all policy for this org (at most one per org)
             parentUID:
               type: string
               description: UID of the parent route node; empty for root routes
@@ -3409,9 +3449,9 @@ components:
               items:
                 $ref: '#/components/schemas/LabelMatcher'
               description: All matchers must match for this route to apply
-            receiverUID:
+            contactPointUID:
               type: string
-              description: UID of the receiver to send notifications to
+              description: UID of the contact point to send notifications to
             continue:
               type: boolean
               description: If true, continue matching sibling routes after this one matches
@@ -3435,6 +3475,17 @@ components:
             sortOrder:
               type: integer
               description: Route evaluation priority (lower = higher priority)
+
+    AlertRouteNode:
+      allOf:
+        - $ref: '#/components/schemas/AlertRoute'
+        - type: object
+          properties:
+            children:
+              type: array
+              description: Ordered child route nodes; evaluated in sort_order after the parent matches
+              items:
+                $ref: '#/components/schemas/AlertRouteNode'
 
     AlertRouteListResponse:
       type: object
@@ -3481,9 +3532,6 @@ components:
               items:
                 $ref: '#/components/schemas/NotificationChannel'
               description: One or more notification channels sent simultaneously
-            templateUID:
-              type: string
-              description: Optional UID of a NotificationTemplate to use for rendering
 
     ContactPointListResponse:
       type: object
@@ -3684,6 +3732,13 @@ components:
               type: string
             name:
               type: string
+            isDefault:
+              type: boolean
+              description: >
+                When true, this example is automatically used as the preview payload
+                when no explicit payload is provided in a preview request.
+                At most one example per org may be the default; setting a new default
+                clears the previous one atomically.
             payload:
               type: string
               description: |

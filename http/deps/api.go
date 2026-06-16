@@ -20,6 +20,7 @@ package deps
 import (
 	"github.com/lindb/linsight/alerting/manager"
 	"github.com/lindb/linsight/alerting/schedule"
+	alerttemplate "github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/plugin/datasource"
 	"github.com/lindb/linsight/service"
@@ -60,6 +61,8 @@ type API struct {
 	NotificationTemplateExampleSrv service.NotificationTemplateExampleService
 
 	AlertMgr manager.AlertManager
+
+	RenderingEngine *alerttemplate.RenderingEngine // shared engine with TTL cache for org templates
 
 	DatasourceMgr datasource.Manager
 

@@ -62,6 +62,10 @@ type Setting struct {
 // Config holds per-receiver email configuration.
 type Config struct {
 	Addresses string `json:"addresses"` // comma or newline separated recipient addresses
+	// Optional named template names ({{define "NAME"}} blocks from org templates).
+	// Empty value falls back to the built-in defaults.
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
 }
 
 type emailNotifier struct {
@@ -96,14 +100,30 @@ func (n *emailNotifier) Notify(ctx context.Context, data *template.NotificationD
 
 	renderer := template.NewRenderer()
 
+	// renderOrDefault tries to render a named {{define}} block from org templates.
+	// Falls back to defaultFn when the name is empty, OrgTemplates is absent, or rendering fails.
+	renderOrDefault := func(name string, defaultFn func() (string, error)) string {
+		if name != "" && data.OrgTemplates != "" {
+			if s, err := renderer.RenderNamed(data.OrgTemplates, name, data); err == nil {
+				return s
+			}
+		}
+		s, _ := defaultFn()
+		return s
+	}
+
 	// render subject and body
-	subject, err := renderer.RenderDefaultTitle(data)
-	if err != nil {
+	subject := renderOrDefault(n.cfg.Subject, func() (string, error) {
+		return renderer.RenderDefaultTitle(data)
+	})
+	if subject == "" {
 		subject = fmt.Sprintf("[%s] Alert notification", strings.ToUpper(data.Status))
 	}
 
-	body, err := renderer.RenderDefaultBody(data)
-	if err != nil {
+	body := renderOrDefault(n.cfg.Body, func() (string, error) {
+		return renderer.RenderDefaultBody(data)
+	})
+	if body == "" {
 		body = fmt.Sprintf("Alert notification for %s", data.ReceiverName)
 	}
 

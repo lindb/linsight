@@ -20,11 +20,13 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -32,6 +34,8 @@ import (
 
 	"github.com/lindb/common/pkg/encoding"
 
+	alerttemplate "github.com/lindb/linsight/alerting/template"
+	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/service"
@@ -47,12 +51,24 @@ func buildNotificationTemplateAPI(ctrl *gomock.Controller) (
 ) {
 	templateSrv := service.NewMockNotificationTemplateService(ctrl)
 	exampleSrv := service.NewMockNotificationTemplateExampleService(ctrl)
+	// No-op loader: return empty org templates so rendered output is template-only.
+	renderingEngine := alerttemplate.NewRenderingEngine(func(int64) (string, error) { return "", nil }, 5*time.Minute)
 	apiDeps := &deps.API{
 		NotificationTemplateSrv:        templateSrv,
 		NotificationTemplateExampleSrv: exampleSrv,
+		RenderingEngine:                renderingEngine,
 	}
 	notifAPI := NewNotificationTemplateAPI(apiDeps)
 	r := gin.New()
+	// Inject a dummy signed user so handlers that call util.GetUser never encounter a nil user.
+	// orgID=0 is sufficient for tests: Invalidate(0) is a no-op when nothing is cached.
+	r.Use(func(c *gin.Context) {
+		ctx := context.WithValue(c.Request.Context(), constant.LinSightSignedKey, &model.SignedUser{
+			Org: &model.Org{},
+		})
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	})
 	return notifAPI, templateSrv, exampleSrv, r
 }
 
@@ -330,22 +346,55 @@ func TestNotificationTemplateAPI_PreviewNotificationTemplate(t *testing.T) {
 			},
 		},
 		{
-			// No payload/exampleUID → fallback to hardcoded sample data containing "HighCPUUsage".
+			// No payload → DB has no default → fallback to hardcoded sample data containing "HighCPUUsage".
 			name: "fallback to hardcoded sample data",
 			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
 				"template": `{{ .CommonLabels.alertname }}`,
 			})),
+			prepare: func() {
+				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(nil, nil)
+			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
 				assert.Contains(t, resp.Body.String(), "HighCPUUsage")
 			},
 		},
 		{
-			// Inline payload: template should render from provided firing alert.
+			// No payload → DB default example is used for rendering.
+			name: "use DB default example when no payload",
+			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
+				"template": `{{ .CommonLabels.alertname }}`,
+			})),
+			prepare: func() {
+				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(
+					&model.NotificationTemplateExample{
+						Payload: `{"commonLabels":{"alertname":"DBDefaultAlert"}}`,
+					}, nil)
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+				assert.Contains(t, resp.Body.String(), "DBDefaultAlert")
+			},
+		},
+		{
+			// No payload → DB query fails → propagate error.
+			name: "DB default fetch error",
+			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
+				"template": `{{ .CommonLabels.alertname }}`,
+			})),
+			prepare: func() {
+				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(nil, fmt.Errorf("db error"))
+			},
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+			},
+		},
+		{
+			// Payload is a JSON object → alerts auto-derived and rendered correctly.
 			name: "inline payload renders correctly",
 			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
 				"template": `{{ range .FiringAlerts }}{{ .RuleTitle }}{{ end }}`,
-				"payload":  `{"status":"firing","alerts":[{"ruleTitle":"DiskFull","state":2}]}`,
+				"payload":  json.RawMessage(`{"status":"firing","alerts":[{"ruleTitle":"DiskFull","state":2}]}`),
 			})),
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
@@ -353,70 +402,22 @@ func TestNotificationTemplateAPI_PreviewNotificationTemplate(t *testing.T) {
 			},
 		},
 		{
-			// Inline payload with invalid JSON should return an error.
+			// Malformed JSON in the request body → ShouldBind fails with 500.
 			name: "inline payload invalid json",
-			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
-				"template": `{{ .Status }}`,
-				"payload":  `{invalid`,
-			})),
+			body: bytes.NewBufferString(`{"template":"{{ .Status }}","payload":{not-valid-json}}`),
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
-			// ExampleUID lookup fails → error propagated.
-			name: "exampleUID db failure",
-			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
-				"template":   `{{ .Status }}`,
-				"exampleUID": "ex-1",
-			})),
-			prepare: func() {
-				exampleSrv.EXPECT().GetNotificationTemplateExampleByUID(gomock.Any(), "ex-1").
-					Return(nil, fmt.Errorf("not found"))
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
-			},
-		},
-		{
-			// ExampleUID loads a stored payload and renders the template from it.
-			name: "exampleUID renders from stored payload",
-			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
-				"template":   `{{ range .FiringAlerts }}{{ .RuleTitle }}{{ end }}`,
-				"exampleUID": "ex-2",
-			})),
-			prepare: func() {
-				exampleSrv.EXPECT().GetNotificationTemplateExampleByUID(gomock.Any(), "ex-2").
-					Return(&model.NotificationTemplateExample{
-						Payload: `{"status":"firing","alerts":[{"ruleTitle":"MemLeak","state":2}]}`,
-					}, nil)
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, resp.Code)
-				assert.Contains(t, resp.Body.String(), "MemLeak")
-			},
-		},
-		{
-			// ExampleUID found but its stored payload is invalid JSON.
-			name: "exampleUID invalid stored payload",
-			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
-				"template":   `{{ .Status }}`,
-				"exampleUID": "ex-3",
-			})),
-			prepare: func() {
-				exampleSrv.EXPECT().GetNotificationTemplateExampleByUID(gomock.Any(), "ex-3").
-					Return(&model.NotificationTemplateExample{Payload: `{bad`}, nil)
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
-			},
-		},
-		{
-			// Syntactically broken template → render error.
+			// Syntactically broken template (no payload) → GetDefault called, then render error.
 			name: "invalid template syntax",
 			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
 				"template": `{{ .Foo`,
 			})),
+			prepare: func() {
+				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(nil, nil)
+			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},

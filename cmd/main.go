@@ -20,6 +20,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/lindb/common/pkg/fileutil"
@@ -29,6 +30,7 @@ import (
 	_ "github.com/lindb/linsight/alerting"
 	"github.com/lindb/linsight/alerting/manager"
 	"github.com/lindb/linsight/alerting/schedule"
+	alerttemplate "github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
@@ -191,6 +193,23 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	notificationTemplateSrv := service.NewNotificationTemplateService(db)
 	notificationTemplateExampleSrv := service.NewNotificationTemplateExampleService(db)
 
+	// Build the rendering engine with a TTL cache to avoid per-dispatch DB queries for org templates.
+	renderingEngine := alerttemplate.NewRenderingEngine(
+		func(orgID int64) (string, error) {
+			templates, err := notificationTemplateSrv.GetAllTemplatesByOrgID(orgID)
+			if err != nil {
+				return "", err
+			}
+			var sb strings.Builder
+			for _, t := range templates {
+				sb.WriteString(t.Template)
+				sb.WriteByte('\n')
+			}
+			return sb.String(), nil
+		},
+		5*time.Minute,
+	)
+
 	// alertmanager
 	alertMgr := manager.NewAlertManager(&manager.Deps{
 		AlertEventSrv:           alertEventSrv,
@@ -201,6 +220,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		NotificationTemplateSrv: notificationTemplateSrv,
 		NotificationSrv:         service.NewNotificationService(db),
 		ContactPointStatusSrv:   contactPointStatusSrv, // persist per-channel delivery outcomes
+		RenderingEngine:         renderingEngine,
 		ExternalURL:             "", // TODO: configure public URL in server config
 	})
 
@@ -233,7 +253,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		NotificationTemplateSrv:        notificationTemplateSrv,
 		NotificationTemplateExampleSrv: notificationTemplateExampleSrv,
 
-		AlertMgr: alertMgr,
+		AlertMgr:        alertMgr,
+		RenderingEngine: renderingEngine,
 
 		DatasourceMgr: datasource.NewDatasourceManager(),
 

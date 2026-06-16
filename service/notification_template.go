@@ -39,8 +39,12 @@ type NotificationTemplateService interface {
 	GetNotificationTemplateByUID(ctx context.Context, uid string) (*model.NotificationTemplate, error)
 	// SearchNotificationTemplates queries templates with optional filters.
 	SearchNotificationTemplates(ctx context.Context, req *model.SearchNotificationTemplateRequest) (rs []model.NotificationTemplate, total int64, err error)
+	// GetAllNotificationTemplates returns all templates for the current user's org (used by HTTP handlers).
+	GetAllNotificationTemplates(ctx context.Context) ([]model.NotificationTemplate, error)
 	// GetTemplateByOrgAndUID returns a template without a signed-in user context (used by the alert engine).
 	GetTemplateByOrgAndUID(orgID int64, uid string) (*model.NotificationTemplate, error)
+	// GetAllTemplatesByOrgID returns all templates for an org without a signed-in user context (used by the alert engine).
+	GetAllTemplatesByOrgID(orgID int64) ([]model.NotificationTemplate, error)
 }
 
 type notificationTemplateService struct {
@@ -121,6 +125,21 @@ func (srv *notificationTemplateService) SearchNotificationTemplates(ctx context.
 
 func (srv *notificationTemplateService) GetTemplateByOrgAndUID(orgID int64, uid string) (rs *model.NotificationTemplate, err error) {
 	if err := srv.db.Get(&rs, "uid=? and org_id=?", uid, orgID); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+func (srv *notificationTemplateService) GetAllNotificationTemplates(ctx context.Context) (rs []model.NotificationTemplate, err error) {
+	signedUser := util.GetUser(ctx)
+	if err := srv.db.Find(&rs, "org_id=?", signedUser.Org.ID); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+func (srv *notificationTemplateService) GetAllTemplatesByOrgID(orgID int64) (rs []model.NotificationTemplate, err error) {
+	if err := srv.db.Find(&rs, "org_id=?", orgID); err != nil {
 		return nil, err
 	}
 	return rs, nil

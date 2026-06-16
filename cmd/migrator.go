@@ -137,5 +137,14 @@ func runMigration(_ *cobra.Command, _ []string) error {
 			log.Warn("failed to drop legacy type column from notification_templates", logger.Error(err))
 		}
 	}
+
+	// Copy receiver_uid → contact_point_uid for rows that were created before the rename.
+	// AutoMigrate has already added the contact_point_uid column; this back-fills existing data.
+	// The UPDATE is idempotent: rows where contact_point_uid is already set are left untouched.
+	if rawDB.Migrator().HasColumn("alert_routes", "receiver_uid") {
+		if err = rawDB.Exec("UPDATE alert_routes SET contact_point_uid = receiver_uid WHERE (contact_point_uid = '' OR contact_point_uid IS NULL) AND receiver_uid != ''").Error; err != nil {
+			log.Warn("failed to copy receiver_uid to contact_point_uid in alert_routes", logger.Error(err))
+		}
+	}
 	return nil
 }

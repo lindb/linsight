@@ -1,7 +1,27 @@
 {
   "fields": [
-    {"type": "input", "key": "token",       "label": "Token",       "required": true},
-    {"type": "input", "key": "channel",     "label": "Channel",     "required": true},
-    {"type": "input", "key": "templateUID", "label": "Template UID"}
+    { "type": "input", "key": "token", "label": "Token", "required": true },
+    { "type": "input", "key": "channel", "label": "Channel", "required": true },
+    {
+      "type": "alert-template",
+      "key": "title",
+      "label": "Title",
+      "buttonLabel": "Edit Title",
+      "placeholder": "[{{ .Status | upper }}] {{ .CommonLabels.alertname }}"
+    },
+    {
+      "type": "alert-template",
+      "key": "body",
+      "label": "Body",
+      "buttonLabel": "Edit Body",
+      "placeholder": "{{ range .FiringAlerts }}*{{ .RuleTitle }}*  value={{ .Value }}\n{{ end }}"
+    },
+    {
+      "type": "alert-template",
+      "key": "footer",
+      "label": "Footer",
+      "buttonLabel": "Edit Footer",
+      "placeholder": "Sent by {{ .ReceiverName }}"
+    }
   ]
 }

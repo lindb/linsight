@@ -105,7 +105,6 @@ func (srv *contactPointService) UpdateContactPoint(ctx context.Context, cp *mode
 	user := util.GetUser(ctx)
 	fromDB.Name = cp.Name
 	fromDB.Channels = cp.Channels
-	fromDB.TemplateUID = cp.TemplateUID
 	fromDB.UpdatedBy = user.User.ID
 	// fill missing UIDs before persisting so new channels always get a stable identifier
 	if err := ensureChannelUIDs(fromDB); err != nil {

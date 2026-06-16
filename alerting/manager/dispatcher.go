@@ -30,32 +30,28 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
-const templateRenderTimeout = 5 * time.Second
-
 // dispatcher resolves a receiver and sends notifications through all its enabled channels.
 type dispatcher struct {
-	deps        *Deps
-	receiverUID string
-	orgID       int64
-	renderer    template.Renderer
-	logger      logger.Logger
+	deps            *Deps
+	contactPointUID string
+	orgID           int64
+	logger          logger.Logger
 }
 
-func newDispatcher(deps *Deps, receiverUID string, orgID int64) *dispatcher {
+func newDispatcher(deps *Deps, contactPointUID string, orgID int64) *dispatcher {
 	return &dispatcher{
-		deps:        deps,
-		receiverUID: receiverUID,
-		orgID:       orgID,
-		renderer:    template.NewRenderer(),
-		logger:      logger.GetLogger("Alerting", "Dispatcher"),
+		deps:            deps,
+		contactPointUID: contactPointUID,
+		orgID:           orgID,
+		logger:          logger.GetLogger("Alerting", "Dispatcher"),
 	}
 }
 
 // dispatch builds notification data and sends it through all enabled channels of the receiver.
 func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string]string) error {
-	receiver, err := d.deps.ContactPointSrv.GetContactPointByOrgAndUID(d.orgID, d.receiverUID)
+	receiver, err := d.deps.ContactPointSrv.GetContactPointByOrgAndUID(d.orgID, d.contactPointUID)
 	if err != nil {
-		return fmt.Errorf("get contact point %s: %w", d.receiverUID, err)
+		return fmt.Errorf("get contact point %s: %w", d.contactPointUID, err)
 	}
 
 	// determine notification status
@@ -73,6 +69,9 @@ func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string
 
 	data := template.BuildNotificationData(events, receiver.Name, status, d.deps.ExternalURL, groupLabels)
 
+	// Populate OrgTemplates from the shared rendering engine (cached, avoids per-dispatch DB queries).
+	data.OrgTemplates, _ = d.deps.RenderingEngine.GetMergedOrgTemplates(d.orgID)
+
 	channels, err := receiver.ToChannels()
 	if err != nil {
 		return fmt.Errorf("decode receiver channels: %w", err)
@@ -84,19 +83,13 @@ func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string
 		logger.Int32("events", int32(len(events))),
 		logger.Int32("channels", int32(len(channels))))
 
-	// load custom template if configured
-	var notifTmpl *model.NotificationTemplate
-	if receiver.TemplateUID != "" {
-		notifTmpl, _ = d.deps.NotificationTemplateSrv.GetTemplateByOrgAndUID(d.orgID, receiver.TemplateUID)
-	}
-
 	for _, ch := range channels {
 		if !ch.Enabled {
 			continue
 		}
 
-		// render template
-		if err := d.renderAndSend(ch, data, notifTmpl); err != nil {
+		// send through the notifier
+		if err := d.renderAndSend(ch, data); err != nil {
 			d.logger.Error("send notification failure",
 				logger.String("type", ch.Type),
 				logger.Error(err))
@@ -106,7 +99,7 @@ func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string
 	return nil
 }
 
-func (d *dispatcher) renderAndSend(ch model.NotificationChannel, data *template.NotificationData, notifTmpl *model.NotificationTemplate) error {
+func (d *dispatcher) renderAndSend(ch model.NotificationChannel, data *template.NotificationData) error {
 	pluginDef, ok := types.GetNotifierDef(ch.Type)
 	if !ok {
 		return fmt.Errorf("notifier plugin %q not registered", ch.Type)
@@ -138,20 +131,6 @@ func (d *dispatcher) renderAndSend(ch model.NotificationChannel, data *template.
 		return fmt.Errorf("create notifier: %w", err)
 	}
 
-	// override notification data with rendered template if available
-	if notifTmpl != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), templateRenderTimeout)
-		defer cancel()
-		rendered, renderErr := template.RenderWithContext(ctx, d.renderer, notifTmpl.Template, data)
-		if renderErr != nil {
-			d.logger.Warn("template render failure, using default",
-				logger.String("templateUID", notifTmpl.UID),
-				logger.Error(renderErr))
-		} else {
-			_ = rendered // rendered result is available for channel-specific use
-		}
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -167,7 +146,7 @@ func (d *dispatcher) renderAndSend(ch model.NotificationChannel, data *template.
 	// Only record status when the channel has a stable UID (legacy channels without UIDs are skipped).
 	if ch.UID != "" {
 		_ = d.deps.ContactPointStatusSrv.UpsertChannelStatus(
-			d.orgID, d.receiverUID, ch.UID, ch.Type,
+			d.orgID, d.contactPointUID, ch.UID, ch.Type,
 			deliveryStatus, errMsg,
 			time.Now().UnixMilli(), durationMs,
 		)

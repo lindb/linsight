@@ -10,6 +10,18 @@
           "label": "Addresses",
           "required": true,
           "placeholder": "One address per line"
+        },
+        {
+          "type":        "alert-template",
+          "key":         "subject",
+          "label":       "Subject",
+          "placeholder": "[{{ .Status | upper }}] {{ .CommonLabels.alertname }}"
+        },
+        {
+          "type":        "alert-template",
+          "key":         "body",
+          "label":       "Body",
+          "placeholder": "{{ range .FiringAlerts }}[{{ .RuleTitle }}] value={{ .Value }}\n{{ end }}"
         }
       ]
     },
