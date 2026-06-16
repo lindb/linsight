@@ -2399,105 +2399,29 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ─── Notification Template Examples ──────────────────────────────────────────
+  # Read-only: examples are static built-in data loaded from YAML at startup (not stored in DB).
   /api/v1/alerting/template-examples:
     get:
       tags: [NotificationTemplateExamples]
       summary: Search notification template examples (Viewer)
-      description: Search example payloads with optional name filter and pagination. Requires Viewer role.
+      description: >
+        Return the built-in static notification template examples with optional name filter.
+        Examples are embedded in the binary at build time and cannot be modified via API.
+        Requires Viewer role.
       parameters:
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
         - name: name
           in: query
           schema:
             type: string
       responses:
         '200':
-          description: Paginated list of notification template examples
+          description: List of notification template examples
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/NotificationTemplateExampleListResponse'
         '403':
           $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [NotificationTemplateExamples]
-      summary: Create notification template example (Editor)
-      description: Create a new example payload for template preview. Requires Editor role.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NotificationTemplateExample'
-      responses:
-        '200':
-          description: Example created – returns new UID
-          content:
-            application/json:
-              schema:
-                type: string
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    put:
-      tags: [NotificationTemplateExamples]
-      summary: Update notification template example (Editor)
-      description: Update an existing example payload. Requires Editor role.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/NotificationTemplateExample'
-      responses:
-        '200':
-          description: Example updated
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  /api/v1/alerting/template-examples/{uid}:
-    get:
-      tags: [NotificationTemplateExamples]
-      summary: Get notification template example by UID (Viewer)
-      description: Returns a single example by UID. Requires Viewer role.
-      parameters:
-        - $ref: '#/components/parameters/UIDPath'
-      responses:
-        '200':
-          description: Notification template example detail
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NotificationTemplateExample'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    delete:
-      tags: [NotificationTemplateExamples]
-      summary: Delete notification template example by UID (Editor)
-      description: Delete an example by UID. Requires Editor role.
-      parameters:
-        - $ref: '#/components/parameters/UIDPath'
-      responses:
-        '200':
-          description: Example deleted
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
 
 # ─── Components ──────────────────────────────────────────────────────────────
 components:
@@ -3723,31 +3647,25 @@ components:
 
     # ── Notification Template Example ────────────────────────────────────────────
     NotificationTemplateExample:
-      allOf:
-        - $ref: '#/components/schemas/BaseModel'
-        - type: object
-          required: [name, payload]
-          properties:
-            uid:
-              type: string
-            name:
-              type: string
-            isDefault:
-              type: boolean
-              description: >
-                When true, this example is automatically used as the preview payload
-                when no explicit payload is provided in a preview request.
-                At most one example per org may be the default; setting a new default
-                clears the previous one atomically.
-            payload:
-              type: string
-              description: |
-                JSON-serialised NotificationData used as template render context.
-                Matches the shape of NotificationData:
-                  alerts, firingAlerts, resolvedAlerts – alert event arrays
-                  commonLabels, commonAnnotations, groupLabels – string maps
-                  receiverName, status, externalURL – string fields
-                FiringAlerts/ResolvedAlerts are auto-derived from Alerts by state when omitted.
+      type: object
+      required: [name, payload]
+      properties:
+        name:
+          type: string
+        isDefault:
+          type: boolean
+          description: >
+            When true, this example is automatically used as the preview payload
+            when no explicit payload is provided in a preview request.
+        payload:
+          type: string
+          description: |
+            JSON-serialised NotificationData used as template render context.
+            Matches the shape of NotificationData:
+              alerts, firingAlerts, resolvedAlerts – alert event arrays
+              commonLabels, commonAnnotations, groupLabels – string maps
+              receiverName, status, externalURL – string fields
+            FiringAlerts/ResolvedAlerts are auto-derived from Alerts by state when omitted.
 
     NotificationTemplateExampleListResponse:
       type: object

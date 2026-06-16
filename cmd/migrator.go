@@ -84,7 +84,8 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertSilence{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.AlertInhibitRule{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.NotificationTemplate{}))
-	migrator.AddMigration(dbpkg.NewMigration(&model.NotificationTemplateExample{}))
+	// NotificationTemplateExample was removed — examples are now static YAML config (see config/notification_template_examples.yaml).
+	// The old table is dropped below after migrator.Run().
 	migrator.AddMigration(dbpkg.NewMigration(&model.UserToken{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Datasource{}))
 	migrator.AddMigration(dbpkg.NewMigration(&model.Integration{}))
@@ -144,6 +145,13 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	if rawDB.Migrator().HasColumn("alert_routes", "receiver_uid") {
 		if err = rawDB.Exec("UPDATE alert_routes SET contact_point_uid = receiver_uid WHERE (contact_point_uid = '' OR contact_point_uid IS NULL) AND receiver_uid != ''").Error; err != nil {
 			log.Warn("failed to copy receiver_uid to contact_point_uid in alert_routes", logger.Error(err))
+		}
+	}
+
+	// Drop notification_template_examples — examples are now embedded static YAML configuration.
+	if rawDB.Migrator().HasTable("notification_template_examples") {
+		if err = rawDB.Exec("DROP TABLE notification_template_examples").Error; err != nil {
+			log.Warn("failed to drop notification_template_examples table", logger.Error(err))
 		}
 	}
 	return nil

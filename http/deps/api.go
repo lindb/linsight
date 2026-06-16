@@ -22,6 +22,7 @@ import (
 	"github.com/lindb/linsight/alerting/schedule"
 	alerttemplate "github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/config"
+	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/plugin/datasource"
 	"github.com/lindb/linsight/service"
 )
@@ -58,7 +59,7 @@ type API struct {
 	AlertSilenceSrv                service.AlertSilenceService
 	AlertInhibitRuleSrv            service.AlertInhibitRuleService
 	NotificationTemplateSrv        service.NotificationTemplateService
-	NotificationTemplateExampleSrv service.NotificationTemplateExampleService
+	NotificationTemplateExamples   []model.NotificationTemplateExample // static built-in examples loaded from YAML at startup
 
 	AlertMgr manager.AlertManager
 

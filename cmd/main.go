@@ -18,6 +18,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -26,6 +27,7 @@ import (
 	"github.com/lindb/common/pkg/fileutil"
 	"github.com/lindb/common/pkg/logger"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	_ "github.com/lindb/linsight/alerting"
 	"github.com/lindb/linsight/alerting/manager"
@@ -34,6 +36,8 @@ import (
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
+	linsight "github.com/lindb/linsight"
+	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/plugin/datasource"
 	provisioningdeps "github.com/lindb/linsight/provisioning/deps"
@@ -191,7 +195,10 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	alertSilenceSrv := service.NewAlertSilenceService(db)
 	alertInhibitRuleSrv := service.NewAlertInhibitRuleService(db)
 	notificationTemplateSrv := service.NewNotificationTemplateService(db)
-	notificationTemplateExampleSrv := service.NewNotificationTemplateExampleService(db)
+	// Parse built-in notification template examples from the embedded YAML file.
+	// Each example's payload is a nested YAML object that is re-encoded as a JSON string
+	// so that handlers can pass it directly to template.BuildNotificationDataFromPayload.
+	notifTmplExamples := mustLoadNotificationTemplateExamples()
 
 	// Build the rendering engine with a TTL cache to avoid per-dispatch DB queries for org templates.
 	renderingEngine := alerttemplate.NewRenderingEngine(
@@ -251,7 +258,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AlertSilenceSrv:         alertSilenceSrv,
 		AlertInhibitRuleSrv:            alertInhibitRuleSrv,
 		NotificationTemplateSrv:        notificationTemplateSrv,
-		NotificationTemplateExampleSrv: notificationTemplateExampleSrv,
+		NotificationTemplateExamples:   notifTmplExamples,
 
 		AlertMgr:        alertMgr,
 		RenderingEngine: renderingEngine,
@@ -268,6 +275,38 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 			DatasourceMgr: datasource.NewDatasourceManager(),
 		}),
 	}
+}
+
+// mustLoadNotificationTemplateExamples parses the built-in YAML file embedded in the binary
+// and returns a slice of NotificationTemplateExample with Payload encoded as a JSON string.
+// Panics on parse error so that misconfigured binaries fail fast at startup.
+func mustLoadNotificationTemplateExamples() []model.NotificationTemplateExample {
+	// rawEntry is the intermediate YAML representation where payload is a nested map
+	// so that yaml.v3 can decode the nested object, which is then re-encoded as JSON.
+	type rawEntry struct {
+		Name      string                 `yaml:"name"`
+		IsDefault bool                   `yaml:"isDefault"`
+		Payload   map[string]interface{} `yaml:"payload"`
+	}
+
+	var raw []rawEntry
+	if err := yaml.Unmarshal([]byte(linsight.NotificationTemplateExamplesYAML), &raw); err != nil {
+		panic("failed to parse notification_template_examples.yaml: " + err.Error())
+	}
+
+	examples := make([]model.NotificationTemplateExample, 0, len(raw))
+	for _, r := range raw {
+		payloadJSON, err := json.Marshal(r.Payload)
+		if err != nil {
+			panic("failed to encode example payload as JSON (name=" + r.Name + "): " + err.Error())
+		}
+		examples = append(examples, model.NotificationTemplateExample{
+			Name:      r.Name,
+			IsDefault: r.IsDefault,
+			Payload:   string(payloadJSON),
+		})
+	}
+	return examples
 }
 
 func loadConfig() (*config.Server, error) {

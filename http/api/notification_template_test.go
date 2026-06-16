@@ -43,20 +43,20 @@ import (
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-func buildNotificationTemplateAPI(ctrl *gomock.Controller) (
+// buildNotificationTemplateAPI constructs a test API instance.
+// examples is loaded directly into deps.NotificationTemplateExamples (static slice, no service mock).
+func buildNotificationTemplateAPI(ctrl *gomock.Controller, examples ...model.NotificationTemplateExample) (
 	*NotificationTemplateAPI,
 	*service.MockNotificationTemplateService,
-	*service.MockNotificationTemplateExampleService,
 	*gin.Engine,
 ) {
 	templateSrv := service.NewMockNotificationTemplateService(ctrl)
-	exampleSrv := service.NewMockNotificationTemplateExampleService(ctrl)
 	// No-op loader: return empty org templates so rendered output is template-only.
 	renderingEngine := alerttemplate.NewRenderingEngine(func(int64) (string, error) { return "", nil }, 5*time.Minute)
 	apiDeps := &deps.API{
-		NotificationTemplateSrv:        templateSrv,
-		NotificationTemplateExampleSrv: exampleSrv,
-		RenderingEngine:                renderingEngine,
+		NotificationTemplateSrv:      templateSrv,
+		NotificationTemplateExamples: examples,
+		RenderingEngine:              renderingEngine,
 	}
 	notifAPI := NewNotificationTemplateAPI(apiDeps)
 	r := gin.New()
@@ -69,7 +69,7 @@ func buildNotificationTemplateAPI(ctrl *gomock.Controller) (
 		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	})
-	return notifAPI, templateSrv, exampleSrv, r
+	return notifAPI, templateSrv, r
 }
 
 // ─── NotificationTemplate CRUD ────────────────────────────────────────────────
@@ -78,7 +78,7 @@ func TestNotificationTemplateAPI_CreateNotificationTemplate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notifAPI, templateSrv, _, r := buildNotificationTemplateAPI(ctrl)
+	notifAPI, templateSrv, r := buildNotificationTemplateAPI(ctrl)
 	r.POST("/templates", notifAPI.CreateNotificationTemplate)
 
 	body := encoding.JSONMarshal(&model.NotificationTemplate{Name: "tmpl-1", Template: "hello"})
@@ -137,7 +137,7 @@ func TestNotificationTemplateAPI_UpdateNotificationTemplate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notifAPI, templateSrv, _, r := buildNotificationTemplateAPI(ctrl)
+	notifAPI, templateSrv, r := buildNotificationTemplateAPI(ctrl)
 	r.PUT("/templates", notifAPI.UpdateNotificationTemplate)
 
 	body := encoding.JSONMarshal(&model.NotificationTemplate{UID: "uid-1", Name: "updated"})
@@ -188,7 +188,7 @@ func TestNotificationTemplateAPI_DeleteNotificationTemplateByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notifAPI, templateSrv, _, r := buildNotificationTemplateAPI(ctrl)
+	notifAPI, templateSrv, r := buildNotificationTemplateAPI(ctrl)
 	r.DELETE("/templates/:uid", notifAPI.DeleteNotificationTemplateByUID)
 
 	cases := []struct {
@@ -233,7 +233,7 @@ func TestNotificationTemplateAPI_GetNotificationTemplateByUID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notifAPI, templateSrv, _, r := buildNotificationTemplateAPI(ctrl)
+	notifAPI, templateSrv, r := buildNotificationTemplateAPI(ctrl)
 	r.GET("/templates/:uid", notifAPI.GetNotificationTemplateByUID)
 
 	cases := []struct {
@@ -280,7 +280,7 @@ func TestNotificationTemplateAPI_SearchNotificationTemplates(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notifAPI, templateSrv, _, r := buildNotificationTemplateAPI(ctrl)
+	notifAPI, templateSrv, r := buildNotificationTemplateAPI(ctrl)
 	r.GET("/templates", notifAPI.SearchNotificationTemplates)
 
 	cases := []struct {
@@ -329,14 +329,17 @@ func TestNotificationTemplateAPI_PreviewNotificationTemplate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notifAPI, _, exampleSrv, r := buildNotificationTemplateAPI(ctrl)
-	r.POST("/templates/preview", notifAPI.PreviewNotificationTemplate)
+	// defaultExample is the built-in example used for tests that rely on slice-based default lookup.
+	defaultExample := model.NotificationTemplateExample{
+		IsDefault: true,
+		Payload:   `{"commonLabels":{"alertname":"DBDefaultAlert"}}`,
+	}
 
 	cases := []struct {
-		name    string
-		body    io.Reader
-		prepare func()
-		assert  func(resp *httptest.ResponseRecorder)
+		name     string
+		examples []model.NotificationTemplateExample // contents of deps.NotificationTemplateExamples
+		body     io.Reader
+		assert   func(resp *httptest.ResponseRecorder)
 	}{
 		{
 			name: "cannot bind params",
@@ -346,47 +349,26 @@ func TestNotificationTemplateAPI_PreviewNotificationTemplate(t *testing.T) {
 			},
 		},
 		{
-			// No payload → DB has no default → fallback to hardcoded sample data containing "HighCPUUsage".
+			// No payload + no default in slice → fallback to hardcoded sample containing "HighCPUUsage".
 			name: "fallback to hardcoded sample data",
 			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
 				"template": `{{ .CommonLabels.alertname }}`,
 			})),
-			prepare: func() {
-				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(nil, nil)
-			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
 				assert.Contains(t, resp.Body.String(), "HighCPUUsage")
 			},
 		},
 		{
-			// No payload → DB default example is used for rendering.
-			name: "use DB default example when no payload",
+			// No payload → slice contains a default example → it is used for rendering.
+			name:     "use default example from slice when no payload",
+			examples: []model.NotificationTemplateExample{defaultExample},
 			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
 				"template": `{{ .CommonLabels.alertname }}`,
 			})),
-			prepare: func() {
-				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(
-					&model.NotificationTemplateExample{
-						Payload: `{"commonLabels":{"alertname":"DBDefaultAlert"}}`,
-					}, nil)
-			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
 				assert.Contains(t, resp.Body.String(), "DBDefaultAlert")
-			},
-		},
-		{
-			// No payload → DB query fails → propagate error.
-			name: "DB default fetch error",
-			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
-				"template": `{{ .CommonLabels.alertname }}`,
-			})),
-			prepare: func() {
-				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(nil, fmt.Errorf("db error"))
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
 		},
 		{
@@ -410,14 +392,11 @@ func TestNotificationTemplateAPI_PreviewNotificationTemplate(t *testing.T) {
 			},
 		},
 		{
-			// Syntactically broken template (no payload) → GetDefault called, then render error.
+			// Syntactically broken template + no default in slice → render error.
 			name: "invalid template syntax",
 			body: bytes.NewBuffer(encoding.JSONMarshal(map[string]any{
 				"template": `{{ .Foo`,
 			})),
-			prepare: func() {
-				exampleSrv.EXPECT().GetDefaultNotificationTemplateExample(gomock.Any()).Return(nil, nil)
-			},
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusInternalServerError, resp.Code)
 			},
@@ -426,9 +405,10 @@ func TestNotificationTemplateAPI_PreviewNotificationTemplate(t *testing.T) {
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			if tt.prepare != nil {
-				tt.prepare()
-			}
+			// Each case builds its own API with the specific example slice for that scenario.
+			notifAPI, _, r := buildNotificationTemplateAPI(ctrl, tt.examples...)
+			r.POST("/templates/preview", notifAPI.PreviewNotificationTemplate)
+
 			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/templates/preview", tt.body)
 			req.Header.Set("content-type", "application/json")
 			resp := httptest.NewRecorder()
@@ -438,243 +418,57 @@ func TestNotificationTemplateAPI_PreviewNotificationTemplate(t *testing.T) {
 	}
 }
 
-// ─── NotificationTemplateExample CRUD ─────────────────────────────────────────
-
-func TestNotificationTemplateAPI_CreateNotificationTemplateExample(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	notifAPI, _, exampleSrv, r := buildNotificationTemplateAPI(ctrl)
-	r.POST("/template-examples", notifAPI.CreateNotificationTemplateExample)
-
-	body := encoding.JSONMarshal(&model.NotificationTemplateExample{Name: "ex-1", Payload: `{}`})
-
-	cases := []struct {
-		name    string
-		body    io.Reader
-		prepare func()
-		assert  func(resp *httptest.ResponseRecorder)
-	}{
-		{
-			name: "create failure",
-			body: bytes.NewBuffer(body),
-			prepare: func() {
-				exampleSrv.EXPECT().CreateNotificationTemplateExample(gomock.Any(), gomock.Any()).Return("", fmt.Errorf("err"))
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
-			},
-		},
-		{
-			name: "create successfully",
-			body: bytes.NewBuffer(body),
-			prepare: func() {
-				exampleSrv.EXPECT().CreateNotificationTemplateExample(gomock.Any(), gomock.Any()).Return("ex-uid", nil)
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, resp.Code)
-				assert.Equal(t, `"ex-uid"`, resp.Body.String())
-			},
-		},
-	}
-	for _, tt := range cases {
-		tt := tt
-		t.Run(tt.name, func(_ *testing.T) {
-			if tt.prepare != nil {
-				tt.prepare()
-			}
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPost, "/template-examples", tt.body)
-			req.Header.Set("content-type", "application/json")
-			resp := httptest.NewRecorder()
-			r.ServeHTTP(resp, req)
-			tt.assert(resp)
-		})
-	}
-}
-
-func TestNotificationTemplateAPI_UpdateNotificationTemplateExample(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	notifAPI, _, exampleSrv, r := buildNotificationTemplateAPI(ctrl)
-	r.PUT("/template-examples", notifAPI.UpdateNotificationTemplateExample)
-
-	body := encoding.JSONMarshal(&model.NotificationTemplateExample{UID: "ex-1", Name: "updated"})
-
-	cases := []struct {
-		name    string
-		body    io.Reader
-		prepare func()
-		assert  func(resp *httptest.ResponseRecorder)
-	}{
-		{
-			name: "update failure",
-			body: bytes.NewBuffer(body),
-			prepare: func() {
-				exampleSrv.EXPECT().UpdateNotificationTemplateExample(gomock.Any(), gomock.Any()).Return(fmt.Errorf("err"))
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
-			},
-		},
-		{
-			name: "update successfully",
-			body: bytes.NewBuffer(body),
-			prepare: func() {
-				exampleSrv.EXPECT().UpdateNotificationTemplateExample(gomock.Any(), gomock.Any()).Return(nil)
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, resp.Code)
-			},
-		},
-	}
-	for _, tt := range cases {
-		tt := tt
-		t.Run(tt.name, func(_ *testing.T) {
-			if tt.prepare != nil {
-				tt.prepare()
-			}
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodPut, "/template-examples", tt.body)
-			req.Header.Set("content-type", "application/json")
-			resp := httptest.NewRecorder()
-			r.ServeHTTP(resp, req)
-			tt.assert(resp)
-		})
-	}
-}
-
-func TestNotificationTemplateAPI_DeleteNotificationTemplateExampleByUID(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	notifAPI, _, exampleSrv, r := buildNotificationTemplateAPI(ctrl)
-	r.DELETE("/template-examples/:uid", notifAPI.DeleteNotificationTemplateExampleByUID)
-
-	cases := []struct {
-		name    string
-		prepare func()
-		assert  func(resp *httptest.ResponseRecorder)
-	}{
-		{
-			name: "delete failure",
-			prepare: func() {
-				exampleSrv.EXPECT().DeleteNotificationTemplateExampleByUID(gomock.Any(), "ex-1").Return(fmt.Errorf("err"))
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
-			},
-		},
-		{
-			name: "delete successfully",
-			prepare: func() {
-				exampleSrv.EXPECT().DeleteNotificationTemplateExampleByUID(gomock.Any(), "ex-1").Return(nil)
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, resp.Code)
-			},
-		},
-	}
-	for _, tt := range cases {
-		tt := tt
-		t.Run(tt.name, func(_ *testing.T) {
-			if tt.prepare != nil {
-				tt.prepare()
-			}
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodDelete, "/template-examples/ex-1", http.NoBody)
-			resp := httptest.NewRecorder()
-			r.ServeHTTP(resp, req)
-			tt.assert(resp)
-		})
-	}
-}
-
-func TestNotificationTemplateAPI_GetNotificationTemplateExampleByUID(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	notifAPI, _, exampleSrv, r := buildNotificationTemplateAPI(ctrl)
-	r.GET("/template-examples/:uid", notifAPI.GetNotificationTemplateExampleByUID)
-
-	cases := []struct {
-		name    string
-		prepare func()
-		assert  func(resp *httptest.ResponseRecorder)
-	}{
-		{
-			name: "get failure",
-			prepare: func() {
-				exampleSrv.EXPECT().GetNotificationTemplateExampleByUID(gomock.Any(), "ex-1").Return(nil, fmt.Errorf("err"))
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
-			},
-		},
-		{
-			name: "get successfully",
-			prepare: func() {
-				exampleSrv.EXPECT().GetNotificationTemplateExampleByUID(gomock.Any(), "ex-1").
-					Return(&model.NotificationTemplateExample{Name: "ex-1"}, nil)
-			},
-			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusOK, resp.Code)
-				assert.Contains(t, resp.Body.String(), "ex-1")
-			},
-		},
-	}
-	for _, tt := range cases {
-		tt := tt
-		t.Run(tt.name, func(_ *testing.T) {
-			if tt.prepare != nil {
-				tt.prepare()
-			}
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/template-examples/ex-1", http.NoBody)
-			resp := httptest.NewRecorder()
-			r.ServeHTTP(resp, req)
-			tt.assert(resp)
-		})
-	}
-}
+// ─── NotificationTemplateExample read-only handlers ───────────────────────────
 
 func TestNotificationTemplateAPI_SearchNotificationTemplateExamples(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	notifAPI, _, exampleSrv, r := buildNotificationTemplateAPI(ctrl)
+	examples := []model.NotificationTemplateExample{
+		{Name: "Alpha Example"},
+		{Name: "Beta Example"},
+	}
+
+	notifAPI, _, r := buildNotificationTemplateAPI(ctrl, examples...)
 	r.GET("/template-examples", notifAPI.SearchNotificationTemplateExamples)
 
 	cases := []struct {
-		name    string
-		prepare func()
-		assert  func(resp *httptest.ResponseRecorder)
+		name   string
+		query  string
+		assert func(resp *httptest.ResponseRecorder)
 	}{
 		{
-			name: "search failure",
-			prepare: func() {
-				exampleSrv.EXPECT().SearchNotificationTemplateExamples(gomock.Any(), gomock.Any()).Return(nil, int64(0), fmt.Errorf("err"))
-			},
+			name:  "search all",
+			query: "",
 			assert: func(resp *httptest.ResponseRecorder) {
-				assert.Equal(t, http.StatusInternalServerError, resp.Code)
+				assert.Equal(t, http.StatusOK, resp.Code)
+				assert.Contains(t, resp.Body.String(), `"total":2`)
+				assert.Contains(t, resp.Body.String(), "Alpha Example")
+				assert.Contains(t, resp.Body.String(), "Beta Example")
 			},
 		},
 		{
-			name: "search successfully",
-			prepare: func() {
-				exampleSrv.EXPECT().SearchNotificationTemplateExamples(gomock.Any(), gomock.Any()).
-					Return([]model.NotificationTemplateExample{{Name: "ex-1"}}, int64(1), nil)
-			},
+			name:  "search by name filter",
+			query: "?name=Alpha",
 			assert: func(resp *httptest.ResponseRecorder) {
 				assert.Equal(t, http.StatusOK, resp.Code)
 				assert.Contains(t, resp.Body.String(), `"total":1`)
+				assert.Contains(t, resp.Body.String(), "Alpha Example")
+			},
+		},
+		{
+			name:  "search no match",
+			query: "?name=ZZZ",
+			assert: func(resp *httptest.ResponseRecorder) {
+				assert.Equal(t, http.StatusOK, resp.Code)
+				assert.Contains(t, resp.Body.String(), `"total":0`)
 			},
 		},
 	}
 	for _, tt := range cases {
 		tt := tt
 		t.Run(tt.name, func(_ *testing.T) {
-			if tt.prepare != nil {
-				tt.prepare()
-			}
-			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/template-examples", http.NoBody)
+			req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, "/template-examples"+tt.query, http.NoBody)
 			resp := httptest.NewRecorder()
 			r.ServeHTTP(resp, req)
 			tt.assert(resp)

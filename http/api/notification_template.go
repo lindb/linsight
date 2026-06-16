@@ -142,13 +142,16 @@ func (api *NotificationTemplateAPI) PreviewNotificationTemplate(c *gin.Context) 
 	} else {
 		// Try the org's designated default example first so users get a meaningful preview
 		// without having to manually construct a payload.
-		ex, err := api.deps.NotificationTemplateExampleSrv.GetDefaultNotificationTemplateExample(c.Request.Context())
-		if err != nil {
-			httppkg.Error(c, err)
-			return
+		var defaultEx *model.NotificationTemplateExample
+		for i := range api.deps.NotificationTemplateExamples {
+			if api.deps.NotificationTemplateExamples[i].IsDefault {
+				defaultEx = &api.deps.NotificationTemplateExamples[i]
+				break
+			}
 		}
-		if ex != nil && ex.Payload != "" {
-			data, err = template.BuildNotificationDataFromPayload(ex.Payload)
+		if defaultEx != nil && defaultEx.Payload != "" {
+			var err error
+			data, err = template.BuildNotificationDataFromPayload(defaultEx.Payload)
 			if err != nil {
 				httppkg.Error(c, err)
 				return
@@ -245,70 +248,25 @@ func (api *NotificationTemplateAPI) GetTemplateDefinitions(c *gin.Context) {
 
 // ---- NotificationTemplateExample handlers ----
 
-// CreateNotificationTemplateExample creates a new template example.
-func (api *NotificationTemplateAPI) CreateNotificationTemplateExample(c *gin.Context) {
-	ex := &model.NotificationTemplateExample{}
-	if err := c.ShouldBind(ex); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	uid, err := api.deps.NotificationTemplateExampleSrv.CreateNotificationTemplateExample(c.Request.Context(), ex)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, uid)
-}
-
-// UpdateNotificationTemplateExample updates an existing template example.
-func (api *NotificationTemplateAPI) UpdateNotificationTemplateExample(c *gin.Context) {
-	ex := &model.NotificationTemplateExample{}
-	if err := c.ShouldBind(ex); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	if err := api.deps.NotificationTemplateExampleSrv.UpdateNotificationTemplateExample(c.Request.Context(), ex); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, "Notification template example updated")
-}
-
-// DeleteNotificationTemplateExampleByUID removes a template example.
-func (api *NotificationTemplateAPI) DeleteNotificationTemplateExampleByUID(c *gin.Context) {
-	uid := c.Param(constant.UID)
-	if err := api.deps.NotificationTemplateExampleSrv.DeleteNotificationTemplateExampleByUID(c.Request.Context(), uid); err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, "Notification template example deleted")
-}
-
-// GetNotificationTemplateExampleByUID returns a template example by UID.
-func (api *NotificationTemplateAPI) GetNotificationTemplateExampleByUID(c *gin.Context) {
-	uid := c.Param(constant.UID)
-	ex, err := api.deps.NotificationTemplateExampleSrv.GetNotificationTemplateExampleByUID(c.Request.Context(), uid)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
-	}
-	httppkg.OK(c, ex)
-}
-
-// SearchNotificationTemplateExamples queries template examples with optional filters.
+// SearchNotificationTemplateExamples returns all built-in template examples, with optional name filter.
 func (api *NotificationTemplateAPI) SearchNotificationTemplateExamples(c *gin.Context) {
 	req := &model.SearchNotificationTemplateExampleRequest{}
 	if err := c.ShouldBind(req); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	examples, total, err := api.deps.NotificationTemplateExampleSrv.SearchNotificationTemplateExamples(c.Request.Context(), req)
-	if err != nil {
-		httppkg.Error(c, err)
-		return
+
+	var matched []model.NotificationTemplateExample
+	for _, ex := range api.deps.NotificationTemplateExamples {
+		if req.Name == "" || strings.Contains(ex.Name, req.Name) {
+			matched = append(matched, ex)
+		}
+	}
+	if matched == nil {
+		matched = []model.NotificationTemplateExample{}
 	}
 	httppkg.OK(c, gin.H{
-		"total":    total,
-		"examples": examples,
+		"total":    len(matched),
+		"examples": matched,
 	})
 }

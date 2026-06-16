@@ -245,16 +245,12 @@ type NotificationTemplate struct {
 	Template string `json:"template" gorm:"column:template;type:text"`
 }
 
-// NotificationTemplateExample stores a reusable sample alert payload used to preview or test notification templates.
-// The Payload field holds a JSON-serialised NotificationData value.
+// NotificationTemplateExample is a static, platform-wide sample alert payload for
+// notification template preview. Loaded from YAML at startup; not persisted to DB.
 type NotificationTemplateExample struct {
-	BaseModel
-
-	OrgID     int64  `json:"-" gorm:"column:org_id"`
-	UID       string `json:"uid" gorm:"column:uid;index:u_idx_notif_tmpl_example_uid,unique"`
-	Name      string `json:"name" gorm:"column:name"`
-	IsDefault bool   `json:"isDefault" gorm:"column:is_default;default:false"` // marks the org-wide default preview payload (at most one per org)
-	Payload   string `json:"payload" gorm:"column:payload;type:text"`          // JSON of template.NotificationData
+	Name      string `json:"name"`
+	IsDefault bool   `json:"isDefault"` // marks the built-in default preview payload
+	Payload   string `json:"payload"`   // JSON of template.NotificationData; populated from YAML at startup
 }
 
 // SearchAlertEventRequest holds parameters for querying alert events.

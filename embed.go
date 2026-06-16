@@ -38,3 +38,6 @@ var Menus string
 
 //go:embed config/integrations.json
 var Integrationss string
+
+//go:embed config/notification_template_examples.yaml
+var NotificationTemplateExamplesYAML string
