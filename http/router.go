@@ -300,6 +300,8 @@ func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRouteAPI.GetAlertRouteTree)...)
 	router.GET("/alerting/routes/search",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRouteAPI.SearchAlertRoutes)...)
+	router.PUT("/alerting/routes/sort",
+		middleware.Authorize(r.deps, accesscontrol.EditorAccessResource, accesscontrol.Write, r.alertRouteAPI.SortAlertRoutes)...)
 	router.GET("/alerting/routes/:uid",
 		middleware.Authorize(r.deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, r.alertRouteAPI.GetAlertRouteByUID)...)
 	router.POST("/alerting/routes",

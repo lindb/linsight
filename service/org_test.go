@@ -125,7 +125,8 @@ func TestOrgService_CreateOrg(t *testing.T) {
 		{
 			name: "create org successfully",
 			prepare: func() {
-				mockDB.EXPECT().Create(gomock.Any()).Return(nil)
+				// First Create: the org record; second Create: the root alert route.
+				mockDB.EXPECT().Create(gomock.Any()).Return(nil).Times(2)
 			},
 			wantErr: false,
 		},

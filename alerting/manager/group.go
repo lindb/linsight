@@ -26,12 +26,6 @@ import (
 	"github.com/lindb/linsight/model"
 )
 
-const (
-	defaultGroupWait      = 30 * time.Second
-	defaultGroupInterval  = 5 * time.Minute
-	defaultRepeatInterval = 4 * time.Hour
-)
-
 // alertGroup holds a set of alerts that share the same routing label values.
 // It schedules notifications according to GroupWait / GroupInterval / RepeatInterval.
 type alertGroup struct {
@@ -174,19 +168,19 @@ func (g *alertGroup) groupWait() time.Duration {
 	if g.route.GroupWait > 0 {
 		return g.route.GroupWait
 	}
-	return defaultGroupWait
+	return model.DefaultPolicyGroupWait
 }
 
 func (g *alertGroup) groupInterval() time.Duration {
 	if g.route.GroupInterval > 0 {
 		return g.route.GroupInterval
 	}
-	return defaultGroupInterval
+	return model.DefaultPolicyGroupInterval
 }
 
 func (g *alertGroup) repeatInterval() time.Duration {
 	if g.route.RepeatInterval > 0 {
 		return g.route.RepeatInterval
 	}
-	return defaultRepeatInterval
+	return model.DefaultPolicyRepeatInterval
 }

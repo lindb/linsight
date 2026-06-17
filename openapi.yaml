@@ -1747,7 +1747,7 @@ paths:
     get:
       tags: [AlertRoutes]
       summary: Get alert route tree (Viewer)
-      description: Returns the nested routing tree for the current organization. The tree root has isDefault=true. Returns null when no default route has been created yet. Requires Viewer role.
+      description: Returns the nested routing tree for the current organization. The tree root has parentUID="". Returns null when no root route has been created yet. Requires Viewer role.
       responses:
         '200':
           description: Alert routing tree root node (null when no default route exists)
@@ -1760,13 +1760,16 @@ paths:
     post:
       tags: [AlertRoutes]
       summary: Create alert route (Editor)
-      description: Create a new route node. Requires Editor role.
+      description: >
+        Create a new route node. When `refUID` and `position` are provided,
+        the new node is inserted as a sibling before or after the referenced
+        node; otherwise it is appended with default sort_order. Requires Editor role.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AlertRoute'
+              $ref: '#/components/schemas/CreateAlertRouteRequest'
       responses:
         '200':
           description: Alert route created – returns new UID
@@ -1823,6 +1826,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AlertRouteListResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/alerting/routes/sort:
+    put:
+      tags: [AlertRoutes]
+      summary: Sort sibling alert routes (Editor)
+      description: >
+        Reorder sibling route nodes by assigning sequential sort_order values.
+        The request body is the ordered array of routes; their position in the
+        array determines the final sort_order (0-based). The caller must ensure
+        all routes in the array share the same parent. Requires Editor role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/AlertRoute'
+      responses:
+        '200':
+          description: Alert routes sorted
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -3362,12 +3390,9 @@ components:
               type: string
             name:
               type: string
-            isDefault:
-              type: boolean
-              description: Marks the root/catch-all policy for this org (at most one per org)
             parentUID:
               type: string
-              description: UID of the parent route node; empty for root routes
+              description: UID of the parent route node; empty string identifies the root route, which is auto-created when the org is initialized and cannot be created via API
             matchers:
               type: array
               items:
@@ -3405,7 +3430,7 @@ components:
         - $ref: '#/components/schemas/AlertRoute'
         - type: object
           properties:
-            children:
+            routes:
               type: array
               description: Ordered child route nodes; evaluated in sort_order after the parent matches
               items:
@@ -3421,6 +3446,19 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AlertRoute'
+
+    CreateAlertRouteRequest:
+      allOf:
+        - $ref: '#/components/schemas/AlertRoute'
+        - type: object
+          properties:
+            refUID:
+              type: string
+              description: UID of the sibling reference node; when set, the new route is inserted relative to this node.
+            position:
+              type: string
+              enum: [before, after]
+              description: Insertion position relative to refUID. "before" inserts at refUID's sort_order; "after" inserts one position later. Ignored when refUID is empty.
 
     # ── Contact Point ─────────────────────────────────────────────────────────────
     NotificationChannel:

@@ -19,8 +19,6 @@ package manager
 
 import (
 	"context"
-	"encoding/json"
-	"regexp"
 	"sync"
 	"time"
 
@@ -96,44 +94,17 @@ func (m *alertManager) ProcessEvents(orgID int64, events []*model.AlertEvent) {
 		}
 	}
 
-	silences, inhibits, routeTree := m.getOrgConfig(orgID)
+	silences, inhibits, root := m.getOrgConfig(orgID)
 
-	for _, ev := range events {
-		// check silence
-		if m.isSilenced(ev, silences, now) {
-			continue
-		}
+	// fetch DB-persisted firing events so InhibitStage can detect cross-batch source alerts
+	dbFiring, _ := m.deps.AlertEventSrv.GetFiringEventsByOrg(orgID)
 
-		// check inhibition
-		if m.isInhibited(ev, inhibits, events) {
-			continue
-		}
-
-		// route to receiver(s)
-		matched := m.traverseRouteTree(ev, routeTree)
-		if len(matched) == 0 {
-			m.logger.Info("no route matched",
-				logger.String("fingerprint", ev.Fingerprint),
-				logger.String("rule", ev.RuleUID))
-		}
-		for _, route := range matched {
-			m.logger.Info("alert event routed",
-				logger.String("fingerprint", ev.Fingerprint),
-				logger.String("rule", ev.RuleUID),
-				logger.String("routeUID", route.UID),
-				logger.String("contactPointUID", route.ContactPointUID))
-			groupKey := m.buildGroupKey(orgID, route, ev)
-			m.groupMu.Lock()
-			grp, ok := m.groups[groupKey]
-			if !ok {
-				grp = newAlertGroup(orgID, groupKey, route, m.deps)
-				m.groups[groupKey] = grp
-			}
-			m.groupMu.Unlock()
-
-			grp.addEvent(ev, now)
-		}
+	pipeline := Pipeline{
+		&SilenceStage{silences: silences, now: now, logger: m.logger},
+		&InhibitStage{inhibits: inhibits, allFiring: mergeFiring(dbFiring, events), logger: m.logger},
+		&RouteStage{root: root, mgr: m, logger: m.logger},
 	}
+	pipeline.Run(&stageCtx{orgID: orgID, now: now, deps: m.deps}, events)
 }
 
 func (m *alertManager) ReloadConfig(orgID int64) {
@@ -168,220 +139,6 @@ func (m *alertManager) getOrgConfig(orgID int64) ([]*model.AlertSilence, []*mode
 	m.cfgMu.RLock()
 	defer m.cfgMu.RUnlock()
 	return m.orgSilences[orgID], m.orgInhibits[orgID], m.orgRoutes[orgID]
-}
-
-// isSilenced returns true if the alert event matches any active silence.
-func (m *alertManager) isSilenced(ev *model.AlertEvent, silences []*model.AlertSilence, now int64) bool {
-	labels := parseEventLabels(ev)
-	for _, s := range silences {
-		if s.StartsAt > now || s.EndsAt <= now {
-			continue
-		}
-		matchers, err := s.ToMatchers()
-		if err != nil {
-			continue
-		}
-		if matchAll(labels, matchers) {
-			m.logger.Info("alert event silenced",
-				logger.String("fingerprint", ev.Fingerprint),
-				logger.String("rule", ev.RuleUID),
-				logger.String("silenceUID", s.UID))
-			return true
-		}
-	}
-	return false
-}
-
-// isInhibited returns true if any enabled inhibit rule suppresses this event.
-func (m *alertManager) isInhibited(ev *model.AlertEvent, inhibits []*model.AlertInhibitRule, allEvents []*model.AlertEvent) bool {
-	targetLabels := parseEventLabels(ev)
-
-	for _, rule := range inhibits {
-		targetMatchers, err := rule.ToTargetMatchers()
-		if err != nil {
-			continue
-		}
-		// check if this event is a target
-		if !matchAll(targetLabels, targetMatchers) {
-			continue
-		}
-
-		equalLabels, err := rule.ToEqualLabels()
-		if err != nil {
-			continue
-		}
-		sourceMatchers, err := rule.ToSourceMatchers()
-		if err != nil {
-			continue
-		}
-
-		// look for a firing source alert that satisfies the source matchers and equal-labels
-		for _, src := range allEvents {
-			if src.Fingerprint == ev.Fingerprint {
-				continue
-			}
-			if src.State != model.AlertEventFiring {
-				continue
-			}
-			srcLabels := parseEventLabels(src)
-			if !matchAll(srcLabels, sourceMatchers) {
-				continue
-			}
-			// check equal labels
-			inhibit := true
-			for _, lbl := range equalLabels {
-				if srcLabels[lbl] != targetLabels[lbl] {
-					inhibit = false
-					break
-				}
-			}
-			if inhibit {
-				m.logger.Info("alert event inhibited",
-					logger.String("fingerprint", ev.Fingerprint),
-					logger.String("rule", ev.RuleUID),
-					logger.String("inhibitRuleUID", rule.UID))
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// traverseRouteTree applies the Alertmanager-style tree-traversal algorithm to find all
-// routes that should receive notifications for the given event.
-//
-// Traversal rules (mirrors Grafana / Alertmanager behaviour):
-//   - The root node (IsDefault=true) is entered unconditionally.
-//   - Child nodes are checked against the event's label matchers in sort_order.
-//   - If continue=false on a matched child, sibling evaluation stops after that child.
-//   - When no child matches, the current node itself becomes the fallback receiver.
-//   - Zero-value GroupWait/GroupInterval/RepeatInterval/GroupBy on a leaf are filled from ancestors.
-func (m *alertManager) traverseRouteTree(ev *model.AlertEvent, root *model.AlertRouteNode) []*model.AlertRoute {
-	if root == nil {
-		return nil
-	}
-	labels := parseEventLabels(ev)
-	return traverseNode(root, labels, nil)
-}
-
-// traverseNode is the recursive core of traverseRouteTree.
-// ancestors holds the route chain from root to the current node's parent (used for inheritance).
-func traverseNode(node *model.AlertRouteNode, labels map[string]string, ancestors []*model.AlertRoute) []*model.AlertRoute {
-	// Non-root nodes must match the event labels; root (IsDefault) always passes.
-	if !node.IsDefault {
-		matchers, err := node.ToMatchers()
-		if err != nil || !matchAll(labels, matchers) {
-			return nil
-		}
-	}
-
-	newAncestors := append(ancestors, &node.AlertRoute) //nolint:gocritic // intentional accumulation per call stack frame
-
-	// Evaluate children in sort order
-	var result []*model.AlertRoute
-	childMatched := false
-	for _, child := range node.Children {
-		childResults := traverseNode(child, labels, newAncestors)
-		if len(childResults) > 0 {
-			result = append(result, childResults...)
-			childMatched = true
-			if !child.Continue {
-				// Stop checking siblings once the first non-continue match is found
-				break
-			}
-		}
-	}
-
-	// When no child matched, the current node is the fallback/leaf receiver.
-	// Inherit zero-value timing fields from ancestors so every dispatched route
-	// has meaningful GroupWait / GroupInterval / RepeatInterval / GroupBy values.
-	if !childMatched {
-		resolved := resolveInheritance(&node.AlertRoute, ancestors)
-		result = append(result, resolved)
-	}
-	return result
-}
-
-// resolveInheritance returns a copy of route with zero-value fields filled from the nearest
-// ancestor that defines them (walking from closest parent toward root).
-func resolveInheritance(route *model.AlertRoute, ancestors []*model.AlertRoute) *model.AlertRoute {
-	resolved := *route
-	for i := len(ancestors) - 1; i >= 0; i-- {
-		p := ancestors[i]
-		if resolved.GroupWait == 0 {
-			resolved.GroupWait = p.GroupWait
-		}
-		if resolved.GroupInterval == 0 {
-			resolved.GroupInterval = p.GroupInterval
-		}
-		if resolved.RepeatInterval == 0 {
-			resolved.RepeatInterval = p.RepeatInterval
-		}
-		if len(resolved.GroupBy) == 0 {
-			resolved.GroupBy = p.GroupBy
-		}
-	}
-	return &resolved
-}
-
-// buildGroupKey constructs the unique key for an alert group.
-func (m *alertManager) buildGroupKey(orgID int64, route *model.AlertRoute, ev *model.AlertEvent) string {
-	labels := parseEventLabels(ev)
-	groupBy, _ := route.ToGroupBy()
-	groupValues := make([]byte, 0, 64)
-	for _, k := range groupBy {
-		groupValues = append(groupValues, k+"="+labels[k]+";"...)
-	}
-	return string(groupValues) + ":" + route.UID
-}
-
-// matchAll returns true when every matcher in the list matches the label set.
-func matchAll(labels map[string]string, matchers []model.LabelMatcher) bool {
-	for _, m := range matchers {
-		val := labels[m.Name]
-		switch m.Type {
-		case model.MatchEqual:
-			if val != m.Value {
-				return false
-			}
-		case model.MatchNotEqual:
-			if val == m.Value {
-				return false
-			}
-		case model.MatchRegexp:
-			ok, _ := regexp.MatchString("^(?:"+m.Value+")$", val)
-			if !ok {
-				return false
-			}
-		case model.MatchNotRegexp:
-			ok, _ := regexp.MatchString("^(?:"+m.Value+")$", val)
-			if ok {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// parseEventLabels decodes the JSON labels of an AlertEvent into a map.
-func parseEventLabels(ev *model.AlertEvent) map[string]string {
-	if len(ev.Labels) == 0 {
-		return nil
-	}
-	result := make(map[string]string)
-	_ = json.Unmarshal(ev.Labels, &result)
-	return result
-}
-
-// extractMatchers decodes a datatypes.JSON field into a []LabelMatcher slice.
-func extractMatchers(raw interface{ MarshalJSON() ([]byte, error) }) []model.LabelMatcher {
-	data, err := raw.MarshalJSON()
-	if err != nil {
-		return nil
-	}
-	var ms []model.LabelMatcher
-	_ = json.Unmarshal(data, &ms)
-	return ms
 }
 
 // StartRepeatTicker runs a 1-minute background loop that calls MaybeRepeat on every alert group.

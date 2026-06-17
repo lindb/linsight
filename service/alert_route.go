@@ -23,6 +23,8 @@ import (
 	"sort"
 	"strings"
 
+	"gorm.io/gorm"
+
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
@@ -37,8 +39,9 @@ type AlertRouteService interface {
 	// GetAlertRouteTreeByOrg returns the routing tree root for the given org.
 	// This variant is used by the alert engine which has no signed-in user context.
 	GetAlertRouteTreeByOrg(orgID int64) (*model.AlertRouteNode, error)
-	// CreateAlertRoute creates a route node.
-	CreateAlertRoute(ctx context.Context, route *model.AlertRoute) (string, error)
+	// CreateAlertRoute creates a route node. When req.RefUID is set, the new node
+	// is inserted as a sibling before or after the referenced node.
+	CreateAlertRoute(ctx context.Context, req *model.CreateAlertRouteRequest) (string, error)
 	// UpdateAlertRoute updates a route node.
 	UpdateAlertRoute(ctx context.Context, route *model.AlertRoute) error
 	// DeleteAlertRouteByUID removes a route node and — for non-default nodes —
@@ -48,6 +51,8 @@ type AlertRouteService interface {
 	GetAlertRouteByUID(ctx context.Context, uid string) (*model.AlertRoute, error)
 	// SearchAlertRoutes searches routes by name.
 	SearchAlertRoutes(ctx context.Context, req *model.SearchAlertRouteRequest) (rs []model.AlertRoute, total int64, err error)
+	// SortAlertRoutes reorders sibling routes by assigning sequential sort_order values.
+	SortAlertRoutes(ctx context.Context, routes []model.AlertRoute) error
 }
 
 type alertRouteService struct {
@@ -72,19 +77,15 @@ func (srv *alertRouteService) GetAlertRouteTreeByOrg(orgID int64) (*model.AlertR
 	return buildRouteTree(routes), nil
 }
 
-func (srv *alertRouteService) CreateAlertRoute(ctx context.Context, route *model.AlertRoute) (string, error) {
+func (srv *alertRouteService) CreateAlertRoute(ctx context.Context, req *model.CreateAlertRouteRequest) (string, error) {
 	user := util.GetUser(ctx)
 	orgID := user.Org.ID
+	route := &req.AlertRoute
 
-	// Enforce at-most-one default route per org
-	if route.IsDefault {
-		count, err := srv.db.Count(&model.AlertRoute{}, "org_id=? and is_default=?", orgID, true)
-		if err != nil {
-			return "", err
-		}
-		if count > 0 {
-			return "", fmt.Errorf("org already has a default (root) alert route; only one is allowed")
-		}
+	// Root route (ParentUID="") is created automatically when an org is initialized.
+	// Callers must always specify a parent; creating a root route via API is not allowed.
+	if route.ParentUID == "" {
+		return "", fmt.Errorf("parentUID is required; the root route is created automatically when the org is initialized")
 	}
 
 	// Validate that the referenced contact point exists
@@ -99,21 +100,52 @@ func (srv *alertRouteService) CreateAlertRoute(ctx context.Context, route *model
 	}
 
 	// Validate that the referenced parent route exists
-	if route.ParentUID != "" {
-		exists, err := srv.db.Exist(&model.AlertRoute{}, "org_id=? and uid=?", orgID, route.ParentUID)
-		if err != nil {
-			return "", err
-		}
-		if !exists {
-			return "", fmt.Errorf("parent route %q not found", route.ParentUID)
-		}
+	exists, err := srv.db.Exist(&model.AlertRoute{}, "org_id=? and uid=?", orgID, route.ParentUID)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", fmt.Errorf("parent route %q not found", route.ParentUID)
 	}
 
 	route.UID = uuid.GenerateShortUUID()
 	route.OrgID = orgID
 	route.CreatedBy = user.User.ID
 	route.UpdatedBy = user.User.ID
-	if err := srv.db.Create(route); err != nil {
+
+	if req.RefUID == "" {
+		// Simple create: no sibling positioning requested.
+		if err := srv.db.Create(route); err != nil {
+			return "", err
+		}
+		return route.UID, nil
+	}
+
+	// Sibling insertion: resolve the reference node inside the transaction to get
+	// a consistent snapshot, validate it is a true sibling, then shift existing
+	// siblings to make room and insert — all atomically.
+	if err := srv.db.Transaction(func(tx dbpkg.DB) error {
+		var refRoute model.AlertRoute
+		if err := tx.Get(&refRoute, "uid=? and org_id=?", req.RefUID, orgID); err != nil {
+			return fmt.Errorf("reference route %q not found", req.RefUID)
+		}
+		if refRoute.ParentUID != route.ParentUID {
+			return fmt.Errorf("reference route %q is not a sibling: expected parentUID %q, got %q",
+				req.RefUID, route.ParentUID, refRoute.ParentUID)
+		}
+		targetOrder := refRoute.SortOrder
+		if req.Position == "after" {
+			targetOrder = refRoute.SortOrder + 1
+		}
+		route.SortOrder = targetOrder
+		// Shift siblings at or after the target position to create a gap.
+		if err := tx.RawDB().Model(&model.AlertRoute{}).
+			Where("org_id=? and parent_uid=? and sort_order>=?", orgID, route.ParentUID, targetOrder).
+			UpdateColumn("sort_order", gorm.Expr("sort_order + 1")).Error; err != nil {
+			return err
+		}
+		return tx.Create(route)
+	}); err != nil {
 		return "", err
 	}
 	return route.UID, nil
@@ -127,15 +159,9 @@ func (srv *alertRouteService) UpdateAlertRoute(ctx context.Context, route *model
 	user := util.GetUser(ctx)
 	orgID := user.Org.ID
 
-	// If caller is promoting this route to default, ensure no other default exists
-	if route.IsDefault && !fromDB.IsDefault {
-		count, err := srv.db.Count(&model.AlertRoute{}, "org_id=? and is_default=?", orgID, true)
-		if err != nil {
-			return err
-		}
-		if count > 0 {
-			return fmt.Errorf("org already has a default (root) alert route; only one is allowed")
-		}
+	// If caller tries to re-parent the root (ParentUID=""), reject it to preserve the tree invariant.
+	if fromDB.ParentUID == "" && route.ParentUID != "" {
+		return fmt.Errorf("cannot re-parent the root route")
 	}
 
 	// Validate that the referenced contact point exists
@@ -164,7 +190,6 @@ func (srv *alertRouteService) UpdateAlertRoute(ctx context.Context, route *model
 	}
 
 	fromDB.Name = route.Name
-	fromDB.IsDefault = route.IsDefault
 	fromDB.ParentUID = route.ParentUID
 	fromDB.Matchers = route.Matchers
 	fromDB.ContactPointUID = route.ContactPointUID
@@ -187,20 +212,20 @@ func (srv *alertRouteService) DeleteAlertRouteByUID(ctx context.Context, uid str
 		return err
 	}
 
-	if route.IsDefault {
+	if route.ParentUID == "" {
 		// Refuse to delete the root route while it still has child nodes to prevent
-		// accidentally orphaning the entire policy tree (mirrors Grafana behaviour).
+		// accidentally orphaning the entire policy tree.
 		count, err := srv.db.Count(&model.AlertRoute{}, "org_id=? and parent_uid=?", orgID, uid)
 		if err != nil {
 			return err
 		}
 		if count > 0 {
-			return fmt.Errorf("cannot delete the default (root) route while it has %d child node(s); delete children first", count)
+			return fmt.Errorf("cannot delete the root route while it has %d child node(s); delete children first", count)
 		}
 		return srv.db.Delete(&model.AlertRoute{}, "uid=? and org_id=?", uid, orgID)
 	}
 
-	// For non-default routes, BFS-collect the entire subtree, then delete all in one transaction.
+	// For non-root routes, BFS-collect the entire subtree, then delete all in one transaction.
 	toDelete := []string{uid}
 	queue := []string{uid}
 	for len(queue) > 0 {
@@ -282,11 +307,11 @@ func buildRouteTree(routes []*model.AlertRoute) *model.AlertRouteNode {
 		return nil
 	}
 
-	// Index children by parent UID
+	// Index children by parent UID; root is identified by empty ParentUID.
 	childrenMap := make(map[string][]*model.AlertRoute, len(routes))
 	var root *model.AlertRoute
 	for _, r := range routes {
-		if r.IsDefault {
+		if r.ParentUID == "" {
 			root = r
 		} else {
 			childrenMap[r.ParentUID] = append(childrenMap[r.ParentUID], r)
@@ -314,7 +339,22 @@ func buildRouteTree(routes []*model.AlertRoute) *model.AlertRouteNode {
 func buildNode(route *model.AlertRoute, childrenMap map[string][]*model.AlertRoute) *model.AlertRouteNode {
 	node := &model.AlertRouteNode{AlertRoute: *route}
 	for _, child := range childrenMap[route.UID] {
-		node.Children = append(node.Children, buildNode(child, childrenMap))
+		node.Routes = append(node.Routes, buildNode(child, childrenMap))
 	}
 	return node
+}
+
+func (srv *alertRouteService) SortAlertRoutes(ctx context.Context, routes []model.AlertRoute) error {
+	user := util.GetUser(ctx)
+	return srv.db.Transaction(func(tx dbpkg.DB) error {
+		for i, route := range routes {
+			if err := tx.Updates(&model.AlertRoute{}, map[string]any{
+				"sort_order": i,
+				"updated_by": user.User.ID,
+			}, "uid=? and org_id=?", route.UID, user.Org.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

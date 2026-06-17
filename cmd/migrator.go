@@ -154,5 +154,61 @@ func runMigration(_ *cobra.Command, _ []string) error {
 			log.Warn("failed to drop notification_template_examples table", logger.Error(err))
 		}
 	}
+
+	// Promote the oldest root-candidate route to is_default=true for each org that has
+	// routes but no default root, recovering deployments that contain orphan routes.
+	if rawDB.Migrator().HasTable("alert_routes") {
+		if err = rawDB.Exec(`
+			UPDATE alert_routes SET is_default = 1
+			WHERE (parent_uid = '' OR parent_uid IS NULL)
+			  AND org_id NOT IN (
+			      SELECT DISTINCT org_id FROM alert_routes WHERE is_default = 1
+			  )
+			  AND id IN (
+			      SELECT MIN(id) FROM alert_routes
+			      WHERE (parent_uid = '' OR parent_uid IS NULL)
+			      GROUP BY org_id
+			  )`).Error; err != nil {
+			log.Warn("failed to promote default alert route for orgs with no default", logger.Error(err))
+		}
+	}
+
+	// Re-parent orphan routes (parent_uid="" but is_default=0) to the org's designated root.
+	// These arose from the old bug where CreateAlertRoute allowed ParentUID="" without IsDefault.
+	// The promotion block above ensures each org has exactly one is_default=1 route.
+	if rawDB.Migrator().HasTable("alert_routes") && rawDB.Migrator().HasColumn("alert_routes", "is_default") {
+		if err = rawDB.Exec(`
+			UPDATE alert_routes SET parent_uid = (
+			    SELECT uid FROM (
+			        SELECT uid, org_id FROM alert_routes WHERE is_default = 1
+			    ) roots WHERE roots.org_id = alert_routes.org_id
+			)
+			WHERE is_default = 0
+			  AND (parent_uid = '' OR parent_uid IS NULL)`).Error; err != nil {
+			log.Warn("failed to re-parent orphan alert routes", logger.Error(err))
+		}
+
+		// Drop the now-redundant is_default column; ParentUID="" is the sole root marker.
+		// SQLite 3.35+ supports DROP COLUMN; older versions will log a warning but continue.
+		if err = rawDB.Exec("ALTER TABLE alert_routes DROP COLUMN `is_default`").Error; err != nil {
+			log.Warn("failed to drop is_default column from alert_routes", logger.Error(err))
+		}
+	}
+
+	// Seed root alert route for admin org (org_id=1) on fresh deployments.
+	// Existing deployments already have a root (parent_uid='') from the migrations above.
+	// Direct DB calls are used instead of AddInitRecord to avoid overwriting an existing root route's UID
+	// (which would break child routes that reference it).
+	if rawDB.Migrator().HasTable("alert_routes") {
+		exists, existErr := db.Exist(&model.AlertRoute{}, "org_id=? and (parent_uid='' or parent_uid is null)", int64(1))
+		if existErr != nil {
+			log.Warn("failed to check root alert route for admin org", logger.Error(existErr))
+		} else if !exists {
+			rootRoute := model.NewDefaultPolicyRoute(1, uuid.GenerateShortUUID(), 1)
+			if err = db.Create(rootRoute); err != nil {
+				log.Warn("failed to create root alert route for admin org", logger.Error(err))
+			}
+		}
+	}
 	return nil
 }

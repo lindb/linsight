@@ -30,10 +30,10 @@ type AlertEventState int
 
 const (
 	AlertEventPending  AlertEventState = iota + 1 // condition is true but not yet firing (waiting for 'for' duration)
-	AlertEventFiring                               // condition has been true long enough; alert is active
-	AlertEventResolved                             // condition is no longer true; alert has ended
-	AlertEventNoData                               // query returned no data
-	AlertEventError                                // query or evaluation encountered an error
+	AlertEventFiring                              // condition has been true long enough; alert is active
+	AlertEventResolved                            // condition is no longer true; alert has ended
+	AlertEventNoData                              // query returned no data
+	AlertEventError                               // query or evaluation encountered an error
 )
 
 // MatchType represents the operator used in a label matcher.
@@ -81,8 +81,7 @@ type AlertRoute struct {
 	OrgID           int64          `json:"-" gorm:"column:org_id"`
 	UID             string         `json:"uid" gorm:"column:uid;index:u_idx_alert_route_uid,unique"`
 	Name            string         `json:"name" gorm:"column:name"`
-	IsDefault       bool           `json:"isDefault" gorm:"column:is_default;default:false"` // marks the root/catch-all policy (at most one per org)
-	ParentUID       string         `json:"parentUID" gorm:"column:parent_uid"`
+	ParentUID       string         `json:"parentUID" gorm:"column:parent_uid"` // empty string identifies the root route (auto-created, not settable via API)
 	Matchers        datatypes.JSON `json:"matchers,omitempty" gorm:"column:matchers"`
 	ContactPointUID string         `json:"contactPointUID" gorm:"column:contact_point_uid"` // renamed from receiver_uid
 	Continue        bool           `json:"continue" gorm:"column:continue_match"`
@@ -93,12 +92,48 @@ type AlertRoute struct {
 	SortOrder       int            `json:"sortOrder" gorm:"column:sort_order"`
 }
 
+// Default values for the root alert route that is automatically created per org.
+const (
+	DefaultPolicyName           = "Default policy"
+	DefaultPolicyGroupWait      = 30 * time.Second
+	DefaultPolicyGroupInterval  = 5 * time.Minute
+	DefaultPolicyRepeatInterval = 4 * time.Hour
+)
+
+// NewDefaultPolicyRoute returns a root AlertRoute pre-populated with the org's
+// default notification policy. uid must be a pre-generated short UUID; createdBy
+// is the user ID to record as the creator.
+func NewDefaultPolicyRoute(orgID int64, uid string, createdBy int64) *AlertRoute {
+	r := &AlertRoute{
+		OrgID:          orgID,
+		UID:            uid,
+		Name:           DefaultPolicyName,
+		ParentUID:      "",
+		GroupBy:        datatypes.JSON(`["alertname"]`),
+		GroupWait:      DefaultPolicyGroupWait,
+		GroupInterval:  DefaultPolicyGroupInterval,
+		RepeatInterval: DefaultPolicyRepeatInterval,
+	}
+	r.CreatedBy = createdBy
+	r.UpdatedBy = createdBy
+	return r
+}
+
 // AlertRouteNode is a response value object that wraps AlertRoute with its
 // children, enabling the service to return a true nested tree structure
 // instead of the flat DB representation.
 type AlertRouteNode struct {
 	AlertRoute
-	Children []*AlertRouteNode `json:"children,omitempty"`
+	Routes []*AlertRouteNode `json:"routes,omitempty"`
+}
+
+// CreateAlertRouteRequest is the payload for creating a new route node.
+// RefUID and Position are optional; when provided, the new route is inserted
+// as a sibling before or after the referenced node.
+type CreateAlertRouteRequest struct {
+	AlertRoute
+	RefUID   string `json:"refUID,omitempty"`                                             // sibling reference node UID
+	Position string `json:"position,omitempty" binding:"omitempty,oneof=before after"` // "before" or "after"
 }
 
 func (r *AlertRoute) ToMatchers() ([]LabelMatcher, error) {
@@ -367,7 +402,7 @@ type AlertRule struct {
 	Version       int            `json:"version" gorm:"column:version"`
 	State         AlertRuleState `json:"state" gorm:"column:state"`
 	Interval      time.Duration  `json:"interval" gorm:"column:interval"`
-	For           time.Duration  `json:"for" gorm:"column:for_duration"`  // pending duration before firing
+	For           time.Duration  `json:"for" gorm:"column:for_duration"` // pending duration before firing
 	Data          datatypes.JSON `json:"data,omitempty" gorm:"column:data"`
 	Conditions    datatypes.JSON `json:"conditions,omitempty" gorm:"column:conditions"`
 	Notifications datatypes.JSON `json:"notifications,omitempty" gorm:"column:notifications"` // kept for backward compat
@@ -446,10 +481,10 @@ type SearchAlertRuleRequest struct {
 
 type Alert struct {
 	BaseModel
-	OrgID     int64       `json:"-" gorm:"column:org_id"`
-	UID       string      `json:"uid" gorm:"column:uid"`
-	RuleUID   string      `json:"rule_uid" gorm:"column:rule_uid;index:u_idx_alert_uid,unique"`
-	DataPoint *DataPoint  `gorm:"-"`
+	OrgID     int64      `json:"-" gorm:"column:org_id"`
+	UID       string     `json:"uid" gorm:"column:uid"`
+	RuleUID   string     `json:"rule_uid" gorm:"column:rule_uid;index:u_idx_alert_uid,unique"`
+	DataPoint *DataPoint `gorm:"-"`
 }
 
 // ContactPointStatus records the last delivery result for a single channel within a contact point.
@@ -460,11 +495,11 @@ type ContactPointStatus struct {
 	OrgID           int64  `json:"-"                      gorm:"column:org_id;index:u_idx_cp_status,unique"`
 	ContactPointUID string `json:"contactPointUID"        gorm:"column:contact_point_uid;index:u_idx_cp_status,unique"`
 	ChannelUID      string `json:"channelUID"             gorm:"column:channel_uid;index:u_idx_cp_status,unique"` // unique key; matches NotificationChannel.UID
-	ChannelType     string `json:"channelType"            gorm:"column:channel_type"`                              // plain column; for display purposes only
-	Status          string `json:"status"                 gorm:"column:status"`                                     // "ok" or "error"
-	ErrorMessage    string `json:"errorMessage,omitempty" gorm:"column:error_message"`                              // populated when Status == "error"
-	LastSentAt      int64  `json:"lastSentAt"             gorm:"column:last_sent_at"`                               // Unix milliseconds
-	DurationMs      int64  `json:"durationMs"             gorm:"column:duration_ms"`                                // delivery round-trip in ms
+	ChannelType     string `json:"channelType"            gorm:"column:channel_type"`                             // plain column; for display purposes only
+	Status          string `json:"status"                 gorm:"column:status"`                                   // "ok" or "error"
+	ErrorMessage    string `json:"errorMessage,omitempty" gorm:"column:error_message"`                            // populated when Status == "error"
+	LastSentAt      int64  `json:"lastSentAt"             gorm:"column:last_sent_at"`                             // Unix milliseconds
+	DurationMs      int64  `json:"durationMs"             gorm:"column:duration_ms"`                              // delivery round-trip in ms
 }
 
 // NotifierPlugin describes a registered notifier plugin.

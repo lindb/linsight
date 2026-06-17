@@ -37,6 +37,9 @@ type AlertEventService interface {
 	UpsertAlertEvent(orgID int64, event *model.AlertEvent) error
 	// GetActiveAlertEvents returns all non-resolved events for an org.
 	GetActiveAlertEvents(orgID int64) ([]*model.AlertEvent, error)
+	// GetFiringEventsByOrg returns all currently firing events for an org.
+	// Used by InhibitStage to check cross-batch source alerts.
+	GetFiringEventsByOrg(orgID int64) ([]*model.AlertEvent, error)
 }
 
 type alertEventService struct {
@@ -121,6 +124,14 @@ func (srv *alertEventService) UpsertAlertEvent(orgID int64, event *model.AlertEv
 func (srv *alertEventService) GetActiveAlertEvents(orgID int64) ([]*model.AlertEvent, error) {
 	var rs []*model.AlertEvent
 	if err := srv.db.Find(&rs, "org_id=? and state in (?,?)", orgID, model.AlertEventPending, model.AlertEventFiring); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+func (srv *alertEventService) GetFiringEventsByOrg(orgID int64) ([]*model.AlertEvent, error) {
+	var rs []*model.AlertEvent
+	if err := srv.db.Find(&rs, "org_id=? and state=?", orgID, model.AlertEventFiring); err != nil {
 		return nil, err
 	}
 	return rs, nil

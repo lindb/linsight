@@ -78,17 +78,31 @@ func (api *AlertRouteAPI) GetAlertRouteByUID(c *gin.Context) {
 
 // CreateAlertRoute creates a new route node.
 func (api *AlertRouteAPI) CreateAlertRoute(c *gin.Context) {
-	route := &model.AlertRoute{}
-	if err := c.ShouldBind(route); err != nil {
+	req := &model.CreateAlertRouteRequest{}
+	if err := c.ShouldBind(req); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	uid, err := api.deps.AlertRouteSrv.CreateAlertRoute(c.Request.Context(), route)
+	uid, err := api.deps.AlertRouteSrv.CreateAlertRoute(c.Request.Context(), req)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	httppkg.OK(c, uid)
+}
+
+// SortAlertRoutes reorders sibling routes by assigning sequential sort_order values.
+func (api *AlertRouteAPI) SortAlertRoutes(c *gin.Context) {
+	var routes []model.AlertRoute
+	if err := c.ShouldBind(&routes); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	if err := api.deps.AlertRouteSrv.SortAlertRoutes(c.Request.Context(), routes); err != nil {
+		httppkg.Error(c, err)
+		return
+	}
+	httppkg.OK(c, "alert routes sorted")
 }
 
 // UpdateAlertRoute updates a route node.

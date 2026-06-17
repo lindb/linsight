@@ -73,8 +73,11 @@ func (srv *orgService) CreateOrg(ctx context.Context, org *model.Org) (string, e
 		if err := tx.Create(org); err != nil {
 			return err
 		}
-		// FIXME: add default cmps
-		return nil
+		// Initialize the root alert route for the new org.
+		// Root is identified by ParentUID="" (no parent) and is entered unconditionally,
+		// serving as the catch-all policy for all alerts from this org.
+		rootRoute := model.NewDefaultPolicyRoute(org.ID, uuid.GenerateShortUUID(), signedUser.User.ID)
+		return tx.Create(rootRoute)
 	})
 	if err != nil {
 		return "", err
