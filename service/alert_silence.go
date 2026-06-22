@@ -19,6 +19,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
@@ -52,6 +54,13 @@ func NewAlertSilenceService(db dbpkg.DB) AlertSilenceService {
 }
 
 func (srv *alertSilenceService) CreateAlertSilence(ctx context.Context, silence *model.AlertSilence) (string, error) {
+	now := time.Now().UnixMilli()
+	if silence.EndsAt <= silence.StartsAt {
+		return "", fmt.Errorf("invalid silence: end time must be after start time")
+	}
+	if silence.EndsAt <= now {
+		return "", fmt.Errorf("invalid silence: end time can't be in the past")
+	}
 	silence.UID = uuid.GenerateShortUUID()
 	user := util.GetUser(ctx)
 	silence.OrgID = user.Org.ID
@@ -67,6 +76,13 @@ func (srv *alertSilenceService) CreateAlertSilence(ctx context.Context, silence 
 }
 
 func (srv *alertSilenceService) UpdateAlertSilence(ctx context.Context, silence *model.AlertSilence) error {
+	now := time.Now().UnixMilli()
+	if silence.EndsAt <= silence.StartsAt {
+		return fmt.Errorf("invalid silence: end time must be after start time")
+	}
+	if silence.EndsAt <= now {
+		return fmt.Errorf("invalid silence: end time can't be in the past")
+	}
 	fromDB, err := srv.GetAlertSilenceByUID(ctx, silence.UID)
 	if err != nil {
 		return err
@@ -90,6 +106,7 @@ func (srv *alertSilenceService) GetAlertSilenceByUID(ctx context.Context, uid st
 	if err := srv.db.Get(&rs, "uid=? and org_id=?", uid, signedUser.Org.ID); err != nil {
 		return nil, err
 	}
+	rs.SetState(time.Now().UnixMilli())
 	return rs, nil
 }
 
@@ -115,6 +132,10 @@ func (srv *alertSilenceService) SearchAlertSilences(ctx context.Context, req *mo
 	}
 	if err := srv.db.FindForPaging(&rs, offset, limit, "id desc", where, params...); err != nil {
 		return nil, 0, err
+	}
+	now := time.Now().UnixMilli()
+	for i := range rs {
+		rs[i].SetState(now)
 	}
 	return rs, count, nil
 }

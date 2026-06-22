@@ -72,10 +72,11 @@ type Config struct {
 type emailNotifier struct {
 	setting Setting
 	cfg     Config
+	engine  *template.RenderingEngine
 	logger  logger.Logger
 }
 
-func newEmailNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
+func newEmailNotifier(settingJSON, cfgJSON json.RawMessage, engine *template.RenderingEngine) (types.Notifier, error) {
 	sRaw, _ := settingJSON.MarshalJSON()
 	var settingData Setting
 	if err := encoding.JSONUnmarshal(sRaw, &settingData); err != nil {
@@ -89,6 +90,7 @@ func newEmailNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, err
 	return &emailNotifier{
 		setting: settingData,
 		cfg:     cfgData,
+		engine:  engine,
 		logger:  logger.GetLogger("Alerting", "EmailNotifier"),
 	}, nil
 }
@@ -103,29 +105,32 @@ func (n *emailNotifier) Notify(ctx context.Context, data *template.NotificationD
 
 	renderer := template.NewRenderer()
 
-	// renderOrDefault tries to render a named {{define}} block from org templates.
-	// Falls back to defaultFn when the name is empty, OrgTemplates is absent, or rendering fails.
-	renderOrDefault := func(name string, defaultFn func() (string, error)) string {
-		if name != "" && data.OrgTemplates != "" {
-			if s, err := renderer.RenderNamed(data.OrgTemplates, name, data); err == nil {
-				return s
-			}
+	// renderOrDefault renders the template string via engine (with org template blocks merged in)
+	// when name is non-empty; falls back to defaultFn otherwise.
+	renderOrDefault := func(name string, defaultFn func() (string, error)) (string, error) {
+		if name != "" && n.engine != nil {
+			return n.engine.Render(data.OrgID, name, data)
 		}
-		s, _ := defaultFn()
-		return s
+		return defaultFn()
 	}
 
 	// render subject and body
-	subject := renderOrDefault(n.cfg.Subject, func() (string, error) {
+	subject, err := renderOrDefault(n.cfg.Subject, func() (string, error) {
 		return renderer.RenderDefaultTitle(data)
 	})
+	if err != nil {
+		return fmt.Errorf("render email subject: %w", err)
+	}
 	if subject == "" {
 		subject = fmt.Sprintf("[%s] Alert notification", strings.ToUpper(data.Status))
 	}
 
-	body := renderOrDefault(n.cfg.Body, func() (string, error) {
+	body, err := renderOrDefault(n.cfg.Body, func() (string, error) {
 		return renderer.RenderDefaultBody(data)
 	})
+	if err != nil {
+		return fmt.Errorf("render email body: %w", err)
+	}
 	if body == "" {
 		body = fmt.Sprintf("Alert notification for %s", data.ReceiverName)
 	}
@@ -214,6 +219,68 @@ func (n *emailNotifier) sendWithTLS(addr string, msg []byte, recipients []string
 		return fmt.Errorf("email write body: %w", err)
 	}
 	return w.Close()
+}
+
+// emailDryRunResult is the plugin-specific output returned by DryRun.
+type emailDryRunResult struct {
+	Addresses []string `json:"addresses"`
+	Subject   string   `json:"subject"`
+	Body      string   `json:"body"`
+}
+
+// DryRun renders the email subject/body and optionally sends the message.
+func (n *emailNotifier) DryRun(ctx context.Context, data *template.NotificationData, send bool) (json.RawMessage, error) {
+	if n.cfg.Addresses == "" {
+		return nil, fmt.Errorf("email: no recipient addresses configured")
+	}
+	if n.setting.Host == "" {
+		return nil, fmt.Errorf("email: SMTP host not configured")
+	}
+
+	renderer := template.NewRenderer()
+	renderOrDefault := func(name string, defaultFn func() (string, error)) (string, error) {
+		if name != "" && n.engine != nil {
+			return n.engine.Render(data.OrgID, name, data)
+		}
+		return defaultFn()
+	}
+
+	subject, err := renderOrDefault(n.cfg.Subject, func() (string, error) {
+		return renderer.RenderDefaultTitle(data)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("render email subject: %w", err)
+	}
+	if subject == "" {
+		subject = fmt.Sprintf("[%s] Alert notification", strings.ToUpper(data.Status))
+	}
+	body, err := renderOrDefault(n.cfg.Body, func() (string, error) {
+		return renderer.RenderDefaultBody(data)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("render email body: %w", err)
+	}
+	if body == "" {
+		body = fmt.Sprintf("Alert notification for %s", data.ReceiverName)
+	}
+
+	recipients := parseAddresses(n.cfg.Addresses)
+	if len(recipients) == 0 {
+		return nil, fmt.Errorf("email: no valid recipients")
+	}
+
+	if send {
+		if err := n.Notify(ctx, data); err != nil {
+			return nil, err
+		}
+	}
+
+	result := emailDryRunResult{
+		Addresses: recipients,
+		Subject:   subject,
+		Body:      body,
+	}
+	return encoding.JSONMarshal(result), nil
 }
 
 // parseAddresses splits a comma- or newline-separated address list.

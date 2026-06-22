@@ -71,6 +71,7 @@ func (d *dispatcher) dispatch(events []*model.AlertEvent, groupLabels map[string
 
 	// Populate OrgTemplates from the shared rendering engine (cached, avoids per-dispatch DB queries).
 	data.OrgTemplates, _ = d.deps.RenderingEngine.GetMergedOrgTemplates(d.orgID)
+	data.OrgID = d.orgID
 
 	channels, err := receiver.ToChannels()
 	if err != nil {
@@ -126,7 +127,7 @@ func (d *dispatcher) renderAndSend(ch model.NotificationChannel, data *template.
 		settingJSON = json.RawMessage("{}")
 	}
 
-	notifier, err := pluginDef.NewFn(settingJSON, ch.Config)
+	notifier, err := pluginDef.NewFn(settingJSON, ch.Config, d.deps.RenderingEngine)
 	if err != nil {
 		return fmt.Errorf("create notifier: %w", err)
 	}

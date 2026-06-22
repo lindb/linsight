@@ -62,11 +62,12 @@ type Config struct {
 
 type webhookNotifier struct {
 	cfg    Config
+	engine *template.RenderingEngine
 	client *http.Client
 	logger logger.Logger
 }
 
-func newWebhookNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
+func newWebhookNotifier(settingJSON, cfgJSON json.RawMessage, engine *template.RenderingEngine) (types.Notifier, error) {
 	cRaw, _ := cfgJSON.MarshalJSON()
 	var cfgData Config
 	if err := encoding.JSONUnmarshal(cRaw, &cfgData); err != nil {
@@ -77,6 +78,7 @@ func newWebhookNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, e
 	}
 	return &webhookNotifier{
 		cfg:    cfgData,
+		engine: engine,
 		client: &http.Client{},
 		logger: logger.GetLogger("Alerting", "WebhookNotifier"),
 	}, nil
@@ -87,15 +89,14 @@ func (n *webhookNotifier) Notify(ctx context.Context, data *template.Notificatio
 		return fmt.Errorf("webhook: URL not configured")
 	}
 
-	// Use named template block when configured; fall back to JSON-serialized data.
+	// Use content template when configured; fall back to JSON-serialized data.
 	var payload []byte
-	if n.cfg.Content != "" && data.OrgTemplates != "" {
-		renderer := template.NewRenderer()
-		if rendered, err := renderer.RenderNamed(data.OrgTemplates, n.cfg.Content, data); err == nil {
-			payload = []byte(rendered)
-		} else {
-			payload = encoding.JSONMarshal(data)
+	if n.cfg.Content != "" && n.engine != nil {
+		rendered, err := n.engine.Render(data.OrgID, n.cfg.Content, data)
+		if err != nil {
+			return fmt.Errorf("webhook: render content template: %w", err)
 		}
+		payload = []byte(rendered)
 	} else {
 		payload = encoding.JSONMarshal(data)
 	}
@@ -130,4 +131,42 @@ func (n *webhookNotifier) Notify(ctx context.Context, data *template.Notificatio
 		logger.String("url", n.cfg.URL),
 		logger.Int32("status", int32(resp.StatusCode)))
 	return nil
+}
+
+// webhookDryRunResult is the plugin-specific output returned by DryRun.
+type webhookDryRunResult struct {
+	URL     string `json:"url"`
+	Method  string `json:"method"`
+	Payload string `json:"payload"`
+}
+
+// DryRun renders the webhook payload and optionally dispatches it.
+func (n *webhookNotifier) DryRun(ctx context.Context, data *template.NotificationData, send bool) (json.RawMessage, error) {
+	if n.cfg.URL == "" {
+		return nil, fmt.Errorf("webhook: URL not configured")
+	}
+
+	var payload []byte
+	if n.cfg.Content != "" && n.engine != nil {
+		rendered, err := n.engine.Render(data.OrgID, n.cfg.Content, data)
+		if err != nil {
+			return nil, fmt.Errorf("webhook: render content template: %w", err)
+		}
+		payload = []byte(rendered)
+	} else {
+		payload = encoding.JSONMarshal(data)
+	}
+
+	if send {
+		if err := n.Notify(ctx, data); err != nil {
+			return nil, err
+		}
+	}
+
+	result := webhookDryRunResult{
+		URL:     n.cfg.URL,
+		Method:  n.cfg.Method,
+		Payload: string(payload),
+	}
+	return encoding.JSONMarshal(result), nil
 }

@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
+	linsight "github.com/lindb/linsight"
 	_ "github.com/lindb/linsight/alerting"
 	"github.com/lindb/linsight/alerting/manager"
 	"github.com/lindb/linsight/alerting/schedule"
@@ -36,7 +37,6 @@ import (
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
-	linsight "github.com/lindb/linsight"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/plugin/datasource"
@@ -218,7 +218,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	)
 
 	// alertmanager
-	alertMgr := manager.NewAlertManager(&manager.Deps{
+	mgrDeps := &manager.Deps{
 		AlertEventSrv:           alertEventSrv,
 		AlertRouteSrv:           alertRouteSrv,
 		ContactPointSrv:         contactPointSrv,
@@ -229,7 +229,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		ContactPointStatusSrv:   contactPointStatusSrv, // persist per-channel delivery outcomes
 		RenderingEngine:         renderingEngine,
 		ExternalURL:             "", // TODO: configure public URL in server config
-	})
+	}
+	alertMgr := manager.NewAlertManager(mgrDeps)
 
 	return &deps.API{
 		Config:              cfg,
@@ -251,21 +252,21 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AlertRuleGroupSrv: service.NewAlertRuleGroupService(db),
 		AlertRuleSrv:      service.NewAlertRuleService(db, service.NewAlertRuleGroupService(db)),
 
-		AlertEventSrv:           alertEventSrv,
-		AlertRouteSrv:           alertRouteSrv,
-		ContactPointSrv:         contactPointSrv,
-		ContactPointStatusSrv:   contactPointStatusSrv,
-		AlertSilenceSrv:         alertSilenceSrv,
-		AlertInhibitRuleSrv:            alertInhibitRuleSrv,
-		NotificationTemplateSrv:        notificationTemplateSrv,
-		NotificationTemplateExamples:   notifTmplExamples,
+		AlertEventSrv:                alertEventSrv,
+		AlertRouteSrv:                alertRouteSrv,
+		ContactPointSrv:              contactPointSrv,
+		ContactPointStatusSrv:        contactPointStatusSrv,
+		AlertSilenceSrv:              alertSilenceSrv,
+		AlertInhibitRuleSrv:          alertInhibitRuleSrv,
+		NotificationTemplateSrv:      notificationTemplateSrv,
+		NotificationTemplateExamples: notifTmplExamples,
 
 		AlertMgr:        alertMgr,
 		RenderingEngine: renderingEngine,
 
 		DatasourceMgr: datasource.NewDatasourceManager(),
 
-		// DryRunner uses its own Deps; AlertMgr/NotificationSrv are not needed for dry-run.
+		// DryRunner reuses the same manager.Deps so it can access silences/inhibits/routes/contact-points.
 		DryRunner: schedule.NewDryRunner(&schedule.Deps{
 			Opts: &schedule.Options{
 				Interval:        time.Second * 10,
@@ -273,6 +274,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 			},
 			DatasourceSrv: service.NewDatasourceService(db),
 			DatasourceMgr: datasource.NewDatasourceManager(),
+			ManagerDeps:   mgrDeps,
 		}),
 	}
 }

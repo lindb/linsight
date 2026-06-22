@@ -193,17 +193,39 @@ func (r *ContactPoint) ToChannels() ([]NotificationChannel, error) {
 	return rs, nil
 }
 
+// AlertSilenceState represents the lifecycle state of a silence.
+type AlertSilenceState string
+
+const (
+	AlertSilencePending  AlertSilenceState = "pending"  // startsAt > now
+	AlertSilenceActive   AlertSilenceState = "active"   // startsAt <= now < endsAt
+	AlertSilenceExpired  AlertSilenceState = "expired"  // endsAt <= now
+)
+
 // AlertSilence suppresses notifications for alerts matching the given label matchers during the specified time window.
 type AlertSilence struct {
 	BaseModel
 
-	OrgID         int64          `json:"-" gorm:"column:org_id;index:idx_alert_silence_org"`
-	UID           string         `json:"uid" gorm:"column:uid;index:u_idx_alert_silence_uid,unique"`
-	Matchers      datatypes.JSON `json:"matchers,omitempty" gorm:"column:matchers"`
-	StartsAt      int64          `json:"startsAt" gorm:"column:starts_at"`
-	EndsAt        int64          `json:"endsAt" gorm:"column:ends_at"`
-	CreatedByName string         `json:"createdByName" gorm:"column:created_by_name"`
-	Comment       string         `json:"comment" gorm:"column:comment"`
+	OrgID         int64             `json:"-" gorm:"column:org_id;index:idx_alert_silence_org"`
+	UID           string            `json:"uid" gorm:"column:uid;index:u_idx_alert_silence_uid,unique"`
+	Matchers      datatypes.JSON    `json:"matchers,omitempty" gorm:"column:matchers"`
+	StartsAt      int64             `json:"startsAt" gorm:"column:starts_at"`
+	EndsAt        int64             `json:"endsAt" gorm:"column:ends_at"`
+	CreatedByName string            `json:"createdByName" gorm:"column:created_by_name"`
+	Comment       string            `json:"comment" gorm:"column:comment"`
+	State         AlertSilenceState `json:"state" gorm:"-"` // computed from StartsAt/EndsAt vs now; not persisted
+}
+
+// SetState computes and assigns the silence state based on the given current time (Unix ms).
+func (s *AlertSilence) SetState(nowMs int64) {
+	switch {
+	case s.StartsAt > nowMs:
+		s.State = AlertSilencePending
+	case s.EndsAt <= nowMs:
+		s.State = AlertSilenceExpired
+	default:
+		s.State = AlertSilenceActive
+	}
 }
 
 func (s *AlertSilence) ToMatchers() ([]LabelMatcher, error) {
@@ -548,13 +570,78 @@ func (dp *DataPoint) ToMap() map[string]any {
 	return env
 }
 
+// DryRunQueryInfo captures one datasource query along with its metadata and the data points
+// that were returned, grouped by refID.
+type DryRunQueryInfo struct {
+	RefID          string       `json:"refID"`
+	DatasourceUID  string       `json:"datasourceUID"`
+	DatasourceName string       `json:"datasourceName"`
+	DatasourceType string       `json:"datasourceType"`
+	Query          *Query       `json:"query"`
+	TimeRange      TimeRange    `json:"timeRange"`
+	DataPoints     []*DataPoint `json:"dataPoints"`
+}
+
+// DryRunSilenceCheck holds the full silence configuration plus whether it matched the event.
+type DryRunSilenceCheck struct {
+	UID      string         `json:"uid"`
+	Comment  string         `json:"comment"`
+	StartsAt int64          `json:"startsAt"`
+	EndsAt   int64          `json:"endsAt"`
+	Matchers []LabelMatcher `json:"matchers"`
+	Matched  bool           `json:"matched"`
+}
+
+// DryRunInhibitCheck holds the full inhibit rule configuration plus whether it suppressed the event.
+type DryRunInhibitCheck struct {
+	UID            string         `json:"uid"`
+	Name           string         `json:"name"`
+	SourceMatchers []LabelMatcher `json:"sourceMatchers"`
+	TargetMatchers []LabelMatcher `json:"targetMatchers"`
+	EqualLabels    []string       `json:"equalLabels"`
+	Matched        bool           `json:"matched"`
+}
+
+// DryRunChannelOutput records the rendered content for one notification channel.
+// Result is plugin-specific JSON produced by each notifier's DryRun implementation.
+type DryRunChannelOutput struct {
+	ChannelUID string          `json:"channelUID"`
+	Type       string          `json:"type"`
+	Sent       bool            `json:"sent"`             // true when send=true and dispatch succeeded
+	Error      string          `json:"error,omitempty"`  // error message if sending failed
+	Result     json.RawMessage `json:"result,omitempty"` // plugin-specific rendered content
+}
+
+// DryRunRouteMatch describes one matched route and its per-channel notification preview.
+type DryRunRouteMatch struct {
+	RouteUID         string                `json:"routeUID"`
+	RouteName        string                `json:"routeName"`
+	ContactPointUID  string                `json:"contactPointUID"`
+	ContactPointName string                `json:"contactPointName"`
+	GroupLabels      map[string]string     `json:"groupLabels"`
+	Status           string                `json:"status"` // "firing" | "resolved"
+	Channels         []DryRunChannelOutput `json:"channels"`
+}
+
+// DryRunEventResult holds the complete pipeline trace for a single alert event.
+type DryRunEventResult struct {
+	Event     *AlertEvent          `json:"event"`
+	Silenced  bool                 `json:"silenced"`
+	Inhibited bool                 `json:"inhibited"`
+	Silences  []DryRunSilenceCheck `json:"silences,omitempty"`
+	Inhibits  []DryRunInhibitCheck `json:"inhibits,omitempty"`
+	Routes    []DryRunRouteMatch   `json:"routes,omitempty"`
+}
+
 // AlertRuleDryRunResult captures the full output of a single dry-run evaluation cycle.
-// When a pipeline stage fails, Stage and Error are set; DataPoints and Events are empty.
-// When all stages succeed, DataPoints contains the raw datasource data and Events contains
-// the alert events that would have been produced (but were NOT persisted).
+// When a pipeline stage fails, Stage and Error are set; other fields are empty.
+// When all stages succeed, Queries contains per-refID datasource info, Events contains
+// the alert events, and EventResults contains the full per-event pipeline trace.
 type AlertRuleDryRunResult struct {
-	Stage      string        `json:"stage,omitempty"`      // prepare / fetch / eval — set only on failure
-	Error      string        `json:"error,omitempty"`      // error message — set only on failure
-	DataPoints []*DataPoint  `json:"dataPoints,omitempty"` // raw data points returned by the datasource
-	Events     []*AlertEvent `json:"events,omitempty"`     // alert events from the in-memory state machine
+	Stage        string              `json:"stage,omitempty"`        // prepare / fetch / eval — set only on failure
+	Error        string              `json:"error,omitempty"`        // error message — set only on failure
+	Queries      []DryRunQueryInfo   `json:"queries,omitempty"`      // per-query datasource info with data points
+	DataPoints   []*DataPoint        `json:"dataPoints,omitempty"`   // all raw data points (kept for backward compat)
+	Events       []*AlertEvent       `json:"events,omitempty"`       // alert events from the in-memory state machine
+	EventResults []DryRunEventResult `json:"eventResults,omitempty"` // full pipeline trace per event
 }

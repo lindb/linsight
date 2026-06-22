@@ -71,7 +71,7 @@ func (api *NotificationAPI) Test(c *gin.Context) {
 			break
 		}
 	}
-	notifier, err := notifierDef.NewFn(json.RawMessage(setting.Config.String()), receiver.Config)
+	notifier, err := notifierDef.NewFn(json.RawMessage(setting.Config.String()), receiver.Config, api.deps.RenderingEngine)
 	if err != nil {
 		httppkg.Error(c, err)
 		return

@@ -34,5 +34,9 @@ type Deps struct {
 	// AlertMgr receives alert events and handles routing, silencing and notification dispatch.
 	AlertMgr manager.AlertManager
 
+	// ManagerDeps exposes the full set of services used by AlertManager, giving DryRunner
+	// access to silence / inhibit / route / contact-point data without an active AlertManager.
+	ManagerDeps *manager.Deps
+
 	notificationMgr NotificationManager
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/lindb/linsight/constant"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/model"
+	"github.com/lindb/linsight/pkg/util"
 )
 
 // AlertRuleAPI represents alert rule related api handlers.
@@ -114,13 +115,19 @@ func (api *AlertRuleAPI) GetAlertRuleByUID(c *gin.Context) {
 // persisting any state or delivering any notifications.
 // The response always contains a structured result; pipeline errors are reported
 // inside AlertRuleDryRunResult.Stage / Error rather than as HTTP errors.
+// Pass ?send=true to also dispatch real notifications to the configured contact points.
 func (api *AlertRuleAPI) DryRunAlertRule(c *gin.Context) {
 	rule := &model.AlertRule{}
 	if err := c.ShouldBind(rule); err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	result, err := api.deps.DryRunner.Run(c.Request.Context(), rule)
+	// inject org from authenticated context; the request body won't carry orgID
+	if signedUser := util.GetUser(c.Request.Context()); signedUser != nil {
+		rule.OrgID = signedUser.Org.ID
+	}
+	send := c.Query("send") == "true"
+	result, err := api.deps.DryRunner.Run(c.Request.Context(), rule, send)
 	if err != nil {
 		httppkg.Error(c, err)
 		return

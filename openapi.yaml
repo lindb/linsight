@@ -1632,12 +1632,20 @@ paths:
       tags: [AlertRules]
       summary: Dry-run alert rule evaluation (Editor)
       description: |
-        Executes the full evaluation pipeline (prepare → fetch → eval) for the given rule
-        without persisting any state or delivering any notifications.
-        Useful for debugging rule configuration (data query, conditions, labels).
+        Executes the full evaluation pipeline (prepare → fetch → eval → silence → inhibit → route → notify)
+        for the given rule without persisting any state. By default notifications are NOT dispatched.
+        Pass `?send=true` to also deliver real notifications to the configured contact points.
         Pipeline errors are returned inside the response body (stage + error fields)
         rather than as HTTP error codes so the caller always receives a structured result.
         Requires Editor role.
+      parameters:
+        - name: send
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: When true, dispatch real notifications to contact point targets
       requestBody:
         required: true
         content:
@@ -3268,10 +3276,12 @@ components:
     AlertRuleDryRunResult:
       type: object
       description: |
-        Result of a single dry-run evaluation cycle. When a pipeline stage fails,
-        `stage` and `error` are populated and `series`/`events` are absent.
-        When all stages succeed, `series` contains the raw datasource data and
-        `events` contains the alert events that *would* have been produced.
+        Result of a full dry-run evaluation cycle. When a pipeline stage fails,
+        `stage` and `error` are populated and other fields are absent.
+        When all stages succeed, `queries` contains per-query datasource metadata,
+        `dataPoints` contains all raw data points, `events` contains the alert events
+        produced, and `eventResults` contains the full AlertManager pipeline trace
+        per event (silences, inhibits, route matches, notification previews).
       properties:
         stage:
           type: string
@@ -3280,9 +3290,14 @@ components:
         error:
           type: string
           description: Error message from the failed stage
-        series:
+        queries:
           type: array
-          description: Raw series returned by the datasource query
+          description: Per-query datasource metadata and grouped data points
+          items:
+            $ref: '#/components/schemas/DryRunQueryInfo'
+        dataPoints:
+          type: array
+          description: All raw data points returned by the datasource (backward compat)
           items:
             $ref: '#/components/schemas/AlertSeries'
         events:
@@ -3290,6 +3305,161 @@ components:
           description: Alert events produced by the in-memory state machine (not persisted)
           items:
             $ref: '#/components/schemas/AlertEvent'
+        eventResults:
+          type: array
+          description: Full AlertManager pipeline trace for each alert event
+          items:
+            $ref: '#/components/schemas/DryRunEventResult'
+
+    DryRunQueryInfo:
+      type: object
+      description: Datasource query metadata and the data points returned for a single refID
+      properties:
+        refID:
+          type: string
+        datasourceUID:
+          type: string
+        datasourceName:
+          type: string
+        datasourceType:
+          type: string
+        query:
+          type: object
+          description: Exact query parameters sent to the datasource
+        timeRange:
+          type: object
+          description: Time range used for the query
+        dataPoints:
+          type: array
+          description: Data points returned for this refID
+          items:
+            $ref: '#/components/schemas/AlertSeries'
+
+    DryRunSilenceCheck:
+      type: object
+      description: Result of checking one active silence against this alert event
+      properties:
+        uid:
+          type: string
+        comment:
+          type: string
+        startsAt:
+          type: integer
+          format: int64
+          description: Unix milliseconds
+        endsAt:
+          type: integer
+          format: int64
+          description: Unix milliseconds
+        matchers:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabelMatcher'
+        matched:
+          type: boolean
+          description: True when this silence suppresses the event
+
+    DryRunInhibitCheck:
+      type: object
+      description: Result of checking one inhibit rule against this alert event
+      properties:
+        uid:
+          type: string
+        name:
+          type: string
+        sourceMatchers:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabelMatcher'
+        targetMatchers:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabelMatcher'
+        equalLabels:
+          type: array
+          items:
+            type: string
+        matched:
+          type: boolean
+          description: True when this inhibit rule suppresses the event
+
+    DryRunChannelOutput:
+      type: object
+      description: Rendered notification content for one contact-point channel
+      properties:
+        channelUID:
+          type: string
+        type:
+          type: string
+          description: "Plugin type: Slack | Email | Webhook"
+        sent:
+          type: boolean
+          description: True when send=true and dispatch was attempted
+        error:
+          type: string
+        result:
+          type: object
+          description: Plugin-specific rendered content (structure varies by plugin type)
+
+    DryRunRouteMatch:
+      type: object
+      description: One matched route and its notification preview
+      properties:
+        routeUID:
+          type: string
+        routeName:
+          type: string
+        contactPointUID:
+          type: string
+        contactPointName:
+          type: string
+        groupLabels:
+          type: object
+          additionalProperties:
+            type: string
+        status:
+          type: string
+          enum: [firing, resolved]
+        channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/DryRunChannelOutput'
+
+    DryRunEventResult:
+      type: object
+      description: Full AlertManager pipeline trace for one alert event
+      properties:
+        event:
+          $ref: '#/components/schemas/AlertEvent'
+        silenced:
+          type: boolean
+        inhibited:
+          type: boolean
+        silences:
+          type: array
+          items:
+            $ref: '#/components/schemas/DryRunSilenceCheck'
+        inhibits:
+          type: array
+          items:
+            $ref: '#/components/schemas/DryRunInhibitCheck'
+        routes:
+          type: array
+          items:
+            $ref: '#/components/schemas/DryRunRouteMatch'
+
+    LabelMatcher:
+      type: object
+      description: A single label matcher (name/value pair with match type)
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        type:
+          type: integer
+          description: "0=Equal, 1=NotEqual, 2=Regexp, 3=NotRegexp"
+          enum: [0, 1, 2, 3]
 
     AlertSeries:
       type: object
@@ -3599,6 +3769,12 @@ components:
             comment:
               type: string
               description: Reason for the silence (required)
+            state:
+              type: string
+              enum: [pending, active, expired]
+              description: |
+                Computed lifecycle state (not persisted):
+                pending = startsAt > now; active = startsAt <= now < endsAt; expired = endsAt <= now
 
     AlertSilenceListResponse:
       type: object

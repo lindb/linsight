@@ -79,6 +79,9 @@ type NotificationData struct {
 	ReceiverName      string            `json:"receiverName"`      // name of the target receiver
 	Status            string            `json:"status"`            // "firing" or "resolved"
 	ExternalURL       string            `json:"externalURL"`       // base URL for generating links
+	// OrgID is the organisation that owns this notification batch.
+	// It is set by the dispatcher/dryrunner so notifiers can call engine.Render(data.OrgID, ...).
+	OrgID int64 `json:"-"`
 	// OrgTemplates holds the merged content of all org-level notification templates.
 	// It is populated by the alert engine before calling Notify so that notifiers can
 	// resolve {{define "NAME"}} named blocks via RenderNamed without changing the Notifier interface.

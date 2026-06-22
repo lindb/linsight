@@ -263,7 +263,7 @@ func (api *ContactPointAPI) TestContactPoint(c *gin.Context) {
 		if len(settingJSON) == 0 {
 			settingJSON = []byte("{}")
 		}
-		notifier, err := pluginDef.NewFn(settingJSON, ch.Config)
+		notifier, err := pluginDef.NewFn(settingJSON, ch.Config, api.deps.RenderingEngine)
 		if err != nil {
 			httppkg.Error(c, err)
 			return
@@ -308,7 +308,7 @@ func (api *ContactPointAPI) TestNotificationChannel(c *gin.Context) {
 		settingJSON = []byte("{}")
 	}
 
-	notifier, err := pluginDef.NewFn(settingJSON, ch.Config)
+	notifier, err := pluginDef.NewFn(settingJSON, ch.Config, api.deps.RenderingEngine)
 	if err != nil {
 		httppkg.Error(c, err)
 		return

@@ -24,9 +24,12 @@ import (
 	"github.com/lindb/linsight/alerting/template"
 )
 
-type NewNotifier func(setting, cfg json.RawMessage) (Notifier, error)
+type NewNotifier func(setting, cfg json.RawMessage, engine *template.RenderingEngine) (Notifier, error)
 
 // Notifier sends alert notifications through a specific channel (e.g. Slack, Email).
 type Notifier interface {
 	Notify(ctx context.Context, data *template.NotificationData) error
+	// DryRun renders the notification content and returns plugin-specific JSON.
+	// When send is true the notifier also dispatches the real notification.
+	DryRun(ctx context.Context, data *template.NotificationData, send bool) (json.RawMessage, error)
 }
