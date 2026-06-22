@@ -166,21 +166,21 @@ func (g *alertGroup) buildGroupLabels() map[string]string {
 
 func (g *alertGroup) groupWait() time.Duration {
 	if g.route.GroupWait > 0 {
-		return g.route.GroupWait
+		return time.Duration(g.route.GroupWait)
 	}
-	return model.DefaultPolicyGroupWait
+	return time.Duration(model.DefaultPolicyGroupWait)
 }
 
 func (g *alertGroup) groupInterval() time.Duration {
 	if g.route.GroupInterval > 0 {
-		return g.route.GroupInterval
+		return time.Duration(g.route.GroupInterval)
 	}
-	return model.DefaultPolicyGroupInterval
+	return time.Duration(model.DefaultPolicyGroupInterval)
 }
 
 func (g *alertGroup) repeatInterval() time.Duration {
 	if g.route.RepeatInterval > 0 {
-		return g.route.RepeatInterval
+		return time.Duration(g.route.RepeatInterval)
 	}
-	return model.DefaultPolicyRepeatInterval
+	return time.Duration(model.DefaultPolicyRepeatInterval)
 }

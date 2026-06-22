@@ -36,6 +36,9 @@ type AlertManager interface {
 	ProcessEvents(orgID int64, events []*model.AlertEvent)
 	// ReloadConfig reloads routes, silences and inhibit rules from the database.
 	ReloadConfig(orgID int64)
+	// ReconcileOrgs reloads config for orgs with active rules and purges all cached state
+	// (config maps and alert groups) for orgs that no longer have any rules.
+	ReconcileOrgs(activeOrgIDs map[int64]struct{})
 	// StartRepeatTicker runs a background loop that periodically calls MaybeRepeat on all
 	// alert groups so that steady-state Firing alerts get re-notified after RepeatInterval.
 	StartRepeatTicker(ctx context.Context)
@@ -180,4 +183,33 @@ func (m *alertManager) CleanupGroups(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// ReconcileOrgs reloads config for active orgs and purges all cached state for orgs
+// that no longer have any rules (config maps + in-flight alert groups).
+func (m *alertManager) ReconcileOrgs(activeOrgIDs map[int64]struct{}) {
+	// Refresh route/silence/inhibit config for every org that still has active rules.
+	for orgID := range activeOrgIDs {
+		m.ReloadConfig(orgID)
+	}
+
+	// Remove cached config for orgs whose last rule has been deleted.
+	m.cfgMu.Lock()
+	for orgID := range m.orgRoutes {
+		if _, ok := activeOrgIDs[orgID]; !ok {
+			delete(m.orgRoutes, orgID)
+			delete(m.orgSilences, orgID)
+			delete(m.orgInhibits, orgID)
+		}
+	}
+	m.cfgMu.Unlock()
+
+	// Remove alert groups that belong to now-inactive orgs.
+	m.groupMu.Lock()
+	for key, grp := range m.groups {
+		if _, ok := activeOrgIDs[grp.orgID]; !ok {
+			delete(m.groups, key)
+		}
+	}
+	m.groupMu.Unlock()
 }

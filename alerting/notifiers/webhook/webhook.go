@@ -26,6 +26,7 @@ import (
 	"net/http"
 
 	"github.com/lindb/common/pkg/encoding"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/alerting/types"
@@ -62,6 +63,7 @@ type Config struct {
 type webhookNotifier struct {
 	cfg    Config
 	client *http.Client
+	logger logger.Logger
 }
 
 func newWebhookNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
@@ -76,6 +78,7 @@ func newWebhookNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, e
 	return &webhookNotifier{
 		cfg:    cfgData,
 		client: &http.Client{},
+		logger: logger.GetLogger("Alerting", "WebhookNotifier"),
 	}, nil
 }
 
@@ -96,6 +99,11 @@ func (n *webhookNotifier) Notify(ctx context.Context, data *template.Notificatio
 	} else {
 		payload = encoding.JSONMarshal(data)
 	}
+
+	n.logger.Info("sending webhook notification",
+		logger.String("url", n.cfg.URL),
+		logger.String("method", n.cfg.Method),
+		logger.String("payload", string(payload)))
 
 	req, err := http.NewRequestWithContext(ctx, n.cfg.Method, n.cfg.URL, bytes.NewReader(payload))
 	if err != nil {
@@ -118,5 +126,8 @@ func (n *webhookNotifier) Notify(ctx context.Context, data *template.Notificatio
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("webhook: unexpected status %d", resp.StatusCode)
 	}
+	n.logger.Info("webhook notification sent",
+		logger.String("url", n.cfg.URL),
+		logger.Int32("status", int32(resp.StatusCode)))
 	return nil
 }

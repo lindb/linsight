@@ -86,18 +86,18 @@ type AlertRoute struct {
 	ContactPointUID string         `json:"contactPointUID" gorm:"column:contact_point_uid"` // renamed from receiver_uid
 	Continue        bool           `json:"continue" gorm:"column:continue_match"`
 	GroupBy         datatypes.JSON `json:"groupBy,omitempty" gorm:"column:group_by"`
-	GroupWait       time.Duration  `json:"groupWait" gorm:"column:group_wait"`
-	GroupInterval   time.Duration  `json:"groupInterval" gorm:"column:group_interval"`
-	RepeatInterval  time.Duration  `json:"repeatInterval" gorm:"column:repeat_interval"`
+	GroupWait       Duration  `json:"groupWait" gorm:"column:group_wait"`
+	GroupInterval   Duration  `json:"groupInterval" gorm:"column:group_interval"`
+	RepeatInterval  Duration  `json:"repeatInterval" gorm:"column:repeat_interval"`
 	SortOrder       int            `json:"sortOrder" gorm:"column:sort_order"`
 }
 
 // Default values for the root alert route that is automatically created per org.
 const (
 	DefaultPolicyName           = "Default policy"
-	DefaultPolicyGroupWait      = 30 * time.Second
-	DefaultPolicyGroupInterval  = 5 * time.Minute
-	DefaultPolicyRepeatInterval = 4 * time.Hour
+	DefaultPolicyGroupWait      = Duration(30 * time.Second)
+	DefaultPolicyGroupInterval  = Duration(5 * time.Minute)
+	DefaultPolicyRepeatInterval = Duration(4 * time.Hour)
 )
 
 // NewDefaultPolicyRoute returns a root AlertRoute pre-populated with the org's
@@ -362,14 +362,14 @@ type AlertRuleGroup struct {
 	OrgID    int64         `json:"-"        gorm:"column:org_id;index:u_idx_alert_rule_group_org_name,unique"`
 	UID      string        `json:"uid"      gorm:"column:uid;index:u_idx_alert_rule_group_uid,unique"`
 	Name     string        `json:"name"     gorm:"column:name;index:u_idx_alert_rule_group_org_name,unique"`
-	Interval time.Duration `json:"interval" gorm:"column:interval"`
+	Interval Duration `json:"interval" gorm:"column:interval"`
 }
 
 // CreateAlertRuleGroupParam carries group metadata when creating a rule.
 // If a group with the same name already exists in the org, it is reused; otherwise a new group is created.
 type CreateAlertRuleGroupParam struct {
-	Name     string        `json:"name"`     // required; used as find-or-create key
-	Interval time.Duration `json:"interval"` // required only when the group does not yet exist
+	Name     string   `json:"name"`     // required; used as find-or-create key
+	Interval Duration `json:"interval"` // required only when the group does not yet exist
 }
 
 // CreateAlertRuleRequest combines an AlertRule with the group it should belong to.
@@ -401,8 +401,8 @@ type AlertRule struct {
 	Integration   string         `json:"integration" gorm:"column:integration"`
 	Version       int            `json:"version" gorm:"column:version"`
 	State         AlertRuleState `json:"state" gorm:"column:state"`
-	Interval      time.Duration  `json:"interval" gorm:"column:interval"`
-	For           time.Duration  `json:"for" gorm:"column:for_duration"` // pending duration before firing
+	Interval      Duration  `json:"interval" gorm:"column:interval"`
+	For           Duration  `json:"for" gorm:"column:for_duration"` // pending duration before firing
 	Data          datatypes.JSON `json:"data,omitempty" gorm:"column:data"`
 	Conditions    datatypes.JSON `json:"conditions,omitempty" gorm:"column:conditions"`
 	Notifications datatypes.JSON `json:"notifications,omitempty" gorm:"column:notifications"` // kept for backward compat

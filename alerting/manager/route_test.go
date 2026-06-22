@@ -24,6 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/datatypes"
+
+	"github.com/lindb/linsight/model"
 )
 
 // ─── Routing scenario tests ──────────────────────────────────────────────────
@@ -107,9 +109,9 @@ func TestTraverseRouteTree_Inheritance_TimingFromRoot(t *testing.T) {
 	result := traverseNode(root, map[string]string{"service": "database", "env": "production"}, nil)
 	require.Len(t, result, 1)
 	r := result[0]
-	assert.Equal(t, 30*time.Second, r.GroupWait, "GroupWait should be inherited from root")
-	assert.Equal(t, 5*time.Minute, r.GroupInterval, "GroupInterval should be inherited from root")
-	assert.Equal(t, 4*time.Hour, r.RepeatInterval, "RepeatInterval should be inherited from root")
+	assert.Equal(t, model.Duration(30*time.Second), r.GroupWait, "GroupWait should be inherited from root")
+	assert.Equal(t, model.Duration(5*time.Minute), r.GroupInterval, "GroupInterval should be inherited from root")
+	assert.Equal(t, model.Duration(4*time.Hour), r.RepeatInterval, "RepeatInterval should be inherited from root")
 	assert.Equal(t, datatypes.JSON(`["alertname"]`), r.GroupBy, "GroupBy should be inherited from root")
 }
 
@@ -118,13 +120,13 @@ func TestTraverseRouteTree_Inheritance_TimingFromRoot(t *testing.T) {
 // while GroupInterval/RepeatInterval/GroupBy fall through to root.
 func TestTraverseRouteTree_Inheritance_PartialOverride(t *testing.T) {
 	root := buildTestTree(t)
-	root.Routes[0].GroupWait = 10 * time.Second
+	root.Routes[0].GroupWait = model.Duration(10 * time.Second)
 
 	result := traverseNode(root, map[string]string{"service": "database", "env": "production"}, nil)
 	require.Len(t, result, 1)
 	r := result[0]
-	assert.Equal(t, 10*time.Second, r.GroupWait, "GroupWait should be inherited from db-route (closest ancestor)")
-	assert.Equal(t, 5*time.Minute, r.GroupInterval, "GroupInterval should fall through to root")
-	assert.Equal(t, 4*time.Hour, r.RepeatInterval, "RepeatInterval should fall through to root")
+	assert.Equal(t, model.Duration(10*time.Second), r.GroupWait, "GroupWait should be inherited from db-route (closest ancestor)")
+	assert.Equal(t, model.Duration(5*time.Minute), r.GroupInterval, "GroupInterval should fall through to root")
+	assert.Equal(t, model.Duration(4*time.Hour), r.RepeatInterval, "RepeatInterval should fall through to root")
 	assert.Equal(t, datatypes.JSON(`["alertname"]`), r.GroupBy, "GroupBy should fall through to root")
 }

@@ -27,6 +27,7 @@ import (
 	"github.com/slack-go/slack"
 
 	"github.com/lindb/common/pkg/encoding"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/alerting/types"
@@ -68,6 +69,7 @@ type notifier struct {
 	setting Setting
 	cfg     Config
 	cli     *slack.Client
+	logger  logger.Logger
 }
 
 func newSlackNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
@@ -83,6 +85,7 @@ func newSlackNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, err
 		setting: settingData,
 		cfg:     cfgData,
 		cli:     slack.New(settingData.Token),
+		logger:  logger.GetLogger("Alerting", "SlackNotifier"),
 	}, nil
 }
 
@@ -126,6 +129,11 @@ func (n *notifier) Notify(ctx context.Context, data *template.NotificationData) 
 		if err != nil {
 			return fmt.Errorf("render firing alert body: %w", err)
 		}
+
+		n.logger.Info("slack firing attachment rendered",
+			logger.String("channel", n.cfg.Channel),
+			logger.String("title", title),
+			logger.String("body", body))
 
 		var titleLink string
 		if data.ExternalURL != "" && alert.GeneratorURL != "" {
@@ -175,6 +183,10 @@ func (n *notifier) Notify(ctx context.Context, data *template.NotificationData) 
 			return fmt.Errorf("render resolved alert title: %w", err)
 		}
 
+		n.logger.Info("slack resolved attachment rendered",
+			logger.String("channel", n.cfg.Channel),
+			logger.String("title", title))
+
 		// Format resolution time only when it is meaningful.
 		var resolvedText string
 		if alert.EndsAt > 0 {
@@ -208,5 +220,11 @@ func (n *notifier) Notify(ctx context.Context, data *template.NotificationData) 
 		n.cfg.Channel,
 		slack.MsgOptionAttachments(attachments...),
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	n.logger.Info("slack notification sent",
+		logger.String("channel", n.cfg.Channel),
+		logger.Int32("attachments", int32(len(attachments))))
+	return nil
 }

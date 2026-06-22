@@ -176,6 +176,8 @@ func (w *ruleExecWorker) exec() error {
 // WorkerManager creates and tracks RuleExecWorkers per rule UID.
 type WorkerManager interface {
 	GetOrCreateWorker(ctx context.Context, rule *model.AlertRule) RuleExecWorker
+	// ReconcileWorkers stops and removes workers whose rule UIDs are absent from activeUIDs.
+	ReconcileWorkers(activeUIDs map[string]struct{})
 }
 
 type workerManager struct {
@@ -210,4 +212,15 @@ func (mgr *workerManager) GetOrCreateWorker(ctx context.Context, rule *model.Ale
 
 	mgr.workers[rule.UID] = worker
 	return worker
+}
+
+func (mgr *workerManager) ReconcileWorkers(activeUIDs map[string]struct{}) {
+	mgr.lock.Lock()
+	defer mgr.lock.Unlock()
+	for uid, worker := range mgr.workers {
+		if _, ok := activeUIDs[uid]; !ok {
+			worker.Stop()
+			delete(mgr.workers, uid)
+		}
+	}
 }

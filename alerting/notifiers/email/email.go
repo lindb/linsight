@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/lindb/common/pkg/encoding"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/alerting/template"
 	"github.com/lindb/linsight/alerting/types"
@@ -71,6 +72,7 @@ type Config struct {
 type emailNotifier struct {
 	setting Setting
 	cfg     Config
+	logger  logger.Logger
 }
 
 func newEmailNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, error) {
@@ -87,6 +89,7 @@ func newEmailNotifier(settingJSON, cfgJSON json.RawMessage) (types.Notifier, err
 	return &emailNotifier{
 		setting: settingData,
 		cfg:     cfgData,
+		logger:  logger.GetLogger("Alerting", "EmailNotifier"),
 	}, nil
 }
 
@@ -132,6 +135,11 @@ func (n *emailNotifier) Notify(ctx context.Context, data *template.NotificationD
 		return fmt.Errorf("email: no valid recipients")
 	}
 
+	n.logger.Info("sending email notification",
+		logger.String("to", strings.Join(recipients, ",")),
+		logger.String("subject", subject),
+		logger.String("body", body))
+
 	// build raw message
 	msg := buildMessage(n.setting.From, recipients, subject, body)
 
@@ -145,9 +153,17 @@ func (n *emailNotifier) Notify(ctx context.Context, data *template.NotificationD
 	}
 
 	if n.setting.StartTLS {
-		return n.sendWithTLS(addr, msg, recipients)
+		if err := n.sendWithTLS(addr, msg, recipients); err != nil {
+			return err
+		}
+	} else {
+		if err := n.sendPlain(addr, msg, recipients); err != nil {
+			return err
+		}
 	}
-	return n.sendPlain(addr, msg, recipients)
+	n.logger.Info("email notification sent",
+		logger.String("to", strings.Join(recipients, ",")))
+	return nil
 }
 
 func (n *emailNotifier) sendPlain(addr string, msg []byte, recipients []string) error {

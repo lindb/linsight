@@ -22,7 +22,6 @@ package service
 import (
 	"context"
 	"strings"
-	"time"
 
 	"gorm.io/datatypes"
 
@@ -43,7 +42,7 @@ type groupRuleRow struct {
 	GUpdatedBy int64         `gorm:"column:g_updated_by"`
 	GUID       string        `gorm:"column:g_uid"`
 	GName      string        `gorm:"column:g_name"`
-	GInterval  time.Duration `gorm:"column:g_interval"`
+	GInterval  model.Duration `gorm:"column:g_interval"`
 
 	// rule columns — NULL when no rule matches (LEFT JOIN with no WHERE on rule columns)
 	RID            *int64         `gorm:"column:r_id"`
@@ -154,8 +153,8 @@ func reshapeGroupRuleRows(rows []groupRuleRow) []model.GroupWithRules {
 				Integration:   derefStr(row.RIntegration),
 				Version:       derefInt(row.RVersion),
 				State:         model.AlertRuleState(derefInt(row.RState)),
-				Interval:      time.Duration(derefInt64(row.RInterval)),
-				For:           time.Duration(derefInt64(row.RFor)),
+				Interval:      model.Duration(derefInt64(row.RInterval)),
+				For:           model.Duration(derefInt64(row.RFor)),
 				Data:          row.RData,
 				Conditions:    row.RConditions,
 				Notifications: row.RNotifications,
@@ -360,7 +359,7 @@ func (srv *alertRuleService) FetchAllAlertRules(_ *model.SearchAlertRuleRequest)
 			return nil, err
 		}
 
-		intervalByUID := make(map[string]time.Duration, len(groups))
+		intervalByUID := make(map[string]model.Duration, len(groups))
 		for _, g := range groups {
 			intervalByUID[g.UID] = g.Interval
 		}

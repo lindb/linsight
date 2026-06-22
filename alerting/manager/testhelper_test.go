@@ -116,9 +116,9 @@ func buildTestTree(t *testing.T) *model.AlertRouteNode {
 			ParentUID:       "",
 			ContactPointUID: "default-email",
 			GroupBy:         datatypes.JSON(`["alertname"]`),
-			GroupWait:       30 * time.Second,
-			GroupInterval:   5 * time.Minute,
-			RepeatInterval:  4 * time.Hour,
+			GroupWait:       model.Duration(30 * time.Second),
+			GroupInterval:   model.Duration(5 * time.Minute),
+			RepeatInterval:  model.Duration(4 * time.Hour),
 		},
 	}
 

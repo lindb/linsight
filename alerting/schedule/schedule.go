@@ -132,6 +132,18 @@ func (s *schedule) loadAlertRules() {
 		s.logger.Error("fetch alert rule failure", logger.Any("org", s.orgID), logger.Error(err))
 		return
 	}
+
+	// Reload config for active orgs and purge state for orgs with no remaining rules.
+	// Runs before rules are dispatched to workers so config is always fresh when
+	// the first evaluation happens — this also handles startup pre-warming.
+	if s.deps.AlertMgr != nil {
+		orgSet := make(map[int64]struct{})
+		for i := range rules {
+			orgSet[rules[i].OrgID] = struct{}{}
+		}
+		s.deps.AlertMgr.ReconcileOrgs(orgSet)
+	}
+
 	s.ruleCh <- rules
 }
 
@@ -139,9 +151,13 @@ func (s *schedule) processRules(tickTime time.Time) {
 	select {
 	case rules := <-s.ruleCh:
 		tick := tickTime.Unix() / int64(s.deps.Opts.Interval.Seconds())
+		activeUIDs := make(map[string]struct{}, len(rules))
 		for idx := range rules {
 			s.processRule(&rules[idx], tick)
+			activeUIDs[rules[idx].UID] = struct{}{}
 		}
+		// Stop and remove workers for rules that no longer exist in the DB.
+		s.workerMgr.ReconcileWorkers(activeUIDs)
 	case <-s.ctx.Done():
 		return
 	}
@@ -149,8 +165,8 @@ func (s *schedule) processRules(tickTime time.Time) {
 
 func (s *schedule) processRule(rule *model.AlertRule, tick int64) {
 	// if rule eval interval < min eval interval, need reset rule eval interval
-	if rule.Interval < s.deps.Opts.MinEvalInterval {
-		rule.Interval = s.deps.Opts.MinEvalInterval
+	if rule.Interval < model.Duration(s.deps.Opts.MinEvalInterval) {
+		rule.Interval = model.Duration(s.deps.Opts.MinEvalInterval)
 	}
 
 	worker := s.workerMgr.GetOrCreateWorker(s.ctx, rule)

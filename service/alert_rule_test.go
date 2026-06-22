@@ -20,7 +20,6 @@ package service
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +34,7 @@ func ptrStr(v string) *string { return &v }
 func ptrInt(v int) *int       { return &v }
 
 // makeGroupRow builds a groupRuleRow that represents a group with no matched rule (LEFT JOIN NULL side).
-func makeGroupRow(gid int64, guid, gname string, interval time.Duration) groupRuleRow {
+func makeGroupRow(gid int64, guid, gname string, interval model.Duration) groupRuleRow {
 	return groupRuleRow{
 		GID:       gid,
 		GUID:      guid,
@@ -45,7 +44,7 @@ func makeGroupRow(gid int64, guid, gname string, interval time.Duration) groupRu
 }
 
 // makeGroupRuleRow builds a groupRuleRow with both group and rule fields populated.
-func makeGroupRuleRow(gid int64, guid, gname string, gInterval time.Duration,
+func makeGroupRuleRow(gid int64, guid, gname string, gInterval model.Duration,
 	rid int64, ruid, rGroupUID, rTitle, rDatasourceUID string) groupRuleRow {
 	row := makeGroupRow(gid, guid, gname, gInterval)
 	row.RID = ptrInt64(rid)
@@ -70,7 +69,7 @@ func TestAlertRuleService_SearchAlertRules(t *testing.T) {
 	mockDB := db.NewMockDB(ctrl)
 	srv := NewAlertRuleService(mockDB, nil)
 
-	interval := 30 * time.Second
+	interval := model.Duration(30e9) // 30s in nanoseconds
 
 	cases := []struct {
 		name       string
