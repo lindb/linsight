@@ -31,32 +31,21 @@ import (
 	"github.com/lindb/linsight/pkg/uuid"
 )
 
-func newMigratorCmd() *cobra.Command {
-	migratorCmd := &cobra.Command{
-		Use:   "migrator",
-		Short: "Run as a server",
-	}
-	migratorCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
-		fmt.Sprintf("linsight config file path, default is %s", defaultServerCfgFile))
-
-	migratorCmd.AddCommand(
-		&cobra.Command{
-			Use:   "all",
-			Short: "starts the server",
-			RunE:  runMigration,
-		},
-	)
-	return migratorCmd
+var migratorCmd = &cobra.Command{
+	Use:   "migrator",
+	Short: "Run database migrations",
+	Long:  "Create or update all database tables and seed initial records (admin user, admin org, root alert route).",
+	RunE:  runMigration,
 }
 
 func runMigration(_ *cobra.Command, _ []string) error {
 	cfg, err := loadConfig()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	db, err := dbpkg.NewDB(cfg.Database)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to open database: %w", err)
 	}
 	defer func() {
 		if err = db.Close(); err != nil {
@@ -111,7 +100,10 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	migrator.AddMigration(org)
 
 	user := dbpkg.NewMigration(&model.User{})
-	salt, _ := util.GetRandomString(10)
+	salt, err := util.GetRandomString(10)
+	if err != nil {
+		return fmt.Errorf("failed to generate password salt: %w", err)
+	}
 	pwd := util.EncodePassword("admin", salt)
 	user.AddInitRecord(
 		&model.User{Name: "admin", UserName: "admin", Password: pwd, Salt: salt, OrgID: 1, Email: "admin@admin.io"},
@@ -119,7 +111,7 @@ func runMigration(_ *cobra.Command, _ []string) error {
 	)
 	migrator.AddMigration(user)
 	if err = migrator.Run(); err != nil {
-		panic(err)
+		return fmt.Errorf("migration run failed: %w", err)
 	}
 
 	// Rename alert_receivers → contact_points if the old table still exists.

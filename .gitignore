@@ -38,5 +38,6 @@ cpu_profile
 # vendor/
 test.md
 linsight
+linsight.toml
 .claude/settings.local.json
 LINSIGHT_ALERT_EXECUTION_FLOW.md

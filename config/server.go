@@ -48,13 +48,67 @@ type HTTP struct {
 	ReadTimeout  ltoml.Duration `env:"READ_TIMEOUT" toml:"read-timeout"`
 }
 
+func (h *HTTP) TOML() string {
+	return fmt.Sprintf(`
+## Port the HTTP server listens on.
+## Default: %d
+## Env: LINSIGHT_HTTP_PORT
+port = %d
+## Maximum duration to keep idle connections alive.
+## Default: %s
+## Env: LINSIGHT_HTTP_IDLE_TIMEOUT
+idle-timeout = "%s"
+## Maximum duration before timing out writes of the response.
+## Default: %s
+## Env: LINSIGHT_HTTP_WRITE_TIMEOUT
+write-timeout = "%s"
+## Maximum duration for reading the entire request, including the body.
+## Default: %s
+## Env: LINSIGHT_HTTP_READ_TIMEOUT
+read-timeout = "%s"`,
+		h.Port, h.Port,
+		h.IdleTimeout.Duration().String(), h.IdleTimeout.Duration().String(),
+		h.WriteTimeout.Duration().String(), h.WriteTimeout.Duration().String(),
+		h.ReadTimeout.Duration().String(), h.ReadTimeout.Duration().String())
+}
+
 type Server struct {
-	Migration    bool            `envPrefix:"LINSIGHT_MIGRATION" toml:"migration"`
+	Migration    bool            `env:"LINSIGHT_MIGRATION" toml:"migration"`
 	Database     *Database       `envPrefix:"LINSIGHT_DATABASE_" toml:"database"`
 	HTTP         *HTTP           `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
 	Cookie       *Cookie         `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
-	Provisioning string          `envPrefix:"LINSIGHT_PROVISIONING" toml:"provisioning"`
+	Provisioning string          `env:"LINSIGHT_PROVISIONING" toml:"provisioning"`
 	Logger       *logger.Setting `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
+}
+
+// TOML returns the server configuration as a commented TOML string.
+func (s *Server) TOML() string {
+	return fmt.Sprintf(`## Run database migrations automatically on every startup.
+## Default: %v
+## Env: LINSIGHT_MIGRATION
+migration = %v
+
+## Directory that LinSight scans for provisioning files (dashboards, etc.).
+## Default: %s
+## Env: LINSIGHT_PROVISIONING
+provisioning = "%s"
+
+## Database configuration.
+[database]%s
+
+## HTTP server configuration.
+[http]%s
+
+## Session cookie configuration.
+[cookie]%s
+%s`,
+		s.Migration, s.Migration,
+		s.Provisioning, s.Provisioning,
+		s.Database.TOML(),
+		s.HTTP.TOML(),
+		s.Cookie.TOML(),
+		s.Logger.TOML("LINSIGHT"),
+	)
 }
 
 func NewDefaultServer() *Server {
@@ -67,6 +121,7 @@ func NewDefaultServer() *Server {
 		},
 		HTTP: &HTTP{
 			Port:         8080,
+			IdleTimeout:  ltoml.Duration(time.Minute),
 			WriteTimeout: ltoml.Duration(time.Second * 30),
 			ReadTimeout:  ltoml.Duration(time.Second * 30),
 		},
@@ -79,8 +134,14 @@ func NewDefaultServer() *Server {
 	}
 }
 
+// NewDefaultServerTOML returns the default server configuration as a commented TOML string,
+// suitable for writing to an initial configuration file (linsight init-config).
+func NewDefaultServerTOML() string {
+	return NewDefaultServer().TOML()
+}
+
 func LoadAndSetServerConfig(cfgName, defaultPath string, serverCfg *Server) error {
-	if err := loadConfigFn(cfgName, defaultPath, &serverCfg); err != nil {
+	if err := loadConfigFn(cfgName, defaultPath, serverCfg); err != nil {
 		return fmt.Errorf("decode server config file error: %s", err)
 	}
 	if err := envParseFn(serverCfg); err != nil {

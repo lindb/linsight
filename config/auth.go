@@ -17,9 +17,27 @@
 
 package config
 
-import "github.com/lindb/common/pkg/ltoml"
+import (
+	"fmt"
+
+	"github.com/lindb/common/pkg/ltoml"
+)
 
 type Cookie struct {
 	Name   string         `env:"NAME" toml:"name"`
 	MaxAge ltoml.Duration `env:"MAX_AGE" toml:"max-age"`
+}
+
+func (c *Cookie) TOML() string {
+	return fmt.Sprintf(`
+## Name of the session cookie sent to the browser.
+## Default: %s
+## Env: LINSIGHT_COOKIE_NAME
+name = "%s"
+## Cookie expiration duration. Use Go duration strings (e.g. "720h", "24h").
+## Default: %s
+## Env: LINSIGHT_COOKIE_MAX_AGE
+max-age = "%s"`,
+		c.Name, c.Name,
+		c.MaxAge.Duration().String(), c.MaxAge.Duration().String())
 }

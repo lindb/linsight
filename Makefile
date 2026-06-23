@@ -6,7 +6,7 @@ help:  ## Display this help
 		/^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 run: ## run local server for demo/debug
-	go run github.com/lindb/linsight/cmd server run
+	go run github.com/lindb/linsight/cmd server 
 
 GOMOCK_VERSION = "v1.6.0"
 gomock: ## go generate mock file.

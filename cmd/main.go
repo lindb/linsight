@@ -19,6 +19,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/lindb/common/pkg/fileutil"
 	"github.com/lindb/common/pkg/logger"
+	"github.com/lindb/common/pkg/ltoml"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -56,18 +58,43 @@ var (
 	cfgFile = ""
 )
 
-// RootCmd command of cobra
+// RootCmd is the root command of the CLI.
 var RootCmd = &cobra.Command{
-	Use:   "sight",
-	Short: "sight is the main command, used to control LinSight",
-	Long:  "logo and desc",
+	Use:   "linsight",
+	Short: "LinSight - unified observability platform",
+	Long:  "LinSight is an open-source observability platform for metrics, logs, and traces.",
+}
+
+var serverCmd = &cobra.Command{
+	Use:   "server",
+	Short: "Start the LinSight server",
+	Long:  "Start the LinSight HTTP server and all background services (alerting scheduler, provisioning, etc.).",
+	RunE:  runServer,
+}
+
+var initConfigCmd = &cobra.Command{
+	Use:   "init-config",
+	Short: "Generate a default configuration file",
+	Long:  fmt.Sprintf("Write a default server configuration to a TOML file (default: %s). Prompts before overwriting an existing file.", defaultServerCfgFile),
+	RunE: func(_ *cobra.Command, _ []string) error {
+		path := cfgFile
+		if path == "" {
+			path = defaultServerCfgFile
+		}
+		if err := checkExistenceOf(path); err != nil {
+			if errors.Is(err, errSkipped) {
+				return nil
+			}
+			return err
+		}
+		return ltoml.WriteConfig(path, config.NewDefaultServerTOML())
+	},
 }
 
 func init() {
-	RootCmd.AddCommand(
-		newServerCmd(),
-		newMigratorCmd(),
-	)
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
+		fmt.Sprintf("config file path (default: %s)", defaultServerCfgFile))
+	RootCmd.AddCommand(serverCmd, initConfigCmd, migratorCmd)
 }
 
 func main() {
@@ -77,34 +104,17 @@ func main() {
 	}
 }
 
-func newServerCmd() *cobra.Command {
-	serverCmd := &cobra.Command{
-		Use:   "server",
-		Short: "Run as a server",
-	}
-	serverCmd.PersistentFlags().StringVar(&cfgFile, "config", "",
-		fmt.Sprintf("linsight config file path, default is %s", defaultServerCfgFile))
-	serverCmd.AddCommand(
-		&cobra.Command{
-			Use:   "run",
-			Short: "starts the server",
-			RunE:  runServer,
-		},
-	)
-	return serverCmd
-}
-
 func runServer(_ *cobra.Command, _ []string) error {
 	ctx := newCtxWithSignals()
 	cfg, err := loadConfig()
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if cfg.Migration {
 		// if auto migration enabled, need do data migration
 		if err := runMigration(nil, nil); err != nil {
-			panic(err)
+			return fmt.Errorf("auto migration failed: %w", err)
 		}
 	}
 
@@ -218,6 +228,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	)
 
 	// alertmanager
+	notificationSrv := service.NewNotificationService(db)
+	alertRuleGroupSrv := service.NewAlertRuleGroupService(db)
 	mgrDeps := &manager.Deps{
 		AlertEventSrv:           alertEventSrv,
 		AlertRouteSrv:           alertRouteSrv,
@@ -225,7 +237,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AlertSilenceSrv:         alertSilenceSrv,
 		AlertInhibitRuleSrv:     alertInhibitRuleSrv,
 		NotificationTemplateSrv: notificationTemplateSrv,
-		NotificationSrv:         service.NewNotificationService(db),
+		NotificationSrv:         notificationSrv,
 		ContactPointStatusSrv:   contactPointStatusSrv, // persist per-channel delivery outcomes
 		RenderingEngine:         renderingEngine,
 		ExternalURL:             "", // TODO: configure public URL in server config
@@ -248,9 +260,9 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DashboardVersionSrv: service.NewDashboardVersionService(db),
 		ChartSrv:            service.NewChartService(starSrv, db),
 
-		NotificationSrv:   service.NewNotificationService(db),
-		AlertRuleGroupSrv: service.NewAlertRuleGroupService(db),
-		AlertRuleSrv:      service.NewAlertRuleService(db, service.NewAlertRuleGroupService(db)),
+		NotificationSrv:   notificationSrv,
+		AlertRuleGroupSrv: alertRuleGroupSrv,
+		AlertRuleSrv:      service.NewAlertRuleService(db, alertRuleGroupSrv),
 
 		AlertEventSrv:                alertEventSrv,
 		AlertRouteSrv:                alertRouteSrv,
@@ -312,6 +324,11 @@ func mustLoadNotificationTemplateExamples() []model.NotificationTemplateExample 
 }
 
 func loadConfig() (*config.Server, error) {
+	// reject an explicit --config path that does not exist
+	if cfgFile != "" && !fileutil.Exist(cfgFile) {
+		return nil, fmt.Errorf("config file not found: %s", cfgFile)
+	}
+
 	var cfg *config.Server
 	if fileutil.Exist(cfgFile) || fileutil.Exist(defaultServerCfgFile) {
 		cfg = &config.Server{}
@@ -323,7 +340,5 @@ func loadConfig() (*config.Server, error) {
 		cfg = config.NewDefaultServer()
 	}
 
-	// TODO: remove this after add default config file, just for debug
-	cfg.Logger.Level = "debug"
 	return cfg, nil
 }

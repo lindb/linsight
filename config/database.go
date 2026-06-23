@@ -17,8 +17,29 @@
 
 package config
 
+import "fmt"
+
 type Database struct {
 	Type  string `env:"TYPE" toml:"type"`
 	DSN   string `env:"DSN" toml:"dsn"`
 	Debug bool   `env:"DEBUG" toml:"debug"`
+}
+
+func (d *Database) TOML() string {
+	return fmt.Sprintf(`
+## Database driver: sqlite, mysql, postgres.
+## Default: %s
+## Env: LINSIGHT_DATABASE_TYPE
+type = "%s"
+## Data source name. For SQLite this is the file path; for MySQL/Postgres use a DSN connection string.
+## Default: %s
+## Env: LINSIGHT_DATABASE_DSN
+dsn = "%s"
+## Enable SQL debug logging (prints all queries).
+## Default: %v
+## Env: LINSIGHT_DATABASE_DEBUG
+debug = %v`,
+		d.Type, d.Type,
+		d.DSN, d.DSN,
+		d.Debug, d.Debug)
 }
