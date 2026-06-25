@@ -27,6 +27,7 @@ import (
 	"github.com/lindb/common/pkg/logger"
 	"github.com/lindb/common/pkg/ltoml"
 
+	agentconfig "github.com/lindb/linsight/agent/config"
 	"github.com/lindb/linsight/constant"
 )
 
@@ -73,16 +74,21 @@ read-timeout = "%s"`,
 }
 
 type Server struct {
-	Migration    bool            `env:"LINSIGHT_MIGRATION" toml:"migration"`
-	Database     *Database       `envPrefix:"LINSIGHT_DATABASE_" toml:"database"`
-	HTTP         *HTTP           `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
-	Cookie       *Cookie         `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
-	Provisioning string          `env:"LINSIGHT_PROVISIONING" toml:"provisioning"`
-	Logger       *logger.Setting `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
+	Migration    bool              `env:"LINSIGHT_MIGRATION" toml:"migration"`
+	Database     *Database         `envPrefix:"LINSIGHT_DATABASE_" toml:"database"`
+	HTTP         *HTTP             `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
+	Cookie       *Cookie           `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
+	Provisioning string            `env:"LINSIGHT_PROVISIONING" toml:"provisioning"`
+	Logger       *logger.Setting   `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
+	Agent        *agentconfig.Config `envPrefix:"LINSIGHT_AGENT_" toml:"agent"`
 }
 
 // TOML returns the server configuration as a commented TOML string.
 func (s *Server) TOML() string {
+	agentSection := ""
+	if s.Agent != nil {
+		agentSection = fmt.Sprintf("\n\n## AI agent configuration.\n[agent]%s", s.Agent.TOML())
+	}
 	return fmt.Sprintf(`## Run database migrations automatically on every startup.
 ## Default: %v
 ## Env: LINSIGHT_MIGRATION
@@ -101,13 +107,14 @@ provisioning = "%s"
 
 ## Session cookie configuration.
 [cookie]%s
-%s`,
+%s%s`,
 		s.Migration, s.Migration,
 		s.Provisioning, s.Provisioning,
 		s.Database.TOML(),
 		s.HTTP.TOML(),
 		s.Cookie.TOML(),
 		s.Logger.TOML("LINSIGHT"),
+		agentSection,
 	)
 }
 
@@ -131,6 +138,7 @@ func NewDefaultServer() *Server {
 			MaxAge: ltoml.Duration(time.Hour * 24 * 30),
 		},
 		Logger: logger.NewDefaultSetting(),
+		Agent:  agentconfig.NewDefaultConfig(),
 	}
 }
 

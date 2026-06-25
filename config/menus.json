@@ -57,6 +57,46 @@
     "role": "Viewer"
   },
   {
+    "uid": "agent",
+    "label": "AI",
+    "icon": "ai-agent",
+    "role": "Viewer",
+    "children": [
+      {
+        "uid": "agent_chat",
+        "label": "Chat",
+        "path": "/agent/chat/*",
+        "page": "agent_chat",
+        "icon": "chat",
+        "role": "Viewer"
+      },
+      {
+        "uid": "agent_models",
+        "label": "Models",
+        "path": "/agent/models/*",
+        "page": "agent_models",
+        "icon": "ai-model",
+        "role": "Admin"
+      },
+      {
+        "uid": "agent_mcp",
+        "label": "MCP",
+        "path": "/agent/settings/mcp/*",
+        "page": "agent_mcp",
+        "icon": "ai-mcp",
+        "role": "Admin"
+      },
+      {
+        "uid": "agent_model_routing",
+        "label": "Model Routing",
+        "path": "/agent/settings/model-routing/*",
+        "page": "agent_model_routing",
+        "icon": "route",
+        "role": "Admin"
+      }
+    ]
+  },
+  {
     "uid": "alerting",
     "label": "Alerting",
     "icon": "alert",

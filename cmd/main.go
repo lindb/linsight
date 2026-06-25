@@ -36,6 +36,7 @@ import (
 	"github.com/lindb/linsight/alerting/manager"
 	"github.com/lindb/linsight/alerting/schedule"
 	alerttemplate "github.com/lindb/linsight/alerting/template"
+	agentmodule "github.com/lindb/linsight/agent"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
@@ -243,6 +244,9 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		ExternalURL:             "", // TODO: configure public URL in server config
 	}
 	alertMgr := manager.NewAlertManager(mgrDeps)
+
+	// Bootstrap the agent module (no-op when cfg.Agent is nil or Enabled is false).
+	agentmodule.Bootstrap(cfg, db)
 
 	return &deps.API{
 		Config:              cfg,
