@@ -63,11 +63,11 @@ tags:
     description: Notification template example payload management (Editor/Viewer)
   - name: NotificationSettings
     description: Global notification channel settings (Admin)
-  - name: AgentChat
+  - name: AIChat
     description: AI Agent streaming chat (Viewer)
-  - name: AgentConversations
+  - name: AIConversations
     description: Conversation history management (Viewer)
-  - name: AgentSettings
+  - name: AISettings
     description: Per-org LLM model and MCP server settings (Admin)
 
 security:
@@ -2465,10 +2465,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  # ── Agent: Chat ──────────────────────────────────────────────────────────────
-  /api/v1/agent/chat:
+  # ── AI: Chat ──────────────────────────────────────────────────────────────
+  /api/v1/ai/chat:
     post:
-      tags: [AgentChat]
+      tags: [AIChat]
       summary: Start a new conversation turn (SSE)
       description: |
         Sends a user message to the AI Agent and receives a streaming SSE response.
@@ -2494,13 +2494,13 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/agent/conversations/{uid}/chat:
+  /api/v1/ai/conversations/{uid}/chat:
     post:
-      tags: [AgentChat]
+      tags: [AIChat]
       summary: Continue an existing conversation turn (SSE)
       description: |
         Appends a user message to an existing conversation and streams the agent's response.
-        Same SSE event format as `POST /agent/chat`.
+        Same SSE event format as `POST /ai/chat`.
       parameters:
         - name: uid
           in: path
@@ -2528,10 +2528,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  # ── Agent: Conversations ──────────────────────────────────────────────────────
-  /api/v1/agent/conversations:
+  # ── AI: Conversations ──────────────────────────────────────────────────────
+  /api/v1/ai/conversations:
     get:
-      tags: [AgentConversations]
+      tags: [AIConversations]
       summary: List conversations for the current user
       parameters:
         - name: offset
@@ -2556,9 +2556,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/agent/conversations/{uid}:
+  /api/v1/ai/conversations/{uid}:
     delete:
-      tags: [AgentConversations]
+      tags: [AIConversations]
       summary: Delete a conversation and all its messages
       parameters:
         - name: uid
@@ -2574,10 +2574,73 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  # ── Agent: Model CRUD ─────────────────────────────────────────────────────────
-  /api/v1/agent/models:
+  /api/v1/ai/conversations/{uid}/title:
+    put:
+      tags: [AIConversations]
+      summary: Update the title of a conversation
+      description: Allows users to rename a conversation after it has been auto-titled.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateConversationTitleRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/ai/conversations/{uid}/messages:
     get:
-      tags: [AgentSettings]
+      tags: [AIConversations]
+      summary: Get conversation message history
+      description: Returns the message history for a conversation, ordered oldest-first. Used to restore a chat session.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Message history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── AI: Model CRUD ─────────────────────────────────────────────────────────
+  /api/v1/ai/models:
+    get:
+      tags: [AISettings]
       summary: List all named model configurations for the org
       responses:
         '200':
@@ -2593,7 +2656,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Create a new named model configuration
       requestBody:
         required: true
@@ -2618,9 +2681,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/agent/models/default:
+  /api/v1/ai/models/default:
     get:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Get the default model for the org (fixed mode)
       responses:
         '200':
@@ -2634,9 +2697,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/agent/models/{uid}:
+  /api/v1/ai/models/{uid}:
     get:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Get a single model configuration by UID
       parameters:
         - name: uid
@@ -2658,7 +2721,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Update an existing model configuration
       parameters:
         - name: uid
@@ -2682,7 +2745,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
     delete:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Delete a model configuration by UID
       parameters:
         - name: uid
@@ -2698,9 +2761,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/agent/models/{uid}/default:
+  /api/v1/ai/models/{uid}/default:
     put:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Set this model as the default for the org (fixed mode)
       parameters:
         - name: uid
@@ -2716,10 +2779,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  # ── Agent: Model Routing Config ───────────────────────────────────────────────
-  /api/v1/agent/settings/model-routing:
+  # ── AI: Model Routing Config ───────────────────────────────────────────────
+  /api/v1/ai/settings/model-routing:
     get:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Get the per-org model routing strategy
       responses:
         '200':
@@ -2733,7 +2796,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
     put:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Save the per-org model routing strategy
       requestBody:
         required: true
@@ -2751,10 +2814,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  # ── Agent: MCP Server Settings ────────────────────────────────────────────────
-  /api/v1/agent/settings/mcp:
+  # ── AI: MCP Server Settings ────────────────────────────────────────────────
+  /api/v1/ai/settings/mcp:
     get:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: List all MCP server configurations for the org
       responses:
         '200':
@@ -2770,7 +2833,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Add an MCP server configuration
       requestBody:
         required: true
@@ -2795,9 +2858,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /api/v1/agent/settings/mcp/{uid}:
+  /api/v1/ai/settings/mcp/{uid}:
     delete:
-      tags: [AgentSettings]
+      tags: [AISettings]
       summary: Delete an MCP server configuration
       parameters:
         - name: uid
@@ -4279,10 +4342,24 @@ components:
           description: Identifies the kind of SSE frame.
         content:
           type: string
-          description: Text fragment (type=content) or error description (type=error).
+          description: Human-readable text fragment (type=content) or error description (type=error).
+        errorCode:
+          type: string
+          enum: [rate_limit, model_not_configured, internal_error]
+          description: >
+            Machine-readable error category (type=error only). Clients should use this to
+            render actionable guidance: rate_limit → retry later;
+            model_not_configured → redirect admin to AI Settings → Models;
+            internal_error → generic retry prompt.
         conversationUid:
           type: string
           description: Set on the done event so the client can link future requests.
+        title:
+          type: string
+          description: >
+            Auto-generated title for the conversation (type=done, new conversations only).
+            Empty for existing conversations or when title generation fails/times out.
+            The title language matches the language of the first user message.
         toolName:
           type: string
           description: Tool being invoked or whose result is delivered.
@@ -4323,6 +4400,30 @@ components:
           items:
             $ref: '#/components/schemas/AgentConversation'
 
+    AgentMessage:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            conversationId:
+              type: integer
+              format: int64
+            role:
+              type: string
+              description: Message role (user, assistant, system, tool).
+            content:
+              type: string
+              description: Plain-text content of the message.
+            toolCalls:
+              type: string
+              description: JSON-encoded array of tool call requests (assistant messages only).
+            toolCallId:
+              type: string
+              description: Correlates a tool-result message with the assistant tool_call request.
+            toolName:
+              type: string
+              description: Name of the tool that produced this message (tool messages only).
+
     AgentModel:
       allOf:
         - $ref: '#/components/schemas/BaseModel'
@@ -4342,9 +4443,6 @@ components:
             model:
               type: string
               description: Model name (e.g. gpt-4o).
-            apiKey:
-              type: string
-              description: API key for the LLM provider.
             baseUrl:
               type: string
               description: Optional base URL override for the provider API.
@@ -4387,35 +4485,17 @@ components:
               description: Strategy used when selectionMode is "auto".
 
     CreateModelRequest:
-      type: object
-      required: [name, provider, model, apiKey]
-      properties:
-        name:
-          type: string
-        provider:
-          type: string
-        model:
-          type: string
-        apiKey:
-          type: string
-        baseUrl:
-          type: string
-        maxTokens:
-          type: integer
-        temperature:
-          type: number
-          format: float
-        isEnabled:
-          type: boolean
-        priority:
-          type: integer
-        costWeight:
-          type: integer
-        tags:
-          type: string
+      $ref: '#/components/schemas/ModelRequest'
 
     UpdateModelRequest:
+      $ref: '#/components/schemas/ModelRequest'
+
+    ModelRequest:
       type: object
+      description: >
+        Unified request body for POST /ai/models and PUT /ai/models/:uid.
+        Required fields (name, provider, model, apiKey) are enforced by the
+        service layer; they are required on create but optional on update.
       properties:
         name:
           type: string
@@ -4425,6 +4505,15 @@ components:
           type: string
         apiKey:
           type: string
+          writeOnly: true
+          description: >
+            API key for the LLM provider. On update, omitting this field (or
+            sending an empty string) leaves the stored key unchanged.
+        isDefault:
+          type: boolean
+          description: >
+            When true, this model is promoted to the org default atomically
+            after the create/update operation completes.
         baseUrl:
           type: string
         maxTokens:
@@ -4433,8 +4522,6 @@ components:
           type: number
           format: float
         isEnabled:
-          type: boolean
-        isDefault:
           type: boolean
         priority:
           type: integer
@@ -4481,6 +4568,14 @@ components:
               description: Space-separated command arguments (type=stdio).
             enabled:
               type: boolean
+
+    UpdateConversationTitleRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          description: New title for the conversation.
 
     CreateMCPServerRequest:
       type: object

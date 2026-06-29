@@ -27,7 +27,7 @@ import (
 	"github.com/lindb/common/pkg/logger"
 	"github.com/lindb/common/pkg/ltoml"
 
-	agentconfig "github.com/lindb/linsight/agent/config"
+	aiconfig "github.com/lindb/linsight/ai/config"
 	"github.com/lindb/linsight/constant"
 )
 
@@ -80,14 +80,14 @@ type Server struct {
 	Cookie       *Cookie           `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
 	Provisioning string            `env:"LINSIGHT_PROVISIONING" toml:"provisioning"`
 	Logger       *logger.Setting   `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
-	Agent        *agentconfig.Config `envPrefix:"LINSIGHT_AGENT_" toml:"agent"`
+	AI           *aiconfig.Config `envPrefix:"LINSIGHT_AI_" toml:"ai"`
 }
 
 // TOML returns the server configuration as a commented TOML string.
 func (s *Server) TOML() string {
-	agentSection := ""
-	if s.Agent != nil {
-		agentSection = fmt.Sprintf("\n\n## AI agent configuration.\n[agent]%s", s.Agent.TOML())
+	aiSection := ""
+	if s.AI != nil {
+		aiSection = fmt.Sprintf("\n\n## AI agent configuration.\n[ai]%s", s.AI.TOML())
 	}
 	return fmt.Sprintf(`## Run database migrations automatically on every startup.
 ## Default: %v
@@ -114,7 +114,7 @@ provisioning = "%s"
 		s.HTTP.TOML(),
 		s.Cookie.TOML(),
 		s.Logger.TOML("LINSIGHT"),
-		agentSection,
+		aiSection,
 	)
 }
 
@@ -138,7 +138,7 @@ func NewDefaultServer() *Server {
 			MaxAge: ltoml.Duration(time.Hour * 24 * 30),
 		},
 		Logger: logger.NewDefaultSetting(),
-		Agent:  agentconfig.NewDefaultConfig(),
+		AI:  aiconfig.NewDefaultConfig(),
 	}
 }
 

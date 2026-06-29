@@ -57,40 +57,40 @@
     "role": "Viewer"
   },
   {
-    "uid": "agent",
+    "uid": "ai",
     "label": "AI",
     "icon": "ai-agent",
     "role": "Viewer",
     "children": [
       {
-        "uid": "agent_chat",
+        "uid": "ai_chat",
         "label": "Chat",
-        "path": "/agent/chat/*",
-        "page": "agent_chat",
+        "path": "/ai/chat/*",
+        "page": "ai_chat",
         "icon": "chat",
         "role": "Viewer"
       },
       {
-        "uid": "agent_models",
+        "uid": "ai_models",
         "label": "Models",
-        "path": "/agent/models/*",
-        "page": "agent_models",
+        "path": "/ai/models/*",
+        "page": "ai_models",
         "icon": "ai-model",
         "role": "Admin"
       },
       {
-        "uid": "agent_mcp",
+        "uid": "ai_mcp",
         "label": "MCP",
-        "path": "/agent/settings/mcp/*",
-        "page": "agent_mcp",
+        "path": "/ai/settings/mcp/*",
+        "page": "ai_mcp",
         "icon": "ai-mcp",
         "role": "Admin"
       },
       {
-        "uid": "agent_model_routing",
+        "uid": "ai_model_routing",
         "label": "Model Routing",
-        "path": "/agent/settings/model-routing/*",
-        "page": "agent_model_routing",
+        "path": "/ai/settings/model-routing/*",
+        "page": "ai_model_routing",
         "icon": "route",
         "role": "Admin"
       }

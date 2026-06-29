@@ -21,7 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/lindb/linsight/accesscontrol"
-	agentmodule "github.com/lindb/linsight/agent"
+	aimodule "github.com/lindb/linsight/ai"
 	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/http/api"
 	depspkg "github.com/lindb/linsight/http/deps"
@@ -249,8 +249,8 @@ func (r *Router) RegisterRouters() {
 	// alerting
 	r.registerAlertingRouters(router)
 
-	// agent (no-op when agent module is disabled)
-	agentmodule.RegisterRoutes(router, r.deps)
+	// ai agent (no-op when agent module is disabled)
+	aimodule.RegisterRoutes(router, r.deps)
 }
 
 func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {

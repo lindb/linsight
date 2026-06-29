@@ -64,13 +64,13 @@ pkg/db/      → Database abstraction over GORM (SQLite/MySQL/PostgreSQL)
 plugin/      → Datasource plugins (e.g., LinDB)
 accesscontrol/ → RBAC + ABAC via Casbin
 provisioning/  → Dashboard provisioning from files
-agent/       → AI Agent sub-module (self-contained; enabled via config.Agent.Enabled)
+ai/          → AI Agent sub-module (self-contained; enabled via config.Agent.Enabled)
   api/           → SSE/request types
   components/
     model/       → ModelFactory + DynamicModelProxy (per-org LLM routing)
     skills/      → SkillRegistry (3-level governance funnel)
     tools/       → MCPToolsFactory (per-org MCP tool cache)
-  config/        → Agent-specific config struct
+  config/        → AI-specific config struct
   handler/       → HTTP handlers split by business capability
   model/         → GORM models (AgentModel, AgentMCPServer, …)
   service/       → AgentService (streaming chat orchestration)
@@ -87,10 +87,10 @@ agent/       → AI Agent sub-module (self-contained; enabled via config.Agent.E
 - **Authentication**: Cookie-based sessions with token table in DB; password uses salted hashing
 - **Database**: Defaults to SQLite (`linsight.db`). Configured via `linsight.toml` or env vars
 
-### Agent Sub-Module Patterns
+### AI Sub-Module Patterns
 
 - **Org/user extraction**: Always call `util.GetUser(ctx)` inside service methods to get `orgID`/`userID`. Handlers must NOT call `util.GetUser`.
-- **DTO conversion**: Handlers pass `*agentapi.XxxRequest` directly to service. Service methods own all DTO→model conversions internally.
+- **DTO conversion**: Handlers pass `*aiapi.XxxRequest` directly to service. Service methods own all DTO→model conversions internally.
 - **Create return value**: Service `CreateXxx` methods return `(string, error)` where the string is the generated UID; handlers forward it to the client as `gin.H{"uid": uid}`.
 - **List response shape**: List handlers must return `gin.H{"<resource>": items, "total": n}` unless the endpoint spec explicitly says otherwise. The key name matches the resource noun (e.g. `"models"`, `"servers"`, `"conversations"`). `total` is optional — omit it only when the caller has no pagination need and the spec explicitly permits it.
 
