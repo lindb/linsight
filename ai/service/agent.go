@@ -136,6 +136,7 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 	// Apply a global deadline to the entire Chat() call.
 	timeoutCtx, cancel := context.WithTimeout(ctx, s.cfg.RequestTimeout.Duration())
 	defer cancel()
+	start := time.Now()
 
 	user := util.GetUser(ctx)
 	orgID := user.Org.ID
@@ -208,6 +209,14 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 		agentLog.Warn("failed to load conversation tools via skill registry, proceeding without tools",
 			logger.Error(err))
 	}
+
+	agentLog.Info("chat session start",
+		logger.Int64("org.id", orgID),
+		logger.Int64("user.id", userID),
+		logger.String("conv.uid", conv.UID),
+		logger.Any("is_new", isNew),
+		logger.Int("tools_count", len(orgTools)),
+	)
 
 	// Build a name→level map and inject it into context for the telemetry callback.
 	metaMap := buildMetaMap(skillMeta)
@@ -283,6 +292,11 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 	if isNew {
 		title = s.generateTitle(ctx, conv.ID, req.Content)
 	}
+	agentLog.Info("chat session complete",
+		logger.String("conv.uid", conv.UID),
+		logger.Int("response_len", sb.Len()),
+		logger.String("elapsed", time.Since(start).String()),
+	)
 	return conv.UID, writer.WriteDone(conv.UID, title)
 }
 

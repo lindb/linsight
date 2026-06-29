@@ -27,8 +27,8 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/lindb/common/pkg/logger"
 
-	agentmodel "github.com/lindb/linsight/ai/model"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
+	agentmodel "github.com/lindb/linsight/ai/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 )
 
@@ -61,11 +61,11 @@ type skillRow struct {
 // Non-matching tools are hard-blocked: they are never sent to the LLM.
 type SkillRegistry struct {
 	db           dbpkg.DB
-	toolsFactory *toolscomp.MCPToolsFactory
+	toolsFactory toolscomp.ToolsProvider
 }
 
-// NewSkillRegistry creates a SkillRegistry backed by db and the org's MCP tool pool.
-func NewSkillRegistry(db dbpkg.DB, toolsFactory *toolscomp.MCPToolsFactory) *SkillRegistry {
+// NewSkillRegistry creates a SkillRegistry backed by db and the given tools provider.
+func NewSkillRegistry(db dbpkg.DB, toolsFactory toolscomp.ToolsProvider) *SkillRegistry {
 	return &SkillRegistry{db: db, toolsFactory: toolsFactory}
 }
 
@@ -106,10 +106,10 @@ SELECT
     s.is_global,
     COALESCE(os.status, 0) AS org_status,
     COALESCE(cs.status, 0) AS conv_status
-FROM agent_skills AS s
-LEFT JOIN agent_org_skills AS os
+FROM skills AS s
+LEFT JOIN org_skills AS os
     ON os.skill_id = s.id AND os.org_id = ?
-LEFT JOIN agent_conversation_skills AS cs
+LEFT JOIN conversation_skills AS cs
     ON cs.skill_id = s.id AND cs.conversation_id = ?
 WHERE s.is_global = 1
    OR (COALESCE(os.status, 0) = 1 AND COALESCE(cs.status, 0) = 1)`

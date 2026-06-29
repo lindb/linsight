@@ -25,18 +25,29 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/lindb/linsight/accesscontrol"
-	agenthandler "github.com/lindb/linsight/ai/handler"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
+	agenthandler "github.com/lindb/linsight/ai/handler"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	agentservice "github.com/lindb/linsight/ai/service"
 	"github.com/lindb/linsight/ai/telemetry"
 	"github.com/lindb/linsight/config"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/http/middleware"
+	datasourcepkg "github.com/lindb/linsight/plugin/datasource"
 	dbpkg "github.com/lindb/linsight/pkg/db"
+	servicepkg "github.com/lindb/linsight/service"
 )
+
+// ObservabilityDeps carries the observability service dependencies required by
+// the built-in AI tools. Passed to Bootstrap so the AI module can access
+// datasources and dashboards without creating duplicate service instances.
+type ObservabilityDeps struct {
+	DatasourceSrv servicepkg.DatasourceService
+	DashboardSrv  servicepkg.DashboardService
+	DatasourceMgr datasourcepkg.Manager
+}
 
 // aiModule holds the domain handlers wired up during Bootstrap.
 // A nil mod means the agent is disabled or Bootstrap was never called.
@@ -49,11 +60,20 @@ type aiModule struct {
 // mod is the package-level singleton; nil if AI is disabled.
 var mod *aiModule
 
+// builtinSkillNames are the tool names seeded into the skills table on every
+// startup with is_global=true so they pass the three-level governance funnel
+// without any org subscription or per-conversation enablement.
+var builtinSkillNames = []string{
+	"linsight_list_datasources",
+	"linsight_datasource_query",
+	"linsight_search_dashboards",
+}
+
 // Bootstrap wires up all agent services, runs DB migrations, and registers the
 // OTel observability handler. It must be called once from cmd/main.go's buildDeps()
 // before the server starts accepting requests. If cfg.AI is nil or Enabled is
 // false this function is a no-op, so callers need no guard code.
-func Bootstrap(cfg *config.Server, db dbpkg.DB) {
+func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	if cfg.AI == nil || !cfg.AI.Enabled {
 		return
 	}
@@ -73,14 +93,34 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB) {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
 	}
 
+	// Seed built-in skill entries so they pass the three-level governance funnel
+	// without requiring org subscription or per-conversation enablement.
+	// FirstOrCreate is idempotent: a second startup is a no-op.
+	for _, name := range builtinSkillNames {
+		db.RawDB().Where(agentmodel.Skill{Name: name}).
+			Attrs(agentmodel.Skill{IsGlobal: true, SkillType: "builtin"}).
+			FirstOrCreate(&agentmodel.Skill{})
+	}
+
 	// Wire service dependencies bottom-up.
 	modelSrv := agentservice.NewModelService(db)
 	mcpSrv := agentservice.NewMCPService(db)
 	convSrv := agentservice.NewConversationService(db)
 	modelFactory := modelcomp.NewModelFactory(modelSrv)
 	proxy := modelcomp.NewDynamicModelProxy(modelFactory)
-	toolsFactory := toolscomp.NewMCPToolsFactory(cfg.AI, mcpSrv)
-	skillRegistry := skillscomp.NewSkillRegistry(db, toolsFactory)
+
+	mcpFactory := toolscomp.NewMCPToolsFactory(cfg.AI, mcpSrv)
+	builtinFactory, err := toolscomp.NewBuiltinToolsFactory(
+		obsDeps.DatasourceSrv,
+		obsDeps.DashboardSrv,
+		obsDeps.DatasourceMgr,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("ai: failed to build builtin tools: %v", err))
+	}
+	composite := toolscomp.NewCompositeToolsFactory(mcpFactory, builtinFactory)
+	skillRegistry := skillscomp.NewSkillRegistry(db, composite)
+
 	aiSrv, err := agentservice.NewService(cfg.AI, convSrv, modelFactory, skillRegistry, proxy)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to compile react graph: %v", err))

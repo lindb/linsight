@@ -132,25 +132,29 @@ func runServer(_ *cobra.Command, _ []string) error {
 			router.RegisterRouters()
 
 			// TODO:
-			sche := schedule.NewSchedule(
-				ctx,
-				1,
-				&schedule.Deps{
-					Opts: &schedule.Options{
-						Interval:        time.Second * 10,
-						MinEvalInterval: time.Second * 10,
+			if cfg.Alerting == nil || cfg.Alerting.Enabled {
+				sche := schedule.NewSchedule(
+					ctx,
+					1,
+					&schedule.Deps{
+						Opts: &schedule.Options{
+							Interval:        time.Second * 10,
+							MinEvalInterval: time.Second * 10,
+						},
+						DatasourceSrv:   apiDeps.DatasourceSrv,
+						AlertRuleSrv:    apiDeps.AlertRuleSrv,
+						NotificationSrv: apiDeps.NotificationSrv,
+						DatasourceMgr:   apiDeps.DatasourceMgr,
+						AlertMgr:        apiDeps.AlertMgr,
 					},
-					DatasourceSrv:   apiDeps.DatasourceSrv,
-					AlertRuleSrv:    apiDeps.AlertRuleSrv,
-					NotificationSrv: apiDeps.NotificationSrv,
-					DatasourceMgr:   apiDeps.DatasourceMgr,
-					AlertMgr:        apiDeps.AlertMgr,
-				},
-			)
-			sche.Run()
+				)
+				sche.Run()
 
-			// start the repeat-notification ticker so steady-state Firing alerts are re-notified
-			go apiDeps.AlertMgr.StartRepeatTicker(ctx)
+				// start the repeat-notification ticker so steady-state Firing alerts are re-notified
+				go apiDeps.AlertMgr.StartRepeatTicker(ctx)
+				// remove idle alert groups to prevent unbounded memory growth
+				go apiDeps.AlertMgr.CleanupGroups(ctx)
+			}
 
 			provisionSrv := provisionservice.NewProvisionService(&provisioningdeps.ProvisioningDeps{
 				BaseDir:      cfg.Provisioning,
@@ -245,8 +249,18 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 	}
 	alertMgr := manager.NewAlertManager(mgrDeps)
 
+	// Construct observability services before Bootstrap so they can be shared
+	// with both the AI module and the main deps.API without double-initialization.
+	datasourceSrv := service.NewDatasourceService(db)
+	dashboardSrv := service.NewDashboardService(starSrv, tagSrv, db)
+	datasourceMgr := datasource.NewDatasourceManager()
+
 	// Bootstrap the AI module (no-op when cfg.AI is nil or Enabled is false).
-	aimodule.Bootstrap(cfg, db)
+	aimodule.Bootstrap(cfg, db, aimodule.ObservabilityDeps{
+		DatasourceSrv: datasourceSrv,
+		DashboardSrv:  dashboardSrv,
+		DatasourceMgr: datasourceMgr,
+	})
 
 	return &deps.API{
 		Config:              cfg,
@@ -259,8 +273,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AuthorizeSrv:        authorizeSrv,
 		AuthenticateSrv:     service.NewAuthenticateService(userSrv, db),
 		TagSrv:              tagSrv,
-		DatasourceSrv:       service.NewDatasourceService(db),
-		DashboardSrv:        service.NewDashboardService(starSrv, tagSrv, db),
+		DatasourceSrv:       datasourceSrv,
+		DashboardSrv:        dashboardSrv,
 		DashboardVersionSrv: service.NewDashboardVersionService(db),
 		ChartSrv:            service.NewChartService(starSrv, db),
 
@@ -280,7 +294,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		AlertMgr:        alertMgr,
 		RenderingEngine: renderingEngine,
 
-		DatasourceMgr: datasource.NewDatasourceManager(),
+		DatasourceMgr: datasourceMgr,
 
 		// DryRunner reuses the same manager.Deps so it can access silences/inhibits/routes/contact-points.
 		DryRunner: schedule.NewDryRunner(&schedule.Deps{
@@ -288,8 +302,8 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 				Interval:        time.Second * 10,
 				MinEvalInterval: time.Second * 10,
 			},
-			DatasourceSrv: service.NewDatasourceService(db),
-			DatasourceMgr: datasource.NewDatasourceManager(),
+			DatasourceSrv: datasourceSrv,
+			DatasourceMgr: datasourceMgr,
 			ManagerDeps:   mgrDeps,
 		}),
 	}

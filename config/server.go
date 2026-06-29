@@ -81,6 +81,7 @@ type Server struct {
 	Provisioning string            `env:"LINSIGHT_PROVISIONING" toml:"provisioning"`
 	Logger       *logger.Setting   `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
 	AI           *aiconfig.Config `envPrefix:"LINSIGHT_AI_" toml:"ai"`
+	Alerting     *Alerting        `envPrefix:"LINSIGHT_ALERTING_" toml:"alerting"`
 }
 
 // TOML returns the server configuration as a commented TOML string.
@@ -88,6 +89,10 @@ func (s *Server) TOML() string {
 	aiSection := ""
 	if s.AI != nil {
 		aiSection = fmt.Sprintf("\n\n## AI agent configuration.\n[ai]%s", s.AI.TOML())
+	}
+	alertingSection := ""
+	if s.Alerting != nil {
+		alertingSection = fmt.Sprintf("\n\n## Alerting background services configuration.\n[alerting]%s", s.Alerting.TOML())
 	}
 	return fmt.Sprintf(`## Run database migrations automatically on every startup.
 ## Default: %v
@@ -107,7 +112,7 @@ provisioning = "%s"
 
 ## Session cookie configuration.
 [cookie]%s
-%s%s`,
+%s%s%s`,
 		s.Migration, s.Migration,
 		s.Provisioning, s.Provisioning,
 		s.Database.TOML(),
@@ -115,6 +120,7 @@ provisioning = "%s"
 		s.Cookie.TOML(),
 		s.Logger.TOML("LINSIGHT"),
 		aiSection,
+		alertingSection,
 	)
 }
 
@@ -138,7 +144,8 @@ func NewDefaultServer() *Server {
 			MaxAge: ltoml.Duration(time.Hour * 24 * 30),
 		},
 		Logger: logger.NewDefaultSetting(),
-		AI:  aiconfig.NewDefaultConfig(),
+		AI:       aiconfig.NewDefaultConfig(),
+		Alerting: NewDefaultAlerting(),
 	}
 }
 

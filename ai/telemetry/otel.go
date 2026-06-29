@@ -94,6 +94,7 @@ func GetSkillControlLevel(ctx context.Context, toolName string) agentmodel.Skill
 // data races (Eino's AppendGlobalHandlers is not thread-safe).
 func Register() {
 	callbacks.AppendGlobalHandlers(buildAttrHandler())
+	callbacks.AppendGlobalHandlers(buildLogHandler())
 }
 
 // buildAttrHandler constructs the Eino callback handler that annotates every

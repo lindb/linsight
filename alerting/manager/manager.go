@@ -42,6 +42,9 @@ type AlertManager interface {
 	// StartRepeatTicker runs a background loop that periodically calls MaybeRepeat on all
 	// alert groups so that steady-state Firing alerts get re-notified after RepeatInterval.
 	StartRepeatTicker(ctx context.Context)
+	// CleanupGroups runs a background loop that periodically removes idle alert groups
+	// to prevent unbounded memory growth.
+	CleanupGroups(ctx context.Context)
 }
 
 // Deps holds all service dependencies needed by the AlertManager.
