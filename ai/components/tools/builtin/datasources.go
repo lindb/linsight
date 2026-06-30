@@ -15,9 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package tools
+package builtin
 
-import "context"
+import (
+	"context"
+
+	"github.com/lindb/common/pkg/logger"
+)
 
 // datasourceInfo is the per-datasource summary returned by linsight_list_datasources.
 type datasourceInfo struct {
@@ -30,8 +34,10 @@ type datasourceInfo struct {
 
 // listDatasources calls the service and maps the result to the LLM-friendly shape.
 func listDatasources(ctx context.Context, srv datasourceReader) ([]datasourceInfo, error) {
+	toolsLog.Info("tool: list_datasources called")
 	datasources, err := srv.GetDatasources(ctx)
 	if err != nil {
+		toolsLog.Error("tool: list_datasources failed", logger.Error(err))
 		return nil, err
 	}
 	result := make([]datasourceInfo, 0, len(datasources))
@@ -44,5 +50,6 @@ func listDatasources(ctx context.Context, srv datasourceReader) ([]datasourceInf
 			IsDefault: ds.IsDefault,
 		})
 	}
+	toolsLog.Info("tool: list_datasources done", logger.Int("count", len(result)))
 	return result, nil
 }

@@ -15,9 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Package tools provides MCP-based and built-in Eino tool implementations
-// for the LinSight AI agent module.
-package tools
+// Package builtin provides the built-in observability tools for the LinSight
+// AI agent: linsight_list_datasources, linsight_datasource_query, and
+// linsight_search_dashboards.
+package builtin
 
 import (
 	"context"
@@ -25,10 +26,22 @@ import (
 
 	"github.com/cloudwego/eino/components/tool"
 	toolutils "github.com/cloudwego/eino/components/tool/utils"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/plugin"
 )
+
+var toolsLog = logger.GetLogger("agent", "tools")
+
+// truncateStr returns at most maxRunes runes from s, appending "…" when truncated.
+func truncateStr(s string, maxRunes int) string {
+	runes := []rune(s)
+	if len(runes) <= maxRunes {
+		return s
+	}
+	return string(runes[:maxRunes]) + "…"
+}
 
 // datasourceReader is the minimal DatasourceService surface that builtin tools require.
 // Defined locally to avoid an import cycle with the service package.
@@ -81,7 +94,7 @@ func NewBuiltinToolsFactory(
 }
 
 // GetToolsForOrg returns all built-in tools; built-in tools are org-agnostic.
-// The signature satisfies the ToolsProvider interface.
+// The signature satisfies the ToolsProvider interface in the parent tools package.
 func (f *BuiltinToolsFactory) GetToolsForOrg(_ context.Context, _ int64) ([]tool.BaseTool, error) {
 	return f.tools, nil
 }
@@ -102,9 +115,10 @@ func newListDatasourcesTool(srv datasourceReader) (tool.BaseTool, error) {
 func newDatasourceQueryTool(srv datasourceReader, mgr pluginManager) (tool.BaseTool, error) {
 	return toolutils.InferTool(
 		"linsight_datasource_query",
-		"Execute a data query against a LinSight datasource. "+
-			"Supports metrics (LinDB), logs (LinDB), and traces (LinGo). "+
-			"Call linsight_list_datasources first to obtain a valid datasource_uid.",
+		"Execute a SQL query against a LinSight datasource. "+
+			"LinDB supports metrics, logs, and traces via SQL. "+
+			"REQUIRED: call linsight_list_datasources first to get the datasource_uid. "+
+			"Whenever a user provides a SQL query or asks about data, call this tool immediately.",
 		func(ctx context.Context, input datasourceQueryInput) (*queryResult, error) {
 			return queryDatasource(ctx, srv, mgr, input)
 		},

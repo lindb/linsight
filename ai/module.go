@@ -25,9 +25,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/lindb/linsight/accesscontrol"
+	memorycomp "github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
+	builtintools "github.com/lindb/linsight/ai/components/tools/builtin"
 	agenthandler "github.com/lindb/linsight/ai/handler"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	agentservice "github.com/lindb/linsight/ai/service"
@@ -110,7 +112,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	proxy := modelcomp.NewDynamicModelProxy(modelFactory)
 
 	mcpFactory := toolscomp.NewMCPToolsFactory(cfg.AI, mcpSrv)
-	builtinFactory, err := toolscomp.NewBuiltinToolsFactory(
+	builtinFactory, err := builtintools.NewBuiltinToolsFactory(
 		obsDeps.DatasourceSrv,
 		obsDeps.DashboardSrv,
 		obsDeps.DatasourceMgr,
@@ -121,7 +123,11 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	composite := toolscomp.NewCompositeToolsFactory(mcpFactory, builtinFactory)
 	skillRegistry := skillscomp.NewSkillRegistry(db, composite)
 
-	aiSrv, err := agentservice.NewService(cfg.AI, convSrv, modelFactory, skillRegistry, proxy)
+	// Create MemoryStore factory and instance
+	memoryStoreFactory := memorycomp.NewMemoryStoreFactory(db, convSrv, cfg.AI)
+	memoryStore := memoryStoreFactory.GetDefaultStore()
+
+	aiSrv, err := agentservice.NewService(cfg.AI, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to compile react graph: %v", err))
 	}

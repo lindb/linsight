@@ -15,11 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package tools
+package builtin
 
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/model"
 )
@@ -43,6 +45,11 @@ type dashboardInfo struct {
 
 // searchDashboards calls the service and maps the results to the LLM-friendly shape.
 func searchDashboards(ctx context.Context, srv dashboardSearcher, input searchDashboardsInput) ([]dashboardInfo, error) {
+	toolsLog.Info("tool: search_dashboards called",
+		logger.String("title", input.Title),
+		logger.Int("limit", input.Limit),
+	)
+
 	limit := input.Limit
 	if limit <= 0 || limit > 50 {
 		limit = maxDashboardResults
@@ -56,6 +63,7 @@ func searchDashboards(ctx context.Context, srv dashboardSearcher, input searchDa
 
 	dashboards, _, err := srv.SearchDashboards(ctx, req)
 	if err != nil {
+		toolsLog.Error("tool: search_dashboards failed", logger.Error(err))
 		return nil, err
 	}
 
@@ -71,5 +79,6 @@ func searchDashboards(ctx context.Context, srv dashboardSearcher, input searchDa
 			Tags:  tags,
 		})
 	}
+	toolsLog.Info("tool: search_dashboards done", logger.Int("count", len(result)))
 	return result, nil
 }

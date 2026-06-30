@@ -40,18 +40,15 @@ import (
 	agentconfig "github.com/lindb/linsight/ai/config"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	"github.com/lindb/linsight/ai/components/memory"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/ai/telemetry"
+	aiutil "github.com/lindb/linsight/ai/util"
 	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/pkg/util"
 )
 
-var (
-	agentLog = logger.GetLogger("agent", "service")
-
-	// ErrTooManyRequests is returned when the per-org concurrency limit is exceeded.
-	ErrTooManyRequests = errors.New("too many concurrent requests for this org")
-)
+var agentLog = logger.GetLogger("agent", "service")
 
 // Service orchestrates LLM streaming chat with per-org model routing and SSE delivery.
 type Service interface {
@@ -69,6 +66,8 @@ type agentSvc struct {
 	// skillRegistry applies the three-level governance funnel to select allowed tools.
 	skillRegistry *skillscomp.SkillRegistry
 	proxy         *modelcomp.DynamicModelProxy
+	// memoryStore manages conversation state persistence
+	memoryStore memory.MemoryStore
 	// compiled is the singleton ReAct agent graph built once at startup.
 	compiled *react.Agent
 	// sems maps orgID (int64) → chan struct{} (buffered semaphore).
@@ -84,6 +83,7 @@ func NewService(
 	modelFactory *modelcomp.ModelFactory,
 	skillRegistry *skillscomp.SkillRegistry,
 	proxy *modelcomp.DynamicModelProxy,
+	memoryStore memory.MemoryStore,
 ) (Service, error) {
 	// Build the ReAct graph once at startup with context.Background().
 	// proxy.ForOrg / proxy.WithTools are called per-request, so the graph is stateless.
@@ -100,6 +100,7 @@ func NewService(
 		modelFactory:  modelFactory,
 		skillRegistry: skillRegistry,
 		proxy:         proxy,
+		memoryStore:   memoryStore,
 		compiled:      compiled,
 	}, nil
 }
@@ -107,6 +108,10 @@ func NewService(
 // getSemaphore returns (or lazily creates) the per-org concurrency semaphore.
 // The semaphore is a buffered channel of size MaxConcurrentPerOrg.
 func (s *agentSvc) getSemaphore(orgID int64) chan struct{} {
+	// Fast path: semaphore already exists, skip allocation.
+	if v, ok := s.sems.Load(orgID); ok {
+		return v.(chan struct{})
+	}
 	sem := make(chan struct{}, s.cfg.MaxConcurrentPerOrg)
 	v, _ := s.sems.LoadOrStore(orgID, sem)
 	return v.(chan struct{})
@@ -121,6 +126,7 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 	// Write the fallback title explicitly here as a safety net for panic scenarios.
 	var isNew bool
 	var conv *agentmodel.Conversation
+	var userMsgSaved bool
 	defer func() {
 		if r := recover(); r != nil {
 			panicErr := fmt.Errorf("agent panic: %v", r)
@@ -148,7 +154,7 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 	case sem <- struct{}{}:
 		defer func() { <-sem }()
 	default:
-		return "", ErrTooManyRequests
+		return "", agentapi.ErrTooManyRequests
 	}
 
 	// Resolve or create the conversation.
@@ -175,6 +181,15 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 		}()
 	}
 
+	// Persist the error as a conversation message when the user message was already saved
+	// so the failure remains visible after a page refresh. Uses a fresh context because
+	// timeoutCtx may be expired by the time this defer fires.
+	defer func() {
+		if retErr != nil && conv != nil && userMsgSaved {
+			s.saveErrorMessage(ctx, conv.ID, userID, retErr)
+		}
+	}()
+
 	// Persist the incoming user message before streaming starts.
 	userMsg := &agentmodel.Message{
 		ConversationID: conv.ID,
@@ -187,19 +202,56 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 		agentLog.Error("failed to save user message", logger.Error(err))
 		return conv.UID, fmt.Errorf("save user message: %w", err)
 	}
+	userMsgSaved = true
 
-	// Load recent conversation history for LLM context assembly.
-	history, err := s.convSrv.GetRecentMessages(timeoutCtx, conv.ID, s.cfg.MemorySize)
-	if err != nil {
-		agentLog.Error("failed to load conversation history", logger.Error(err))
-		return conv.UID, fmt.Errorf("load history: %w", err)
+	// Use MemoryStore to restore conversation state and build messages.
+	// assembleErr is declared outside all branches so shadowed inner-scope errors
+	// are not silently dropped after the if/else block exits.
+	var messages []*schema.Message
+	var assembleErr error
+	if s.memoryStore != nil && s.cfg.EnableMultiTurnContext {
+		agentLog.Info("memory: using MemoryStore for multi-turn context",
+			logger.String("conv.uid", conv.UID),
+			logger.String("promptRigidityLevel", s.cfg.PromptRigidityLevel),
+		)
+
+		state, stateErr := s.memoryStore.GetConversationState(timeoutCtx, conv.UID)
+		if stateErr != nil {
+			agentLog.Warn("memory: failed to restore conversation state, falling back to DB history",
+				logger.String("conv.uid", conv.UID),
+				logger.Error(stateErr),
+			)
+			// Fall back to direct DB load so the current user message is included.
+			history, histErr := s.convSrv.GetRecentMessages(timeoutCtx, conv.ID, s.cfg.MemorySize)
+			if histErr != nil {
+				agentLog.Error("failed to load conversation history as fallback", logger.Error(histErr))
+				return conv.UID, fmt.Errorf("load history fallback: %w", histErr)
+			}
+			messages, assembleErr = s.assembleMessages(history, req.Content)
+		} else {
+			agentLog.Info("memory: conversation state restored",
+				logger.String("conv.uid", conv.UID),
+				logger.Int("contextWindow", len(state.ContextWindow)),
+				logger.Int("activeToolCalls", len(state.ActiveToolCalls)),
+			)
+			messages = s.buildMessagesWithMemoryState(state, req.Content)
+		}
+	} else {
+		agentLog.Info("memory: MemoryStore disabled, using DB history",
+			logger.Any("memoryStoreEnabled", s.memoryStore != nil),
+			logger.Any("multiTurnContext", s.cfg.EnableMultiTurnContext),
+		)
+		history, histErr := s.convSrv.GetRecentMessages(timeoutCtx, conv.ID, s.cfg.MemorySize)
+		if histErr != nil {
+			agentLog.Error("failed to load conversation history", logger.Error(histErr))
+			return conv.UID, fmt.Errorf("load history: %w", histErr)
+		}
+		messages, assembleErr = s.assembleMessages(history, req.Content)
 	}
 
-	// Build the message slice: system prompt followed by chronological history.
-	messages, err := s.assembleMessages(history)
-	if err != nil {
-		agentLog.Error("failed to assemble messages", logger.Error(err))
-		return conv.UID, fmt.Errorf("assemble messages: %w", err)
+	if assembleErr != nil {
+		agentLog.Error("failed to assemble messages", logger.Error(assembleErr))
+		return conv.UID, fmt.Errorf("assemble messages: %w", assembleErr)
 	}
 
 	// Load the governance-filtered tool set for this conversation.
@@ -209,6 +261,10 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 		agentLog.Warn("failed to load conversation tools via skill registry, proceeding without tools",
 			logger.Error(err))
 	}
+
+	// Note: Removed auto-generated tool calls approach as it violates OpenAI API rules
+	// Assistant messages with tool_calls must be followed by tool responses
+	// Instead, we rely on enhanced system prompt to guide LLM behavior
 
 	agentLog.Info("chat session start",
 		logger.Int64("org.id", orgID),
@@ -235,8 +291,19 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 		}
 	}
 
+	// toolCallsByIndex accumulates streaming fragments using the Index field defined
+	// by the OpenAI streaming protocol: the first chunk carries id+name, subsequent
+	// chunks carry only arguments with id="". Merging by Index (not ID) handles this.
+	// toolNameToID maps tool name → call_id for SSE and DB correlation in callbacks.
+	// sync.Map is used to avoid a data race between the stream loop (writer) and
+	// Eino's tool-execution goroutines (readers via callback closures).
+	toolCallsByIndex := make(map[int]*schema.ToolCall) // index → accumulated ToolCall
+	var toolCallsIndexOrder []int                       // preserves insertion order
+	var toolNameToID sync.Map                           // toolName → call_id
+
 	// Inject SSE callback to relay tool_call / tool_result events to the client.
-	sseCallback := s.buildSSECallback(writer)
+	// Pass &toolNameToID so the callback can correlate results with their call IDs.
+	sseCallback := s.buildSSECallback(writer, conv.ID, userID, timeoutCtx, &toolNameToID)
 	opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(sseCallback)))
 
 	// Use the pre-compiled singleton ReAct graph; tools and callbacks are injected per-request.
@@ -251,6 +318,8 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 	defer reader.Close()
 
 	// Forward content chunks to the SSE client; accumulate for DB persistence.
+	// Tool call chunks are merged by ID so each reasoning round produces exactly
+	// one assistant message in the DB (not one row per streaming fragment).
 	var sb strings.Builder
 	for {
 		chunk, recvErr := reader.Recv()
@@ -261,13 +330,82 @@ func (s *agentSvc) Chat(ctx context.Context, req *agentapi.ChatRequest, writer *
 			agentLog.Error("stream recv error", logger.Error(recvErr))
 			return conv.UID, fmt.Errorf("stream recv: %w", recvErr)
 		}
-		if chunk != nil && chunk.Content != "" {
-			sb.WriteString(chunk.Content)
-			if writeErr := writer.WriteContent(chunk.Content); writeErr != nil {
-				// Client disconnected; stop streaming but still persist what we have.
-				agentLog.Debug("SSE client disconnected during stream", logger.Error(writeErr))
-				break
+		if chunk != nil {
+			if chunk.Content != "" {
+				sb.WriteString(chunk.Content)
+				if writeErr := writer.WriteContent(chunk.Content); writeErr != nil {
+					// Client disconnected; stop streaming but still persist what we have.
+					agentLog.Debug("SSE client disconnected during stream", logger.Error(writeErr))
+					break
+				}
 			}
+			// Merge tool_call fragments by Index — OpenAI streaming sends id+name in the
+			// first chunk but subsequent chunks have id="" with only arguments appended.
+			// Index (not ID) is the stable per-tool identifier across chunks.
+			if chunk.Role == schema.Assistant && len(chunk.ToolCalls) > 0 {
+				for i := range chunk.ToolCalls {
+					tc := &chunk.ToolCalls[i]
+					// Determine the merge key; fall back to loop position if Index is nil.
+					idx := i
+					if tc.Index != nil {
+						idx = *tc.Index
+					}
+					if existing, ok := toolCallsByIndex[idx]; ok {
+						// Continuation chunk: append arguments; fill in fields if present.
+						existing.Function.Arguments += tc.Function.Arguments
+						if tc.ID != "" {
+							existing.ID = tc.ID
+						}
+						if tc.Function.Name != "" {
+							existing.Function.Name = tc.Function.Name
+						}
+						if tc.Type != "" {
+							existing.Type = tc.Type
+						}
+					} else {
+						copied := *tc
+						toolCallsByIndex[idx] = &copied
+						toolCallsIndexOrder = append(toolCallsIndexOrder, idx)
+					}
+					// Update name→ID mapping once both fields are known.
+					entry := toolCallsByIndex[idx]
+					if entry.Function.Name != "" && entry.ID != "" {
+						toolNameToID.Store(entry.Function.Name, entry.ID)
+					}
+				}
+			}
+		}
+	}
+
+	// Persist the merged tool call round as a single assistant message so that
+	// history replay sees the complete assistant→tool→assistant chain without duplicates.
+	if len(toolCallsByIndex) > 0 {
+		merged := make([]schema.ToolCall, 0, len(toolCallsIndexOrder))
+		for _, idx := range toolCallsIndexOrder {
+			merged = append(merged, *toolCallsByIndex[idx])
+		}
+		// Eino's FunctionCall.Arguments has omitempty; normalize empty strings to "{}"
+		// so OpenAI never receives a history tool_call entry without the arguments field.
+		for i := range merged {
+			if merged[i].Function.Arguments == "" {
+				merged[i].Function.Arguments = "{}"
+			}
+		}
+		toolCallsJSON, _ := json.Marshal(merged)
+		tcMsg := &agentmodel.Message{
+			ConversationID: conv.ID,
+			Role:           agentmodel.MessageRoleAssistant,
+			ToolCalls:      string(toolCallsJSON),
+		}
+		tcMsg.CreatedBy = userID
+		tcMsg.UpdatedBy = userID
+		if saveErr := s.convSrv.SaveMessage(timeoutCtx, tcMsg); saveErr != nil {
+			agentLog.Warn("failed to persist tool call message", logger.Error(saveErr))
+		} else {
+			agentLog.Info("stream: tool call message persisted",
+				logger.String("conv.uid", conv.UID),
+				logger.Int("tool_calls", len(merged)),
+			)
 		}
 	}
 
@@ -314,17 +452,33 @@ func buildMetaMap(meta []skillscomp.SkillMeta) map[string]agentmodel.SkillContro
 
 // assembleMessages builds the message slice for the LLM: system prompt first,
 // then the conversation history in chronological (oldest-first) order.
-func (s *agentSvc) assembleMessages(history []*agentmodel.Message) ([]*schema.Message, error) {
+func (s *agentSvc) assembleMessages(history []*agentmodel.Message, userInput string) ([]*schema.Message, error) {
 	msgs := make([]*schema.Message, 0, len(history)+1)
 
-	if s.cfg.SystemPrompt != "" {
+	systemPrompt := s.cfg.SystemPrompt
+
+	// Enhance system prompt based on query intent detection
+	if userInput != "" {
+		queryIntent := aiutil.DetectQueryIntent(userInput)
+		if queryIntent.HasQueryIntent {
+			systemPrompt += " When users provide SQL queries or mention data sources, automatically use the linsight_datasource_query tool to execute the query. "
+			systemPrompt += "Always call linsight_list_datasources first to get valid datasource UIDs. "
+			systemPrompt += "For SQL queries, extract the query statement and data source name from the user input."
+		}
+	}
+
+	if systemPrompt != "" {
 		msgs = append(msgs, &schema.Message{
 			Role:    schema.System,
-			Content: s.cfg.SystemPrompt,
+			Content: systemPrompt,
 		})
 	}
 
 	for _, m := range history {
+		if m.Role == agentmodel.MessageRoleError {
+			// error messages are for display only; exclude from LLM context
+			continue
+		}
 		msg, err := dbMessageToSchema(m)
 		if err != nil {
 			// Skip malformed history entries rather than aborting the entire request.
@@ -359,6 +513,13 @@ func dbMessageToSchema(m *agentmodel.Message) (*schema.Message, error) {
 			var toolCalls []schema.ToolCall
 			if err := json.Unmarshal([]byte(m.ToolCalls), &toolCalls); err != nil {
 				return nil, fmt.Errorf("unmarshal tool_calls: %w", err)
+			}
+			// Safety-net: normalize arguments="" to "{}" for data stored before this fix
+			// and for tools that legitimately take no arguments.
+			for i := range toolCalls {
+				if toolCalls[i].Function.Arguments == "" {
+					toolCalls[i].Function.Arguments = "{}"
+				}
 			}
 			msg.ToolCalls = toolCalls
 		}
@@ -426,6 +587,30 @@ func (s *agentSvc) generateTitle(reqCtx context.Context, convID int64, firstMess
 	return title
 }
 
+// saveErrorMessage persists a MessageRoleError message so the failure is visible after refresh.
+// Uses a fresh background context (like persistFallbackTitle) because timeoutCtx may be expired.
+func (s *agentSvc) saveErrorMessage(reqCtx context.Context, convID int64, userID int64, err error) {
+	user := util.GetUser(reqCtx)
+	saveCtx, cancel := context.WithTimeout(
+		context.WithValue(context.Background(), constant.LinSightSignedKey, user),
+		titleGenTimeout,
+	)
+	defer cancel()
+
+	code, msg := aiutil.ClassifyError(err)
+	errMsg := &agentmodel.Message{
+		ConversationID: convID,
+		Role:           agentmodel.MessageRoleError,
+		Content:        msg,
+		ErrorCode:      string(code),
+	}
+	errMsg.CreatedBy = userID
+	errMsg.UpdatedBy = userID
+	if saveErr := s.convSrv.SaveMessage(saveCtx, errMsg); saveErr != nil {
+		agentLog.Warn("failed to persist error message", logger.Error(saveErr))
+	}
+}
+
 // titleFallback truncates msg to 40 runes as a best-effort conversation title
 // when LLM title generation fails or returns an empty response.
 func titleFallback(msg string) string {
@@ -439,6 +624,57 @@ func titleFallback(msg string) string {
 		return string(runes[:maxRunes]) + "..."
 	}
 	return s
+}
+
+// buildMessagesWithMemoryState builds messages using MemoryStore conversation state.
+// NOTE: SaveMessage is called before GetConversationState, so state.ContextWindow
+// already contains the current user message as its last entry. Do NOT add userInput
+// again — that would produce two consecutive identical user messages which confuses the LLM.
+func (s *agentSvc) buildMessagesWithMemoryState(state *memory.ConversationState, userInput string) []*schema.Message {
+	messages := make([]*schema.Message, 0, len(state.ContextWindow)+1)
+
+	// Apply the same query-intent enhancement as assembleMessages so the system prompt
+	// hints the LLM to call datasource tools when a query is detected.
+	systemPrompt := s.cfg.SystemPrompt
+	if userInput != "" {
+		queryIntent := aiutil.DetectQueryIntent(userInput)
+		if queryIntent.HasQueryIntent {
+			systemPrompt += " When users provide SQL queries or mention data sources, automatically use the linsight_datasource_query tool to execute the query. "
+			systemPrompt += "Always call linsight_list_datasources first to get valid datasource UIDs. "
+			systemPrompt += "For SQL queries, extract the query statement and data source name from the user input."
+		}
+	}
+
+	// Add system prompt
+	if systemPrompt != "" {
+		messages = append(messages, &schema.Message{
+			Role:    schema.System,
+			Content: systemPrompt,
+		})
+		prompt := systemPrompt
+		if len(prompt) > 80 {
+			prompt = prompt[:80] + "..."
+		}
+		agentLog.Info("prompt: system prompt injected",
+			logger.String("conv.uid", state.ConversationID),
+			logger.String("preview", prompt),
+			logger.Int("len", len(systemPrompt)),
+		)
+	}
+
+	// Add conversation history from context window.
+	// The last entry is already the current user message (saved to DB before this call).
+	for _, msg := range state.ContextWindow {
+		messages = append(messages, msg)
+	}
+
+	agentLog.Info("prompt: final message list built",
+		logger.String("conv.uid", state.ConversationID),
+		logger.Int("total_messages", len(messages)),
+		logger.Int("history_messages", len(state.ContextWindow)),
+	)
+
+	return messages
 }
 
 // buildTitlePrompt constructs the prompt sent to the LLM for title generation.
@@ -462,17 +698,25 @@ func buildTitlePrompt(msg string) string {
 }
 
 // buildSSECallback constructs an Eino callbacks.Handler that relays
-// tool_call and tool_result events to the SSE client.
-// ToolCallID is intentionally left empty: callbacks.RunInfo exposes only
-// the tool name; the client correlates events by name and ordering.
-func (s *agentSvc) buildSSECallback(writer *agentapi.SSEWriter) callbacks.Handler {
+// tool_call and tool_result events to the SSE client and persists tool
+// results to the DB for accurate history replay.
+// convID, userID identify the current conversation and user; saveCtx is the
+// request-scoped context used for DB writes (still alive during streaming).
+// toolNameToID is a sync.Map populated by the stream loop; it maps tool name →
+// LLM-generated call ID. Using sync.Map prevents a data race when Eino's
+// tool-execution goroutines read the map while the stream loop writes to it.
+func (s *agentSvc) buildSSECallback(writer *agentapi.SSEWriter, convID int64, userID int64, saveCtx context.Context, toolNameToID *sync.Map) callbacks.Handler {
 	toolHandler := &cbtemplate.ToolCallbackHandler{
 		OnStart: func(ctx context.Context, info *callbacks.RunInfo, input *tool.CallbackInput) context.Context {
 			args := ""
 			if input != nil {
 				args = input.ArgumentsInJSON
 			}
-			_ = writer.WriteToolCall(info.Name, "", args)
+			callID := ""
+			if v, ok := toolNameToID.Load(info.Name); ok {
+				callID = v.(string)
+			}
+			_ = writer.WriteToolCall(info.Name, callID, args)
 			return ctx
 		},
 		OnEnd: func(ctx context.Context, info *callbacks.RunInfo, output *tool.CallbackOutput) context.Context {
@@ -480,7 +724,35 @@ func (s *agentSvc) buildSSECallback(writer *agentapi.SSEWriter) callbacks.Handle
 			if output != nil {
 				result = output.Response
 			}
-			_ = writer.WriteToolResult(info.Name, "", result)
+			callID := ""
+			if v, ok := toolNameToID.Load(info.Name); ok {
+				callID = v.(string)
+			}
+			_ = writer.WriteToolResult(info.Name, callID, result)
+
+			// Persist tool result so future history replay includes the full
+			// assistant→tool→assistant chain, preventing the LLM from repeating
+			// verbal-promise responses when context is loaded from DB.
+			toolMsg := &agentmodel.Message{
+				ConversationID: convID,
+				Role:           agentmodel.MessageRoleTool,
+				Content:        result,
+				ToolName:       info.Name,
+				ToolCallID:     callID,
+			}
+			toolMsg.CreatedBy = userID
+			toolMsg.UpdatedBy = userID
+			if err := s.convSrv.SaveMessage(saveCtx, toolMsg); err != nil {
+				agentLog.Warn("failed to persist tool result",
+					logger.String("tool", info.Name),
+					logger.Error(err),
+				)
+			} else {
+				agentLog.Info("stream: tool result persisted",
+					logger.String("tool", info.Name),
+					logger.Int("result_len", len(result)),
+				)
+			}
 			return ctx
 		},
 	}

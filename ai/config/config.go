@@ -19,6 +19,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/lindb/common/pkg/ltoml"
@@ -59,6 +60,26 @@ type Config struct {
 	// SystemPrompt is prepended to every conversation as a system message.
 	// Override this to customise the agent persona.
 	SystemPrompt string `env:"SYSTEM_PROMPT" toml:"system-prompt"`
+
+	// MemoryStoreType specifies the storage backend for conversation state.
+	// Options: "db" (default), "redis" (future)
+	MemoryStoreType string `env:"MEMORY_STORE_TYPE" toml:"memory-store-type"`
+
+	// MemoryStoreTTL specifies the time-to-live for conversation state cache.
+	MemoryStoreTTL ltoml.Duration `env:"MEMORY_STORE_TTL" toml:"memory-store-ttl"`
+
+	// EnableStateLocking enables conversation state locking to prevent concurrent access.
+	EnableStateLocking bool `env:"ENABLE_STATE_LOCKING" toml:"enable-state-locking"`
+
+	// PromptRigidityLevel controls the strictness of prompt constraints to prevent planning drift.
+	// Options: "none", "basic", "strict" (default)
+	PromptRigidityLevel string `env:"PROMPT_RIGIDITY_LEVEL" toml:"prompt-rigidity-level"`
+
+	// EnableMultiTurnContext enables multi-turn conversation context preservation.
+	EnableMultiTurnContext bool `env:"ENABLE_MULTI_TURN_CONTEXT" toml:"enable-multi-turn-context"`
+
+	// MaxContextWindowSize specifies the maximum number of messages to include in context window.
+	MaxContextWindowSize int `env:"MAX_CONTEXT_WINDOW_SIZE" toml:"max-context-window-size"`
 }
 
 // NewDefaultConfig returns a Config with conservative, safe defaults.
@@ -72,7 +93,18 @@ func NewDefaultConfig() *Config {
 		MaxConcurrentPerOrg: 5,
 		MemorySize:          20,
 		MaxMessageLength:    8192,
-		SystemPrompt:        "You are a helpful observability assistant for LinSight.",
+		SystemPrompt: "You are a helpful observability assistant for LinSight." +
+			" When users provide SQL queries or mention data sources, you MUST immediately call the appropriate tools to execute queries and return results." +
+			" NEVER output verbal promises without corresponding tool calls." +
+			" When the user asks to list datasources, you MUST call linsight_list_datasources immediately.",
+
+		// MemoryStore configuration defaults
+		MemoryStoreType:        "db",
+		MemoryStoreTTL:         ltoml.Duration(24 * time.Hour),
+		EnableStateLocking:     true,
+		PromptRigidityLevel:    "strict",
+		EnableMultiTurnContext: true,
+		MaxContextWindowSize:   50,
 	}
 }
 
@@ -109,7 +141,31 @@ max-message-length = %d
 
 ## System prompt prepended to every conversation.
 ## Env: LINSIGHT_AI_SYSTEM_PROMPT
-system-prompt = "%s"`,
+system-prompt = "%s"
+
+## Storage backend for conversation state. Options: "db" (default), "redis" (future)
+## Env: LINSIGHT_AI_MEMORY_STORE_TYPE
+memory-store-type = "%s"
+
+## Time-to-live for conversation state cache. Default: %s
+## Env: LINSIGHT_AI_MEMORY_STORE_TTL
+memory-store-ttl = "%s"
+
+## Enable conversation state locking to prevent concurrent access. Default: %v
+## Env: LINSIGHT_AI_ENABLE_STATE_LOCKING
+enable-state-locking = %v
+
+## Strictness of prompt constraints to prevent planning drift. Options: "none", "basic", "strict" (default)
+## Env: LINSIGHT_AI_PROMPT_RIGIDITY_LEVEL
+prompt-rigidity-level = "%s"
+
+## Enable multi-turn conversation context preservation. Default: %v
+## Env: LINSIGHT_AI_ENABLE_MULTI_TURN_CONTEXT
+enable-multi-turn-context = %v
+
+## Maximum number of messages to include in context window. Default: %d
+## Env: LINSIGHT_AI_MAX_CONTEXT_WINDOW_SIZE
+max-context-window-size = %d`,
 		c.Enabled, c.Enabled,
 		c.MaxStep, c.MaxStep,
 		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
@@ -117,6 +173,23 @@ system-prompt = "%s"`,
 		c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
 		c.MemorySize, c.MemorySize,
 		c.MaxMessageLength, c.MaxMessageLength,
-		c.SystemPrompt,
+		escapeTOMLString(c.SystemPrompt),
+		escapeTOMLString(c.MemoryStoreType),
+		c.MemoryStoreTTL.Duration().String(), c.MemoryStoreTTL.Duration().String(),
+		c.EnableStateLocking, c.EnableStateLocking,
+		escapeTOMLString(c.PromptRigidityLevel),
+		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
+		c.MaxContextWindowSize, c.MaxContextWindowSize,
 	)
+}
+
+// escapeTOMLString escapes special characters in s for safe embedding in a TOML basic string.
+// TOML basic strings are delimited by double quotes and do not allow literal newlines or unescaped quotes.
+func escapeTOMLString(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
+	s = strings.ReplaceAll(s, "\t", `\t`)
+	return s
 }

@@ -112,6 +112,15 @@ func runServer(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
+	// Apply logging level from config so [logging] level = "debug" in linsight.toml takes effect.
+	if cfg.Logger != nil && cfg.Logger.Level != "" {
+		if err := logger.RunningAtomicLevel.UnmarshalText([]byte(cfg.Logger.Level)); err != nil {
+			log.Warn("invalid log level in config, keeping default", logger.String("level", cfg.Logger.Level), logger.Error(err))
+		} else {
+			log.Info("log level set from config", logger.String("level", cfg.Logger.Level))
+		}
+	}
+
 	if cfg.Migration {
 		// if auto migration enabled, need do data migration
 		if err := runMigration(nil, nil); err != nil {

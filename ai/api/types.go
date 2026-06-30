@@ -17,6 +17,13 @@
 
 package api
 
+import "errors"
+
+// ErrTooManyRequests is returned when the per-org concurrency limit is exceeded.
+// Defined here (rather than in the service layer) so that ai/util can reference it
+// without creating a circular import (ai/util ← ai/api; ai/service → ai/util).
+var ErrTooManyRequests = errors.New("too many concurrent requests for this org")
+
 // ChatRequest is the request body for POST /agent/chat and
 // POST /agent/conversations/:uid/chat.
 type ChatRequest struct {

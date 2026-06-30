@@ -41,6 +41,9 @@ const (
 	MessageRoleUser      MessageRole = "user"
 	MessageRoleAssistant MessageRole = "assistant"
 	MessageRoleTool      MessageRole = "tool"
+	// MessageRoleError is used to persist agent-side failures as conversation messages
+	// so they remain visible after a page refresh. These messages are excluded from LLM context.
+	MessageRoleError MessageRole = "error"
 )
 
 // Message is a single turn in a conversation, stored for replay as LLM context.
@@ -48,7 +51,11 @@ const (
 // full assistant turn (including tool invocations) can be reconstructed accurately.
 type Message struct {
 	basemodel.BaseModel
-	ConversationID int64       `json:"conversationId" gorm:"column:conversation_id;index"`
+	ConversationID  int64  `json:"-"                        gorm:"column:conversation_id;index"`
+	// ConversationUID is the public identifier of the owning conversation.
+	// It is not stored in the DB (gorm:"-"); it is populated by the service layer
+	// before returning messages to callers so the API never exposes internal int64 IDs.
+	ConversationUID string `json:"conversationUID,omitempty" gorm:"-"`
 	Role           MessageRole `json:"role" gorm:"column:role"`
 	// Content holds the plain-text portion of the message.
 	Content    string `json:"content" gorm:"column:content;type:text"`
@@ -61,6 +68,9 @@ type Message struct {
 	// ToolName is the name of the tool that produced this message.
 	// Non-empty only when Role == "tool".
 	ToolName   string `json:"toolName,omitempty" gorm:"column:tool_name"`
+	// ErrorCode holds the machine-readable SSE error code for role=error messages.
+	// Non-empty only when Role == "error".
+	ErrorCode  string `json:"errorCode,omitempty" gorm:"column:error_code"`
 }
 
 // TableName specifies the GORM table name.

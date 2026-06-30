@@ -15,14 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package tools
+package builtin
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	ljson "github.com/lindb/arrow/pkg/json"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/model"
 )
@@ -34,8 +36,8 @@ const maxQueryRows = 500
 // datasourceQueryInput is the input struct for linsight_datasource_query.
 // Field descriptions become part of the tool's JSON schema sent to the LLM.
 type datasourceQueryInput struct {
-	DatasourceUID string `json:"datasource_uid" jsonschema:"required,description=Datasource UID obtained from linsight_list_datasources."`
-	Params        string `json:"params"         jsonschema:"required,description=JSON query params for the datasource. For LinDB metric/log: {\\\"metric\\\":\\\"cpu\\\",\\\"namespace\\\":\\\"ns\\\",\\\"fields\\\":[\\\"usage\\\"],\\\"groupBy\\\":[\\\"host\\\"]} or {\\\"sql\\\":\\\"SELECT ...\\\"}. For LinGo trace: {\\\"traceID\\\":\\\"abc123\\\"}."`
+	DatasourceUID string `json:"datasource_uid" jsonschema:"required,description=Datasource UID (short alphanumeric string\\, e.g. 'uHI9ecwNz'). Call linsight_list_datasources first to resolve the UID for a named datasource."`
+	Params        string `json:"params"         jsonschema:"required,description=JSON-encoded query parameters containing the SQL query. Example: {\\\"sql\\\":\\\"select node\\, used/total\\, timestamp from lindb.monitor.system.mem_stat\\\"}."`
 	StartTime     string `json:"start_time"     jsonschema:"description=Query start time: Unix millisecond timestamp or relative string (now-1h\\, now-30m\\, now-1d). Default: now-1h."`
 	EndTime       string `json:"end_time"       jsonschema:"description=Query end time: Unix millisecond timestamp or relative string. Default: now."`
 }
@@ -55,13 +57,41 @@ func queryDatasource(
 	mgr pluginManager,
 	input datasourceQueryInput,
 ) (*queryResult, error) {
-	ds, err := srv.GetDatasourceByUID(ctx, input.DatasourceUID)
+	toolsLog.Info("tool: datasource_query called",
+		logger.String("datasource_uid", input.DatasourceUID),
+		logger.String("params", truncateStr(input.Params, 200)),
+	)
+
+	// Try to resolve data source UID if it looks like a name
+	datasourceUID := input.DatasourceUID
+	if !isValidUID(datasourceUID) {
+		// If it doesn't look like a UID, try to find by name
+		datasources, err := srv.GetDatasources(ctx)
+		if err == nil {
+			for _, ds := range datasources {
+				if strings.EqualFold(ds.Name, datasourceUID) {
+					datasourceUID = ds.UID
+					break
+				}
+			}
+		}
+	}
+
+	ds, err := srv.GetDatasourceByUID(ctx, datasourceUID)
 	if err != nil {
-		return nil, fmt.Errorf("datasource not found (uid=%s): %w", input.DatasourceUID, err)
+		toolsLog.Error("tool: datasource_query failed: datasource not found",
+			logger.String("datasource_uid", datasourceUID),
+			logger.Error(err),
+		)
+		return nil, fmt.Errorf("datasource not found (uid=%s): %w", datasourceUID, err)
 	}
 
 	p, err := mgr.GetPlugin(ds)
 	if err != nil {
+		toolsLog.Error("tool: datasource_query failed: plugin unavailable",
+			logger.String("datasource_type", ds.Type),
+			logger.Error(err),
+		)
 		return nil, fmt.Errorf("datasource plugin unavailable (type=%s): %w", ds.Type, err)
 	}
 
@@ -77,6 +107,10 @@ func queryDatasource(
 
 	rs, err := p.DataQuery(ctx, query, timeRange)
 	if err != nil {
+		toolsLog.Error("tool: datasource_query failed: data query error",
+			logger.String("datasource_uid", datasourceUID),
+			logger.Error(err),
+		)
 		return nil, fmt.Errorf("data query failed: %w", err)
 	}
 
@@ -86,6 +120,9 @@ func queryDatasource(
 		// LinGo DataQuery returns nil — known limitation; return helpful message.
 		result.Message = fmt.Sprintf(
 			"datasource type %q returned no data. This may be a known limitation of the plugin.", ds.Type)
+		toolsLog.Info("tool: datasource_query done (nil result set)",
+			logger.String("datasource_uid", datasourceUID),
+		)
 		return result, nil
 	}
 
@@ -99,7 +136,32 @@ func queryDatasource(
 		result.Message = fmt.Sprintf(
 			"result truncated to %d rows (result set exceeded the %d-row limit)", maxQueryRows, maxQueryRows)
 	}
+	toolsLog.Info("tool: datasource_query done",
+		logger.String("datasource_uid", datasourceUID),
+		logger.Int("row_count", result.RowCount),
+	)
 	return result, nil
+}
+
+// isValidUID checks if a string looks like a valid UUID
+func isValidUID(s string) bool {
+	// UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+	if len(s) == 36 && strings.Count(s, "-") == 4 {
+		return true
+	}
+
+	// Short UID format (common in LinSight)
+	if len(s) >= 8 && len(s) <= 32 {
+		// Check if it contains only alphanumeric characters and hyphens
+		for _, r := range s {
+			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-') {
+				return false
+			}
+		}
+		return true
+	}
+
+	return false
 }
 
 // parseTimeRange builds a model.TimeRange from optional start/end strings.

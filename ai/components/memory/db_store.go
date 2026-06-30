@@ -36,15 +36,17 @@ var dbMemoryLog = logger.GetLogger("agent", "db_memory_store")
 
 // DBMemoryStore MemoryStore implementation based on database, adapting existing ConversationProvider
 type dbMemoryStore struct {
-	db      dbpkg.DB
-	convSrv ConversationProvider
+	db         dbpkg.DB
+	convSrv    ConversationProvider
+	memorySize int
 }
 
 // NewDBMemoryStore creates a database-based MemoryStore instance
-func NewDBMemoryStore(db dbpkg.DB, convSrv ConversationProvider) MemoryStore {
+func NewDBMemoryStore(db dbpkg.DB, convSrv ConversationProvider, memorySize int) MemoryStore {
 	return &dbMemoryStore{
-		db:      db,
-		convSrv: convSrv,
+		db:         db,
+		convSrv:    convSrv,
+		memorySize: memorySize,
 	}
 }
 
@@ -130,19 +132,10 @@ func (s *dbMemoryStore) SetConversationState(ctx context.Context, conversationID
 	return s.Set(ctx, key, data, DefaultTTL)
 }
 
-// LockConversation locks conversation to prevent concurrent access
+// LockConversation is a no-op for the DB-backed store.
+// SQLite does not support SELECT ... FOR UPDATE; its write-lock provides
+// sufficient serialization for single-node deployments.
 func (s *dbMemoryStore) LockConversation(ctx context.Context, conversationID string) error {
-	var conv agentmodel.Conversation
-	err := s.db.RawDB().WithContext(ctx).
-		Where("uid = ?", conversationID).
-		Set("gorm:query_option", "FOR UPDATE").
-		First(&conv).Error
-
-	if err != nil {
-		return fmt.Errorf("lock conversation: %w", err)
-	}
-
-	dbMemoryLog.Info("memory: conversation locked", logger.String("conv.uid", conversationID))
 	return nil
 }
 
@@ -164,7 +157,7 @@ func (s *dbMemoryStore) getConversationState(ctx context.Context, key string) ([
 		return nil, fmt.Errorf("get conversation: %w", err)
 	}
 
-	messages, err := s.convSrv.GetRecentMessages(ctx, conv.ID, 20)
+	messages, err := s.convSrv.GetRecentMessages(ctx, conv.ID, s.memorySize)
 	if err != nil {
 		return nil, fmt.Errorf("get recent messages: %w", err)
 	}

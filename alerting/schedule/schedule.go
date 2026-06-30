@@ -84,7 +84,7 @@ func (s *schedule) runScheduler() {
 		for {
 			select {
 			case tick := <-ticker.C:
-				if s.fetching.CAS(false, true) {
+				if s.fetching.CompareAndSwap(false, true) {
 					// notifiy fetch config from storage(alert ruel/notifications etc.)
 					s.fetchSignal <- struct{}{}
 				}
@@ -123,7 +123,6 @@ func (s *schedule) runFetcher() {
 			}
 		}
 	})
-
 }
 
 func (s *schedule) loadAlertRules() {

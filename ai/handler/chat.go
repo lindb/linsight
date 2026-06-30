@@ -18,7 +18,6 @@
 package handler
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -27,8 +26,7 @@ import (
 	"github.com/lindb/common/pkg/logger"
 
 	agentapi "github.com/lindb/linsight/ai/api"
-	modelcomp "github.com/lindb/linsight/ai/components/model"
-	agentservice "github.com/lindb/linsight/ai/service"
+	aiutil "github.com/lindb/linsight/ai/util"
 	"github.com/lindb/linsight/constant"
 )
 
@@ -47,14 +45,7 @@ func NewChatHandler(deps *Deps) *ChatHandler {
 // chatError translates a service-layer Chat error into an SSE error code and a user-facing message.
 // It deliberately avoids exposing raw internal error strings (e.g. eino NodeRunError) to clients.
 func chatError(err error) (agentapi.SSEErrorCode, string) {
-	switch {
-	case errors.Is(err, agentservice.ErrTooManyRequests):
-		return agentapi.SSEErrorRateLimit, "too many concurrent requests, please try again later"
-	case errors.Is(err, modelcomp.ErrNoDefaultModel), errors.Is(err, modelcomp.ErrNoEnabledModels):
-		return agentapi.SSEErrorModelNotConfigured, "no AI model configured for this org — please add and enable a model in AI Settings"
-	default:
-		return agentapi.SSEErrorInternal, "internal error"
-	}
+	return aiutil.ClassifyError(err)
 }
 
 // Chat handles POST /agent/chat and POST /agent/conversations/:uid/chat.

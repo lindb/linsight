@@ -79,7 +79,7 @@ type Server struct {
 	HTTP         *HTTP             `envPrefix:"LINSIGHT_HTTP_" toml:"http"`
 	Cookie       *Cookie           `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
 	Provisioning string            `env:"LINSIGHT_PROVISIONING" toml:"provisioning"`
-	Logger       *logger.Setting   `envPrefix:"LINSIGHT_LOGGER_" toml:"logger"`
+	Logger       *logger.Setting   `envPrefix:"LINSIGHT_LOGGING_" toml:"logging"`
 	AI           *aiconfig.Config `envPrefix:"LINSIGHT_AI_" toml:"ai"`
 	Alerting     *Alerting        `envPrefix:"LINSIGHT_ALERTING_" toml:"alerting"`
 }

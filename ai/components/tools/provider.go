@@ -27,7 +27,7 @@ import (
 var compositeLog = logger.GetLogger("agent", "composite-tools")
 
 // ToolsProvider is the minimal interface that SkillRegistry uses to load the
-// org's available tool set. Both MCPToolsFactory and BuiltinToolsFactory
+// org's available tool set. Both MCPToolsFactory and the builtin.BuiltinToolsFactory
 // implement this interface without any code changes.
 type ToolsProvider interface {
 	GetToolsForOrg(ctx context.Context, orgID int64) ([]tool.BaseTool, error)
