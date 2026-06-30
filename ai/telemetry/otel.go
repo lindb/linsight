@@ -124,8 +124,9 @@ func onStart(ctx context.Context, info *callbacks.RunInfo, _ callbacks.CallbackI
 	if controlLevel != "" {
 		// info.Name is a known tool name — emit a tool-specific log entry.
 		telLog.Debug("agent tool invocation",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
 			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Int64("org.id", u.Org.ID),
 			logger.Int64("user.id", u.User.ID),
 			logger.Int64("conversation.id", convID),
@@ -134,8 +135,9 @@ func onStart(ctx context.Context, info *callbacks.RunInfo, _ callbacks.CallbackI
 		)
 	} else {
 		telLog.Debug("agent component start",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
 			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Int64("org.id", u.Org.ID),
 			logger.Int64("user.id", u.User.ID),
 			logger.Int64("conversation.id", convID),

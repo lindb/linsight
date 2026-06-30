@@ -42,6 +42,16 @@ func buildLogHandler() callbacks.Handler {
 		Build()
 }
 
+// nodeLabel returns info.Name if set; otherwise falls back to string(info.Component)
+// for inner components not registered as named graph nodes (e.g. the OpenAI model
+// inside DynamicModelProxy).
+func nodeLabel(info *callbacks.RunInfo) string {
+	if info.Name != "" {
+		return info.Name
+	}
+	return string(info.Component)
+}
+
 // logOnStart fires when an Eino component begins processing.
 // For model components it logs the message history summary and last user message.
 // For tool components it logs the tool name and input arguments.
@@ -62,7 +72,9 @@ func logOnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.Ca
 			args = truncate(toolInput.ArgumentsInJSON, 200)
 		}
 		telLog.Info("agent tool call",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
+			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Int64("org.id", orgID),
 			logger.Int64("user.id", userID),
 			logger.Int64("conv.id", convID),
@@ -76,7 +88,9 @@ func logOnStart(ctx context.Context, info *callbacks.RunInfo, input callbacks.Ca
 		msgs := modelInput.Messages
 		lastMsg := lastUserMessage(msgs)
 		telLog.Info("agent model input",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
+			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Int64("org.id", orgID),
 			logger.Int64("user.id", userID),
 			logger.Int64("conv.id", convID),
@@ -107,7 +121,9 @@ func logOnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.Cal
 			result = truncate(toolOutput.Response, 300)
 		}
 		telLog.Info("agent tool result",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
+			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Int64("org.id", orgID),
 			logger.Int64("user.id", userID),
 			logger.Int64("conv.id", convID),
@@ -139,7 +155,9 @@ func logOnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.Cal
 	// Log with token usage when available, without otherwise.
 	if modelOutput.TokenUsage != nil {
 		telLog.Info("agent model output",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
+			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Int64("org.id", orgID),
 			logger.Int64("user.id", userID),
 			logger.Int64("conv.id", convID),
@@ -151,7 +169,9 @@ func logOnEnd(ctx context.Context, info *callbacks.RunInfo, output callbacks.Cal
 		)
 	} else {
 		telLog.Info("agent model output",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
+			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Int64("org.id", orgID),
 			logger.Int64("user.id", userID),
 			logger.Int64("conv.id", convID),
@@ -167,8 +187,9 @@ func logOnError(ctx context.Context, info *callbacks.RunInfo, err error) context
 	u := util.GetUser(ctx)
 	if u == nil || u.Org == nil || u.User == nil {
 		telLog.Error("agent component error",
-			logger.String("node", info.Name),
+			logger.String("node", nodeLabel(info)),
 			logger.String("type", info.Type),
+			logger.String("component", string(info.Component)),
 			logger.Error(err),
 		)
 		return ctx
@@ -176,8 +197,9 @@ func logOnError(ctx context.Context, info *callbacks.RunInfo, err error) context
 
 	convID := GetConversationID(ctx)
 	telLog.Error("agent component error",
-		logger.String("node", info.Name),
+		logger.String("node", nodeLabel(info)),
 		logger.String("type", info.Type),
+		logger.String("component", string(info.Component)),
 		logger.Int64("org.id", u.Org.ID),
 		logger.Int64("user.id", u.User.ID),
 		logger.Int64("conv.id", convID),
