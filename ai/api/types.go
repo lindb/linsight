@@ -17,7 +17,11 @@
 
 package api
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/lindb/linsight/ai/agui"
+)
 
 // ErrTooManyRequests is returned when the per-org concurrency limit is exceeded.
 // Defined here (rather than in the service layer) so that ai/util can reference it
@@ -31,63 +35,22 @@ type ChatRequest struct {
 	Content string `json:"content" binding:"required"`
 }
 
-// SSEEventType identifies the kind of Server-Sent Event frame.
-type SSEEventType string
-
-const (
-	// SSEEventContent carries a streamed text fragment from the LLM.
-	SSEEventContent SSEEventType = "content"
-	// SSEEventToolCall notifies the client that the agent is about to invoke a tool.
-	SSEEventToolCall SSEEventType = "tool_call"
-	// SSEEventToolResult delivers the result of a completed tool invocation.
-	SSEEventToolResult SSEEventType = "tool_result"
-	// SSEEventDone signals that the full response has been delivered.
-	SSEEventDone SSEEventType = "done"
-	// SSEEventError signals an unrecoverable error during response generation.
-	SSEEventError SSEEventType = "error"
-)
-
 // SSEErrorCode categorises the error so clients can show actionable guidance
-// rather than a generic error message.
-type SSEErrorCode string
+// rather than a generic error message. Values are sent in RUN_ERROR events as the
+// code field, matching agui.Event.Code.
+type SSEErrorCode = agui.ErrorCode
 
 const (
 	// SSEErrorRateLimit is returned when the org has too many concurrent requests in flight.
 	// Clients should prompt the user to wait and retry.
-	SSEErrorRateLimit SSEErrorCode = "rate_limit"
+	SSEErrorRateLimit SSEErrorCode = agui.ErrorRateLimit
 	// SSEErrorModelNotConfigured is returned when no enabled AI model is found for the org.
 	// Clients should guide admins to AI Settings → Models to add or enable a model.
-	SSEErrorModelNotConfigured SSEErrorCode = "model_not_configured"
+	SSEErrorModelNotConfigured SSEErrorCode = agui.ErrorModelNotConfigured
 	// SSEErrorInternal covers all other server-side errors. No specific action is available;
 	// clients should show a generic retry prompt.
-	SSEErrorInternal SSEErrorCode = "internal_error"
+	SSEErrorInternal SSEErrorCode = agui.ErrorInternal
 )
-
-// SSEEvent is the JSON payload of a single Server-Sent Event frame.
-// All fields are optional except Type; only the fields relevant to the
-// specific event type are populated.
-type SSEEvent struct {
-	// Type identifies what kind of event this is.
-	Type SSEEventType `json:"type"`
-	// Content carries a text fragment (type=content) or human-readable error description (type=error).
-	Content string `json:"content,omitempty"`
-	// ErrorCode classifies the error so clients can render actionable guidance (type=error only).
-	ErrorCode SSEErrorCode `json:"errorCode,omitempty"`
-	// ConversationUID is set on the done event so the client can link future requests.
-	ConversationUID string `json:"conversationUid,omitempty"`
-	// Title is set on the done event for new conversations, carrying the auto-generated title.
-	// Empty for existing conversations or when title generation fails/times out.
-	Title string `json:"title,omitempty"`
-	// ToolName is the name of the tool being invoked (type=tool_call) or whose result
-	// is being delivered (type=tool_result).
-	ToolName string `json:"toolName,omitempty"`
-	// ToolCallID correlates tool_call and tool_result events for the same invocation.
-	ToolCallID string `json:"toolCallId,omitempty"`
-	// Arguments is the JSON-encoded arguments string sent to the tool (type=tool_call).
-	Arguments string `json:"arguments,omitempty"`
-	// Result is the tool's plain-text response (type=tool_result).
-	Result string `json:"result,omitempty"`
-}
 
 // ModelRequest is the unified request body for POST /agent/models and
 // PUT /agent/models/:uid. Required-field validation is enforced by the

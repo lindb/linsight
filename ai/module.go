@@ -25,6 +25,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/lindb/linsight/accesscontrol"
+	agentcomp "github.com/lindb/linsight/ai/components/agent"
 	memorycomp "github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
@@ -37,8 +38,8 @@ import (
 	"github.com/lindb/linsight/config"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/http/middleware"
-	datasourcepkg "github.com/lindb/linsight/plugin/datasource"
 	dbpkg "github.com/lindb/linsight/pkg/db"
+	datasourcepkg "github.com/lindb/linsight/plugin/datasource"
 	servicepkg "github.com/lindb/linsight/service"
 )
 
@@ -127,7 +128,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	memoryStoreFactory := memorycomp.NewMemoryStoreFactory(db, convSrv, cfg.AI)
 	memoryStore := memoryStoreFactory.GetDefaultStore()
 
-	aiSrv, err := agentservice.NewService(cfg.AI, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
+	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to compile react graph: %v", err))
 	}
@@ -137,7 +138,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 
 	deps := &agenthandler.Deps{
 		Cfg:      cfg.AI,
-		AgentSrv: aiSrv,
+		Agent:    agent,
 		ModelSrv: modelSrv,
 		MCPSrv:   mcpSrv,
 		ConvSrv:  convSrv,

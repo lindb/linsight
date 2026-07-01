@@ -22,14 +22,38 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/gin-gonic/gin"
+
+	"github.com/lindb/linsight/ai/agui"
 )
 
-// SSEWriter sends Server-Sent Events to a Gin response writer.
-// It is safe for concurrent use: a mutex serialises all writes so that
-// multiple goroutines (e.g. the streaming loop and a panic recovery
-// handler) do not interleave frames.
-type SSEWriter struct {
+// SSEWriter sends AG-UI protocol events to a Gin response writer.
+// All methods are safe for concurrent use; a mutex serialises writes so that
+// the streaming loop and error-recovery goroutines do not interleave frames.
+type SSEWriter interface {
+	// Run lifecycle
+	WriteRunStarted(runID, conversationUID string)
+	WriteRunFinished(runID, conversationUID, title string)
+	WriteRunError(runID string, code agui.ErrorCode, message string)
+
+	// Streaming text message
+	WriteTextMessageStart(messageID string, role schema.RoleType)
+	WriteTextMessageContent(messageID, delta string)
+	WriteTextMessageEnd(messageID string)
+
+	// Tool invocation
+	WriteToolCallStart(toolCallID, toolName, parentMessageID string)
+	WriteToolCallArgs(toolCallID, argsDelta string)
+	WriteToolCallEnd(toolCallID string)
+	WriteToolCallResult(messageID, toolCallID, toolName, content string, guidance *agui.Guidance)
+
+	// Conversation history snapshot
+	WriteMessagesSnapshot(messages []agui.Message)
+}
+
+// ginSSEWriter is the concrete SSEWriter implementation backed by gin.ResponseWriter.
+type ginSSEWriter struct {
 	mu sync.Mutex
 	w  gin.ResponseWriter
 }
@@ -37,55 +61,114 @@ type SSEWriter struct {
 // NewSSEWriter prepares c for SSE delivery and returns an SSEWriter bound to it.
 // It sets the required Content-Type and Cache-Control headers and flushes them
 // so the client starts receiving the stream immediately.
-func NewSSEWriter(c *gin.Context) *SSEWriter {
+func NewSSEWriter(c *gin.Context) SSEWriter {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.Flush()
-	return &SSEWriter{w: c.Writer}
+	return &ginSSEWriter{w: c.Writer}
 }
 
-// WriteContent sends a content fragment to the client.
-func (w *SSEWriter) WriteContent(text string) error {
-	return w.writeEvent(&SSEEvent{Type: SSEEventContent, Content: text})
-}
-
-// WriteToolCall notifies the client that the agent is about to invoke a tool.
-func (w *SSEWriter) WriteToolCall(toolName, callID, arguments string) error {
-	return w.writeEvent(&SSEEvent{
-		Type:       SSEEventToolCall,
-		ToolName:   toolName,
-		ToolCallID: callID,
-		Arguments:  arguments,
+func (w *ginSSEWriter) WriteRunStarted(runID, conversationUID string) {
+	_ = w.writeEvent(agui.Event{
+		Type:            agui.RunStarted,
+		RunID:           runID,
+		ConversationUID: conversationUID,
 	})
 }
 
-// WriteToolResult delivers the result of a completed tool invocation.
-func (w *SSEWriter) WriteToolResult(toolName, callID, result string) error {
-	return w.writeEvent(&SSEEvent{
-		Type:       SSEEventToolResult,
-		ToolName:   toolName,
-		ToolCallID: callID,
-		Result:     result,
+func (w *ginSSEWriter) WriteRunFinished(runID, conversationUID, title string) {
+	_ = w.writeEvent(agui.Event{
+		Type:            agui.RunFinished,
+		RunID:           runID,
+		ConversationUID: conversationUID,
+		Title:           title,
 	})
 }
 
-// WriteDone sends the terminal done event carrying the conversation UID and,
-// for new conversations, the auto-generated title (empty string if unavailable).
-func (w *SSEWriter) WriteDone(conversationUID, title string) error {
-	return w.writeEvent(&SSEEvent{Type: SSEEventDone, ConversationUID: conversationUID, Title: title})
+func (w *ginSSEWriter) WriteRunError(runID string, code agui.ErrorCode, message string) {
+	_ = w.writeEvent(agui.Event{
+		Type:    agui.RunError,
+		RunID:   runID,
+		Code:    string(code),
+		Message: message,
+	})
 }
 
-// WriteError sends an error event with a machine-readable code and a human-readable message.
-func (w *SSEWriter) WriteError(code SSEErrorCode, msg string) error {
-	return w.writeEvent(&SSEEvent{Type: SSEEventError, ErrorCode: code, Content: msg})
+func (w *ginSSEWriter) WriteTextMessageStart(messageID string, role schema.RoleType) {
+	_ = w.writeEvent(agui.Event{
+		Type:      agui.TextMessageStart,
+		MessageID: messageID,
+		Role:      role,
+		Status:    agui.StatusStreaming,
+	})
 }
 
-// writeEvent marshals event to JSON and writes it as a single SSE data frame.
+func (w *ginSSEWriter) WriteTextMessageContent(messageID, delta string) {
+	_ = w.writeEvent(agui.Event{
+		Type:      agui.TextMessageContent,
+		MessageID: messageID,
+		Delta:     delta,
+	})
+}
+
+func (w *ginSSEWriter) WriteTextMessageEnd(messageID string) {
+	_ = w.writeEvent(agui.Event{
+		Type:      agui.TextMessageEnd,
+		MessageID: messageID,
+		Status:    agui.StatusComplete,
+	})
+}
+
+func (w *ginSSEWriter) WriteToolCallStart(toolCallID, toolName, parentMessageID string) {
+	_ = w.writeEvent(agui.Event{
+		Type:            agui.ToolCallStart,
+		ToolCallID:      toolCallID,
+		ToolCallName:    toolName,
+		ParentMessageID: parentMessageID,
+		Status:          agui.StatusProcessing,
+	})
+}
+
+func (w *ginSSEWriter) WriteToolCallArgs(toolCallID, argsDelta string) {
+	_ = w.writeEvent(agui.Event{
+		Type:       agui.ToolCallArgs,
+		ToolCallID: toolCallID,
+		Delta:      argsDelta,
+	})
+}
+
+func (w *ginSSEWriter) WriteToolCallEnd(toolCallID string) {
+	_ = w.writeEvent(agui.Event{
+		Type:       agui.ToolCallEnd,
+		ToolCallID: toolCallID,
+	})
+}
+
+func (w *ginSSEWriter) WriteToolCallResult(messageID, toolCallID, toolName, content string, guidance *agui.Guidance) {
+	_ = w.writeEvent(agui.Event{
+		Type:         agui.ToolCallResult,
+		MessageID:    messageID,
+		ToolCallID:   toolCallID,
+		ToolCallName: toolName,
+		Content:      content,
+		Guidance:     guidance,
+		Status:       agui.StatusComplete,
+	})
+}
+
+func (w *ginSSEWriter) WriteMessagesSnapshot(messages []agui.Message) {
+	_ = w.writeEvent(agui.Event{
+		Type:     agui.MessagesSnapshot,
+		Messages: messages,
+	})
+}
+
+// writeEvent marshals evt to JSON and writes it as a single SSE data frame.
 // The frame format is: "data: <json>\n\n"
-func (w *SSEWriter) writeEvent(event *SSEEvent) error {
-	data, err := json.Marshal(event)
+func (w *ginSSEWriter) writeEvent(evt agui.Event) error {
+	data, err := json.Marshal(evt)
 	if err != nil {
 		return err
 	}

@@ -19,7 +19,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
+	"github.com/cloudwego/eino/schema"
+
+	"github.com/lindb/linsight/ai/agui"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
@@ -41,7 +45,7 @@ type ConversationService interface {
 	UpdateConversationTitle(ctx context.Context, convID int64, title string) error
 	// GetConversationMessages returns up to limit messages for the conversation identified
 	// by uid (org-isolated), ordered oldest-first. Used by the history restore API.
-	GetConversationMessages(ctx context.Context, uid string, limit int) ([]*agentmodel.Message, error)
+	GetConversationMessages(ctx context.Context, uid string, limit int) ([]agui.Message, error)
 	// GetRecentMessages returns up to limit messages for the conversation ordered
 	// oldest-first. Used by the agent to build LLM context.
 	GetRecentMessages(ctx context.Context, conversationID int64, limit int) ([]*agentmodel.Message, error)
@@ -129,25 +133,140 @@ func (s *conversationService) UpdateConversationTitle(ctx context.Context, convI
 
 // GetConversationMessages returns up to limit messages for the conversation
 // identified by uid, org-isolated, ordered oldest-first. Used by the history restore API.
-func (s *conversationService) GetConversationMessages(ctx context.Context, uid string, limit int) ([]*agentmodel.Message, error) {
+// Tool messages are filtered out; their Guidance is merged into the parent assistant
+// message's ToolCalls[x].Extra so the frontend uses a single code path for both
+// streaming and history restore.
+func (s *conversationService) GetConversationMessages(ctx context.Context, uid string, limit int) ([]agui.Message, error) {
 	conv, err := s.GetConversation(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 	var msgs []*agentmodel.Message
-	if err := s.db.FindForPaging(&msgs, 0, limit, "id desc",
+	if err := s.db.FindForPaging(&msgs, 0, limit, "id asc",
 		"conversation_id = ?", conv.ID); err != nil {
 		return nil, err
 	}
-	// Reverse to oldest-first so the client renders messages in correct order.
-	for i, j := 0, len(msgs)-1; i < j; i, j = i+1, j-1 {
-		msgs[i], msgs[j] = msgs[j], msgs[i]
+
+	// First pass: build guidanceMap from tool-result rows using the physical
+	// tool_call_id and guidance columns — no JSON parsing needed here.
+	guidanceMap := make(map[string]*agui.Guidance, len(msgs))
+	for _, m := range msgs {
+		if m.Role != schema.Tool || m.ToolCallID == "" || len(m.Guidance) == 0 {
+			continue
+		}
+		var g agui.Guidance
+		if json.Unmarshal(m.Guidance, &g) == nil {
+			guidanceMap[m.ToolCallID] = &g
+		}
 	}
-	// Populate virtual ConversationUID so the API never exposes the internal DB int64 ID.
-	for _, msg := range msgs {
-		msg.ConversationUID = conv.UID
+
+	// Second pass: group non-tool rows by TurnUID into ordered turn groups.
+	// For old messages where TurnUID is empty, fall back to MessageUID so each
+	// row forms its own singleton group — preserving pre-migration behaviour.
+	type turnGroup struct {
+		userMsg      *agentmodel.Message
+		toolCalls    []agui.ToolCall
+		firstTCMsgUID string              // MessageUID of the first intermediate assistant row
+		finalMsg     *agentmodel.Message // last assistant row that carries Content
+		errorMsg     *agentmodel.Message
 	}
-	return msgs, nil
+	groupOrder := make([]string, 0, len(msgs))
+	groups := make(map[string]*turnGroup, len(msgs))
+
+	for _, m := range msgs {
+		if m.Role == schema.Tool {
+			continue
+		}
+		var sm schema.Message
+		if err := json.Unmarshal(m.RawMessage, &sm); err != nil {
+			continue
+		}
+
+		key := m.TurnUID
+		if key == "" {
+			key = m.MessageUID
+		}
+		if _, ok := groups[key]; !ok {
+			groups[key] = &turnGroup{}
+			groupOrder = append(groupOrder, key)
+		}
+		g := groups[key]
+
+		switch m.Role {
+		case schema.User:
+			g.userMsg = m
+		case schema.Assistant:
+			if len(sm.ToolCalls) > 0 {
+				if g.firstTCMsgUID == "" {
+					g.firstTCMsgUID = m.MessageUID
+				}
+				for _, tc := range sm.ToolCalls {
+					g.toolCalls = append(g.toolCalls, agui.ToolCall{
+						ID:        tc.ID,
+						Name:      tc.Function.Name,
+						Arguments: tc.Function.Arguments,
+						Extra:     guidanceMap[tc.ID],
+					})
+				}
+			}
+			// Capture Content independently — a row may carry both ToolCalls and Content
+			// (written by savePartialAssistantMessage at the end of a tool-call chain).
+			if sm.Content != "" {
+				g.finalMsg = m
+			}
+		case agentmodel.RoleError:
+			g.errorMsg = m
+		}
+	}
+
+	result := make([]agui.Message, 0, len(msgs))
+	for _, key := range groupOrder {
+		g := groups[key]
+		if g.userMsg != nil {
+			var sm schema.Message
+			if err := json.Unmarshal(g.userMsg.RawMessage, &sm); err == nil {
+				result = append(result, agui.Message{
+					ID:        g.userMsg.MessageUID,
+					Role:      sm.Role,
+					Content:   sm.Content,
+					Status:    agui.StatusComplete,
+					CreatedAt: g.userMsg.CreatedAt,
+				})
+			}
+		}
+		if g.finalMsg != nil || len(g.toolCalls) > 0 {
+			out := agui.Message{
+				Role:      schema.Assistant,
+				Status:    agui.StatusComplete,
+				ToolCalls: g.toolCalls,
+			}
+			if g.finalMsg != nil {
+				var sm schema.Message
+				if err := json.Unmarshal(g.finalMsg.RawMessage, &sm); err == nil {
+					out.ID = g.finalMsg.MessageUID
+					out.Content = sm.Content
+					out.CreatedAt = g.finalMsg.CreatedAt
+				}
+			} else {
+				// Turn interrupted before final row; use turnUID as synthetic ID.
+				out.ID = key
+			}
+			result = append(result, out)
+		}
+		if g.errorMsg != nil {
+			var sm schema.Message
+			if err := json.Unmarshal(g.errorMsg.RawMessage, &sm); err == nil {
+				result = append(result, agui.Message{
+					ID:        g.errorMsg.MessageUID,
+					Role:      sm.Role,
+					Content:   sm.Content,
+					Status:    agui.StatusError,
+					CreatedAt: g.errorMsg.CreatedAt,
+				})
+			}
+		}
+	}
+	return result, nil
 }
 
 // GetRecentMessages returns up to limit messages for the conversation, ordered

@@ -18,6 +18,7 @@
 package handler
 
 import (
+	agentcomp "github.com/lindb/linsight/ai/components/agent"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentservice "github.com/lindb/linsight/ai/service"
 )
@@ -26,7 +27,7 @@ import (
 // Construct one Deps value in Bootstrap and pass it to each handler constructor.
 type Deps struct {
 	Cfg      *agentconfig.Config
-	AgentSrv agentservice.Service
+	Agent    agentcomp.Agent
 	ModelSrv agentservice.ModelService
 	MCPSrv   agentservice.MCPService
 	ConvSrv  agentservice.ConversationService

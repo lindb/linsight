@@ -221,78 +221,60 @@ func (s *dbMemoryStore) listConversationStateKeys(ctx context.Context) ([]string
 	return keys, nil
 }
 
-// convertMessagesToSchema converts database messages to schema.Message.
-// Verbal-promise assistant messages (no ToolCalls and content shorter than 100 runes)
-// are filtered out — they were produced before tool-call persistence was fixed and
-// would otherwise train the LLM to respond with text instead of calling tools.
+// convertMessagesToSchema converts database messages to schema.Message for LLM context.
+// RawMessage now stores eino schema.Message JSON natively (snake_case keys), so the
+// unmarshal is lossless — ToolCalls, ToolCallID, and ToolName are all preserved.
+//
+// Verbal-promise assistant messages (no ToolCalls, content < 100 runes) are filtered out
+// because they were produced before tool-call persistence was fixed and replaying them
+// trains the LLM to respond with text instead of invoking tools.
+//
+// Orphaned tool messages (ToolCallID not referenced by any assistant ToolCall) are also
+// filtered to prevent LLM API validation errors on the next conversation turn.
 func (s *dbMemoryStore) convertMessagesToSchema(messages []*agentmodel.Message) []*schema.Message {
-	schemaMessages := make([]*schema.Message, 0, len(messages))
-
+	// Collect all call_ids referenced by assistant messages to detect orphaned tool rows.
+	knownCallIDs := make(map[string]bool)
 	for _, msg := range messages {
-		// Skip short assistant messages that carry no tool calls.
-		// These are verbal promises ("好的，我来执行…") stored before the tool-call
-		// persistence fix; replaying them teaches the LLM bad behavior.
-		if msg.Role == agentmodel.MessageRoleAssistant &&
-			msg.ToolCalls == "" &&
-			len([]rune(msg.Content)) < 100 {
-			dbMemoryLog.Debug("memory: skipping verbal-promise assistant message",
-				logger.Int64("msg.id", msg.ID),
-				logger.Int("content_len", len([]rune(msg.Content))),
-			)
+		if msg.Role != schema.Assistant {
 			continue
 		}
-
-		schemaMsg := &schema.Message{
-			Content:    msg.Content,
-			ToolCallID: msg.ToolCallID,
-			Name:       msg.ToolName,
+		var sm schema.Message
+		if err := json.Unmarshal(msg.RawMessage, &sm); err != nil {
+			continue
 		}
-
-		// Convert role
-		switch msg.Role {
-		case agentmodel.MessageRoleSystem:
-			schemaMsg.Role = schema.System
-		case agentmodel.MessageRoleUser:
-			schemaMsg.Role = schema.User
-		case agentmodel.MessageRoleAssistant:
-			schemaMsg.Role = schema.Assistant
-			// Restore tool calls from JSON if present.
-			if msg.ToolCalls != "" {
-				var toolCalls []schema.ToolCall
-				if err := json.Unmarshal([]byte(msg.ToolCalls), &toolCalls); err != nil {
-					// Skip the whole assistant message — appending it without ToolCalls while
-					// subsequent tool-role messages reference its IDs produces an invalid chain
-					// that causes OpenAI to return 400 Bad Request.
-					dbMemoryLog.Warn("memory: skipping assistant message with malformed tool_calls",
-						logger.Int64("msg.id", msg.ID), logger.Error(err))
-					continue
-				}
-				// Safety-net: normalize arguments="" to "{}" — OpenAI requires a valid JSON string.
-				for i := range toolCalls {
-					if toolCalls[i].Function.Arguments == "" {
-						toolCalls[i].Function.Arguments = "{}"
-					}
-				}
-				schemaMsg.ToolCalls = toolCalls
+		for _, tc := range sm.ToolCalls {
+			if tc.ID != "" {
+				knownCallIDs[tc.ID] = true
 			}
-		case agentmodel.MessageRoleTool:
-			schemaMsg.Role = schema.Tool
-		case agentmodel.MessageRoleError:
-			// Error messages must not be replayed to the LLM.
-			continue
-		default:
-			// Unknown role — skip silently rather than sending a zero-role message to the LLM.
-			dbMemoryLog.Warn("memory: unknown message role, skipping",
-				logger.Int64("msg.id", msg.ID),
-				logger.String("role", string(msg.Role)),
-			)
-			continue
 		}
-
-		schemaMessages = append(schemaMessages, schemaMsg)
 	}
 
-	return schemaMessages
+	result := make([]*schema.Message, 0, len(messages))
+	for _, msg := range messages {
+		if msg.Role == agentmodel.RoleError {
+			// Error messages are for display only; never send them to the LLM.
+			continue
+		}
+		var sm schema.Message
+		if err := json.Unmarshal(msg.RawMessage, &sm); err != nil {
+			dbMemoryLog.Warn("memory: skipping message with malformed raw_message",
+				logger.Int64("msg.id", msg.ID),
+				logger.Error(err),
+			)
+			continue
+		}
+		// Drop orphaned tool messages; sending them to the LLM causes an API validation
+		// error because their ToolCallID references a non-existent parent ToolCall.
+		if sm.Role == schema.Tool && !knownCallIDs[sm.ToolCallID] {
+			dbMemoryLog.Warn("memory: skipping orphaned tool message",
+				logger.Int64("msg.id", msg.ID),
+				logger.String("tool_call_id", sm.ToolCallID),
+			)
+			continue
+		}
+		result = append(result, &sm)
+	}
+	return result
 }
 
 // extractConversationIDFromKey extracts conversation ID from key name

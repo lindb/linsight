@@ -2472,8 +2472,10 @@ paths:
       summary: Start a new conversation turn (SSE)
       description: |
         Sends a user message to the AI Agent and receives a streaming SSE response.
-        The response is a series of `data: {...}\n\n` frames, each containing an SSEEvent JSON object.
-        Event types: `content` (text chunk), `tool_call`, `tool_result`, `done`, `error`.
+        The response is a series of `data: {...}\n\n` frames, each containing an AGUIEvent JSON object.
+        Event sequence: `RUN_STARTED` → `TEXT_MESSAGE_START` / `TEXT_MESSAGE_CONTENT` / `TEXT_MESSAGE_END`
+        → `TOOL_CALL_START` / `TOOL_CALL_ARGS` / `TOOL_CALL_END` / `TOOL_CALL_RESULT` (repeated per tool)
+        → `RUN_FINISHED` (or `RUN_ERROR` on failure).
       requestBody:
         required: true
         content:
@@ -2482,11 +2484,11 @@ paths:
               $ref: '#/components/schemas/ChatRequest'
       responses:
         '200':
-          description: SSE stream of agent events
+          description: SSE stream of AG-UI agent events
           content:
             text/event-stream:
               schema:
-                $ref: '#/components/schemas/SSEEvent'
+                $ref: '#/components/schemas/AGUIEvent'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2500,7 +2502,7 @@ paths:
       summary: Continue an existing conversation turn (SSE)
       description: |
         Appends a user message to an existing conversation and streams the agent's response.
-        Same SSE event format as `POST /ai/chat`.
+        Same AG-UI event format as `POST /ai/chat`.
       parameters:
         - name: uid
           in: path
@@ -2516,11 +2518,11 @@ paths:
               $ref: '#/components/schemas/ChatRequest'
       responses:
         '200':
-          description: SSE stream of agent events
+          description: SSE stream of AG-UI agent events
           content:
             text/event-stream:
               schema:
-                $ref: '#/components/schemas/SSEEvent'
+                $ref: '#/components/schemas/AGUIEvent'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2620,16 +2622,11 @@ paths:
             default: 100
       responses:
         '200':
-          description: Message history
+          description: Message history as a MESSAGES_SNAPSHOT AG-UI event
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  messages:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/AgentMessage'
+                $ref: '#/components/schemas/AGUIEvent'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4333,45 +4330,155 @@ components:
           type: string
           description: The user's plain-text message.
 
-    SSEEvent:
+    AGUIEvent:
       type: object
+      description: >
+        A single AG-UI protocol event frame. The `type` field determines which other fields are present.
+        Streaming chat produces a sequence of events; history restore returns a single MESSAGES_SNAPSHOT event.
       properties:
         type:
           type: string
-          enum: [content, tool_call, tool_result, done, error]
-          description: Identifies the kind of SSE frame.
+          enum:
+            - RUN_STARTED
+            - RUN_FINISHED
+            - RUN_ERROR
+            - TEXT_MESSAGE_START
+            - TEXT_MESSAGE_CONTENT
+            - TEXT_MESSAGE_END
+            - TOOL_CALL_START
+            - TOOL_CALL_ARGS
+            - TOOL_CALL_END
+            - TOOL_CALL_RESULT
+            - MESSAGES_SNAPSHOT
+          description: Identifies the kind of AG-UI event frame.
+        runId:
+          type: string
+          description: Unique ID for the current agent run (present on RUN_STARTED, RUN_FINISHED, RUN_ERROR).
+        conversationUid:
+          type: string
+          description: Conversation UID (present on RUN_STARTED and RUN_FINISHED).
+        title:
+          type: string
+          description: Auto-generated conversation title (RUN_FINISHED, new conversations only).
+        id:
+          type: string
+          description: AG-UI message ID (present on TEXT_MESSAGE_* and TOOL_CALL_RESULT).
+        status:
+          type: string
+          enum: [processing, streaming, complete, error]
+          description: >
+            Lifecycle state of the message referenced by id.
+            streaming → TEXT_MESSAGE_START; complete → TEXT_MESSAGE_END or TOOL_CALL_RESULT;
+            processing → TOOL_CALL_START. Omitted for events that do not change message state.
+        role:
+          type: string
+          description: Message role — user, assistant, tool (present on TEXT_MESSAGE_START).
+        delta:
+          type: string
+          description: Incremental text chunk (present on TEXT_MESSAGE_CONTENT).
+        toolCallId:
+          type: string
+          description: Correlates TOOL_CALL_START / TOOL_CALL_ARGS / TOOL_CALL_END / TOOL_CALL_RESULT for one invocation.
+        toolCallName:
+          type: string
+          description: Name of the tool being called (present on TOOL_CALL_START and TOOL_CALL_RESULT).
+        parentMessageId:
+          type: string
+          description: Assistant message ID that triggered this tool call (present on TOOL_CALL_START).
         content:
           type: string
-          description: Human-readable text fragment (type=content) or error description (type=error).
-        errorCode:
+          description: Full tool result content (present on TOOL_CALL_RESULT).
+        guidance:
+          $ref: '#/components/schemas/AGUIGuidance'
+        code:
           type: string
           enum: [rate_limit, model_not_configured, internal_error]
           description: >
-            Machine-readable error category (type=error only). Clients should use this to
-            render actionable guidance: rate_limit → retry later;
-            model_not_configured → redirect admin to AI Settings → Models;
+            Machine-readable error code (present on RUN_ERROR).
+            rate_limit → retry later; model_not_configured → redirect admin to AI Settings → Models;
             internal_error → generic retry prompt.
-        conversationUid:
+        message:
           type: string
-          description: Set on the done event so the client can link future requests.
-        title:
+          description: Human-readable error description (present on RUN_ERROR).
+        messages:
+          type: array
+          description: Full message list (present on MESSAGES_SNAPSHOT only).
+          items:
+            $ref: '#/components/schemas/AGUIMessage'
+
+    AGUIMessage:
+      type: object
+      description: Unified message format used in both streaming events and MESSAGES_SNAPSHOT history.
+      properties:
+        id:
           type: string
+          description: Stable AG-UI message ID (same as the `id` field in streaming events).
+        role:
+          type: string
+          description: Message role — user, assistant, error.
+        status:
+          type: string
+          enum: [processing, streaming, complete, error]
           description: >
-            Auto-generated title for the conversation (type=done, new conversations only).
-            Empty for existing conversations or when title generation fails/times out.
-            The title language matches the language of the first user message.
-        toolName:
+            Message lifecycle state.
+            processing → tool invoked, waiting for result;
+            streaming → LLM actively emitting text deltas;
+            complete → message fully formed and persisted;
+            error → agent-side failure.
+        content:
           type: string
-          description: Tool being invoked or whose result is delivered.
+          description: Plain-text content of the message.
+        delta:
+          type: string
+          description: Incremental text delta during streaming phase (SSE only; empty in history).
+        toolCalls:
+          type: array
+          description: Tool call requests attached to an assistant message.
+          items:
+            $ref: '#/components/schemas/AGUIToolCall'
         toolCallId:
           type: string
-          description: Correlates tool_call and tool_result for the same invocation.
+          description: Correlates a tool-result message with the assistant tool_call request.
+        name:
+          type: string
+          description: Name of the tool that produced this message (tool messages only).
+        createdAt:
+          type: integer
+          format: int64
+          description: Unix millisecond timestamp when the message was persisted.
+
+    AGUIToolCall:
+      type: object
+      description: A single tool invocation in an assistant message.
+      properties:
+        id:
+          type: string
+          description: Tool call ID assigned by the LLM.
+        name:
+          type: string
+          description: Tool function name.
         arguments:
           type: string
-          description: JSON-encoded arguments sent to the tool (type=tool_call).
-        result:
+          description: JSON-encoded argument string produced by the LLM.
+        extra:
+          $ref: '#/components/schemas/AGUIGuidance'
+
+    AGUIGuidance:
+      type: object
+      description: >
+        Structured render hint attached to a tool result.
+        Tells the frontend which rich component to use and provides the unmodified
+        structured payload for that component.
+      properties:
+        render_type:
           type: string
-          description: Tool's plain-text response (type=tool_result).
+          description: >
+            Suggested frontend component: "table" for query results, "list" for enumeration results,
+            "text" for plain output.
+        raw_data:
+          description: >
+            Clean, unmodified structured payload for rich rendering.
+            Omitted when the tool result is plain text.
 
     AgentConversation:
       allOf:
@@ -4399,30 +4506,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AgentConversation'
-
-    AgentMessage:
-      allOf:
-        - $ref: '#/components/schemas/BaseModel'
-        - type: object
-          properties:
-            conversationId:
-              type: integer
-              format: int64
-            role:
-              type: string
-              description: Message role (user, assistant, system, tool).
-            content:
-              type: string
-              description: Plain-text content of the message.
-            toolCalls:
-              type: string
-              description: JSON-encoded array of tool call requests (assistant messages only).
-            toolCallId:
-              type: string
-              description: Correlates a tool-result message with the assistant tool_call request.
-            toolName:
-              type: string
-              description: Name of the tool that produced this message (tool messages only).
 
     AgentModel:
       allOf:

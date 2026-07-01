@@ -19,12 +19,14 @@ package handler
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	httppkg "github.com/lindb/common/pkg/http"
 	"github.com/lindb/common/pkg/logger"
 
+	"github.com/lindb/linsight/ai/agui"
 	agentapi "github.com/lindb/linsight/ai/api"
 	aiutil "github.com/lindb/linsight/ai/util"
 	"github.com/lindb/linsight/constant"
@@ -42,15 +44,9 @@ func NewChatHandler(deps *Deps) *ChatHandler {
 	return &ChatHandler{deps: deps}
 }
 
-// chatError translates a service-layer Chat error into an SSE error code and a user-facing message.
-// It deliberately avoids exposing raw internal error strings (e.g. eino NodeRunError) to clients.
-func chatError(err error) (agentapi.SSEErrorCode, string) {
-	return aiutil.ClassifyError(err)
-}
-
 // Chat handles POST /agent/chat and POST /agent/conversations/:uid/chat.
 // It upgrades the response to an SSE stream and forwards LLM output chunk-by-chunk.
-// All service errors are translated by chatErrMsg and delivered as SSE error events.
+// All service errors are translated by aiutil.ClassifyError and delivered as RUN_ERROR events.
 func (h *ChatHandler) Chat(c *gin.Context) {
 	var req agentapi.ChatRequest
 	if err := c.ShouldBind(&req); err != nil {
@@ -68,20 +64,16 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 	// Commit SSE headers before the first write so the client starts receiving events.
 	writer := agentapi.NewSSEWriter(c)
 
-	createdUID, err := h.deps.AgentSrv.Chat(c.Request.Context(), &req, writer, convUID)
+	_, runID, err := h.deps.Agent.Chat(c.Request.Context(), &req, writer, convUID)
 	if err != nil {
-		// HTTP 200 + SSE headers are already committed; deliver the error via the stream,
-		// then send a done event so the client knows the stream has terminated cleanly.
-		// createdUID is non-empty when the conversation was created before the error occurred,
-		// allowing the frontend to update the URL and refetch the sidebar.
-		code, msg := chatError(err)
-		chatLog.Info("sending SSE error event", logger.String("code", string(code)), logger.String("msg", msg), logger.Error(err))
-		if writeErr := writer.WriteError(code, msg); writeErr != nil {
-			chatLog.Warn("failed to write SSE error event", logger.Error(writeErr))
-		}
-		if doneErr := writer.WriteDone(createdUID, ""); doneErr != nil {
-			chatLog.Warn("failed to write SSE done event", logger.Error(doneErr))
-		}
+		// HTTP 200 + SSE headers are already committed; deliver the error via the stream.
+		// RUN_ERROR is the terminal event — no additional done event is required.
+		code, msg := aiutil.ClassifyError(err)
+		chatLog.Info("sending SSE error event",
+			logger.String("code", string(code)),
+			logger.String("msg", msg),
+			logger.Error(err))
+		writer.WriteRunError(runID, code, msg)
 	}
 }
 
@@ -136,14 +128,21 @@ func (h *ChatHandler) UpdateConversationTitle(c *gin.Context) {
 }
 
 // GetConversationMessages handles GET /agent/conversations/:uid/messages.
-// Returns the conversation history for the session restore flow.
+// Returns the conversation history as a MESSAGES_SNAPSHOT AG-UI event so the
+// frontend processes history with the same schema as live streaming events.
 func (h *ChatHandler) GetConversationMessages(c *gin.Context) {
 	uid := c.Param(constant.UID)
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
+	if err != nil || limit <= 0 {
+		limit = 100
+	}
 	msgs, err := h.deps.ConvSrv.GetConversationMessages(c.Request.Context(), uid, limit)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
-	httppkg.OK(c, gin.H{"messages": msgs})
+	c.JSON(http.StatusOK, agui.Event{
+		Type:     agui.MessagesSnapshot,
+		Messages: msgs,
+	})
 }
