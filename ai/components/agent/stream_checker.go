@@ -25,23 +25,15 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// fullResponseStreamToolCallChecker detects tool calls in the streaming response.
-// It returns early (false) as soon as the model emits reasoning content or regular text
-// content, which signals the model is in text-answer mode and will not produce tool calls.
-// Returning early prevents Eino from buffering the entire LLM stream before the outer
-// reader loop can start, enabling real-time token delivery to the client.
+// fullResponseStreamToolCallChecker reads all streaming chunks to detect tool calls.
+// Unlike the default firstChunkStreamToolCallChecker, this handles LLMs (e.g. DeepSeek)
+// that emit text content before tool_calls in the same streaming response — the default
+// first-chunk checker would route to END prematurely when it sees text before tool_calls.
 //
-// Decision table:
-//
-//	ToolCalls present          → true  (route to tools node)
-//	ReasoningContent non-empty → false (thinking mode; model will not call tools)
-//	Content non-empty          → false (text-answer mode; model will not call tools)
-//	Empty chunk / prefix       → continue reading
-//
-// Trade-off: if a model emits text content THEN tool calls in the same turn, the tool
-// calls will be missed.  This is acceptable because the OnEndWithStreamOutput callback
-// (see buildSSECallback) streams text to the client in real-time for every model call,
-// so the two mechanisms complement each other.
+// The full-read approach is safe to use alongside OnEndWithStreamOutput: the callback
+// drains its fan-out copy in real-time (streaming text to SSE), and by the time the
+// callback returns the LLM output is fully buffered. This checker then reads from
+// that buffer quickly without adding latency.
 //
 // The handler closes sr before returning as required by the Eino contract.
 func fullResponseStreamToolCallChecker(_ context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
@@ -56,14 +48,6 @@ func fullResponseStreamToolCallChecker(_ context.Context, sr *schema.StreamReade
 		}
 		if len(msg.ToolCalls) > 0 {
 			return true, nil
-		}
-		// Once reasoning tokens appear the model is in long-form answer mode — no tool calls follow.
-		if msg.ReasoningContent != "" {
-			return false, nil
-		}
-		// Once text content appears the model is producing a text answer, not a tool call.
-		if len(msg.Content) > 0 {
-			return false, nil
 		}
 	}
 }
