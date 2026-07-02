@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
+	"github.com/lindb/linsight/ai/agui"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
@@ -251,8 +252,10 @@ func (s *dbMemoryStore) convertMessagesToSchema(messages []*agentmodel.Message) 
 
 	result := make([]*schema.Message, 0, len(messages))
 	for _, msg := range messages {
-		if msg.Role == agentmodel.RoleError {
-			// Error messages are for display only; never send them to the LLM.
+		// Agent-level error messages (role=assistant, status=error) are for display only;
+		// never send them to the LLM. Tool-error messages (role=tool, status=error) must
+		// remain — the LLM requires every tool_call to be followed by a tool result.
+		if msg.Role == schema.Assistant && msg.Status == string(agui.StatusError) {
 			continue
 		}
 		var sm schema.Message

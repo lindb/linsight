@@ -141,9 +141,17 @@ func (s *conversationService) UpdateConversationTitle(ctx context.Context, convI
 
 // GetConversationMessages returns up to limit messages for the conversation
 // identified by uid, org-isolated, ordered oldest-first. Used by the history restore API.
-// Tool messages are filtered out; their Guidance is merged into the parent assistant
-// message's ToolCalls[x].Extra so the frontend uses a single code path for both
-// streaming and history restore.
+//
+// The function runs three passes:
+//  1. Index tool-result rows by tool_call_id — each entry carries content, status, and guidance.
+//  2. Group non-tool rows by turn_uid (falling back to message_uid for pre-migration rows) to
+//     reconstruct the logical turns in insertion order.
+//  3. Assemble one or two agui.Message values per turn: a user message and an assistant message
+//     that carries all tool calls (with their results) and the final text content.
+//
+// Tool messages are never included in the output; their content is merged into
+// ToolCalls[x].Content/Status/Extra so the frontend uses a single code path for
+// both streaming and history restore.
 func (s *conversationService) GetConversationMessages(ctx context.Context, uid string, limit int) ([]agui.Message, error) {
 	conv, err := s.GetConversation(ctx, uid)
 	if err != nil {
@@ -155,126 +163,154 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 		return nil, err
 	}
 
-	// First pass: build guidanceMap from tool-result rows using the physical
-	// tool_call_id and guidance columns — no JSON parsing needed here.
-	guidanceMap := make(map[string]*agui.Guidance, len(msgs))
+	// Pass 1: index tool-result rows by tool_call_id.
+	type toolResult struct {
+		content  string
+		status   agui.MessageStatus
+		guidance *agui.Guidance
+	}
+	toolResultMap := make(map[string]*toolResult, len(msgs))
 	for _, m := range msgs {
-		if m.Role != schema.Tool || m.ToolCallID == "" || len(m.Guidance) == 0 {
+		if m.Role != schema.Tool || m.ToolCallID == "" {
 			continue
 		}
-		var g agui.Guidance
-		if json.Unmarshal(m.Guidance, &g) == nil {
-			guidanceMap[m.ToolCallID] = &g
+		var sm schema.Message
+		if json.Unmarshal(m.RawMessage, &sm) != nil {
+			continue
 		}
+		res := &toolResult{content: sm.Content, status: agui.StatusComplete}
+		if m.Status == string(agui.StatusError) {
+			res.status = agui.StatusError
+		}
+		if len(m.Guidance) > 0 {
+			var g agui.Guidance
+			if json.Unmarshal(m.Guidance, &g) == nil {
+				res.guidance = &g
+			}
+		}
+		toolResultMap[m.ToolCallID] = res
 	}
 
-	// Second pass: group non-tool rows by TurnUID into ordered turn groups.
-	// For old messages where TurnUID is empty, fall back to MessageUID so each
-	// row forms its own singleton group — preserving pre-migration behaviour.
-	type turnGroup struct {
-		userMsg    *agentmodel.Message
-		toolCalls  []agui.ToolCall
-		firstTCMsg *agentmodel.Message  // first intermediate assistant row carrying ToolCalls
-		finalMsg   *agentmodel.Message  // last assistant row that carries Content
-		errorMsg   *agentmodel.Message
-	}
-	groupOrder := make([]string, 0, len(msgs))
-	groups := make(map[string]*turnGroup, len(msgs))
-
+	// Pass 2: group non-tool rows by turn_uid, preserving insertion order.
+	// Pre-migration rows with empty TurnUID form singleton groups keyed by MessageUID.
+	turnOrder := make([]string, 0, len(msgs))
+	turnMsgs := make(map[string][]*agentmodel.Message, len(msgs))
 	for _, m := range msgs {
 		if m.Role == schema.Tool {
 			continue
 		}
-		var sm schema.Message
-		if err := json.Unmarshal(m.RawMessage, &sm); err != nil {
-			continue
-		}
-
 		key := m.TurnUID
 		if key == "" {
 			key = m.MessageUID
 		}
-		if _, ok := groups[key]; !ok {
-			groups[key] = &turnGroup{}
-			groupOrder = append(groupOrder, key)
+		if _, ok := turnMsgs[key]; !ok {
+			turnOrder = append(turnOrder, key)
 		}
-		g := groups[key]
-
-		switch m.Role {
-		case schema.User:
-			g.userMsg = m
-		case schema.Assistant:
-			if len(sm.ToolCalls) > 0 {
-				if g.firstTCMsg == nil {
-					g.firstTCMsg = m
-				}
-				for _, tc := range sm.ToolCalls {
-					g.toolCalls = append(g.toolCalls, agui.ToolCall{
-						ID:        tc.ID,
-						Name:      tc.Function.Name,
-						Arguments: tc.Function.Arguments,
-						Extra:     guidanceMap[tc.ID],
-					})
-				}
-			}
-			// Capture Content independently — a row may carry both ToolCalls and Content
-			// (written by savePartialAssistantMessage at the end of a tool-call chain).
-			if sm.Content != "" {
-				g.finalMsg = m
-			}
-		case agentmodel.RoleError:
-			g.errorMsg = m
-		}
+		turnMsgs[key] = append(turnMsgs[key], m)
 	}
 
+	// Pass 3: assemble agui.Message values for each turn.
 	result := make([]agui.Message, 0, len(msgs))
-	for _, key := range groupOrder {
-		g := groups[key]
-		if g.userMsg != nil {
+	for _, key := range turnOrder {
+		rows := turnMsgs[key]
+
+		var userMsg *agentmodel.Message
+		var errMsg *agentmodel.Message
+		var finalMsg *agentmodel.Message    // last assistant row with non-empty Content
+		var firstTCMsg *agentmodel.Message  // first assistant row with ToolCalls (for interrupted-turn ID)
+		var toolCalls []agui.ToolCall
+
+		for _, m := range rows {
 			var sm schema.Message
-			if err := json.Unmarshal(g.userMsg.RawMessage, &sm); err == nil {
+			if err := json.Unmarshal(m.RawMessage, &sm); err != nil {
+				continue
+			}
+			switch m.Role {
+			case schema.User:
+				userMsg = m
+			case schema.Assistant:
+				if m.Status == string(agui.StatusError) {
+					errMsg = m
+					continue
+				}
+				// Accumulate tool calls, merging results from Pass 1.
+				if len(sm.ToolCalls) > 0 {
+					if firstTCMsg == nil {
+						firstTCMsg = m
+					}
+					for _, tc := range sm.ToolCalls {
+						call := agui.ToolCall{
+							ID:        tc.ID,
+							Name:      tc.Function.Name,
+							Arguments: tc.Function.Arguments,
+						}
+						if res, ok := toolResultMap[tc.ID]; ok {
+							call.Content = res.content
+							call.Status = res.status
+							call.Extra = res.guidance
+						}
+						toolCalls = append(toolCalls, call)
+					}
+				}
+				// A row may carry both ToolCalls and Content (written by
+				// savePartialAssistantMessage at the end of a tool-call chain).
+				if sm.Content != "" {
+					finalMsg = m
+				}
+			}
+		}
+
+		// Emit user message first.
+		if userMsg != nil {
+			var sm schema.Message
+			if err := json.Unmarshal(userMsg.RawMessage, &sm); err == nil {
 				result = append(result, agui.Message{
-					ID:        g.userMsg.MessageUID,
+					ID:        userMsg.MessageUID,
 					Role:      sm.Role,
 					Content:   sm.Content,
 					Status:    agui.StatusComplete,
-					CreatedAt: g.userMsg.CreatedAt,
+					CreatedAt: userMsg.CreatedAt,
 				})
 			}
 		}
-		if g.finalMsg != nil || len(g.toolCalls) > 0 {
+
+		// Error turn: emit a single assistant message that absorbs tool calls.
+		if errMsg != nil {
+			var sm schema.Message
+			if err := json.Unmarshal(errMsg.RawMessage, &sm); err == nil {
+				result = append(result, agui.Message{
+					ID:        errMsg.MessageUID,
+					Role:      schema.Assistant,
+					Content:   sm.Content,
+					Status:    agui.StatusError,
+					ToolCalls: toolCalls,
+					CreatedAt: errMsg.CreatedAt,
+				})
+			}
+			continue
+		}
+
+		// Normal turn: emit assistant message with tool calls and/or final content.
+		if finalMsg != nil || len(toolCalls) > 0 {
 			out := agui.Message{
 				Role:      schema.Assistant,
 				Status:    agui.StatusComplete,
-				ToolCalls: g.toolCalls,
+				ToolCalls: toolCalls,
 			}
-			if g.finalMsg != nil {
+			if finalMsg != nil {
 				var sm schema.Message
-				if err := json.Unmarshal(g.finalMsg.RawMessage, &sm); err == nil {
-					out.ID = g.finalMsg.MessageUID
+				if err := json.Unmarshal(finalMsg.RawMessage, &sm); err == nil {
+					out.ID = finalMsg.MessageUID
 					out.Content = sm.Content
-					out.CreatedAt = g.finalMsg.CreatedAt
+					out.CreatedAt = finalMsg.CreatedAt
 				}
 			} else {
-				// Turn interrupted before a final content row exists.
-				// Use the first tool-call assistant message so the ID refers to a real
-				// DB row — a synthetic turnUID would break feedback lookup.
-				out.ID = g.firstTCMsg.MessageUID
-				out.CreatedAt = g.firstTCMsg.CreatedAt
+				// Interrupted turn: no final content row; use the first tool-call
+				// assistant row so the ID refers to a real DB row (needed for feedback lookup).
+				out.ID = firstTCMsg.MessageUID
+				out.CreatedAt = firstTCMsg.CreatedAt
 			}
 			result = append(result, out)
-		}
-		if g.errorMsg != nil {
-			var sm schema.Message
-			if err := json.Unmarshal(g.errorMsg.RawMessage, &sm); err == nil {
-				result = append(result, agui.Message{
-					ID:        g.errorMsg.MessageUID,
-					Role:      sm.Role,
-					Content:   sm.Content,
-					Status:    agui.StatusError,
-					CreatedAt: g.errorMsg.CreatedAt,
-				})
-			}
 		}
 	}
 	return result, nil

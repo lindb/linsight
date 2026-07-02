@@ -37,13 +37,6 @@ type Conversation struct {
 // TableName specifies the GORM table name.
 func (Conversation) TableName() string { return "conversations" }
 
-// RoleError is a custom message role for persisting agent-side failures as
-// conversation messages so they remain visible after a page refresh.
-// This role is intentionally NOT in eino's schema package — it is an internal
-// storage convention only. Memory and agent code must filter it out before
-// sending messages to the LLM.
-const RoleError schema.RoleType = "error"
-
 // Message stores a single turn in a conversation.
 // RawMessage holds the complete eino schema.Message JSON (snake_case keys), enabling
 // the memory store to unmarshal it directly to schema.Message without any field mapping.
@@ -61,8 +54,11 @@ type Message struct {
 	// lookup, and to reconstruct agui.Message.ID when serving conversation history.
 	MessageUID string `json:"-" gorm:"column:message_uid;uniqueIndex"`
 	// Role is a redundant column that mirrors schema.Message.role so queries
-	// like WHERE role != 'error' never need to parse JSON.
+	// like WHERE role = 'assistant' never need to parse JSON.
 	Role schema.RoleType `json:"-" gorm:"column:role;index"`
+	// Status is a first-class column for error-state detection without JSON parsing.
+	// "error" means the message is an agent-side failure and must never be sent to the LLM.
+	Status string `json:"-" gorm:"column:status"`
 	// RawMessage holds the complete eino schema.Message JSON (snake_case keys).
 	// MySQL/PostgreSQL: stored as native JSON column; SQLite: stored as TEXT.
 	RawMessage json.RawMessage `json:"rawMessage" gorm:"column:raw_message;type:json"`

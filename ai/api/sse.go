@@ -46,7 +46,7 @@ type SSEWriter interface {
 	WriteToolCallStart(toolCallID, toolName, parentMessageID string)
 	WriteToolCallArgs(toolCallID, argsDelta string)
 	WriteToolCallEnd(toolCallID string)
-	WriteToolCallResult(messageID, toolCallID, toolName, content string, guidance *agui.Guidance)
+	WriteToolCallResult(messageID, toolCallID, toolName string, status agui.MessageStatus, content string, guidance *agui.Guidance)
 
 	// Conversation history snapshot
 	WriteMessagesSnapshot(messages []agui.Message)
@@ -146,7 +146,7 @@ func (w *ginSSEWriter) WriteToolCallEnd(toolCallID string) {
 	})
 }
 
-func (w *ginSSEWriter) WriteToolCallResult(messageID, toolCallID, toolName, content string, guidance *agui.Guidance) {
+func (w *ginSSEWriter) WriteToolCallResult(messageID, toolCallID, toolName string, status agui.MessageStatus, content string, guidance *agui.Guidance) {
 	_ = w.writeEvent(agui.Event{
 		Type:         agui.ToolCallResult,
 		MessageID:    messageID,
@@ -154,7 +154,7 @@ func (w *ginSSEWriter) WriteToolCallResult(messageID, toolCallID, toolName, cont
 		ToolCallName: toolName,
 		Content:      content,
 		Guidance:     guidance,
-		Status:       agui.StatusComplete,
+		Status:       status,
 	})
 }
 

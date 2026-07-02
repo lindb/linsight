@@ -289,6 +289,14 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	var textStarted bool
 	var sb strings.Builder
 
+	// Close the text stream before the caller emits RUN_ERROR, so the frontend
+	// never sees an unclosed TEXT_MESSAGE_START when the agent returns an error.
+	defer func() {
+		if retErr != nil && textStarted {
+			writer.WriteTextMessageEnd(assistantMsgUID)
+		}
+	}()
+
 	sseCallback := a.buildSSECallback(writer, conv.ID, conv.UID, userID, timeoutCtx, assistantMsgUID,
 		runID, toolCallsByIndex, &toolCallsIndexOrder, &sb)
 	opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(sseCallback)))
@@ -448,7 +456,7 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Message) ([]*schem
 	}
 
 	for _, m := range history {
-		if m.Role == agentmodel.RoleError {
+		if m.Role == schema.Assistant && m.Status == string(agui.StatusError) {
 			continue
 		}
 		var sm schema.Message
@@ -606,7 +614,9 @@ func (a *agentRuntime) savePartialAssistantMessage(
 	}
 }
 
-// saveErrorMessage persists a RoleError message so failures are visible after refresh.
+// saveErrorMessage persists an assistant message with status=error so failures
+// are visible after page refresh. The message is filtered out of LLM context by
+// assembleMessages (status=error check) and never sent to the model.
 func (a *agentRuntime) saveErrorMessage(reqCtx context.Context, convID int64, convUID string, userID int64, turnUID string, chatErr error) {
 	user := util.GetUser(reqCtx)
 	saveCtx, cancel := context.WithTimeout(
@@ -618,7 +628,7 @@ func (a *agentRuntime) saveErrorMessage(reqCtx context.Context, convID int64, co
 	_, errMsg := aiutil.ClassifyError(chatErr)
 	msgUID := uuid.GenerateShortUUID()
 	errSchemaMsg := &schema.Message{
-		Role:    agentmodel.RoleError,
+		Role:    schema.Assistant,
 		Content: errMsg,
 	}
 	raw, _ := json.Marshal(errSchemaMsg)
@@ -626,7 +636,8 @@ func (a *agentRuntime) saveErrorMessage(reqCtx context.Context, convID int64, co
 		ConversationID:  convID,
 		ConversationUID: convUID,
 		MessageUID:      msgUID,
-		Role:            agentmodel.RoleError,
+		Role:            schema.Assistant,
+		Status:          string(agui.StatusError),
 		RawMessage:      json.RawMessage(raw),
 		TurnUID:         turnUID,
 		RunUID:          turnUID,
@@ -759,7 +770,7 @@ func (a *agentRuntime) buildSSECallback(
 			}
 
 			toolMsgUID := uuid.GenerateShortUUID()
-			writer.WriteToolCallResult(toolMsgUID, callID, info.Name, result, guidance)
+			writer.WriteToolCallResult(toolMsgUID, callID, info.Name, agui.StatusComplete, result, guidance)
 
 			// Persist the tool result so future history replay includes the full
 			// assistant→tool→assistant chain.
@@ -791,6 +802,41 @@ func (a *agentRuntime) buildSSECallback(
 			} else {
 				agentLog.Info("stream: tool result persisted",
 					logger.String("tool", info.Name), logger.Int("result_len", len(result)))
+			}
+			return ctx
+		},
+		// OnError fires when the tool execution itself returns an error.
+		// Emit a TOOL_CALL_RESULT with the error text so the frontend's tool-call
+		// lifecycle is properly closed, and persist the record for multi-turn context.
+		OnError: func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
+			callID := compose.GetToolCallID(ctx)
+			errContent := err.Error()
+			toolMsgUID := uuid.GenerateShortUUID()
+			writer.WriteToolCallResult(toolMsgUID, callID, info.Name, agui.StatusError, errContent, nil)
+
+			toolMsg := &schema.Message{
+				Role:       schema.Tool,
+				Content:    errContent,
+				ToolCallID: callID,
+				ToolName:   info.Name,
+			}
+			raw, _ := json.Marshal(toolMsg)
+			dbMsg := &agentmodel.Message{
+				ConversationID:  convID,
+				ConversationUID: convUID,
+				MessageUID:      toolMsgUID,
+				Role:            schema.Tool,
+				Status:          string(agui.StatusError),
+				RawMessage:      json.RawMessage(raw),
+				ToolCallID:      callID,
+				TurnUID:         turnUID,
+				RunUID:          turnUID,
+			}
+			dbMsg.CreatedBy = userID
+			dbMsg.UpdatedBy = userID
+			if saveErr := a.convSrv.SaveMessage(saveCtx, dbMsg); saveErr != nil {
+				agentLog.Warn("failed to persist tool error result",
+					logger.String("tool", info.Name), logger.Error(saveErr))
 			}
 			return ctx
 		},

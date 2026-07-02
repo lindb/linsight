@@ -101,7 +101,7 @@ type Guidance struct {
 
 // ToolCall is the AG-UI DTO representation of a single tool invocation.
 // It intentionally does not embed eino's schema.ToolCall so that the frontend
-// contract remains stable and can carry the Extra guidance field.
+// contract remains stable and can carry result fields alongside the Extra guidance.
 type ToolCall struct {
 	// ID is the tool_call_id assigned by the LLM.
 	ID string `json:"id"`
@@ -109,6 +109,12 @@ type ToolCall struct {
 	Name string `json:"name"`
 	// Arguments is the JSON-encoded arguments string the LLM produced.
 	Arguments string `json:"arguments,omitempty"`
+	// Content is the tool execution result text.
+	// Mirrors TOOL_CALL_RESULT.content; populated in snapshot, empty during live streaming.
+	Content string `json:"content,omitempty"`
+	// Status mirrors TOOL_CALL_RESULT.status (complete or error).
+	// Populated in snapshot, empty during live streaming.
+	Status MessageStatus `json:"status,omitempty"`
 	// Extra carries optional render guidance from the tool result.
 	// Non-nil only when the tool returned queryable structured data.
 	Extra *Guidance `json:"extra,omitempty"`
