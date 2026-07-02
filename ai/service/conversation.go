@@ -172,11 +172,11 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 	// For old messages where TurnUID is empty, fall back to MessageUID so each
 	// row forms its own singleton group — preserving pre-migration behaviour.
 	type turnGroup struct {
-		userMsg      *agentmodel.Message
-		toolCalls    []agui.ToolCall
-		firstTCMsgUID string              // MessageUID of the first intermediate assistant row
-		finalMsg     *agentmodel.Message // last assistant row that carries Content
-		errorMsg     *agentmodel.Message
+		userMsg    *agentmodel.Message
+		toolCalls  []agui.ToolCall
+		firstTCMsg *agentmodel.Message  // first intermediate assistant row carrying ToolCalls
+		finalMsg   *agentmodel.Message  // last assistant row that carries Content
+		errorMsg   *agentmodel.Message
 	}
 	groupOrder := make([]string, 0, len(msgs))
 	groups := make(map[string]*turnGroup, len(msgs))
@@ -205,8 +205,8 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 			g.userMsg = m
 		case schema.Assistant:
 			if len(sm.ToolCalls) > 0 {
-				if g.firstTCMsgUID == "" {
-					g.firstTCMsgUID = m.MessageUID
+				if g.firstTCMsg == nil {
+					g.firstTCMsg = m
 				}
 				for _, tc := range sm.ToolCalls {
 					g.toolCalls = append(g.toolCalls, agui.ToolCall{
@@ -256,8 +256,11 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 					out.CreatedAt = g.finalMsg.CreatedAt
 				}
 			} else {
-				// Turn interrupted before final row; use turnUID as synthetic ID.
-				out.ID = key
+				// Turn interrupted before a final content row exists.
+				// Use the first tool-call assistant message so the ID refers to a real
+				// DB row — a synthetic turnUID would break feedback lookup.
+				out.ID = g.firstTCMsg.MessageUID
+				out.CreatedAt = g.firstTCMsg.CreatedAt
 			}
 			result = append(result, out)
 		}
