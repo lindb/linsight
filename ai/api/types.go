@@ -100,3 +100,20 @@ type SearchConversationsRequest struct {
 type UpdateConversationTitleRequest struct {
 	Title string `json:"title" binding:"required"`
 }
+
+// FeedbackRequest is the body for PUT /ai/conversations/:uid/messages/:messageUID/feedback.
+type FeedbackRequest struct {
+	// Rating is required. 1 = thumbs up, -1 = thumbs down.
+	Rating int8 `json:"rating" binding:"required,oneof=1 -1"`
+
+	// Reasons is the optional list of predefined reason tags.
+	// Each tag is validated against agentmodel.ValidFeedbackReasons in the service layer.
+	Reasons []string `json:"reasons"`
+
+	// Comment is free-text qualitative feedback from the user. Optional.
+	Comment string `json:"comment"`
+
+	// CorrectedContent is the user's manual correction of the assistant message.
+	// Used as gold-label annotation for SFT/DPO fine-tuning pipelines. Optional.
+	CorrectedContent string `json:"correctedContent"`
+}

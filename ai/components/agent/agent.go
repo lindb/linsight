@@ -503,14 +503,14 @@ func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationSt
 // datasource-query hints when the user input looks like a data query.
 func (a *agentRuntime) buildSystemPrompt(userInput string) string {
 	p := a.cfg.SystemPrompt
-	if userInput != "" {
-		qi := aiutil.DetectQueryIntent(userInput)
-		if qi.HasQueryIntent {
-			p += " When users provide SQL queries or mention data sources, automatically use the linsight_datasource_query tool to execute the query. "
-			p += "Always call linsight_list_datasources first to get valid datasource UIDs. "
-			p += "For SQL queries, extract the query statement and data source name from the user input."
-		}
-	}
+	// if userInput != "" {
+	// 	qi := aiutil.DetectQueryIntent(userInput)
+	// 	if qi.HasQueryIntent {
+	// 		p += " When users provide SQL queries or mention data sources, automatically use the linsight_datasource_query tool to execute the query. "
+	// 		p += "Always call linsight_list_datasources first to get valid datasource UIDs. "
+	// 		p += "For SQL queries, extract the query statement and data source name from the user input."
+	// 	}
+	// }
 	return p
 }
 

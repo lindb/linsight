@@ -2635,6 +2635,84 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ── AI: Model CRUD ─────────────────────────────────────────────────────────
+  /api/v1/ai/conversations/{uid}/messages/{messageUID}/feedback:
+    put:
+      tags: [AIConversations]
+      operationId: upsertMessageFeedback
+      summary: Submit or update feedback for a message
+      description: |
+        Creates or replaces the feedback for one assistant message.
+        Only the conversation owner may write feedback.
+        Supports thumbs-up/thumbs-down rating, predefined reason tags,
+        free-text comment, and an optional manual correction (gold annotation
+        for SFT/DPO fine-tuning pipelines).
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conversation UID
+        - name: messageUID
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Message UID (AG-UI messageId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '200':
+          description: The persisted feedback record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageFeedback'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      tags: [AIConversations]
+      operationId: getMessageFeedback
+      summary: Get feedback for a message
+      description: Returns the existing feedback for a message, scoped to the caller's org.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Conversation UID
+        - name: messageUID
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Message UID (AG-UI messageId)
+      responses:
+        '200':
+          description: The feedback record for this message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageFeedback'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── AI: Model CRUD ─────────────────────────────────────────────────────────
   /api/v1/ai/models:
     get:
       tags: [AISettings]
@@ -4506,6 +4584,59 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AgentConversation'
+
+    FeedbackRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating:
+          type: integer
+          format: int8
+          enum: [1, -1]
+          description: "1 = thumbs up, -1 = thumbs down"
+        reasons:
+          type: array
+          items:
+            type: string
+            enum:
+              - tool_call_error
+              - hallucination
+              - bad_format
+              - outdated_info
+              - incomplete
+              - off_topic
+              - logic_perfect
+              - helpful
+              - concise
+          description: Predefined reason tags for the rating
+        comment:
+          type: string
+          description: Free-text qualitative feedback
+        correctedContent:
+          type: string
+          description: User's manual rewrite of the assistant message (gold annotation for SFT/DPO)
+
+    MessageFeedback:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            conversationUid:
+              type: string
+            messageUid:
+              type: string
+            rating:
+              type: integer
+              format: int8
+              enum: [1, -1]
+            reasons:
+              type: array
+              items:
+                type: string
+            comment:
+              type: string
+            correctedContent:
+              type: string
 
     AgentModel:
       allOf:

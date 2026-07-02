@@ -55,9 +55,10 @@ type ObservabilityDeps struct {
 // aiModule holds the domain handlers wired up during Bootstrap.
 // A nil mod means the agent is disabled or Bootstrap was never called.
 type aiModule struct {
-	chat  *agenthandler.ChatHandler
-	model *agenthandler.ModelHandler
-	mcp   *agenthandler.MCPHandler
+	chat     *agenthandler.ChatHandler
+	model    *agenthandler.ModelHandler
+	mcp      *agenthandler.MCPHandler
+	feedback *agenthandler.FeedbackHandler
 }
 
 // mod is the package-level singleton; nil if AI is disabled.
@@ -92,6 +93,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		&agentmodel.Skill{},
 		&agentmodel.OrgSkill{},
 		&agentmodel.ConversationSkill{},
+		&agentmodel.MessageFeedback{},
 	); err != nil {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
 	}
@@ -109,6 +111,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	modelSrv := agentservice.NewModelService(db)
 	mcpSrv := agentservice.NewMCPService(db)
 	convSrv := agentservice.NewConversationService(db)
+	feedbackSrv := agentservice.NewFeedbackService(db, convSrv)
 	modelFactory := modelcomp.NewModelFactory(modelSrv)
 	proxy := modelcomp.NewDynamicModelProxy(modelFactory)
 
@@ -137,16 +140,18 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	telemetry.Register()
 
 	deps := &agenthandler.Deps{
-		Cfg:      cfg.AI,
-		Agent:    agent,
-		ModelSrv: modelSrv,
-		MCPSrv:   mcpSrv,
-		ConvSrv:  convSrv,
+		Cfg:         cfg.AI,
+		Agent:       agent,
+		ModelSrv:    modelSrv,
+		MCPSrv:      mcpSrv,
+		ConvSrv:     convSrv,
+		FeedbackSrv: feedbackSrv,
 	}
 	mod = &aiModule{
-		chat:  agenthandler.NewChatHandler(deps),
-		model: agenthandler.NewModelHandler(deps),
-		mcp:   agenthandler.NewMCPHandler(deps),
+		chat:     agenthandler.NewChatHandler(deps),
+		model:    agenthandler.NewModelHandler(deps),
+		mcp:      agenthandler.NewMCPHandler(deps),
+		feedback: agenthandler.NewFeedbackHandler(deps),
 	}
 }
 
@@ -161,6 +166,7 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 	chat := mod.chat
 	model := mod.model
 	mcp := mod.mcp
+	fb := mod.feedback
 
 	// Viewer-level routes: any authenticated user may invoke the agent.
 	router.POST("/ai/chat",
@@ -175,6 +181,12 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 		middleware.Authorize(deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, chat.UpdateConversationTitle)...)
 	router.GET("/ai/conversations/:uid/messages",
 		middleware.Authorize(deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, chat.GetConversationMessages)...)
+
+	// Feedback — viewer-level: any authenticated conversation owner may submit or read feedback.
+	router.PUT("/ai/conversations/:uid/messages/:messageUID/feedback",
+		middleware.Authorize(deps, accesscontrol.ViewerAccessResource, accesscontrol.Write, fb.UpsertFeedback)...)
+	router.GET("/ai/conversations/:uid/messages/:messageUID/feedback",
+		middleware.Authorize(deps, accesscontrol.ViewerAccessResource, accesscontrol.Read, fb.GetFeedback)...)
 
 	// Admin-level routes: only org admins may configure the agent.
 

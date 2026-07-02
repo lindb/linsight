@@ -32,8 +32,8 @@ import (
 
 // ConversationService manages conversations and their messages.
 type ConversationService interface {
-	// GetConversation returns the conversation with the given UID for the org in ctx.
-	// Returns an error if no matching conversation exists.
+	// GetConversation returns the conversation with the given UID owned by the current user in ctx.
+	// Returns an error if no matching conversation exists or the user does not own it.
 	GetConversation(ctx context.Context, uid string) (*agentmodel.Conversation, error)
 	// CreateConversation creates a new conversation for the user in ctx and returns it.
 	CreateConversation(ctx context.Context) (*agentmodel.Conversation, error)
@@ -62,12 +62,12 @@ func NewConversationService(db dbpkg.DB) ConversationService {
 	return &conversationService{db: db}
 }
 
-// GetConversation returns the conversation with the given UID for the org in ctx.
-// Returns an error if no matching conversation exists.
+// GetConversation returns the conversation with the given UID owned by the current user in ctx.
+// Returns an error if no matching conversation exists or the user does not own it.
 func (s *conversationService) GetConversation(ctx context.Context, uid string) (*agentmodel.Conversation, error) {
 	user := util.GetUser(ctx)
 	var conv agentmodel.Conversation
-	if err := s.db.Get(&conv, "org_id = ? and uid = ?", user.Org.ID, uid); err != nil {
+	if err := s.db.Get(&conv, "org_id = ? and user_id = ? and uid = ?", user.Org.ID, user.User.ID, uid); err != nil {
 		return nil, err
 	}
 	return &conv, nil
@@ -112,14 +112,20 @@ func (s *conversationService) ListConversations(
 func (s *conversationService) DeleteConversation(ctx context.Context, uid string) error {
 	user := util.GetUser(ctx)
 	orgID := user.Org.ID
+	userID := user.User.ID
 	return s.db.Transaction(func(tx dbpkg.DB) error {
 		// Resolve the conversation so we can delete messages by conversation_id.
+		// Enforce user ownership to prevent cross-user deletion within the same org.
 		var conv agentmodel.Conversation
-		if err := tx.Get(&conv, "org_id = ? and uid = ?", orgID, uid); err != nil {
+		if err := tx.Get(&conv, "org_id = ? and user_id = ? and uid = ?", orgID, userID, uid); err != nil {
 			return err
 		}
 		// Delete all messages in this conversation first (no FK constraint assumed).
 		if err := tx.Delete(&agentmodel.Message{}, "conversation_id = ?", conv.ID); err != nil {
+			return err
+		}
+		// Delete all feedback records for this conversation (no FK constraint assumed).
+		if err := tx.Delete(&agentmodel.MessageFeedback{}, "conversation_id = ?", conv.ID); err != nil {
 			return err
 		}
 		return tx.Delete(&agentmodel.Conversation{}, "id = ?", conv.ID)
@@ -128,7 +134,9 @@ func (s *conversationService) DeleteConversation(ctx context.Context, uid string
 
 // UpdateConversationTitle sets the title of an existing conversation.
 func (s *conversationService) UpdateConversationTitle(ctx context.Context, convID int64, title string) error {
-	return s.db.UpdateSingle(&agentmodel.Conversation{}, "title", title, "id = ?", convID)
+	user := util.GetUser(ctx)
+	return s.db.UpdateSingle(&agentmodel.Conversation{}, "title", title,
+		"id = ? and org_id = ? and user_id = ?", convID, user.Org.ID, user.User.ID)
 }
 
 // GetConversationMessages returns up to limit messages for the conversation

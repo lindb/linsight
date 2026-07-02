@@ -26,9 +26,10 @@ import (
 // Deps holds all service-level dependencies shared across agent handlers.
 // Construct one Deps value in Bootstrap and pass it to each handler constructor.
 type Deps struct {
-	Cfg      *agentconfig.Config
-	Agent    agentcomp.Agent
-	ModelSrv agentservice.ModelService
-	MCPSrv   agentservice.MCPService
-	ConvSrv  agentservice.ConversationService
+	Cfg         *agentconfig.Config
+	Agent       agentcomp.Agent
+	ModelSrv    agentservice.ModelService
+	MCPSrv      agentservice.MCPService
+	ConvSrv     agentservice.ConversationService
+	FeedbackSrv agentservice.FeedbackService
 }
