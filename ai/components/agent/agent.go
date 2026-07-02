@@ -392,7 +392,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 				return nil, fmt.Errorf("load history fallback: %w", histErr)
 			}
 			var assembleErr error
-			messages, assembleErr = a.assembleMessages(history, userInput)
+			messages, assembleErr = a.assembleMessages(history)
 			if assembleErr != nil {
 				return nil, assembleErr
 			}
@@ -400,7 +400,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 			agentLog.Info("memory: conversation state restored",
 				logger.String("conv.uid", conv.UID),
 				logger.Int("contextWindow", len(state.ContextWindow)))
-			messages = a.buildMessagesWithMemoryState(state, userInput)
+			messages = a.buildMessagesWithMemoryState(state)
 		}
 	} else {
 		agentLog.Info("memory: MemoryStore disabled, using DB history")
@@ -409,7 +409,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 			return nil, fmt.Errorf("load history: %w", histErr)
 		}
 		var assembleErr error
-		messages, assembleErr = a.assembleMessages(history, userInput)
+		messages, assembleErr = a.assembleMessages(history)
 		if assembleErr != nil {
 			return nil, assembleErr
 		}
@@ -421,10 +421,10 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 // RawMessage stores eino schema.Message JSON (snake_case keys), so direct
 // unmarshal to schema.Message is lossless — ToolCalls, ToolCallID, and ToolName
 // are preserved exactly.
-func (a *agentRuntime) assembleMessages(history []*agentmodel.Message, userInput string) ([]*schema.Message, error) {
+func (a *agentRuntime) assembleMessages(history []*agentmodel.Message) ([]*schema.Message, error) {
 	msgs := make([]*schema.Message, 0, len(history)+1)
 
-	systemPrompt := a.buildSystemPrompt(userInput)
+	systemPrompt := a.buildSystemPrompt()
 	if systemPrompt != "" {
 		msgs = append(msgs, &schema.Message{Role: schema.System, Content: systemPrompt})
 	}
@@ -471,11 +471,11 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Message, userInput
 
 // buildMessagesWithMemoryState builds messages using MemoryStore conversation state.
 // The state's ContextWindow already contains the current user message (saved before
-// GetConversationState was called), so we must NOT append userInput again.
-func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationState, userInput string) []*schema.Message {
+// GetConversationState was called).
+func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationState) []*schema.Message {
 	messages := make([]*schema.Message, 0, len(state.ContextWindow)+1)
 
-	systemPrompt := a.buildSystemPrompt(userInput)
+	systemPrompt := a.buildSystemPrompt()
 	if systemPrompt != "" {
 		messages = append(messages, &schema.Message{Role: schema.System, Content: systemPrompt})
 		preview := systemPrompt
@@ -499,19 +499,9 @@ func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationSt
 	return messages
 }
 
-// buildSystemPrompt returns the base system prompt, optionally enhanced with
-// datasource-query hints when the user input looks like a data query.
-func (a *agentRuntime) buildSystemPrompt(userInput string) string {
-	p := a.cfg.SystemPrompt
-	// if userInput != "" {
-	// 	qi := aiutil.DetectQueryIntent(userInput)
-	// 	if qi.HasQueryIntent {
-	// 		p += " When users provide SQL queries or mention data sources, automatically use the linsight_datasource_query tool to execute the query. "
-	// 		p += "Always call linsight_list_datasources first to get valid datasource UIDs. "
-	// 		p += "For SQL queries, extract the query statement and data source name from the user input."
-	// 	}
-	// }
-	return p
+// buildSystemPrompt returns the configured base system prompt.
+func (a *agentRuntime) buildSystemPrompt() string {
+	return a.cfg.SystemPrompt
 }
 
 // buildMetaMap converts a SkillMeta slice into a name→ControlLevel map for telemetry.
