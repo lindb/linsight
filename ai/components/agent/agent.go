@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/callbacks"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	einoagent "github.com/cloudwego/eino/flow/agent"
@@ -75,26 +76,6 @@ type agentRuntime struct {
 	compiled *react.Agent
 	// sems maps orgID (int64) → chan struct{} (buffered semaphore).
 	sems sync.Map
-}
-
-// fullResponseStreamToolCallChecker reads all streaming chunks to detect tool calls.
-// Unlike the default firstChunkStreamToolCallChecker, this handles LLMs (e.g. DeepSeek, Claude)
-// that emit text content before tool_calls in the same streaming response.
-// The handler closes sr before returning as required by the eino contract.
-func fullResponseStreamToolCallChecker(_ context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
-	defer sr.Close()
-	for {
-		msg, err := sr.Recv()
-		if errors.Is(err, io.EOF) {
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		if len(msg.ToolCalls) > 0 {
-			return true, nil
-		}
-	}
 }
 
 // New creates an Agent wired to the given dependencies.
@@ -298,7 +279,7 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	}()
 
 	sseCallback := a.buildSSECallback(writer, conv.ID, conv.UID, userID, timeoutCtx, assistantMsgUID,
-		runID, toolCallsByIndex, &toolCallsIndexOrder, &sb)
+		runID, toolCallsByIndex, &toolCallsIndexOrder, &sb, &textStarted)
 	opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(sseCallback)))
 
 	reader, err := a.compiled.Stream(runCtx, messages, opts...)
@@ -321,14 +302,8 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 			continue
 		}
 
-		if chunk.Content != "" {
-			if !textStarted {
-				writer.WriteTextMessageStart(assistantMsgUID, schema.Assistant)
-				textStarted = true
-			}
-			sb.WriteString(chunk.Content)
-			writer.WriteTextMessageContent(assistantMsgUID, chunk.Content)
-		}
+		// Text content is streamed in real-time via OnEndWithStreamOutput callback —
+		// no action needed here for content chunks.
 
 		// Merge tool_call fragments by Index (OpenAI streaming protocol).
 		if chunk.Role == schema.Assistant && len(chunk.ToolCalls) > 0 {
@@ -356,10 +331,6 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 				}
 			}
 		}
-	}
-
-	if textStarted {
-		writer.WriteTextMessageEnd(assistantMsgUID)
 	}
 
 	// Persist the merged assistant message (content + tool_calls in one row).
@@ -698,6 +669,7 @@ func (a *agentRuntime) buildSSECallback(
 	toolCallsByIndex map[int]*schema.ToolCall,
 	toolCallsIndexOrder *[]int,
 	sb *strings.Builder,
+	textStarted *bool,
 ) callbacks.Handler {
 	toolHandler := &cbtemplate.ToolCallbackHandler{
 		OnStart: func(ctx context.Context, info *callbacks.RunInfo, input *tool.CallbackInput) context.Context {
@@ -846,6 +818,37 @@ func (a *agentRuntime) buildSSECallback(
 	// tool-result rows written by OnEnd have a parent, preventing orphaned tool
 	// messages from breaking the next LLM API call.
 	modelHandler := &cbtemplate.ModelCallbackHandler{
+		// OnEndWithStreamOutput fires inside the ChatModel node goroutine as the LLM
+		// produces tokens. Reading here drives real-time token delivery to the client;
+		// Eino fans the stream out so the branch checker and outer loop each get their
+		// own copy and are not starved.
+		OnEndWithStreamOutput: func(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[*einomodel.CallbackOutput]) context.Context {
+			defer output.Close()
+			for {
+				out, err := output.Recv()
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				if err != nil {
+					return ctx
+				}
+				if out == nil || out.Message == nil || out.Message.Content == "" {
+					continue
+				}
+				if !*textStarted {
+					writer.WriteTextMessageStart(assistantMsgUID, schema.Assistant)
+					*textStarted = true
+				}
+				sb.WriteString(out.Message.Content)
+				writer.WriteTextMessageContent(assistantMsgUID, out.Message.Content)
+			}
+			if *textStarted {
+				writer.WriteTextMessageEnd(assistantMsgUID)
+				// Reset so the error-recovery defer in Chat() does not double-close.
+				*textStarted = false
+			}
+			return ctx
+		},
 		OnError: func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
 			if len(toolCallsByIndex) > 0 || sb.Len() > 0 {
 				a.savePartialAssistantMessage(saveCtx, convID, convUID, userID,
