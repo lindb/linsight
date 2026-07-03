@@ -217,8 +217,10 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 		var userMsg *agentmodel.Message
 		var errMsg *agentmodel.Message
 		var finalMsg *agentmodel.Message    // last assistant row with non-empty Content
+		var finalMsgContent string          // Content of finalMsg, cached to avoid re-unmarshal
 		var firstTCMsg *agentmodel.Message  // first assistant row with ToolCalls (for interrupted-turn ID)
 		var toolCalls []agui.ToolCall
+		seenCallIDs := make(map[string]bool)
 
 		for _, m := range rows {
 			var sm schema.Message
@@ -239,6 +241,10 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 						firstTCMsg = m
 					}
 					for _, tc := range sm.ToolCalls {
+						if seenCallIDs[tc.ID] {
+							continue
+						}
+						seenCallIDs[tc.ID] = true
 						call := agui.ToolCall{
 							ID:        tc.ID,
 							Name:      tc.Function.Name,
@@ -256,6 +262,7 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 				// savePartialAssistantMessage at the end of a tool-call chain).
 				if sm.Content != "" {
 					finalMsg = m
+					finalMsgContent = sm.Content
 				}
 			}
 		}
@@ -266,6 +273,7 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 			if err := json.Unmarshal(userMsg.RawMessage, &sm); err == nil {
 				result = append(result, agui.Message{
 					ID:        userMsg.MessageUID,
+					TurnUID:   key,
 					Role:      sm.Role,
 					Content:   sm.Content,
 					Status:    agui.StatusComplete,
@@ -274,19 +282,46 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 			}
 		}
 
-		// Error turn: emit a single assistant message that absorbs tool calls.
+		// Error turn: emit up to two messages to mirror the SSE stream structure.
+		//
+		// If partial text was accumulated before the error (finalMsg != nil with non-empty
+		// content), emit it as a complete assistant message first — this reconstructs the
+		// TEXT_MESSAGE_* bubble the client already showed during live streaming. The tool
+		// calls belong to this message (they were streamed as children of the same bubble).
+		//
+		// Always follow with the error message (status=error, content=error description).
+		// When there is no partial text, attach tool calls to the error message so they
+		// are still visible (pure-tool-error path, current behavior unchanged).
 		if errMsg != nil {
-			var sm schema.Message
-			if err := json.Unmarshal(errMsg.RawMessage, &sm); err == nil {
+			partialEmitted := false
+			if finalMsg != nil && finalMsgContent != "" {
 				result = append(result, agui.Message{
-					ID:        errMsg.MessageUID,
+					ID:        finalMsg.MessageUID,
+					TurnUID:   key,
 					Role:      schema.Assistant,
-					Content:   sm.Content,
-					Status:    agui.StatusError,
+					Status:    agui.StatusComplete,
+					Content:   finalMsgContent,
 					ToolCalls: toolCalls,
-					CreatedAt: errMsg.CreatedAt,
+					CreatedAt: finalMsg.CreatedAt,
 				})
+				partialEmitted = true
 			}
+			var errSm schema.Message
+			_ = json.Unmarshal(errMsg.RawMessage, &errSm)
+			errOut := agui.Message{
+				ID:        errMsg.MessageUID,
+				TurnUID:   key,
+				Role:      schema.Assistant,
+				Status:    agui.StatusError,
+				Content:   errSm.Content,
+				CreatedAt: errMsg.CreatedAt,
+			}
+			// Attach tool calls to the error message only when no partial text
+			// message was emitted — otherwise they are already shown in Message 1.
+			if !partialEmitted {
+				errOut.ToolCalls = toolCalls
+			}
+			result = append(result, errOut)
 			continue
 		}
 
@@ -294,6 +329,7 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 		if finalMsg != nil || len(toolCalls) > 0 {
 			out := agui.Message{
 				Role:      schema.Assistant,
+				TurnUID:   key,
 				Status:    agui.StatusComplete,
 				ToolCalls: toolCalls,
 			}

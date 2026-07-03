@@ -192,6 +192,10 @@ type Message struct {
 	ToolCallID string `json:"toolCallId,omitempty"`
 	// Name is the tool name for role=tool messages.
 	Name string `json:"name,omitempty"`
+	// TurnUID groups all messages (user + assistant) that belong to the same agent turn.
+	// Clients can use this to correlate a user message with its assistant reply and
+	// to implement turn-level operations such as retry or feedback.
+	TurnUID string `json:"turnUid,omitempty"`
 	// CreatedAt is the Unix millisecond timestamp when the message was persisted.
 	CreatedAt int64 `json:"createdAt,omitempty"`
 }

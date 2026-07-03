@@ -269,6 +269,21 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	// ModelCallbackHandler.OnError can capture them by pointer.
 	var textStarted bool
 	var sb strings.Builder
+	// partialSaved guards against double-saving the partial assistant message
+	// (OnError and Chat() defer both check sb.Len() > 0; the DB unique constraint
+	// on message_uid would turn the second call into a spurious warn log).
+	var partialSaved bool
+
+	// On error: save any accumulated text content so it survives the error path.
+	// This defer is registered before the text-stream-close defer (LIFO), so it
+	// runs after the stream is closed but before saveErrorMessage fires.
+	defer func() {
+		if retErr != nil && conv != nil && sb.Len() > 0 && !partialSaved {
+			partialSaved = true
+			a.savePartialAssistantMessage(ctx, conv.ID, conv.UID, userID,
+				assistantMsgUID, sb.String(), runID, toolCallsByIndex, toolCallsIndexOrder)
+		}
+	}()
 
 	// Close the text stream before the caller emits RUN_ERROR, so the frontend
 	// never sees an unclosed TEXT_MESSAGE_START when the agent returns an error.
@@ -279,7 +294,7 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	}()
 
 	sseCallback := a.buildSSECallback(writer, conv.ID, conv.UID, userID, timeoutCtx, assistantMsgUID,
-		runID, toolCallsByIndex, &toolCallsIndexOrder, &sb, &textStarted)
+		runID, toolCallsByIndex, &toolCallsIndexOrder, &sb, &textStarted, &partialSaved)
 	opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(sseCallback)))
 
 	reader, err := a.compiled.Stream(runCtx, messages, opts...)
@@ -546,8 +561,10 @@ func (a *agentRuntime) generateTitle(reqCtx context.Context, convID int64, first
 }
 
 // savePartialAssistantMessage persists an assistant message that may contain partial
-// content and/or tool calls. It is called both at the normal end of streaming and by
-// ModelCallbackHandler.OnError to guarantee that tool-result rows always have a parent.
+// content and/or tool calls. It is called at the normal end of streaming and, when
+// sb.Len() > 0, by the Chat() error-path defer to snapshot any text accumulated
+// before a failure. Tool-result orphan prevention is handled separately by
+// ToolCallbackHandler.OnStart, which saves one assistant row per tool call.
 func (a *agentRuntime) savePartialAssistantMessage(
 	ctx context.Context,
 	convID int64, convUID string, userID int64,
@@ -670,6 +687,7 @@ func (a *agentRuntime) buildSSECallback(
 	toolCallsIndexOrder *[]int,
 	sb *strings.Builder,
 	textStarted *bool,
+	partialSaved *bool,
 ) callbacks.Handler {
 	toolHandler := &cbtemplate.ToolCallbackHandler{
 		OnStart: func(ctx context.Context, info *callbacks.RunInfo, input *tool.CallbackInput) context.Context {
@@ -850,7 +868,8 @@ func (a *agentRuntime) buildSSECallback(
 			return ctx
 		},
 		OnError: func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-			if len(toolCallsByIndex) > 0 || sb.Len() > 0 {
+			if sb.Len() > 0 && !*partialSaved {
+				*partialSaved = true
 				a.savePartialAssistantMessage(saveCtx, convID, convUID, userID,
 					assistantMsgUID, sb.String(), turnUID, toolCallsByIndex, *toolCallsIndexOrder)
 			}
