@@ -19,6 +19,7 @@ package model
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 
 	basemodel "github.com/lindb/linsight/model"
@@ -82,6 +83,12 @@ type Model struct {
 	// Tags is a comma-separated list of capability labels (e.g. "code,vision").
 	// Used by CapabilitySelector to match request capabilities.
 	Tags string `json:"tags" gorm:"column:tags"`
+
+	// ExtraFields carries model-specific thinking parameters as JSON.
+	// For OpenAI o1/o3: {"reasoning_effort": "low|medium|high"}
+	// For DeepSeek Reasoner: empty (reasoning_content is returned automatically).
+	// ModelFactory parses this at client build time and injects into ChatModelConfig.
+	ExtraFields json.RawMessage `json:"extraFields" gorm:"column:extra_fields;type:json"`
 }
 
 // TableName returns the GORM table name.
@@ -89,9 +96,21 @@ func (Model) TableName() string { return "models" }
 
 // ConfigHash returns a short fingerprint of the fields that determine the LLM client.
 // ModelFactory uses this to decide whether a cached client can be reused.
+// ExtraFields is normalised before hashing to avoid false mismatches from whitespace
+// differences in the stored JSON (e.g. {"k":"v"} vs { "k" : "v" }).
 func (m *Model) ConfigHash() string {
-	raw := fmt.Sprintf("%s|%s|%s|%s|%d|%g",
-		m.Provider, m.Model, m.APIKey, m.BaseURL, m.MaxTokens, m.Temperature)
+	extra := m.ExtraFields
+	if len(extra) > 0 {
+		var norm any
+		if json.Unmarshal(extra, &norm) == nil {
+			if b, err := json.Marshal(norm); err == nil {
+				extra = b
+			}
+		}
+	}
+	raw := fmt.Sprintf("%s|%s|%s|%s|%d|%g|%s",
+		m.Provider, m.Model, m.APIKey, m.BaseURL, m.MaxTokens, m.Temperature,
+		string(extra))
 	sum := sha256.Sum256([]byte(raw))
 	return fmt.Sprintf("%x", sum[:8])
 }

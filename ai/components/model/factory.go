@@ -19,6 +19,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 
@@ -126,6 +127,9 @@ func (f *ModelFactory) Invalidate(orgID int64) {
 }
 
 // buildChatModelConfig converts an Model DB row to an openai ChatModelConfig.
+// ExtraFields is parsed to inject model-specific thinking parameters:
+//   - OpenAI o1/o3: {"reasoning_effort": "low|medium|high"}
+//   - DeepSeek Reasoner: no extra params needed (reasoning_content is automatic)
 func buildChatModelConfig(m *agentmodel.Model) *openaimodel.ChatModelConfig {
 	cfg := &openaimodel.ChatModelConfig{
 		Model:   m.Model,
@@ -139,6 +143,15 @@ func buildChatModelConfig(m *agentmodel.Model) *openaimodel.ChatModelConfig {
 	if m.Temperature != 0 {
 		t := float32(m.Temperature)
 		cfg.Temperature = &t
+	}
+	// Parse ExtraFields to inject model-specific thinking parameters.
+	if len(m.ExtraFields) > 0 {
+		var extra map[string]any
+		if json.Unmarshal(m.ExtraFields, &extra) == nil {
+			if re, ok := extra["reasoning_effort"].(string); ok && re != "" {
+				cfg.ReasoningEffort = openaimodel.ReasoningEffortLevel(re)
+			}
+		}
 	}
 	return cfg
 }

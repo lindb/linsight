@@ -42,6 +42,11 @@ type SSEWriter interface {
 	WriteTextMessageContent(messageID, delta string)
 	WriteTextMessageEnd(messageID string)
 
+	// Reasoning phase (AG-UI spec: REASONING_MESSAGE_* events)
+	WriteReasoningMessageStart(messageID string)
+	WriteReasoningMessageContent(messageID, delta string)
+	WriteReasoningMessageEnd(messageID string)
+
 	// Tool invocation
 	WriteToolCallStart(toolCallID, toolName, parentMessageID string)
 	WriteToolCallArgs(toolCallID, argsDelta string)
@@ -110,6 +115,30 @@ func (w *ginSSEWriter) WriteTextMessageContent(messageID, delta string) {
 		Type:      agui.TextMessageContent,
 		MessageID: messageID,
 		Delta:     delta,
+	})
+}
+
+func (w *ginSSEWriter) WriteReasoningMessageStart(messageID string) {
+	_ = w.writeEvent(agui.Event{
+		Type:      agui.ReasoningMessageStart,
+		MessageID: messageID,
+		Status:    agui.StatusStreaming,
+	})
+}
+
+func (w *ginSSEWriter) WriteReasoningMessageContent(messageID, delta string) {
+	_ = w.writeEvent(agui.Event{
+		Type:      agui.ReasoningMessageContent,
+		MessageID: messageID,
+		Delta:     delta,
+	})
+}
+
+func (w *ginSSEWriter) WriteReasoningMessageEnd(messageID string) {
+	_ = w.writeEvent(agui.Event{
+		Type:      agui.ReasoningMessageEnd,
+		MessageID: messageID,
+		Status:    agui.StatusComplete,
 	})
 }
 

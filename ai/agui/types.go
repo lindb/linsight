@@ -58,6 +58,13 @@ const (
 	// Used by the GET /conversations/:uid/messages endpoint so the frontend
 	// processes history with the same schema as live streaming events.
 	MessagesSnapshot EventType = "MESSAGES_SNAPSHOT"
+
+	// Reasoning phase events follow the AG-UI spec:
+	// https://docs.ag-ui.com/concepts/reasoning
+	// Reasoning and text messages are separate message lifecycles.
+	ReasoningMessageStart   EventType = "REASONING_MESSAGE_START"
+	ReasoningMessageContent EventType = "REASONING_MESSAGE_CONTENT"
+	ReasoningMessageEnd     EventType = "REASONING_MESSAGE_END"
 )
 
 // ErrorCode classifies RUN_ERROR events so clients can show actionable guidance.
@@ -181,6 +188,10 @@ type Message struct {
 	Status MessageStatus `json:"status,omitempty"`
 	// Content is the full accumulated text for completed messages.
 	Content string `json:"content,omitempty"`
+	// ReasoningContent is the accumulated reasoning/thinking text for completed messages.
+	// Non-empty only when the LLM supports extended thinking (e.g. DeepSeek R1, Claude w/ thinking).
+	// Stripped before sending messages to LLM API to avoid 400 errors.
+	ReasoningContent string `json:"reasoningContent,omitempty"`
 	// Delta carries incremental text during StatusStreaming; empty otherwise.
 	Delta string `json:"delta,omitempty"`
 	// ToolCalls lists tool invocations requested by an assistant message.

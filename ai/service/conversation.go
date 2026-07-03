@@ -216,9 +216,10 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 
 		var userMsg *agentmodel.Message
 		var errMsg *agentmodel.Message
-		var finalMsg *agentmodel.Message    // last assistant row with non-empty Content
-		var finalMsgContent string          // Content of finalMsg, cached to avoid re-unmarshal
-		var firstTCMsg *agentmodel.Message  // first assistant row with ToolCalls (for interrupted-turn ID)
+		var finalMsg *agentmodel.Message            // last assistant row with non-empty Content
+		var finalMsgContent string                  // Content of finalMsg, cached to avoid re-unmarshal
+		var finalMsgReasoningContent string         // ReasoningContent of finalMsg, cached alongside Content
+		var firstTCMsg *agentmodel.Message          // first assistant row with ToolCalls (for interrupted-turn ID)
 		var toolCalls []agui.ToolCall
 		seenCallIDs := make(map[string]bool)
 
@@ -263,6 +264,7 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 				if sm.Content != "" {
 					finalMsg = m
 					finalMsgContent = sm.Content
+					finalMsgReasoningContent = sm.ReasoningContent
 				}
 			}
 		}
@@ -296,18 +298,20 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 			partialEmitted := false
 			if finalMsg != nil && finalMsgContent != "" {
 				result = append(result, agui.Message{
-					ID:        finalMsg.MessageUID,
-					TurnUID:   key,
-					Role:      schema.Assistant,
-					Status:    agui.StatusComplete,
-					Content:   finalMsgContent,
-					ToolCalls: toolCalls,
-					CreatedAt: finalMsg.CreatedAt,
+					ID:               finalMsg.MessageUID,
+					TurnUID:          key,
+					Role:             schema.Assistant,
+					Status:           agui.StatusComplete,
+					Content:          finalMsgContent,
+					ReasoningContent: finalMsgReasoningContent,
+					ToolCalls:        toolCalls,
+					CreatedAt:        finalMsg.CreatedAt,
 				})
 				partialEmitted = true
 			}
 			var errSm schema.Message
 			_ = json.Unmarshal(errMsg.RawMessage, &errSm)
+			// errSm.Content is "" on unmarshal failure — zero value is the correct fallback.
 			errOut := agui.Message{
 				ID:        errMsg.MessageUID,
 				TurnUID:   key,
@@ -334,12 +338,11 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 				ToolCalls: toolCalls,
 			}
 			if finalMsg != nil {
-				var sm schema.Message
-				if err := json.Unmarshal(finalMsg.RawMessage, &sm); err == nil {
-					out.ID = finalMsg.MessageUID
-					out.Content = sm.Content
-					out.CreatedAt = finalMsg.CreatedAt
-				}
+				// Reuse the cached content instead of re-unmarshalling finalMsg.RawMessage.
+				out.ID = finalMsg.MessageUID
+				out.Content = finalMsgContent
+				out.ReasoningContent = finalMsgReasoningContent
+				out.CreatedAt = finalMsg.CreatedAt
 			} else {
 				// Interrupted turn: no final content row; use the first tool-call
 				// assistant row so the ID refers to a real DB row (needed for feedback lookup).

@@ -93,6 +93,7 @@ func New(
 		ToolCallingModel:      proxy,
 		MaxStep:               cfg.MaxStep,
 		StreamToolCallChecker: fullResponseStreamToolCallChecker,
+		MessageModifier:       buildLanguageAlignModifier(),
 		ToolsConfig: compose.ToolsNodeConfig{
 			// When the LLM hallucinates a non-existent tool name, return a descriptive
 			// error message instead of crashing the run so the LLM can self-correct.
@@ -269,8 +270,11 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	// ModelCallbackHandler.OnError can capture them by pointer.
 	var textStarted bool
 	var sb strings.Builder
+	// rsb accumulates reasoning/thinking tokens emitted before actual content.
+	// Persisted in schema.Message.ReasoningContent so history restore can replay them.
+	var rsb strings.Builder
 	// partialSaved guards against double-saving the partial assistant message
-	// (OnError and Chat() defer both check sb.Len() > 0; the DB unique constraint
+	// (OnError and Chat() defer both check (sb.Len() > 0 || rsb.Len() > 0); the DB unique constraint
 	// on message_uid would turn the second call into a spurious warn log).
 	var partialSaved bool
 
@@ -278,10 +282,10 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	// This defer is registered before the text-stream-close defer (LIFO), so it
 	// runs after the stream is closed but before saveErrorMessage fires.
 	defer func() {
-		if retErr != nil && conv != nil && sb.Len() > 0 && !partialSaved {
+		if retErr != nil && conv != nil && (sb.Len() > 0 || rsb.Len() > 0) && !partialSaved {
 			partialSaved = true
 			a.savePartialAssistantMessage(ctx, conv.ID, conv.UID, userID,
-				assistantMsgUID, sb.String(), runID, toolCallsByIndex, toolCallsIndexOrder)
+				assistantMsgUID, sb.String(), rsb.String(), runID, toolCallsByIndex, toolCallsIndexOrder)
 		}
 	}()
 
@@ -294,7 +298,7 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	}()
 
 	sseCallback := a.buildSSECallback(writer, conv.ID, conv.UID, userID, timeoutCtx, assistantMsgUID,
-		runID, toolCallsByIndex, &toolCallsIndexOrder, &sb, &textStarted, &partialSaved)
+		runID, toolCallsByIndex, &toolCallsIndexOrder, &sb, &rsb, &textStarted, &partialSaved)
 	opts = append(opts, einoagent.WithComposeOptions(compose.WithCallbacks(sseCallback)))
 
 	reader, err := a.compiled.Stream(runCtx, messages, opts...)
@@ -349,8 +353,11 @@ func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writ
 	}
 
 	// Persist the merged assistant message (content + tool_calls in one row).
-	a.savePartialAssistantMessage(timeoutCtx, conv.ID, conv.UID, userID,
-		assistantMsgUID, sb.String(), runID, toolCallsByIndex, toolCallsIndexOrder)
+	// Guard against empty responses: skip if there is nothing to persist.
+	if sb.Len() > 0 || rsb.Len() > 0 || len(toolCallsByIndex) > 0 {
+		a.savePartialAssistantMessage(timeoutCtx, conv.ID, conv.UID, userID,
+			assistantMsgUID, sb.String(), rsb.String(), runID, toolCallsByIndex, toolCallsIndexOrder)
+	}
 
 	// Generate a title for new conversations and emit RUN_FINISHED.
 	var title string
@@ -458,6 +465,9 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Message) ([]*schem
 				logger.Int64("id", m.ID), logger.String("tool_call_id", sm.ToolCallID))
 			continue
 		}
+		// Strip reasoning_content: OpenAI-compatible APIs reject messages that carry
+		// reasoning tokens in history, returning a 400 validation error.
+		sm.ReasoningContent = ""
 		msgs = append(msgs, &sm)
 	}
 	return msgs, nil
@@ -482,6 +492,9 @@ func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationSt
 	}
 
 	for _, msg := range state.ContextWindow {
+		// Strip reasoning_content: OpenAI-compatible APIs reject messages that carry
+		// reasoning tokens in history, returning a 400 validation error.
+		msg.ReasoningContent = ""
 		messages = append(messages, msg)
 	}
 
@@ -496,6 +509,36 @@ func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationSt
 // buildSystemPrompt returns the configured base system prompt.
 func (a *agentRuntime) buildSystemPrompt() string {
 	return a.cfg.SystemPrompt
+}
+
+// langAlignInstruction is appended to the system message on every model call to keep
+// both reasoning tokens and final text in the same language as the user's input.
+const langAlignInstruction = "\n\nIMPORTANT: Always use the SAME language as the user's message for BOTH your reasoning/thinking AND your final response. If the user writes in Chinese, think and respond in Chinese. If the user writes in English, think and respond in English."
+
+// buildLanguageAlignModifier returns a MessageModifier that appends langAlignInstruction
+// to the system message before each LLM call, ensuring the model reasons and responds
+// in the same language the user wrote in.
+// If no system message is present (empty SystemPrompt), a new one is prepended.
+func buildLanguageAlignModifier() react.MessageModifier {
+	return func(_ context.Context, input []*schema.Message) []*schema.Message {
+		for i, msg := range input {
+			if msg.Role != schema.System {
+				continue
+			}
+			// Copy to avoid mutating the caller's slice.
+			updated := *msg
+			updated.Content += langAlignInstruction
+			out := make([]*schema.Message, len(input))
+			copy(out, input)
+			out[i] = &updated
+			return out
+		}
+		// No system message found; prepend a minimal one with just the language instruction.
+		out := make([]*schema.Message, 0, len(input)+1)
+		out = append(out, &schema.Message{Role: schema.System, Content: strings.TrimPrefix(langAlignInstruction, "\n\n")})
+		out = append(out, input...)
+		return out
+	}
 }
 
 // buildMetaMap converts a SkillMeta slice into a name→ControlLevel map for telemetry.
@@ -561,14 +604,14 @@ func (a *agentRuntime) generateTitle(reqCtx context.Context, convID int64, first
 }
 
 // savePartialAssistantMessage persists an assistant message that may contain partial
-// content and/or tool calls. It is called at the normal end of streaming and, when
-// sb.Len() > 0, by the Chat() error-path defer to snapshot any text accumulated
-// before a failure. Tool-result orphan prevention is handled separately by
-// ToolCallbackHandler.OnStart, which saves one assistant row per tool call.
+// content, reasoning content, and/or tool calls. It is called at the normal end of
+// streaming and, when sb.Len() > 0, by the Chat() error-path defer to snapshot any
+// text accumulated before a failure. Tool-result orphan prevention is handled
+// separately by ToolCallbackHandler.OnStart, which saves one assistant row per tool call.
 func (a *agentRuntime) savePartialAssistantMessage(
 	ctx context.Context,
 	convID int64, convUID string, userID int64,
-	assistantMsgUID string, content string, turnUID string,
+	assistantMsgUID string, content string, reasoningContent string, turnUID string,
 	toolCallsByIndex map[int]*schema.ToolCall, toolCallsIndexOrder []int,
 ) {
 	var mergedToolCalls []schema.ToolCall
@@ -581,9 +624,10 @@ func (a *agentRuntime) savePartialAssistantMessage(
 		mergedToolCalls = append(mergedToolCalls, tc)
 	}
 	msg := &schema.Message{
-		Role:      schema.Assistant,
-		Content:   content,
-		ToolCalls: mergedToolCalls,
+		Role:             schema.Assistant,
+		Content:          content,
+		ReasoningContent: reasoningContent,
+		ToolCalls:        mergedToolCalls,
 	}
 	raw, _ := json.Marshal(msg)
 	dbMsg := &agentmodel.Message{
@@ -686,6 +730,7 @@ func (a *agentRuntime) buildSSECallback(
 	toolCallsByIndex map[int]*schema.ToolCall,
 	toolCallsIndexOrder *[]int,
 	sb *strings.Builder,
+	rsb *strings.Builder,
 	textStarted *bool,
 	partialSaved *bool,
 ) callbacks.Handler {
@@ -802,7 +847,13 @@ func (a *agentRuntime) buildSSECallback(
 			callID := compose.GetToolCallID(ctx)
 			errContent := err.Error()
 			toolMsgUID := uuid.GenerateShortUUID()
-			writer.WriteToolCallResult(toolMsgUID, callID, info.Name, agui.StatusError, errContent, nil)
+			// Attach structured guidance so the frontend can render errors consistently
+			// using the same rich-component path as successful tool results.
+			errGuidance := &agui.Guidance{
+				RenderType: "error",
+				RawData:    json.RawMessage(fmt.Sprintf(`{"error_msg":%s}`, jsonString(errContent))),
+			}
+			writer.WriteToolCallResult(toolMsgUID, callID, info.Name, agui.StatusError, errContent, errGuidance)
 
 			toolMsg := &schema.Message{
 				Role:       schema.Tool,
@@ -822,6 +873,7 @@ func (a *agentRuntime) buildSSECallback(
 				TurnUID:         turnUID,
 				RunUID:          turnUID,
 			}
+			dbMsg.Guidance, _ = json.Marshal(errGuidance)
 			dbMsg.CreatedBy = userID
 			dbMsg.UpdatedBy = userID
 			if saveErr := a.convSrv.SaveMessage(saveCtx, dbMsg); saveErr != nil {
@@ -842,15 +894,44 @@ func (a *agentRuntime) buildSSECallback(
 		// own copy and are not starved.
 		OnEndWithStreamOutput: func(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[*einomodel.CallbackOutput]) context.Context {
 			defer output.Close()
+			// reasoningStarted tracks whether REASONING_MESSAGE_START has been emitted
+			// for this model call. It is local here because each invocation has its
+			// own independent reasoning phase; no sharing across callbacks needed.
+			var reasoningStarted bool
+			reasoningMsgUID := uuid.GenerateShortUUID()
 			for {
 				out, err := output.Recv()
 				if errors.Is(err, io.EOF) {
 					break
 				}
 				if err != nil {
+					// Ensure the reasoning bubble is closed before returning so the
+					// frontend never shows a permanently open reasoning message.
+					if reasoningStarted {
+						writer.WriteReasoningMessageEnd(reasoningMsgUID)
+					}
 					return ctx
 				}
-				if out == nil || out.Message == nil || out.Message.Content == "" {
+				if out == nil || out.Message == nil {
+					continue
+				}
+				// Handle reasoning/thinking tokens (AG-UI REASONING_MESSAGE_* events).
+				// Reasoning and text messages are independent lifecycles per AG-UI spec.
+				if rc := out.Message.ReasoningContent; rc != "" {
+					if !reasoningStarted {
+						writer.WriteReasoningMessageStart(reasoningMsgUID)
+						reasoningStarted = true
+					}
+					rsb.WriteString(rc)
+					writer.WriteReasoningMessageContent(reasoningMsgUID, rc)
+					continue
+				}
+				// Close the reasoning channel before the first content token arrives.
+				if reasoningStarted {
+					writer.WriteReasoningMessageEnd(reasoningMsgUID)
+					reasoningStarted = false
+				}
+				if out.Message.Content == "" {
 					continue
 				}
 				if !*textStarted {
@@ -860,6 +941,10 @@ func (a *agentRuntime) buildSSECallback(
 				sb.WriteString(out.Message.Content)
 				writer.WriteTextMessageContent(assistantMsgUID, out.Message.Content)
 			}
+			// Flush any trailing reasoning-only output (no content followed).
+			if reasoningStarted {
+				writer.WriteReasoningMessageEnd(reasoningMsgUID)
+			}
 			if *textStarted {
 				writer.WriteTextMessageEnd(assistantMsgUID)
 				// Reset so the error-recovery defer in Chat() does not double-close.
@@ -868,10 +953,10 @@ func (a *agentRuntime) buildSSECallback(
 			return ctx
 		},
 		OnError: func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-			if sb.Len() > 0 && !*partialSaved {
+			if (sb.Len() > 0 || rsb.Len() > 0) && !*partialSaved {
 				*partialSaved = true
 				a.savePartialAssistantMessage(saveCtx, convID, convUID, userID,
-					assistantMsgUID, sb.String(), turnUID, toolCallsByIndex, *toolCallsIndexOrder)
+					assistantMsgUID, sb.String(), rsb.String(), turnUID, toolCallsByIndex, *toolCallsIndexOrder)
 			}
 			return ctx
 		},
@@ -891,4 +976,11 @@ func inferRenderType(toolName string) string {
 	default:
 		return "text"
 	}
+}
+
+// jsonString encodes s as a JSON string literal.
+// Used to safely embed string values inside hand-crafted JSON raw_data objects.
+func jsonString(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
