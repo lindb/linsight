@@ -212,7 +212,7 @@ func (rt *chatRun) run() (retErr error) {
 	// Idempotent: no-op if the step was already closed by the normal path.
 	defer func() {
 		if retErr != nil && rt.currentStepEvt != nil {
-			rt.currentStepEvt.OnFinish(rt.reqCtx, rt.currentStepID)
+			rt.currentStepEvt.OnFinish(rt.reqCtx)
 		}
 	}()
 
@@ -334,7 +334,7 @@ func (rt *chatRun) finalize() error {
 	// IsFinished=true is detected alongside tool calls, causing decideBranch to
 	// terminate before createToolsNode ran and closed the step.
 	if rt.currentStepEvt != nil {
-		rt.currentStepEvt.OnFinish(rt.timeoutCtx, rt.currentStepID)
+		rt.currentStepEvt.OnFinish(rt.timeoutCtx)
 	}
 	rt.assistantEvt.Persist(rt.timeoutCtx, rt.currentStepID)
 

@@ -44,10 +44,20 @@ var stepLog = logger.GetLogger("ai", "StepEvent")
 //     SSE correlation so the frontend can open and close the step UI element.
 //   - modelStepID (passed to OnStart/OnFinish): the model-call iteration UUID stored
 //     in DB step_id column, which correlates all events from the same ReAct round.
+//
+// DB persistence is conditional: step_started and step_finished rows are only written
+// for iterations that contain at least one tool call. Reasoning-only iterations still
+// emit SSE frames (so the frontend can render the step container) but produce no DB
+// rows because there is nothing meaningful to replay. Flush() must be called from the
+// first tool callback to commit the step_started row before any tool events are saved.
 type StepEvent struct {
-	sseStepID string    // per-iteration UUID for SSE STEP_STARTED/STEP_FINISHED pairing
-	startTime time.Time // set in OnStart; used to compute elapsed in OnFinish
-	finished  atomic.Bool // idempotent guard: OnFinish is a no-op after the first call
+	sseStepID   string      // per-iteration UUID for SSE STEP_STARTED/STEP_FINISHED pairing
+	modelStepID string      // stored at OnStart; used by Flush to write step_started DB row
+	name        string      // stored at OnStart; used by Flush to write step_started DB row
+	preAllocSeq int         // sequence number claimed in OnStart, before any tool callbacks fire
+	startTime   time.Time   // set in OnStart; used to compute elapsed in OnFinish
+	finished    atomic.Bool // idempotent guard: OnFinish is a no-op after the first call
+	flushed     atomic.Bool // true once Flush() has written step_started to DB
 
 	writer  agentapi.SSEWriter
 	saver   EventSaver
@@ -65,27 +75,47 @@ func NewStepEvent(writer agentapi.SSEWriter, saver EventSaver, convCtx *ConvCont
 }
 
 // OnStart fires at the very start of a model-call iteration, before any reasoning or
-// tool tokens are emitted. Emits STEP_STARTED SSE with the provided step name and
-// persists the step_started DB row. The name is caller-controlled (e.g. "Reasoning",
-// "Deep Analysis") to carry business-meaningful labels.
-// modelStepID should be chatRun.currentStepID, generated just before calling OnStart.
-func (e *StepEvent) OnStart(ctx context.Context, modelStepID string, name string) {
+// tool tokens are emitted. Emits STEP_STARTED SSE immediately so the frontend can open
+// the step container, and stores modelStepID/name for later use by Flush.
+//
+// DB persistence is intentionally deferred: step_started is NOT written here because
+// we do not yet know whether this iteration will produce tool calls. Call Flush() from
+// the first tool callback to commit the DB row only when tools are confirmed.
+func (e *StepEvent) OnStart(_ context.Context, modelStepID string, name string) {
 	e.startTime = time.Now()
+	e.modelStepID = modelStepID
+	e.name = name
+	// Pre-allocate the sequence number here, while still in the single model-callback
+	// goroutine and before any concurrent tool callbacks can call NextSeq(). This
+	// guarantees step_started.Sequence < all subsequent tool_call/tool_result sequences
+	// even when Eino invokes tool callbacks concurrently.
+	e.preAllocSeq = e.convCtx.NextSeq()
 
 	// SSE: open the step before reasoning begins so the frontend groups the full iteration.
 	e.writer.WriteStepStarted(e.sseStepID, name)
+}
 
-	// DB: step_started row; ToolName stores the step name for history replay
-	// (GetConversationEvents reads r.ToolName as StepName). The sequence number is lower
-	// than any reasoning row generated in the same iteration, guaranteeing correct replay order.
+// Flush writes the step_started DB row exactly once. It must be called from the first
+// tool callback (before any tool events are saved) to ensure the step_started row
+// precedes all tool_call rows in sequence order.
+// Idempotent: subsequent calls are silently ignored.
+func (e *StepEvent) Flush(ctx context.Context) {
+	if !e.flushed.CompareAndSwap(false, true) {
+		return
+	}
 	evt := newDBEvent(e.convCtx,
 		agentmodel.EventTypeStepStarted,
-		modelStepID,
+		e.modelStepID,
 		schema.Assistant,
 		"",
 		0,
-		withToolName(name),
+		withToolName(e.name),
 	)
+	// Override with the pre-allocated sequence so step_started.Sequence is guaranteed
+	// to be lower than any subsequent tool_call rows. newDBEvent calls NextSeq() internally
+	// (wasting one counter slot), but correctness requires we use the value claimed in
+	// OnStart, before concurrent tool callbacks could claim their own sequence numbers.
+	evt.Sequence = e.preAllocSeq
 	if err := e.saver.SaveEvent(ctx, evt); err != nil {
 		stepLog.Warn("failed to persist step_started event", logger.Error(err))
 	}
@@ -95,7 +125,7 @@ func (e *StepEvent) OnStart(ctx context.Context, modelStepID string, name string
 // model streaming ends for text-only iterations (no tool calls). Idempotent: subsequent
 // calls after the first are silently ignored, allowing both the normal path and the
 // error-recovery defer in chatRun.run() to call it safely without a double-close.
-func (e *StepEvent) OnFinish(ctx context.Context, modelStepID string) {
+func (e *StepEvent) OnFinish(ctx context.Context) {
 	if !e.finished.CompareAndSwap(false, true) {
 		return
 	}
@@ -105,13 +135,19 @@ func (e *StepEvent) OnFinish(ctx context.Context, modelStepID string) {
 		elapsed = time.Since(e.startTime).Milliseconds()
 	}
 
-	// SSE: close the step with total iteration elapsed duration.
+	// SSE: close the step with total iteration elapsed duration (always emitted).
 	e.writer.WriteStepFinished(e.sseStepID, elapsed)
 
-	// DB: step_finished row with total iteration elapsed duration.
+	// DB: only persist step_finished when Flush was called (i.e. the iteration had
+	// tool calls). Reasoning-only iterations emit the SSE frame above so the frontend
+	// can close the step container, but produce no DB rows because there is nothing
+	// meaningful to replay in history.
+	if !e.flushed.Load() {
+		return
+	}
 	evt := newDBEvent(e.convCtx,
 		agentmodel.EventTypeStepFinished,
-		modelStepID,
+		e.modelStepID,
 		schema.Assistant,
 		"",
 		elapsed,

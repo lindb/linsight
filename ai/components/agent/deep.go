@@ -198,7 +198,7 @@ func createExecutionNode() *compose.Lambda {
 		}
 
 		// No tool calls: this is a text-only iteration; close the step here.
-		rt.currentStepEvt.OnFinish(ctx, rt.currentStepID)
+		rt.currentStepEvt.OnFinish(ctx)
 		return messages, nil
 	})
 }
@@ -229,6 +229,9 @@ func createToolsNode() *compose.Lambda {
 		}
 
 		lastMsg := messages[len(messages)-1]
+		// Flush the deferred step_started DB row now that tool calls are confirmed.
+		// Idempotent: safe to call even if Flush was already invoked earlier.
+		rt.currentStepEvt.Flush(ctx)
 		for _, tc := range lastMsg.ToolCalls {
 			toolEvt := aievent.NewToolCallEvent(
 				tc.ID, tc.Function.Name,
@@ -271,7 +274,7 @@ func createToolsNode() *compose.Lambda {
 		}
 
 		// All tools in this iteration are done; close the step.
-		rt.currentStepEvt.OnFinish(ctx, rt.currentStepID)
+		rt.currentStepEvt.OnFinish(ctx)
 		return messages, nil
 	})
 }
