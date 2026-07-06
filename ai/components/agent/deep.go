@@ -75,7 +75,7 @@ func createThinkingNode() *compose.Lambda {
 		// Open a new step to group the upcoming model call and tool executions.
 		stepID := uuid.GenerateShortUUID()
 		stepEvt := aievent.NewStepEvent(rt.writer, rt.agent.convSrv, rt.convCtx)
-		stepEvt.OnStart(ctx, stepID)
+		stepEvt.OnStart(ctx, stepID, "Deep Analysis")
 		rt.currentStepID = stepID
 		rt.currentStepEvt = stepEvt
 

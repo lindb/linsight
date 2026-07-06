@@ -65,25 +65,26 @@ func NewStepEvent(writer agentapi.SSEWriter, saver EventSaver, convCtx *ConvCont
 }
 
 // OnStart fires at the very start of a model-call iteration, before any reasoning or
-// tool tokens are emitted. Emits STEP_STARTED SSE with an empty step name (tool name
-// is unknown at iteration start) and persists the step_started DB row.
+// tool tokens are emitted. Emits STEP_STARTED SSE with the provided step name and
+// persists the step_started DB row. The name is caller-controlled (e.g. "Reasoning",
+// "Deep Analysis") to carry business-meaningful labels.
 // modelStepID should be chatRun.currentStepID, generated just before calling OnStart.
-func (e *StepEvent) OnStart(ctx context.Context, modelStepID string) {
+func (e *StepEvent) OnStart(ctx context.Context, modelStepID string, name string) {
 	e.startTime = time.Now()
 
 	// SSE: open the step before reasoning begins so the frontend groups the full iteration.
-	// StepName is empty because the tool name is not known until TOOL_CALL_START arrives.
-	e.writer.WriteStepStarted(e.sseStepID, "")
+	e.writer.WriteStepStarted(e.sseStepID, name)
 
-	// DB: step_started row; Content and ToolName are intentionally empty because the
-	// tool name is not known at iteration start. The sequence number is lower than any
-	// reasoning row generated in the same iteration, which guarantees correct replay order.
+	// DB: step_started row; ToolName stores the step name for history replay
+	// (GetConversationEvents reads r.ToolName as StepName). The sequence number is lower
+	// than any reasoning row generated in the same iteration, guaranteeing correct replay order.
 	evt := newDBEvent(e.convCtx,
 		agentmodel.EventTypeStepStarted,
 		modelStepID,
 		schema.Assistant,
 		"",
 		0,
+		withToolName(name),
 	)
 	if err := e.saver.SaveEvent(ctx, evt); err != nil {
 		stepLog.Warn("failed to persist step_started event", logger.Error(err))
@@ -99,10 +100,13 @@ func (e *StepEvent) OnFinish(ctx context.Context, modelStepID string) {
 		return
 	}
 
-	elapsed := time.Since(e.startTime).Milliseconds()
+	var elapsed int64
+	if !e.startTime.IsZero() {
+		elapsed = time.Since(e.startTime).Milliseconds()
+	}
 
-	// SSE: close the step.
-	e.writer.WriteStepFinished(e.sseStepID)
+	// SSE: close the step with total iteration elapsed duration.
+	e.writer.WriteStepFinished(e.sseStepID, elapsed)
 
 	// DB: step_finished row with total iteration elapsed duration.
 	evt := newDBEvent(e.convCtx,

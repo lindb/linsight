@@ -40,12 +40,12 @@ type SSEWriter interface {
 	// Streaming text message
 	WriteTextMessageStart(messageID string, role schema.RoleType)
 	WriteTextMessageContent(messageID, delta string)
-	WriteTextMessageEnd(messageID string)
+	WriteTextMessageEnd(messageID string, elapsedMs int64)
 
 	// Reasoning phase (AG-UI spec: REASONING_MESSAGE_* events)
 	WriteReasoningMessageStart(messageID string)
 	WriteReasoningMessageContent(messageID, delta string)
-	WriteReasoningMessageEnd(messageID string)
+	WriteReasoningMessageEnd(messageID string, elapsedMs int64)
 
 	// Tool invocation
 	WriteToolCallStart(toolCallID, toolName, parentMessageID string)
@@ -59,7 +59,7 @@ type SSEWriter interface {
 	// Step lifecycle: wraps a named execution step (typically one tool invocation).
 	// STEP_STARTED fires before TOOL_CALL_START; STEP_FINISHED fires after TOOL_CALL_RESULT.
 	WriteStepStarted(stepID, stepName string)
-	WriteStepFinished(stepID string)
+	WriteStepFinished(stepID string, elapsedMs int64)
 }
 
 // ginSSEWriter is the concrete SSEWriter implementation backed by gin.ResponseWriter.
@@ -139,19 +139,21 @@ func (w *ginSSEWriter) WriteReasoningMessageContent(messageID, delta string) {
 	})
 }
 
-func (w *ginSSEWriter) WriteReasoningMessageEnd(messageID string) {
+func (w *ginSSEWriter) WriteReasoningMessageEnd(messageID string, elapsedMs int64) {
 	_ = w.writeEvent(agui.Event{
 		Type:      agui.ReasoningMessageEnd,
 		MessageID: messageID,
 		Status:    agui.StatusComplete,
+		ElapsedMs: elapsedMs,
 	})
 }
 
-func (w *ginSSEWriter) WriteTextMessageEnd(messageID string) {
+func (w *ginSSEWriter) WriteTextMessageEnd(messageID string, elapsedMs int64) {
 	_ = w.writeEvent(agui.Event{
 		Type:      agui.TextMessageEnd,
 		MessageID: messageID,
 		Status:    agui.StatusComplete,
+		ElapsedMs: elapsedMs,
 	})
 }
 
@@ -207,10 +209,11 @@ func (w *ginSSEWriter) WriteStepStarted(stepID, stepName string) {
 	})
 }
 
-func (w *ginSSEWriter) WriteStepFinished(stepID string) {
+func (w *ginSSEWriter) WriteStepFinished(stepID string, elapsedMs int64) {
 	_ = w.writeEvent(agui.Event{
-		Type:   agui.StepFinished,
-		StepID: stepID,
+		Type:      agui.StepFinished,
+		StepID:    stepID,
+		ElapsedMs: elapsedMs,
 	})
 }
 

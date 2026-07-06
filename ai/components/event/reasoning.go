@@ -71,14 +71,17 @@ func (e *ReasoningEvent) OnEnd(ctx context.Context) {
 	if !e.started {
 		return
 	}
-	e.writer.WriteReasoningMessageEnd(e.msgUID)
+	var elapsedMs int64
+	if !e.startTime.IsZero() {
+		elapsedMs = time.Since(e.startTime).Milliseconds()
+	}
+	e.writer.WriteReasoningMessageEnd(e.msgUID, elapsedMs)
 	e.started = false
 
 	if e.rsb.Len() == 0 {
 		return
 	}
 
-	elapsedMs := time.Since(e.startTime).Milliseconds()
 	// Reasoning content is excluded from LLM context: models reject their own
 	// reasoning tokens. RawMessage is intentionally omitted (no schema.Message).
 	evt := newDBEvent(e.convCtx,

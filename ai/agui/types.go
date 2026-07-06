@@ -180,7 +180,8 @@ type Event struct {
 
 	// Step lifecycle: STEP_STARTED and STEP_FINISHED.
 	// StepID is a short UUID distinct from ToolCallID; one per model-call iteration.
-	// StepName is empty at STEP_STARTED (tool name is unknown at iteration start).
+	// StepName carries a caller-supplied label (e.g. "Reasoning", "Deep Analysis").
+	// Empty string is valid for unnamed steps.
 	StepID   string `json:"stepId,omitempty"`
 	StepName string `json:"stepName,omitempty"`
 

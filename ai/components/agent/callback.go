@@ -133,7 +133,7 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 			// Create the iteration StepEvent and open the step BEFORE reasoning begins,
 			// so the frontend groups the full iteration under one step header.
 			rt.currentStepEvt = aievent.NewStepEvent(rt.writer, rt.agent.convSrv, rt.convCtx)
-			rt.currentStepEvt.OnStart(ctx, rt.currentStepID)
+			rt.currentStepEvt.OnStart(ctx, rt.currentStepID, "Reasoning")
 			// Reset the pending tool counter; Eino guarantees all tool callbacks from
 			// the previous iteration have finished before this callback fires.
 			atomic.StoreInt32(&rt.pendingToolCalls, 0)

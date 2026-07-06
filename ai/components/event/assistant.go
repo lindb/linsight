@@ -87,7 +87,11 @@ func (e *AssistantTextEvent) OnContent(delta string) {
 // Does NOT write to DB — call Persist once from finalize() or an error defer.
 func (e *AssistantTextEvent) OnEnd(_ context.Context) {
 	if e.started {
-		e.writer.WriteTextMessageEnd(e.msgUID)
+		var elapsed int64
+		if !e.startTime.IsZero() {
+			elapsed = time.Since(e.startTime).Milliseconds()
+		}
+		e.writer.WriteTextMessageEnd(e.msgUID, elapsed)
 		e.started = false
 	}
 }
