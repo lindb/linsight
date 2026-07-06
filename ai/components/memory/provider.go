@@ -30,5 +30,6 @@ import (
 type ConversationProvider interface {
 	GetConversation(ctx context.Context, uid string) (*agentmodel.Conversation, error)
 	GetRecentMessages(ctx context.Context, convID int64, limit int) ([]*agentmodel.Message, error)
+	GetRecentEvents(ctx context.Context, convUID string, limit int) ([]*agentmodel.Event, error)
 	ListConversations(ctx context.Context, offset, limit int) ([]*agentmodel.Conversation, int64, error)
 }

@@ -25,7 +25,6 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
-	"github.com/lindb/linsight/ai/agui"
 	"github.com/lindb/linsight/ai/components/memory"
 	agentmodel "github.com/lindb/linsight/ai/model"
 )
@@ -43,7 +42,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 		if stateErr != nil {
 			agentLog.Warn("memory: failed to restore conversation state, falling back to DB history",
 				logger.String("conv.uid", conv.UID), logger.Error(stateErr))
-			history, histErr := a.convSrv.GetRecentMessages(ctx, conv.ID, a.cfg.MemorySize)
+			history, histErr := a.convSrv.GetRecentEvents(ctx, conv.UID, a.cfg.MemorySize)
 			if histErr != nil {
 				return nil, fmt.Errorf("load history fallback: %w", histErr)
 			}
@@ -60,7 +59,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 		}
 	} else {
 		agentLog.Info("memory: MemoryStore disabled, using DB history")
-		history, histErr := a.convSrv.GetRecentMessages(ctx, conv.ID, a.cfg.MemorySize)
+		history, histErr := a.convSrv.GetRecentEvents(ctx, conv.UID, a.cfg.MemorySize)
 		if histErr != nil {
 			return nil, fmt.Errorf("load history: %w", histErr)
 		}
@@ -73,11 +72,13 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 	return messages, nil
 }
 
-// assembleMessages builds the LLM message slice from DB history rows.
+// assembleMessages builds the LLM message slice from DB event rows.
 // RawMessage stores eino schema.Message JSON (snake_case keys), so direct
 // unmarshal to schema.Message is lossless — ToolCalls, ToolCallID, and ToolName
 // are preserved exactly.
-func (a *agentRuntime) assembleMessages(history []*agentmodel.Message) ([]*schema.Message, error) {
+// GetRecentEvents already excludes reasoning, step, and error-status rows at query
+// level, so no additional filtering is needed here.
+func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) ([]*schema.Message, error) {
 	msgs := make([]*schema.Message, 0, len(history)+1)
 
 	systemPrompt := a.buildSystemPrompt()
@@ -85,11 +86,11 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Message) ([]*schem
 		msgs = append(msgs, &schema.Message{Role: schema.System, Content: systemPrompt})
 	}
 
-	// Collect all tool call_ids referenced by assistant messages so we can detect
+	// Collect all tool call_ids referenced by tool_call events so we can detect
 	// orphaned tool-result rows (those whose call_id has no matching parent).
 	knownCallIDs := make(map[string]bool)
 	for _, m := range history {
-		if m.Role != schema.Assistant {
+		if m.Type != agentmodel.EventTypeToolCall {
 			continue
 		}
 		var sm schema.Message
@@ -104,19 +105,19 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Message) ([]*schem
 	}
 
 	for _, m := range history {
-		if m.Role == schema.Assistant && m.Status == string(agui.StatusError) {
+		if len(m.RawMessage) == 0 {
 			continue
 		}
 		var sm schema.Message
 		if err := json.Unmarshal(m.RawMessage, &sm); err != nil {
-			agentLog.Warn("skipping malformed history message",
+			agentLog.Warn("skipping malformed history event",
 				logger.Int64("id", m.ID), logger.Error(err))
 			continue
 		}
 		// Drop orphaned tool messages; sending them to the LLM causes an API validation
 		// error because their ToolCallID references a non-existent parent ToolCall.
 		if sm.Role == schema.Tool && !knownCallIDs[sm.ToolCallID] {
-			agentLog.Warn("skipping orphaned tool message",
+			agentLog.Warn("skipping orphaned tool event",
 				logger.Int64("id", m.ID), logger.String("tool_call_id", sm.ToolCallID))
 			continue
 		}

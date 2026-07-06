@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/eino/compose"
@@ -33,6 +33,7 @@ import (
 
 	agentapi "github.com/lindb/linsight/ai/api"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	aievent "github.com/lindb/linsight/ai/components/event"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/ai/telemetry"
 	"github.com/lindb/linsight/pkg/util"
@@ -72,9 +73,15 @@ type chatRun struct {
 	// streaming accumulators; written by callbacks, read by finalize
 	toolCallsByIndex    map[int]*schema.ToolCall // keyed by OpenAI stream Index field
 	toolCallsIndexOrder []int                    // insertion order for deterministic merging
-	sb, rsb             strings.Builder          // text content and reasoning content
-	textStarted         bool                     // true once WriteTextMessageStart has fired
-	partialSaved        bool                     // guards against double-saving partial content
+
+	// event lifecycle objects; initialized in run() after conversation is resolved
+	convCtx         *aievent.ConvContext
+	assistantEvt    *aievent.AssistantTextEvent
+	toolEvtsMu      sync.Mutex                     // guards concurrent reads/writes to toolEvts
+	toolEvts        map[string]*aievent.ToolCallEvent
+	currentStepID   string          // updated at the start of each model-call iteration
+	currentStepEvt  *aievent.StepEvent // step lifecycle for the current model-call iteration
+	pendingToolCalls int32           // atomic counter: outstanding tool calls in the current iteration
 
 	// pre-generated UIDs known before streaming begins
 	assistantMsgUID string
@@ -163,11 +170,22 @@ func (rt *chatRun) run() (retErr error) {
 	// refresh. Guard: only fire once a user message has been persisted (userMsgUID set).
 	defer func() {
 		if retErr != nil && rt.userMsgUID != "" {
-			rt.persistAgentError(rt.reqCtx, rt.runID, retErr)
+			rt.persistAgentError(rt.reqCtx, retErr)
 		}
 	}()
 
 	rt.assistantMsgUID = uuid.GenerateShortUUID()
+
+	// Initialize event lifecycle objects; must be before persistUserMessage so
+	// the user-message event can use convCtx.NextSeq().
+	rt.convCtx = &aievent.ConvContext{
+		ConvID:  rt.conv.ID,
+		ConvUID: rt.conv.UID,
+		UserID:  rt.userID,
+		RunID:   rt.runID,
+	}
+	rt.toolEvts = make(map[string]*aievent.ToolCallEvent)
+	rt.assistantEvt = aievent.NewAssistantTextEvent(rt.assistantMsgUID, rt.writer, rt.agent.convSrv, rt.convCtx)
 
 	if err := rt.persistUserMessage(rt.timeoutCtx); err != nil {
 		return err
@@ -181,21 +199,28 @@ func (rt *chatRun) run() (retErr error) {
 	// resolveTools is non-fatal: it logs and continues if the registry call fails.
 	rt.resolveTools()
 
-	// On error: save accumulated text so tool-result rows written by OnEnd have a
+	// On error: persist any accumulated assistant text so tool-result rows have a
 	// parent — preventing orphaned tool messages from breaking the next LLM call.
 	// Registered before the text-close defer (LIFO), so this runs after stream close.
 	defer func() {
-		if retErr != nil && (rt.sb.Len() > 0 || rt.rsb.Len() > 0) && !rt.partialSaved {
-			rt.partialSaved = true
-			rt.persistAssistantContent(rt.reqCtx)
+		if retErr != nil {
+			rt.assistantEvt.Persist(rt.reqCtx, rt.currentStepID)
+		}
+	}()
+
+	// Close any open step on error so the frontend never sees an unclosed STEP_STARTED.
+	// Idempotent: no-op if the step was already closed by the normal path.
+	defer func() {
+		if retErr != nil && rt.currentStepEvt != nil {
+			rt.currentStepEvt.OnFinish(rt.reqCtx, rt.currentStepID)
 		}
 	}()
 
 	// Close the text stream before RUN_ERROR so the frontend never sees an unclosed
 	// TEXT_MESSAGE_START when the turn returns an error.
 	defer func() {
-		if retErr != nil && rt.textStarted {
-			rt.writer.WriteTextMessageEnd(rt.assistantMsgUID)
+		if retErr != nil && rt.assistantEvt.IsStarted() {
+			rt.assistantEvt.OnEnd(rt.reqCtx)
 		}
 	}()
 
@@ -319,17 +344,10 @@ func (rt *chatRun) executeStream(messages []*schema.Message) error {
 	return nil
 }
 
-// finalize persists the completed assistant message (content + reasoningContent only —
-// tool calls are already saved per-invocation by ToolCallbackHandler.OnStart),
+// finalize persists the completed assistant message (via AssistantTextEvent.Persist),
 // generates a title for new conversations, and emits RUN_FINISHED.
-//
-// Why tool calls are excluded: saving them here would create a spurious merged
-// assistant row alongside the individual OnStart rows, corrupting the
-// assistant→tool→assistant chain used for multi-turn LLM context.
 func (rt *chatRun) finalize() error {
-	if rt.sb.Len() > 0 || rt.rsb.Len() > 0 {
-		rt.persistAssistantContent(rt.timeoutCtx)
-	}
+	rt.assistantEvt.Persist(rt.timeoutCtx, rt.currentStepID)
 
 	var title string
 	if rt.isNew {
@@ -338,7 +356,6 @@ func (rt *chatRun) finalize() error {
 
 	agentLog.Info("chat session complete",
 		logger.String("conv.uid", rt.conv.UID),
-		logger.Int("response_len", rt.sb.Len()),
 		logger.String("elapsed", time.Since(rt.start).String()),
 	)
 

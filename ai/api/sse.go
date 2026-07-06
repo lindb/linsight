@@ -55,6 +55,11 @@ type SSEWriter interface {
 
 	// Conversation history snapshot
 	WriteMessagesSnapshot(messages []agui.Message)
+
+	// Step lifecycle: wraps a named execution step (typically one tool invocation).
+	// STEP_STARTED fires before TOOL_CALL_START; STEP_FINISHED fires after TOOL_CALL_RESULT.
+	WriteStepStarted(stepID, stepName string)
+	WriteStepFinished(stepID string)
 }
 
 // ginSSEWriter is the concrete SSEWriter implementation backed by gin.ResponseWriter.
@@ -191,6 +196,21 @@ func (w *ginSSEWriter) WriteMessagesSnapshot(messages []agui.Message) {
 	_ = w.writeEvent(agui.Event{
 		Type:     agui.MessagesSnapshot,
 		Messages: messages,
+	})
+}
+
+func (w *ginSSEWriter) WriteStepStarted(stepID, stepName string) {
+	_ = w.writeEvent(agui.Event{
+		Type:     agui.StepStarted,
+		StepID:   stepID,
+		StepName: stepName,
+	})
+}
+
+func (w *ginSSEWriter) WriteStepFinished(stepID string) {
+	_ = w.writeEvent(agui.Event{
+		Type:   agui.StepFinished,
+		StepID: stepID,
 	})
 }
 

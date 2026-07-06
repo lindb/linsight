@@ -65,6 +65,20 @@ const (
 	ReasoningMessageStart   EventType = "REASONING_MESSAGE_START"
 	ReasoningMessageContent EventType = "REASONING_MESSAGE_CONTENT"
 	ReasoningMessageEnd     EventType = "REASONING_MESSAGE_END"
+
+	// StepStarted opens a named execution step (one model-call iteration).
+	// Fires before REASONING_MESSAGE_START so the frontend can group the full iteration
+	// (reasoning → tool call(s) → tool result(s) → final text) under one step header.
+	StepStarted EventType = "STEP_STARTED"
+	// StepFinished closes a named execution step.
+	// Fires after the last TOOL_CALL_RESULT in the iteration (or after model stream ends
+	// for text-only iterations); carries the total iteration elapsed time.
+	StepFinished EventType = "STEP_FINISHED"
+
+	// UserMessage represents a complete, non-streaming user input event.
+	// Used only in snapshot (GET /conversations/:uid/messages); never emitted during
+	// live SSE because the frontend already renders the user's input optimistically.
+	UserMessage EventType = "USER_MESSAGE"
 )
 
 // ErrorCode classifies RUN_ERROR events so clients can show actionable guidance.
@@ -164,8 +178,30 @@ type Event struct {
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 
-	// MessagesSnapshot
+	// Step lifecycle: STEP_STARTED and STEP_FINISHED.
+	// StepID is a short UUID distinct from ToolCallID; one per model-call iteration.
+	// StepName is empty at STEP_STARTED (tool name is unknown at iteration start).
+	StepID   string `json:"stepId,omitempty"`
+	StepName string `json:"stepName,omitempty"`
+
+	// ElapsedMs is the processing duration in milliseconds.
+	// Set on TEXT_MESSAGE_END, REASONING_MESSAGE_END, TOOL_CALL_RESULT, and STEP_FINISHED.
+	ElapsedMs int64 `json:"elapsedMs,omitempty"`
+
+	// Sequence is the run-scoped insertion order assigned by the server.
+	// Set on the first event of each DB row (START / single-event rows).
+	// Used by the frontend for ordering and deduplication in snapshot replay.
+	Sequence int `json:"sequence,omitempty"`
+
+	// MessagesSnapshot (legacy — deprecated, use Events instead).
+	// Kept for backwards compatibility; will be removed in a future release.
 	Messages []Message `json:"messages,omitempty"`
+
+	// Events carries the ordered list of agui.Event entries for a MESSAGES_SNAPSHOT response.
+	// Each entry is a complete event with Content (not Delta) for text events, so the
+	// frontend can replay the full conversation using the same event-processing path as
+	// live streaming.
+	Events []Event `json:"events,omitempty"`
 }
 
 // Message is the unified representation of a single conversation turn.

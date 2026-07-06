@@ -21,8 +21,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/cloudwego/eino/callbacks"
 	einomodel "github.com/cloudwego/eino/components/model"
@@ -33,41 +33,41 @@ import (
 	cbtemplate "github.com/cloudwego/eino/utils/callbacks"
 
 	"github.com/lindb/linsight/ai/agui"
+	aievent "github.com/lindb/linsight/ai/components/event"
 	"github.com/lindb/linsight/pkg/uuid"
 )
 
 // newSSECallback constructs the Eino callbacks.Handler that:
 //   - relays model token events as AG-UI SSE frames (TEXT_MESSAGE_*, REASONING_MESSAGE_*)
-//   - relays tool invocation events as AG-UI SSE frames (TOOL_CALL_*)
-//   - persists per-tool assistant rows and tool-result rows to the DB
+//   - relays tool invocation events as AG-UI SSE frames (STEP_*, TOOL_CALL_*)
+//   - persists all event rows to the DB via the event lifecycle objects on chatRun
 func newSSECallback(rt *chatRun) callbacks.Handler {
 	toolHandler := &cbtemplate.ToolCallbackHandler{
 		// OnStart fires when Eino is about to invoke a tool.
-		// Persists the tool-call decision as a role=assistant message so that:
-		//   1. GetConversationMessages snapshots tool calls correctly.
-		//   2. assembleMessages populates knownCallIDs, preventing all subsequent
-		//      tool-result rows from being dropped as orphans.
+		// Increments pendingToolCalls so OnFinish knows how many tools are outstanding.
+		// Creates a ToolCallEvent, caches it by callID, and delegates to its OnStart.
 		OnStart: func(ctx context.Context, info *callbacks.RunInfo, input *tool.CallbackInput) context.Context {
 			args := ""
 			if input != nil {
 				args = input.ArgumentsInJSON
 			}
+			// Increment before creating ToolCallEvent so counter is consistent when OnEnd fires.
+			atomic.AddInt32(&rt.pendingToolCalls, 1)
 			// compose.GetToolCallID reads the call_id injected by Eino before the
 			// callback fires, replacing the previous sync.Map lookup (race-prone).
 			callID := compose.GetToolCallID(ctx)
-
-			toolCallMsgUID := uuid.GenerateShortUUID()
-			rt.persistToolCall(rt.timeoutCtx, toolCallMsgUID, callID, info.Name, args)
-
-			rt.writer.WriteToolCallStart(callID, info.Name, rt.assistantMsgUID)
-			rt.writer.WriteToolCallArgs(callID, args)
-			rt.writer.WriteToolCallEnd(callID)
+			toolEvt := aievent.NewToolCallEvent(callID, info.Name, rt.assistantMsgUID, rt.currentStepID, rt.writer, rt.agent.convSrv, rt.convCtx)
+			rt.toolEvtsMu.Lock()
+			rt.toolEvts[callID] = toolEvt
+			rt.toolEvtsMu.Unlock()
+			toolEvt.OnStart(ctx, args)
 			return ctx
 		},
 
 		// OnEnd fires when a tool returns successfully.
-		// Emits a TOOL_CALL_RESULT and persists the result row with structured guidance
+		// Delegates to the cached ToolCallEvent.OnEnd with structured guidance
 		// so the frontend can render it with a rich component (table, list, …).
+		// Fires STEP_FINISHED when this is the last pending tool in the iteration.
 		OnEnd: func(ctx context.Context, info *callbacks.RunInfo, output *tool.CallbackOutput) context.Context {
 			result := ""
 			if output != nil {
@@ -88,25 +88,34 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 				}
 			}
 
-			toolMsgUID := uuid.GenerateShortUUID()
-			rt.writer.WriteToolCallResult(toolMsgUID, callID, info.Name, agui.StatusComplete, result, guidance)
-			rt.persistToolResult(rt.timeoutCtx, toolMsgUID, callID, info.Name, result, guidance)
+			rt.toolEvtsMu.Lock()
+			toolEvt, ok := rt.toolEvts[callID]
+			rt.toolEvtsMu.Unlock()
+			if ok {
+				toolEvt.OnEnd(ctx, result, guidance)
+			}
+			// Close the iteration step when all tools are done.
+			if atomic.AddInt32(&rt.pendingToolCalls, -1) == 0 {
+				rt.currentStepEvt.OnFinish(ctx, rt.currentStepID)
+			}
 			return ctx
 		},
 
 		// OnError fires when tool execution itself returns an error.
-		// Emits a TOOL_CALL_RESULT with the error text so the frontend's tool-call
-		// lifecycle is properly closed, and persists the record for multi-turn context.
+		// Delegates to the cached ToolCallEvent.OnError to close the tool and persist.
+		// Fires STEP_FINISHED when this is the last pending tool in the iteration.
 		OnError: func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
 			callID := compose.GetToolCallID(ctx)
-			errContent := err.Error()
-			toolMsgUID := uuid.GenerateShortUUID()
-			errGuidance := &agui.Guidance{
-				RenderType: "error",
-				RawData:    json.RawMessage(fmt.Sprintf(`{"error_msg":%s}`, jsonString(errContent))),
+			rt.toolEvtsMu.Lock()
+			toolEvt, ok := rt.toolEvts[callID]
+			rt.toolEvtsMu.Unlock()
+			if ok {
+				toolEvt.OnError(ctx, err)
 			}
-			rt.writer.WriteToolCallResult(toolMsgUID, callID, info.Name, agui.StatusError, errContent, errGuidance)
-			rt.persistToolError(rt.timeoutCtx, toolMsgUID, callID, info.Name, errContent, errGuidance)
+			// Close the iteration step when all tools are done.
+			if atomic.AddInt32(&rt.pendingToolCalls, -1) == 0 {
+				rt.currentStepEvt.OnFinish(ctx, rt.currentStepID)
+			}
 			return ctx
 		},
 	}
@@ -117,10 +126,20 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 		// stream so the branch checker and outer loop each get their own copy.
 		OnEndWithStreamOutput: func(ctx context.Context, info *callbacks.RunInfo, output *schema.StreamReader[*einomodel.CallbackOutput]) context.Context {
 			defer output.Close()
-			// reasoningStarted is local: each model invocation has its own independent
-			// reasoning phase and must not share state across calls.
-			var reasoningStarted bool
-			reasoningMsgUID := uuid.GenerateShortUUID()
+			// Assign a new model-call iteration ID. All events from this iteration
+			// (step, reasoning, tool_call, tool_result, assistant_text) share this ID
+			// in the DB step_id column.
+			rt.currentStepID = uuid.GenerateShortUUID()
+			// Create the iteration StepEvent and open the step BEFORE reasoning begins,
+			// so the frontend groups the full iteration under one step header.
+			rt.currentStepEvt = aievent.NewStepEvent(rt.writer, rt.agent.convSrv, rt.convCtx)
+			rt.currentStepEvt.OnStart(ctx, rt.currentStepID)
+			// Reset the pending tool counter; Eino guarantees all tool callbacks from
+			// the previous iteration have finished before this callback fires.
+			atomic.StoreInt32(&rt.pendingToolCalls, 0)
+
+			reasoning := rt.assistantEvt.NewReasoningEvent(rt.currentStepID)
+			hasTool := false
 			for {
 				out, err := output.Recv()
 				if errors.Is(err, io.EOF) {
@@ -129,62 +148,45 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 				if err != nil {
 					// Ensure the reasoning bubble is closed so the frontend never
 					// shows a permanently open reasoning message.
-					if reasoningStarted {
-						rt.writer.WriteReasoningMessageEnd(reasoningMsgUID)
-					}
+					reasoning.OnEnd(ctx)
 					return ctx
 				}
 				if out == nil || out.Message == nil {
 					continue
 				}
 				// Reasoning/thinking tokens: AG-UI REASONING_MESSAGE_* lifecycle.
-				// Reasoning and text messages are independent lifecycles per AG-UI spec.
 				if rc := out.Message.ReasoningContent; rc != "" {
-					if !reasoningStarted {
-						rt.writer.WriteReasoningMessageStart(reasoningMsgUID)
-						reasoningStarted = true
-					}
-					rt.rsb.WriteString(rc)
-					rt.writer.WriteReasoningMessageContent(reasoningMsgUID, rc)
+					reasoning.OnContent(rc)
 					continue
 				}
 				// Close the reasoning channel before the first content token arrives.
-				if reasoningStarted {
-					rt.writer.WriteReasoningMessageEnd(reasoningMsgUID)
-					reasoningStarted = false
+				reasoning.OnEnd(ctx) // idempotent: no-op if already closed
+				// Detect whether this iteration includes tool calls so we know whether
+				// to close the step here (text-only) or defer to the tool callbacks.
+				if len(out.Message.ToolCalls) > 0 {
+					hasTool = true
 				}
 				if out.Message.Content == "" {
 					continue
 				}
-				if !rt.textStarted {
-					rt.writer.WriteTextMessageStart(rt.assistantMsgUID, schema.Assistant)
-					rt.textStarted = true
-				}
-				rt.sb.WriteString(out.Message.Content)
-				rt.writer.WriteTextMessageContent(rt.assistantMsgUID, out.Message.Content)
+				rt.assistantEvt.OnContent(out.Message.Content)
 			}
-			// Flush any trailing reasoning-only model output (model reasoned but produced
-			// no content tokens in this call).
-			if reasoningStarted {
-				rt.writer.WriteReasoningMessageEnd(reasoningMsgUID)
-			}
-			if rt.textStarted {
-				rt.writer.WriteTextMessageEnd(rt.assistantMsgUID)
-				// Reset so the error-recovery defer in run() does not double-close.
-				rt.textStarted = false
+			// Flush any trailing reasoning-only model output.
+			reasoning.OnEnd(ctx)
+			rt.assistantEvt.OnEnd(ctx)
+			// Text-only iterations: close the step immediately after model stream ends.
+			// Tool iterations: step is closed by the last tool's OnEnd/OnError callback.
+			if !hasTool {
+				rt.currentStepEvt.OnFinish(ctx, rt.currentStepID)
 			}
 			return ctx
 		},
 
 		// OnError fires on a model-layer failure.
-		// Save any accumulated partial assistant message so that tool-result rows
-		// already written by OnEnd have a parent, preventing orphaned tool messages
-		// from breaking the next LLM API call.
+		// Persist any accumulated partial assistant text so that tool-result rows
+		// already written by OnEnd have a parent, preventing orphaned tool messages.
 		OnError: func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-			if (rt.sb.Len() > 0 || rt.rsb.Len() > 0) && !rt.partialSaved {
-				rt.partialSaved = true
-				rt.persistAssistantContent(rt.reqCtx)
-			}
+			rt.assistantEvt.Persist(rt.reqCtx, rt.currentStepID)
 			return ctx
 		},
 	}
@@ -203,11 +205,4 @@ func inferRenderType(toolName string) string {
 	default:
 		return "text"
 	}
-}
-
-// jsonString encodes s as a JSON string literal.
-// Used to safely embed string values inside hand-crafted JSON raw_data objects.
-func jsonString(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
 }

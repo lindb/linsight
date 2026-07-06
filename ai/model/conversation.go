@@ -81,3 +81,71 @@ type Message struct {
 
 // TableName specifies the GORM table name.
 func (Message) TableName() string { return "messages" }
+
+// Event stores one completed AG-UI event with full content, timing, and ordering metadata.
+// Text and reasoning are stored as separate rows; tool-call and tool-result are separate rows.
+// Step events (step_started, step_finished) wrap tool invocations for execution path replay.
+//
+// step_id semantics: all events produced within a single model-call iteration share the same
+// step_id (generated at the start of OnEndWithStreamOutput). Querying by step_id returns the
+// full execution path for one ReAct iteration: reasoning → step_started → tool_call →
+// tool_result → step_finished → assistant_text.
+// user_message and run_error events are not part of any model-call iteration; step_id is empty.
+type Event struct {
+	basemodel.BaseModel
+	RunID      string          `gorm:"column:run_id;index"`
+	ConvUID    string          `gorm:"column:conv_uid;index"`
+	MessageUID string          `gorm:"column:message_uid;uniqueIndex"`
+	// StepID groups all events produced in one model-call iteration (reasoning → tool → text).
+	// Empty for user_message and run_error events.
+	StepID     string          `gorm:"column:step_id;index"`
+	Role       schema.RoleType `gorm:"column:role;index"`
+	// Type is the event category; see EventType* constants.
+	Type       string          `gorm:"column:type;index"`
+	// Status mirrors agui.MessageStatus; "error" rows are excluded from LLM context.
+	Status     string          `gorm:"column:status;index"`
+	// Content holds the full text for text/reasoning events, tool result for tool_result,
+	// tool name for step_started, and human-readable error message for run_error.
+	Content    string          `gorm:"column:content;type:text"`
+	// Code holds the machine-readable error code for run_error events (maps to agui.ErrorCode).
+	Code       string          `gorm:"column:code"`
+	ToolCallID string          `gorm:"column:tool_call_id;index"`
+	ToolName   string          `gorm:"column:tool_name"`
+	// RawMessage is the schema.Message JSON for LLM context reconstruction (user/assistant/tool roles).
+	// Populated for event types that contribute to LLM context; empty for step and reasoning events.
+	RawMessage json.RawMessage `gorm:"column:raw_message;type:json"`
+	// Guidance carries the structured render hint for tool_result events.
+	Guidance   json.RawMessage `gorm:"column:guidance;type:json"`
+	// Sequence is the run-scoped insertion order for deterministic replay.
+	Sequence   int             `gorm:"column:sequence;default:0"`
+	// ElapsedMs is the time from first content to persist (text/reasoning) or from
+	// OnStart to OnEnd (tool events). Zero for step_started and user_message rows.
+	ElapsedMs  int64           `gorm:"column:elapsed_ms;default:0"`
+}
+
+// TableName specifies the GORM table name.
+func (Event) TableName() string { return "events" }
+
+// Event type categories stored in the Event.Type column.
+const (
+	// EventTypeUserMessage is the incoming user request.
+	EventTypeUserMessage = "user_message"
+	// EventTypeAssistantText is the accumulated text response from one chatRun.
+	EventTypeAssistantText = "assistant_text"
+	// EventTypeReasoning is a thinking/reasoning block from a single model call.
+	// Excluded from LLM context (models reject their own reasoning content).
+	EventTypeReasoning = "reasoning"
+	// EventTypeToolCall is the LLM's tool-invocation decision (role=assistant, has ToolCalls).
+	EventTypeToolCall = "tool_call"
+	// EventTypeToolResult is the tool execution result (role=tool).
+	EventTypeToolResult = "tool_result"
+	// EventTypeStepStarted opens a named execution step (one tool invocation).
+	// Content holds the tool name; ElapsedMs is zero.
+	EventTypeStepStarted = "step_started"
+	// EventTypeStepFinished closes a named execution step.
+	// ElapsedMs holds the total tool execution duration in milliseconds.
+	EventTypeStepFinished = "step_finished"
+	// EventTypeRunError is a terminal error event for the agent run.
+	// Code holds agui.ErrorCode; Content holds the human-readable message.
+	EventTypeRunError = "run_error"
+)

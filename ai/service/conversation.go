@@ -51,6 +51,19 @@ type ConversationService interface {
 	GetRecentMessages(ctx context.Context, conversationID int64, limit int) ([]*agentmodel.Message, error)
 	// SaveMessage persists a single message to the conversation.
 	SaveMessage(ctx context.Context, msg *agentmodel.Message) error
+
+	// SaveEvent persists a completed AG-UI event to the events table.
+	SaveEvent(ctx context.Context, evt *agentmodel.Event) error
+	// GetConversationEvents returns the ordered events for a conversation as a flat
+	// []agui.Event slice suitable for snapshot delivery. Each DB event row is expanded
+	// into the corresponding Start+Content+End triple (or tool series) so the frontend
+	// can replay the history using the same event-processing path as live streaming.
+	// Text and reasoning CONTENT events carry Content (full text), not Delta.
+	GetConversationEvents(ctx context.Context, uid string, limit int) ([]agui.Event, error)
+	// GetRecentEvents returns event rows for LLM context building, ordered oldest-first.
+	// Reasoning and step events are excluded at the query level so callers never need to
+	// filter them. Error-status rows are also excluded.
+	GetRecentEvents(ctx context.Context, convUID string, limit int) ([]*agentmodel.Event, error)
 }
 
 type conversationService struct {
@@ -122,6 +135,10 @@ func (s *conversationService) DeleteConversation(ctx context.Context, uid string
 		}
 		// Delete all messages in this conversation first (no FK constraint assumed).
 		if err := tx.Delete(&agentmodel.Message{}, "conversation_id = ?", conv.ID); err != nil {
+			return err
+		}
+		// Delete all events for this conversation.
+		if err := tx.Delete(&agentmodel.Event{}, "conv_uid = ?", conv.UID); err != nil {
 			return err
 		}
 		// Delete all feedback records for this conversation (no FK constraint assumed).
@@ -373,4 +390,179 @@ func (s *conversationService) GetRecentMessages(ctx context.Context, conversatio
 // SaveMessage persists a single message to the conversation.
 func (s *conversationService) SaveMessage(ctx context.Context, msg *agentmodel.Message) error {
 	return s.db.Create(msg)
+}
+
+// SaveEvent persists a completed AG-UI event to the events table.
+func (s *conversationService) SaveEvent(_ context.Context, evt *agentmodel.Event) error {
+	return s.db.Create(evt)
+}
+
+// GetConversationEvents returns the ordered AG-UI events for a conversation,
+// expanding each DB event row into the corresponding SSE event triple (or series)
+// so the frontend can replay history using the same event-processing path as live streaming.
+//
+// Text and reasoning CONTENT events carry Content (full text), not Delta, so the frontend
+// can distinguish snapshot full-content from streaming incremental deltas.
+//
+// Ownership is verified via GetConversation; the events table has no org_id/user_id columns.
+func (s *conversationService) GetConversationEvents(ctx context.Context, uid string, limit int) ([]agui.Event, error) {
+	conv, err := s.GetConversation(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	var rows []*agentmodel.Event
+	// Order by primary key (global insert order) instead of sequence, because
+	// sequence resets to 1 at the start of every turn and cannot be used for
+	// cross-turn global ordering.
+	if err := s.db.FindForPaging(&rows, 0, limit, "id asc",
+		"conv_uid = ?", conv.UID); err != nil {
+		return nil, err
+	}
+
+	// First pass: build run_id → assistant text messageUID map so tool_call rows can
+	// reference the correct parentMessageId when emitting TOOL_CALL_START.
+	assistantMsgByRun := make(map[string]string, len(rows))
+	for _, r := range rows {
+		if r.Type == agentmodel.EventTypeAssistantText {
+			assistantMsgByRun[r.RunID] = r.MessageUID
+		}
+	}
+
+	// Second pass: expand each DB row to one or more agui.Event values.
+	result := make([]agui.Event, 0, len(rows)*2)
+	// stepStack tracks per-step UUIDs for STEP_STARTED/STEP_FINISHED pairing.
+	// Steps do not nest (each tool call is fully sequential), so a stack is safe.
+	stepStack := make([]string, 0, 4)
+
+	for _, r := range rows {
+		switch r.Type {
+		case agentmodel.EventTypeUserMessage:
+			// User messages are never streamed; use a single flat USER_MESSAGE event
+			// with StatusComplete so the frontend does not apply streaming semantics.
+			result = append(result, agui.Event{
+				Type:      agui.UserMessage,
+				MessageID: r.MessageUID,
+				Role:      schema.User,
+				Content:   r.Content,
+				Status:    agui.StatusComplete,
+				RunID:     r.RunID,
+				Sequence:  r.Sequence,
+			})
+
+		case agentmodel.EventTypeAssistantText:
+			result = append(result,
+				agui.Event{Type: agui.TextMessageStart, MessageID: r.MessageUID, Role: schema.Assistant, Status: agui.StatusComplete, RunID: r.RunID, Sequence: r.Sequence},
+				agui.Event{Type: agui.TextMessageContent, MessageID: r.MessageUID, Delta: r.Content},
+				agui.Event{Type: agui.TextMessageEnd, MessageID: r.MessageUID, Status: agui.StatusComplete, ElapsedMs: r.ElapsedMs},
+			)
+
+		case agentmodel.EventTypeReasoning:
+			result = append(result,
+				agui.Event{Type: agui.ReasoningMessageStart, MessageID: r.MessageUID, Status: agui.StatusComplete, RunID: r.RunID, Sequence: r.Sequence},
+				agui.Event{Type: agui.ReasoningMessageContent, MessageID: r.MessageUID, Delta: r.Content},
+				agui.Event{Type: agui.ReasoningMessageEnd, MessageID: r.MessageUID, Status: agui.StatusComplete, ElapsedMs: r.ElapsedMs},
+			)
+
+		case agentmodel.EventTypeToolCall:
+			// Each tool_call row stores a single-element ToolCalls slice in RawMessage.
+			var sm schema.Message
+			if err := json.Unmarshal(r.RawMessage, &sm); err != nil || len(sm.ToolCalls) == 0 {
+				continue
+			}
+			tc := sm.ToolCalls[0]
+			parentMsgUID := assistantMsgByRun[r.RunID]
+			result = append(result,
+				agui.Event{Type: agui.ToolCallStart, ToolCallID: tc.ID, ToolCallName: tc.Function.Name, ParentMessageID: parentMsgUID, Status: agui.StatusProcessing, RunID: r.RunID, Sequence: r.Sequence},
+				agui.Event{Type: agui.ToolCallArgs, ToolCallID: tc.ID, Delta: tc.Function.Arguments},
+				agui.Event{Type: agui.ToolCallEnd, ToolCallID: tc.ID},
+			)
+
+		case agentmodel.EventTypeToolResult:
+			var guidance *agui.Guidance
+			if len(r.Guidance) > 0 {
+				var g agui.Guidance
+				if json.Unmarshal(r.Guidance, &g) == nil {
+					guidance = &g
+				}
+			}
+			status := agui.StatusComplete
+			if r.Status == string(agui.StatusError) {
+				status = agui.StatusError
+			}
+			result = append(result, agui.Event{
+				Type:         agui.ToolCallResult,
+				MessageID:    r.MessageUID,
+				ToolCallID:   r.ToolCallID,
+				ToolCallName: r.ToolName,
+				Content:      r.Content,
+				Guidance:     guidance,
+				Status:       status,
+				RunID:        r.RunID,
+				ElapsedMs:    r.ElapsedMs,
+				Sequence:     r.Sequence,
+			})
+
+		case agentmodel.EventTypeStepStarted:
+			// Generate a fresh per-step UUID for SSE STEP_STARTED/STEP_FINISHED correlation.
+			// The DB step_id column stores the model-call iteration ID (not the SSE step ID),
+			// so we cannot reuse it here.
+			stepUID := uuid.GenerateShortUUID()
+			stepStack = append(stepStack, stepUID)
+			result = append(result, agui.Event{
+				Type:     agui.StepStarted,
+				StepID:   stepUID,
+				StepName: r.ToolName, // empty for iteration-level steps; non-empty legacy tool steps
+				RunID:    r.RunID,
+				Sequence: r.Sequence,
+			})
+
+		case agentmodel.EventTypeStepFinished:
+			// Pop the matching STEP_STARTED UUID so STEP_FINISHED carries the same stepId.
+			if len(stepStack) == 0 {
+				// step_started was missing (e.g. write failure); skip to avoid unmatched event.
+				continue
+			}
+			stepUID := stepStack[len(stepStack)-1]
+			stepStack = stepStack[:len(stepStack)-1]
+			result = append(result, agui.Event{
+				Type:      agui.StepFinished,
+				StepID:    stepUID,
+				ElapsedMs: r.ElapsedMs,
+				Sequence:  r.Sequence,
+			})
+
+		case agentmodel.EventTypeRunError:
+			result = append(result, agui.Event{
+				Type:     agui.RunError,
+				Code:     r.Code,
+				Message:  r.Content,
+				RunID:    r.RunID,
+				Sequence: r.Sequence,
+			})
+		}
+	}
+	return result, nil
+}
+
+// GetRecentEvents returns event rows for LLM context building, ordered oldest-first.
+// Reasoning, step_started, and step_finished rows are excluded at the query level
+// (models reject their own reasoning; step events carry no LLM-relevant content).
+// Error-status rows are also excluded to prevent poisoning the context.
+func (s *conversationService) GetRecentEvents(ctx context.Context, convUID string, limit int) ([]*agentmodel.Event, error) {
+	var evts []*agentmodel.Event
+	excludeTypes := []string{
+		agentmodel.EventTypeReasoning,
+		agentmodel.EventTypeStepStarted,
+		agentmodel.EventTypeStepFinished,
+	}
+	if err := s.db.FindForPaging(&evts, 0, limit, "id desc",
+		"conv_uid = ? AND type NOT IN ? AND status != ?",
+		convUID, excludeTypes, string(agui.StatusError)); err != nil {
+		return nil, err
+	}
+	// Reverse so events are ordered oldest-first for LLM context assembly.
+	for i, j := 0, len(evts)-1; i < j; i, j = i+1, j-1 {
+		evts[i], evts[j] = evts[j], evts[i]
+	}
+	return evts, nil
 }

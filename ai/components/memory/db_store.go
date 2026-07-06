@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
-	"github.com/lindb/linsight/ai/agui"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
@@ -158,15 +157,15 @@ func (s *dbMemoryStore) getConversationState(ctx context.Context, key string) ([
 		return nil, fmt.Errorf("get conversation: %w", err)
 	}
 
-	messages, err := s.convSrv.GetRecentMessages(ctx, conv.ID, s.memorySize)
+	messages, err := s.convSrv.GetRecentEvents(ctx, conv.UID, s.memorySize)
 	if err != nil {
-		return nil, fmt.Errorf("get recent messages: %w", err)
+		return nil, fmt.Errorf("get recent events: %w", err)
 	}
 
-	dbMemoryLog.Info("memory: building state from DB messages",
+	dbMemoryLog.Info("memory: building state from DB events",
 		logger.String("conv.uid", conversationID),
 		logger.Int64("conv.id", conv.ID),
-		logger.Int("messages", len(messages)),
+		logger.Int("events", len(messages)),
 	)
 
 	state := &ConversationState{
@@ -174,7 +173,7 @@ func (s *dbMemoryStore) getConversationState(ctx context.Context, key string) ([
 		OrgID:         conv.OrgID,
 		UserID:        conv.UserID,
 		LastActiveAt:  time.Now(),
-		ContextWindow: s.convertMessagesToSchema(messages),
+		ContextWindow: s.convertEventsToSchema(messages),
 		Metadata:      make(map[string]string),
 	}
 
@@ -222,25 +221,21 @@ func (s *dbMemoryStore) listConversationStateKeys(ctx context.Context) ([]string
 	return keys, nil
 }
 
-// convertMessagesToSchema converts database messages to schema.Message for LLM context.
-// RawMessage now stores eino schema.Message JSON natively (snake_case keys), so the
-// unmarshal is lossless — ToolCalls, ToolCallID, and ToolName are all preserved.
+// convertEventsToSchema converts DB event rows to schema.Message for LLM context.
+// GetRecentEvents already excludes reasoning, step, and error-status rows, so this
+// method only needs to handle user/assistant/tool events.
 //
-// Verbal-promise assistant messages (no ToolCalls, content < 100 runes) are filtered out
-// because they were produced before tool-call persistence was fixed and replaying them
-// trains the LLM to respond with text instead of invoking tools.
-//
-// Orphaned tool messages (ToolCallID not referenced by any assistant ToolCall) are also
+// Orphaned tool messages (ToolCallID not referenced by any tool_call event) are
 // filtered to prevent LLM API validation errors on the next conversation turn.
-func (s *dbMemoryStore) convertMessagesToSchema(messages []*agentmodel.Message) []*schema.Message {
-	// Collect all call_ids referenced by assistant messages to detect orphaned tool rows.
+func (s *dbMemoryStore) convertEventsToSchema(events []*agentmodel.Event) []*schema.Message {
+	// Collect all call_ids referenced by tool_call events to detect orphaned tool rows.
 	knownCallIDs := make(map[string]bool)
-	for _, msg := range messages {
-		if msg.Role != schema.Assistant {
+	for _, evt := range events {
+		if evt.Type != agentmodel.EventTypeToolCall {
 			continue
 		}
 		var sm schema.Message
-		if err := json.Unmarshal(msg.RawMessage, &sm); err != nil {
+		if err := json.Unmarshal(evt.RawMessage, &sm); err != nil {
 			continue
 		}
 		for _, tc := range sm.ToolCalls {
@@ -250,18 +245,15 @@ func (s *dbMemoryStore) convertMessagesToSchema(messages []*agentmodel.Message) 
 		}
 	}
 
-	result := make([]*schema.Message, 0, len(messages))
-	for _, msg := range messages {
-		// Agent-level error messages (role=assistant, status=error) are for display only;
-		// never send them to the LLM. Tool-error messages (role=tool, status=error) must
-		// remain — the LLM requires every tool_call to be followed by a tool result.
-		if msg.Role == schema.Assistant && msg.Status == string(agui.StatusError) {
+	result := make([]*schema.Message, 0, len(events))
+	for _, evt := range events {
+		if len(evt.RawMessage) == 0 {
 			continue
 		}
 		var sm schema.Message
-		if err := json.Unmarshal(msg.RawMessage, &sm); err != nil {
-			dbMemoryLog.Warn("memory: skipping message with malformed raw_message",
-				logger.Int64("msg.id", msg.ID),
+		if err := json.Unmarshal(evt.RawMessage, &sm); err != nil {
+			dbMemoryLog.Warn("memory: skipping event with malformed raw_message",
+				logger.Int64("evt.id", evt.ID),
 				logger.Error(err),
 			)
 			continue
@@ -269,8 +261,8 @@ func (s *dbMemoryStore) convertMessagesToSchema(messages []*agentmodel.Message) 
 		// Drop orphaned tool messages; sending them to the LLM causes an API validation
 		// error because their ToolCallID references a non-existent parent ToolCall.
 		if sm.Role == schema.Tool && !knownCallIDs[sm.ToolCallID] {
-			dbMemoryLog.Warn("memory: skipping orphaned tool message",
-				logger.Int64("msg.id", msg.ID),
+			dbMemoryLog.Warn("memory: skipping orphaned tool event",
+				logger.Int64("evt.id", evt.ID),
 				logger.String("tool_call_id", sm.ToolCallID),
 			)
 			continue

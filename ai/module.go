@@ -94,6 +94,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		&agentmodel.OrgSkill{},
 		&agentmodel.ConversationSkill{},
 		&agentmodel.MessageFeedback{},
+		&agentmodel.Event{},
 	); err != nil {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
 	}

@@ -136,13 +136,13 @@ func (h *ChatHandler) GetConversationMessages(c *gin.Context) {
 	if err != nil || limit <= 0 {
 		limit = 100
 	}
-	msgs, err := h.deps.ConvSrv.GetConversationMessages(c.Request.Context(), uid, limit)
+	events, err := h.deps.ConvSrv.GetConversationEvents(c.Request.Context(), uid, limit)
 	if err != nil {
 		httppkg.Error(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, agui.Event{
-		Type:     agui.MessagesSnapshot,
-		Messages: msgs,
+		Type:   agui.MessagesSnapshot,
+		Events: events,
 	})
 }
