@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	einoagent "github.com/cloudwego/eino/flow/agent"
 	"github.com/cloudwego/eino/flow/agent/react"
@@ -32,8 +33,9 @@ import (
 	"github.com/lindb/common/pkg/logger"
 
 	agentapi "github.com/lindb/linsight/ai/api"
-	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	aievent "github.com/lindb/linsight/ai/components/event"
+	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	agentconfig "github.com/lindb/linsight/ai/config"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/ai/telemetry"
 	"github.com/lindb/linsight/pkg/util"
@@ -82,6 +84,9 @@ type chatRun struct {
 	currentStepID   string          // updated at the start of each model-call iteration
 	currentStepEvt  *aievent.StepEvent // step lifecycle for the current model-call iteration
 	pendingToolCalls int32           // atomic counter: outstanding tool calls in the current iteration
+
+	// orgTools holds the resolved tool set; used by deep Lambda nodes via context.
+	orgTools []tool.BaseTool
 
 	// pre-generated UIDs known before streaming begins
 	assistantMsgUID string
@@ -224,6 +229,14 @@ func (rt *chatRun) run() (retErr error) {
 		}
 	}()
 
+	// Deep mode bypasses the ReAct graph and runs the explicit three-node Lambda graph.
+	if rt.agent.agentMode == agentconfig.AgentModeDeep {
+		if err := rt.executeDeepGraph(messages); err != nil {
+			return err
+		}
+		return rt.finalize()
+	}
+
 	sseCallback := newSSECallback(rt)
 	rt.agentOpts = append(rt.agentOpts, einoagent.WithComposeOptions(compose.WithCallbacks(sseCallback)))
 
@@ -279,6 +292,9 @@ func (rt *chatRun) resolveTools() {
 	metaMap := buildSkillMetaMap(skillMeta)
 	rt.runCtx = telemetry.WithConversationID(rt.timeoutCtx, rt.conv.ID)
 	rt.runCtx = telemetry.WithSkillMetaMap(rt.runCtx, metaMap)
+
+	// Store tools for deep mode Lambda nodes that inject tools per-request via context.
+	rt.orgTools = orgTools
 
 	if len(orgTools) == 0 {
 		return
@@ -347,6 +363,12 @@ func (rt *chatRun) executeStream(messages []*schema.Message) error {
 // finalize persists the completed assistant message (via AssistantTextEvent.Persist),
 // generates a title for new conversations, and emits RUN_FINISHED.
 func (rt *chatRun) finalize() error {
+	// Close any open step — idempotent; handles the edge case in deep mode where
+	// IsFinished=true is detected alongside tool calls, causing decideBranch to
+	// terminate before createToolsNode ran and closed the step.
+	if rt.currentStepEvt != nil {
+		rt.currentStepEvt.OnFinish(rt.timeoutCtx, rt.currentStepID)
+	}
 	rt.assistantEvt.Persist(rt.timeoutCtx, rt.currentStepID)
 
 	var title string
@@ -374,4 +396,33 @@ func buildSkillMetaMap(meta []skillscomp.SkillMeta) map[string]agentmodel.SkillC
 		m[sm.Name] = sm.ControlLevel
 	}
 	return m
+}
+
+// enrichDeepRunCtx injects the current *chatRun into the run context so that
+// deep mode Lambda nodes can access all per-request state (tools, events, writer)
+// via a single context key without additional coupling.
+func (rt *chatRun) enrichDeepRunCtx() context.Context {
+	return context.WithValue(rt.runCtx, deepCtxChatRun, rt)
+}
+
+// executeDeepGraph runs the explicit three-node Lambda graph for deep mode and
+// drains the output stream. All SSE delivery and DB persistence are handled
+// inside the Lambda nodes themselves; we only check for stream errors here.
+func (rt *chatRun) executeDeepGraph(messages []*schema.Message) error {
+	reader, err := rt.agent.deepGraph.Stream(rt.enrichDeepRunCtx(), messages)
+	if err != nil {
+		return fmt.Errorf("deep graph stream: %w", err)
+	}
+	defer reader.Close()
+
+	for {
+		_, recvErr := reader.Recv()
+		if errors.Is(recvErr, io.EOF) {
+			break
+		}
+		if recvErr != nil {
+			return fmt.Errorf("deep graph recv: %w", recvErr)
+		}
+	}
+	return nil
 }

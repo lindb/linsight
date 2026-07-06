@@ -65,16 +65,21 @@ plugin/      → Datasource plugins (e.g., LinDB)
 accesscontrol/ → RBAC + ABAC via Casbin
 provisioning/  → Dashboard provisioning from files
 ai/          → AI Agent sub-module (self-contained; enabled via config.Agent.Enabled)
-  api/           → SSE/request types
+  agui/          → AG-UI protocol: EventType constants, MessageStatus, ErrorCode, Message/Event shapes
+  api/           → SSEWriter interface + Gin impl; ChatRequest, ModelRequest, FeedbackRequest types
   components/
-    model/       → ModelFactory + DynamicModelProxy (per-org LLM routing)
+    agent/       → ReAct agent runtime (Eino graph compile-once; Chat() method)
+    event/       → Event lifecycle package (AssistantText, Reasoning, Tool, Step, Run events)
+    memory/      → ConversationProvider + MemoryStore interfaces; DB-backed implementation
+    model/       → ModelFactory (per-org LLM routing); selector strategies (failover/cost/rr/capability)
     skills/      → SkillRegistry (3-level governance funnel)
-    tools/       → MCPToolsFactory (per-org MCP tool cache)
+    tools/       → CompositeToolsFactory; MCPToolsFactory + BuiltinToolsFactory
   config/        → AI-specific config struct
-  handler/       → HTTP handlers split by business capability
-  model/         → GORM models (AgentModel, AgentMCPServer, …)
-  service/       → AgentService (streaming chat orchestration)
-  telemetry/     → Eino OTel callback (org/user annotation)
+  handler/       → HTTP handlers: chat, model, feedback, mcp, deps
+  model/         → GORM models: Conversation, Message, Event, Model, MCP, Skill, MessageFeedback
+  service/       → ConversationService, ModelService, MCPService, FeedbackService
+  telemetry/     → OTel callback (org/user span annotation)
+  util/          → Datasource type mapper; error classification helpers
 ```
 
 > **⚠️ Must sync `openapi.yaml`**: Whenever you add, modify, or delete any API endpoint (routes, request parameters, response schemas), you **MUST** update `openapi.yaml` accordingly. The spec must always exactly match the actual implementation.
@@ -93,6 +98,10 @@ ai/          → AI Agent sub-module (self-contained; enabled via config.Agent.E
 - **DTO conversion**: Handlers pass `*aiapi.XxxRequest` directly to service. Service methods own all DTO→model conversions internally.
 - **Create return value**: Service `CreateXxx` methods return `(string, error)` where the string is the generated UID; handlers forward it to the client as `gin.H{"uid": uid}`.
 - **List response shape**: List handlers must return `gin.H{"<resource>": items, "total": n}` unless the endpoint spec explicitly says otherwise. The key name matches the resource noun (e.g. `"models"`, `"servers"`, `"conversations"`). `total` is optional — omit it only when the caller has no pagination need and the spec explicitly permits it.
+- **Event lifecycle**: Use `components/event` types (AssistantTextEvent, ReasoningEvent, ToolCallEvent, StepEvent, RunEvent) to emit SSE frames and persist DB rows together. Never call SSEWriter or SaveEvent directly from agent callback — go through the event objects.
+- **ConvContext**: Pass `*event.ConvContext` (carries ConvID, ConvUID, UserID, RunID, atomic seq) into event constructors. Sequence numbers are auto-incremented and guarantee deterministic replay order.
+- **AG-UI event types**: All SSE events follow the AG-UI spec defined in `ai/agui/types.go`. Use the `EventType` constants there — never hardcode event type strings.
+- **Model routing**: `ModelFactory` caches clients by `ConfigHash()`. Two routing modes: `fixed` (single default) and `auto` (failover / cost / round_robin / capability selectors). Org-level routing policy is stored in `OrgModelConfig`.
 
 ### Adding or Modifying an API Endpoint
 

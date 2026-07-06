@@ -23,11 +23,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"sync"
-
-	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/flow/agent/react"
-	"github.com/lindb/common/pkg/logger"
 
 	agentapi "github.com/lindb/linsight/ai/api"
 	"github.com/lindb/linsight/ai/components/memory"
@@ -37,8 +32,6 @@ import (
 	agentservice "github.com/lindb/linsight/ai/service"
 )
 
-var agentLog = logger.GetLogger("agent", "runtime")
-
 // Agent orchestrates LLM streaming chat with per-org model routing and AG-UI SSE delivery.
 type Agent interface {
 	// Chat runs one conversation turn, streaming AG-UI events to writer.
@@ -47,20 +40,7 @@ type Agent interface {
 	Chat(ctx context.Context, req *agentapi.ChatRequest, writer agentapi.SSEWriter, convUID string) (string, string, error)
 }
 
-type agentRuntime struct {
-	cfg           *agentconfig.Config
-	convSrv       agentservice.ConversationService
-	modelFactory  *modelcomp.ModelFactory
-	skillRegistry *skillscomp.SkillRegistry
-	proxy         *modelcomp.DynamicModelProxy
-	memoryStore   memory.MemoryStore
-	// compiled is the singleton ReAct agent graph built once at startup.
-	compiled *react.Agent
-	// sems maps orgID (int64) → chan struct{} (buffered semaphore).
-	sems sync.Map
-}
-
-// New creates an Agent wired to the given dependencies.
+// New creates an Agent dispatching to the correct mode based on cfg.AgentMode.
 // The ReAct graph is compiled eagerly at construction time using context.Background()
 // so that any graph-build failure surfaces at startup rather than on the first request.
 func New(
@@ -71,50 +51,13 @@ func New(
 	proxy *modelcomp.DynamicModelProxy,
 	memoryStore memory.MemoryStore,
 ) (Agent, error) {
-	compiled, err := react.NewAgent(context.Background(), &react.AgentConfig{
-		ToolCallingModel:      proxy,
-		MaxStep:               cfg.MaxStep,
-		StreamToolCallChecker: fullResponseStreamToolCallChecker,
-		MessageModifier:       buildLanguageAlignModifier(),
-		ToolsConfig: compose.ToolsNodeConfig{
-			// When the LLM hallucinates a non-existent tool name, return a descriptive
-			// error message instead of crashing the run so the LLM can self-correct.
-			UnknownToolsHandler: func(_ context.Context, name, _ string) (string, error) {
-				return fmt.Sprintf("tool %q not found; available tools are listed in the system prompt", name), nil
-			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("compile react graph: %w", err)
+	switch cfg.AgentMode {
+	case agentconfig.AgentModeDeep:
+		return newDeepAgent(cfg, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
+	case agentconfig.AgentModeReact, "":
+		return newReactAgent(cfg, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
+	default:
+		return nil, fmt.Errorf("unknown agent mode %q: must be %q or %q",
+			cfg.AgentMode, agentconfig.AgentModeReact, agentconfig.AgentModeDeep)
 	}
-	return &agentRuntime{
-		cfg:           cfg,
-		convSrv:       convSrv,
-		modelFactory:  modelFactory,
-		skillRegistry: skillRegistry,
-		proxy:         proxy,
-		memoryStore:   memoryStore,
-		compiled:      compiled,
-	}, nil
-}
-
-// getSemaphore returns (or lazily creates) the per-org concurrency semaphore.
-func (a *agentRuntime) getSemaphore(orgID int64) chan struct{} {
-	if v, ok := a.sems.Load(orgID); ok {
-		return v.(chan struct{})
-	}
-	sem := make(chan struct{}, a.cfg.MaxConcurrentPerOrg)
-	v, _ := a.sems.LoadOrStore(orgID, sem)
-	return v.(chan struct{})
-}
-
-// Chat runs a full ReAct streaming conversation turn and delivers AG-UI events over writer.
-func (a *agentRuntime) Chat(ctx context.Context, req *agentapi.ChatRequest, writer agentapi.SSEWriter, convUID string) (string, string, error) {
-	rt := newChatRun(a, ctx, req, writer, convUID)
-	err := rt.run()
-	createdUID := ""
-	if rt.conv != nil {
-		createdUID = rt.conv.UID
-	}
-	return createdUID, rt.runID, err
 }

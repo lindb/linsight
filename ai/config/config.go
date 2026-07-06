@@ -25,6 +25,16 @@ import (
 	"github.com/lindb/common/pkg/ltoml"
 )
 
+// AgentMode identifies the agent execution strategy.
+type AgentMode string
+
+const (
+	// AgentModeReact is the standard ReAct loop with tool calling.
+	AgentModeReact AgentMode = "react"
+	// AgentModeDeep is the explicit Graph with three Lambda nodes for fault diagnosis.
+	AgentModeDeep AgentMode = "deep"
+)
+
 // Config holds all configuration for the agent sub-module.
 // Enabled must be the first field; when false, Bootstrap is a no-op.
 // LLM model credentials (provider, API key, base URL, etc.) are managed entirely
@@ -80,6 +90,13 @@ type Config struct {
 
 	// MaxContextWindowSize specifies the maximum number of messages to include in context window.
 	MaxContextWindowSize int `env:"MAX_CONTEXT_WINDOW_SIZE" toml:"max-context-window-size"`
+
+	// AgentMode selects the agent execution strategy.
+	// AgentModeReact (default) uses a standard ReAct loop with tool calling.
+	// AgentModeDeep uses an explicit Graph with three Lambda nodes (thinking → execution → tools)
+	// designed for observability fault diagnosis: the model produces [DEEP THINKING] analysis
+	// before each [ACTION] decision, enabling more deliberate root-cause reasoning.
+	AgentMode AgentMode `env:"AGENT_MODE" toml:"agent-mode"`
 }
 
 // NewDefaultConfig returns a Config with conservative, safe defaults.
@@ -105,6 +122,7 @@ func NewDefaultConfig() *Config {
 		PromptRigidityLevel:    "strict",
 		EnableMultiTurnContext: true,
 		MaxContextWindowSize:   50,
+		AgentMode:              AgentModeReact,
 	}
 }
 
@@ -165,7 +183,12 @@ enable-multi-turn-context = %v
 
 ## Maximum number of messages to include in context window. Default: %d
 ## Env: LINSIGHT_AI_MAX_CONTEXT_WINDOW_SIZE
-max-context-window-size = %d`,
+max-context-window-size = %d
+
+## Agent execution strategy. Options: "react" (default), "deep-react"
+## deep-react mode produces structured [DEEP THINKING]/[ACTION] output for observability fault diagnosis.
+## Env: LINSIGHT_AI_AGENT_MODE
+agent-mode = "%s"`,
 		c.Enabled, c.Enabled,
 		c.MaxStep, c.MaxStep,
 		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
@@ -180,6 +203,7 @@ max-context-window-size = %d`,
 		escapeTOMLString(c.PromptRigidityLevel),
 		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
 		c.MaxContextWindowSize, c.MaxContextWindowSize,
+		escapeTOMLString(string(c.AgentMode)),
 	)
 }
 

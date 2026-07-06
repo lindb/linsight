@@ -26,6 +26,7 @@ import (
 	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/ai/components/memory"
+	agentconfig "github.com/lindb/linsight/ai/config"
 	agentmodel "github.com/lindb/linsight/ai/model"
 )
 
@@ -162,7 +163,12 @@ func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationSt
 	return messages
 }
 
-// buildSystemPrompt returns the configured base system prompt.
+// buildSystemPrompt returns the system prompt for the current agent mode.
+// "deep-react" uses a structured fault-diagnosis prompt; all other modes use
+// the configured system prompt from cfg.SystemPrompt.
 func (a *agentRuntime) buildSystemPrompt() string {
+	if a.agentMode == agentconfig.AgentModeDeep {
+		return deepReactSystemPrompt
+	}
 	return a.cfg.SystemPrompt
 }
