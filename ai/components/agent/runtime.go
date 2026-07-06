@@ -72,10 +72,6 @@ type chatRun struct {
 	// tool + SSE callback options built up by resolveTools and run()
 	agentOpts []einoagent.AgentOption
 
-	// streaming accumulators; written by callbacks, read by finalize
-	toolCallsByIndex    map[int]*schema.ToolCall // keyed by OpenAI stream Index field
-	toolCallsIndexOrder []int                    // insertion order for deterministic merging
-
 	// event lifecycle objects; initialized in run() after conversation is resolved
 	convCtx         *aievent.ConvContext
 	assistantEvt    *aievent.AssistantTextEvent
@@ -102,12 +98,11 @@ func newChatRun(
 	convUID string,
 ) *chatRun {
 	return &chatRun{
-		agent:            a,
-		writer:           writer,
-		req:              req,
-		reqCtx:           ctx,
-		initConvUID:      convUID,
-		toolCallsByIndex: make(map[int]*schema.ToolCall),
+		agent:       a,
+		writer:      writer,
+		req:         req,
+		reqCtx:      ctx,
+		initConvUID: convUID,
 	}
 }
 
@@ -307,10 +302,10 @@ func (rt *chatRun) resolveTools() {
 	rt.agentOpts = append(rt.agentOpts, toolOpts...)
 }
 
-// executeStream starts the ReAct graph, reads chunks from the stream, and merges
-// tool_call fragments by Index (OpenAI streaming protocol).
-// Text content is delivered in real-time via ModelCallbackHandler.OnEndWithStreamOutput;
-// this loop only handles tool_call accumulation.
+// executeStream starts the ReAct graph and drains the output stream until completion.
+// All SSE delivery and DB persistence are handled inside Eino callbacks (sseCallback).
+// This loop acts as a completion barrier and prevents backpressure on the internal
+// stream channel by consuming all chunks, even though their content is unused here.
 func (rt *chatRun) executeStream(messages []*schema.Message) error {
 	reader, err := rt.agent.compiled.Stream(rt.runCtx, messages, rt.agentOpts...)
 	if err != nil {
@@ -320,41 +315,13 @@ func (rt *chatRun) executeStream(messages []*schema.Message) error {
 	defer reader.Close()
 
 	for {
-		chunk, recvErr := reader.Recv()
+		_, recvErr := reader.Recv()
 		if errors.Is(recvErr, io.EOF) {
 			break
 		}
 		if recvErr != nil {
 			agentLog.Error("stream recv error", logger.Error(recvErr))
 			return fmt.Errorf("stream recv: %w", recvErr)
-		}
-		if chunk == nil || chunk.Role != schema.Assistant || len(chunk.ToolCalls) == 0 {
-			continue
-		}
-		// Merge streaming tool_call fragments: each chunk carries a partial Arguments
-		// string that must be concatenated in Index order.
-		for i := range chunk.ToolCalls {
-			tc := &chunk.ToolCalls[i]
-			idx := i
-			if tc.Index != nil {
-				idx = *tc.Index
-			}
-			if existing, ok := rt.toolCallsByIndex[idx]; ok {
-				existing.Function.Arguments += tc.Function.Arguments
-				if tc.ID != "" {
-					existing.ID = tc.ID
-				}
-				if tc.Function.Name != "" {
-					existing.Function.Name = tc.Function.Name
-				}
-				if tc.Type != "" {
-					existing.Type = tc.Type
-				}
-			} else {
-				copied := *tc
-				rt.toolCallsByIndex[idx] = &copied
-				rt.toolCallsIndexOrder = append(rt.toolCallsIndexOrder, idx)
-			}
 		}
 	}
 	return nil
