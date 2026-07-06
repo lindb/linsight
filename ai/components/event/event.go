@@ -28,7 +28,6 @@ import (
 
 	"github.com/cloudwego/eino/schema"
 
-	agentapi "github.com/lindb/linsight/ai/api"
 	"github.com/lindb/linsight/ai/agui"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/pkg/uuid"
@@ -137,16 +136,4 @@ func newDBEvent(
 		opt(e)
 	}
 	return e
-}
-
-// WriteToolCallResult is a shared helper used by ToolCallEvent.OnEnd and OnError
-// to emit a TOOL_CALL_RESULT SSE frame.
-func writeToolCallResult(
-	writer agentapi.SSEWriter,
-	msgUID, callID, toolName string,
-	status agui.MessageStatus,
-	content string,
-	guidance *agui.Guidance,
-) {
-	writer.WriteToolCallResult(msgUID, callID, toolName, status, content, guidance)
 }

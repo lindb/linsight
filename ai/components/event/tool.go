@@ -119,10 +119,13 @@ func (e *ToolCallEvent) OnStart(ctx context.Context, args string) {
 // OnEnd fires when the tool returns successfully.
 // Emits TOOL_CALL_RESULT + STEP_FINISHED and persists tool_result + step_finished DB rows.
 func (e *ToolCallEvent) OnEnd(ctx context.Context, result string, guidance *agui.Guidance) {
-	elapsed := time.Since(e.startTime).Milliseconds()
+	var elapsed int64
+	if !e.startTime.IsZero() {
+		elapsed = time.Since(e.startTime).Milliseconds()
+	}
 
 	toolMsgUID := uuid.GenerateShortUUID()
-	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusComplete, result, guidance)
+	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusComplete, result, guidance, elapsed)
 
 	// DB: tool_result row.
 	toolMsg := &schema.Message{
@@ -154,7 +157,10 @@ func (e *ToolCallEvent) OnEnd(ctx context.Context, result string, guidance *agui
 // OnError fires when tool execution returns an error.
 // Emits TOOL_CALL_RESULT (status=error) + STEP_FINISHED and persists error rows.
 func (e *ToolCallEvent) OnError(ctx context.Context, err error) {
-	elapsed := time.Since(e.startTime).Milliseconds()
+	var elapsed int64
+	if !e.startTime.IsZero() {
+		elapsed = time.Since(e.startTime).Milliseconds()
+	}
 	errContent := err.Error()
 
 	toolMsgUID := uuid.GenerateShortUUID()
@@ -162,7 +168,7 @@ func (e *ToolCallEvent) OnError(ctx context.Context, err error) {
 		RenderType: "error",
 		RawData:    json.RawMessage(fmt.Sprintf(`{"error_msg":%s}`, jsonString(errContent))),
 	}
-	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusError, errContent, errGuidance)
+	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusError, errContent, errGuidance, elapsed)
 
 	// DB: tool_result row with error status.
 	toolMsg := &schema.Message{
