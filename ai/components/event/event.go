@@ -80,12 +80,12 @@ func withToolName(name string) evtOption {
 	}
 }
 
-// withGuidance serialises guidance and attaches it to the DB event row.
-// A nil guidance is a no-op.
-func withGuidance(guidance *agui.Guidance) evtOption {
+// withExtra serialises extra and attaches it to the DB event row.
+// A nil map is a no-op.
+func withExtra(extra map[string]any) evtOption {
 	return func(e *agentmodel.Event) {
-		if guidance != nil {
-			e.Guidance, _ = json.Marshal(guidance)
+		if extra != nil {
+			e.Extra, _ = json.Marshal(extra)
 		}
 	}
 }

@@ -48,10 +48,10 @@ type SSEWriter interface {
 	WriteReasoningMessageEnd(messageID string, elapsedMs int64)
 
 	// Tool invocation
-	WriteToolCallStart(toolCallID, toolName, parentMessageID string)
+	WriteToolCallStart(toolCallID, toolName, parentMessageID string, extra map[string]any)
 	WriteToolCallArgs(toolCallID, argsDelta string)
 	WriteToolCallEnd(toolCallID string)
-	WriteToolCallResult(messageID, toolCallID, toolName string, status agui.MessageStatus, content string, guidance *agui.Guidance, elapsedMs int64)
+	WriteToolCallResult(messageID, toolCallID, toolName string, status agui.MessageStatus, content string, extra map[string]any, elapsedMs int64)
 
 	// Conversation history snapshot
 	WriteMessagesSnapshot(messages []agui.Message)
@@ -157,13 +157,14 @@ func (w *ginSSEWriter) WriteTextMessageEnd(messageID string, elapsedMs int64) {
 	})
 }
 
-func (w *ginSSEWriter) WriteToolCallStart(toolCallID, toolName, parentMessageID string) {
+func (w *ginSSEWriter) WriteToolCallStart(toolCallID, toolName, parentMessageID string, extra map[string]any) {
 	_ = w.writeEvent(agui.Event{
 		Type:            agui.ToolCallStart,
 		ToolCallID:      toolCallID,
 		ToolCallName:    toolName,
 		ParentMessageID: parentMessageID,
 		Status:          agui.StatusProcessing,
+		Extra:           extra,
 	})
 }
 
@@ -182,14 +183,14 @@ func (w *ginSSEWriter) WriteToolCallEnd(toolCallID string) {
 	})
 }
 
-func (w *ginSSEWriter) WriteToolCallResult(messageID, toolCallID, toolName string, status agui.MessageStatus, content string, guidance *agui.Guidance, elapsedMs int64) {
+func (w *ginSSEWriter) WriteToolCallResult(messageID, toolCallID, toolName string, status agui.MessageStatus, content string, extra map[string]any, elapsedMs int64) {
 	_ = w.writeEvent(agui.Event{
 		Type:         agui.ToolCallResult,
 		MessageID:    messageID,
 		ToolCallID:   toolCallID,
 		ToolCallName: toolName,
 		Content:      content,
-		Guidance:     guidance,
+		Extra:        extra,
 		Status:       status,
 		ElapsedMs:    elapsedMs,
 	})

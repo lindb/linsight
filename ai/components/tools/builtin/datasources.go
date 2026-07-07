@@ -19,9 +19,35 @@ package builtin
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
+	"github.com/cloudwego/eino/components/tool"
+	toolutils "github.com/cloudwego/eino/components/tool/utils"
 	"github.com/lindb/common/pkg/logger"
+
+	toolscomp "github.com/lindb/linsight/ai/components/tools"
 )
+
+func init() {
+	register(func(deps BuiltinDeps) (tool.BaseTool, error) {
+		t, err := toolutils.InferTool(
+			"linsight_list_datasources",
+			"List all data sources accessible to the current user. "+
+				"Call this first to discover available data sources before querying data.",
+			func(ctx context.Context, _ struct{}) (*toolscomp.ToolCallResult, error) {
+				return listDatasources(ctx, deps.DatasourceSrv)
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return withExtraInfo(t, map[string]any{
+			"icon":        "datasource",
+			"render_type": "list",
+		}), nil
+	})
+}
 
 // datasourceInfo is the per-datasource summary returned by linsight_list_datasources.
 type datasourceInfo struct {
@@ -33,7 +59,7 @@ type datasourceInfo struct {
 }
 
 // listDatasources calls the service and maps the result to the LLM-friendly shape.
-func listDatasources(ctx context.Context, srv datasourceReader) ([]datasourceInfo, error) {
+func listDatasources(ctx context.Context, srv datasourceReader) (*toolscomp.ToolCallResult, error) {
 	toolsLog.Info("tool: list_datasources called")
 	datasources, err := srv.GetDatasources(ctx)
 	if err != nil {
@@ -51,5 +77,13 @@ func listDatasources(ctx context.Context, srv datasourceReader) ([]datasourceInf
 		})
 	}
 	toolsLog.Info("tool: list_datasources done", logger.Int("count", len(result)))
-	return result, nil
+
+	dataJSON, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("marshal datasource list: %w", err)
+	}
+	return &toolscomp.ToolCallResult{
+		Data:  dataJSON,
+		Extra: map[string]any{"count": len(result)},
+	}, nil
 }

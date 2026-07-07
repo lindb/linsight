@@ -32,7 +32,6 @@ import (
 	"github.com/cloudwego/eino/schema"
 	cbtemplate "github.com/cloudwego/eino/utils/callbacks"
 
-	"github.com/lindb/linsight/ai/agui"
 	aievent "github.com/lindb/linsight/ai/components/event"
 	"github.com/lindb/linsight/pkg/uuid"
 )
@@ -60,7 +59,10 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 			rt.toolEvtsMu.Lock()
 			rt.toolEvts[callID] = toolEvt
 			rt.toolEvtsMu.Unlock()
-			toolEvt.OnStart(ctx, args)
+			// Clone static tool metadata (icon/render_type) from ToolInfo.Extra for
+			// frontend pre-rendering before the result arrives.
+			staticExtra := cloneToolExtra(rt.orgTools, info.Name)
+			toolEvt.OnStart(ctx, args, staticExtra)
 			return ctx
 		},
 
@@ -75,16 +77,24 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 			}
 			callID := compose.GetToolCallID(ctx)
 
-			// Build guidance: attempt JSON parse so the frontend can use a rich renderer.
-			// Falls back to nil (plain-text display) when result is not valid JSON.
-			var guidance *agui.Guidance
-			if result != "" {
+			// Build extra: use runtime extra from ToolCallResult.Extra (if available),
+			// then inject raw_data with the actual result (Data-only JSON stripped by InvokableRun).
+			// MCP fallback: when no runtime extra was cached (non-ToolCallResult output), use raw JSON only.
+			var extra map[string]any
+			if runtimeExtra, ok := rt.toolRuntimeExtras.LoadAndDelete(callID); ok {
+				if m, ok := runtimeExtra.(map[string]any); ok {
+					extra = m
+					if result != "" {
+						var rawData json.RawMessage
+						if json.Unmarshal([]byte(result), &rawData) == nil {
+							extra["raw_data"] = rawData
+						}
+					}
+				}
+			} else if result != "" {
 				var rawData json.RawMessage
 				if json.Unmarshal([]byte(result), &rawData) == nil {
-					guidance = &agui.Guidance{
-						RenderType: inferRenderType(info.Name),
-						RawData:    rawData,
-					}
+					extra = map[string]any{"raw_data": rawData}
 				}
 			}
 
@@ -92,7 +102,7 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 			toolEvt, ok := rt.toolEvts[callID]
 			rt.toolEvtsMu.Unlock()
 			if ok {
-				toolEvt.OnEnd(ctx, result, guidance)
+				toolEvt.OnEnd(ctx, result, extra)
 			}
 			// Close the iteration step when all tools are done.
 			if atomic.AddInt32(&rt.pendingToolCalls, -1) == 0 {
@@ -193,16 +203,24 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 	return react.BuildAgentCallback(modelHandler, toolHandler)
 }
 
-// inferRenderType maps a tool name to the suggested frontend render component.
-// This drives guidance.render_type so the client picks the right rich renderer
-// without inspecting the raw_data structure itself.
-func inferRenderType(toolName string) string {
-	switch toolName {
-	case "linsight_datasource_query":
-		return "table"
-	case "linsight_list_datasources", "linsight_search_dashboards":
-		return "list"
-	default:
-		return "text"
+// cloneToolExtra returns a shallow copy of the named tool's ToolInfo.Extra,
+// or nil if the tool is not found or has no Extra.
+// Used in OnEnd to attach display metadata (icon, render_type) to tool results
+// without coupling the callback to specific tool implementations.
+func cloneToolExtra(tools []tool.BaseTool, name string) map[string]any {
+	for _, t := range tools {
+		info, err := t.Info(context.Background())
+		if err != nil || info == nil || info.Name != name {
+			continue
+		}
+		if len(info.Extra) == 0 {
+			return nil
+		}
+		m := make(map[string]any, len(info.Extra))
+		for k, v := range info.Extra {
+			m[k] = v
+		}
+		return m
 	}
+	return nil
 }

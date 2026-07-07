@@ -32,7 +32,7 @@ func TestDataQuery_buildSQL(t *testing.T) {
 		GroupBy:   []string{"host", "region"},
 	}, "from", "2022-04-03 02:34:33")
 	assert.NoError(t, err)
-	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' ON 'ns' "+
+	assert.Equal(t, "SELECT load,usage FROM `system.host.cpu` ON `ns` "+
 		"WHERE time >= 'from' AND time <= '2022-04-03 02:34:33' GROUP BY host,region,time()", sql)
 
 	sql, err = buildDataQuerySQL(&DataQueryRequest{
@@ -43,7 +43,7 @@ func TestDataQuery_buildSQL(t *testing.T) {
 		GroupBy: []string{"host", "region"},
 	}, "from", "2022-04-03 02:34:33")
 	assert.NoError(t, err)
-	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' "+
+	assert.Equal(t, "SELECT load,usage FROM `system.host.cpu` "+
 		"WHERE time >= 'from' AND time <= '2022-04-03 02:34:33' GROUP BY host,region,time()", sql)
 
 	sql, err = buildDataQuerySQL(&DataQueryRequest{
@@ -52,7 +52,7 @@ func TestDataQuery_buildSQL(t *testing.T) {
 		Fields: []string{"load", "usage"},
 	}, "", "")
 	assert.NoError(t, err)
-	assert.Equal(t, "SELECT load,usage FROM 'system.host.cpu' WHERE key = 'value'", sql)
+	assert.Equal(t, "SELECT load,usage FROM `system.host.cpu` WHERE key = 'value'", sql)
 }
 
 func TestDataQuery_buildSQL_Failure(t *testing.T) {
@@ -67,4 +67,68 @@ func TestDataQuery_buildSQL_Failure(t *testing.T) {
 	}, "from", "2022-04-03 02:34:33")
 	assert.Error(t, err)
 	assert.Empty(t, sql)
+}
+
+func TestNormalizeLinDBSQL(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "empty string passthrough",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "already backtick-quoted FROM — idempotent",
+			input: "SELECT load FROM `lindb.monitor.system.mem_stat`",
+			want:  "SELECT load FROM `lindb.monitor.system.mem_stat`",
+		},
+		{
+			name:  "single-quoted FROM",
+			input: "SELECT load FROM 'lindb.monitor.system.mem_stat'",
+			want:  "SELECT load FROM `lindb.monitor.system.mem_stat`",
+		},
+		{
+			name:  "double-quoted FROM",
+			input: `SELECT load FROM "lindb.monitor.system.mem_stat"`,
+			want:  "SELECT load FROM `lindb.monitor.system.mem_stat`",
+		},
+		{
+			name:  "unquoted FROM",
+			input: "SELECT load FROM lindb.monitor.system.mem_stat",
+			want:  "SELECT load FROM `lindb.monitor.system.mem_stat`",
+		},
+		{
+			name:  "unquoted FROM and ON",
+			input: "SELECT load FROM lindb.monitor.system.mem_stat ON mynamespace",
+			want:  "SELECT load FROM `lindb.monitor.system.mem_stat` ON `mynamespace`",
+		},
+		{
+			name:  "backtick FROM with WHERE clause not modified",
+			input: "SELECT load FROM `system.host.cpu` WHERE time >= 'now-1h' AND status = 'from_cache'",
+			want:  "SELECT load FROM `system.host.cpu` WHERE time >= 'now-1h' AND status = 'from_cache'",
+		},
+		{
+			name:  "single-quoted FROM and ON with WHERE",
+			input: "SELECT load,usage FROM 'system.host.cpu' ON 'ns' WHERE time >= 'now-1h' AND time <= 'now'",
+			want:  "SELECT load,usage FROM `system.host.cpu` ON `ns` WHERE time >= 'now-1h' AND time <= 'now'",
+		},
+		{
+			name:  "lowercase keywords preserved",
+			input: "select load from `lindb.monitor.mem_stat` on `ns`",
+			want:  "select load from `lindb.monitor.mem_stat` on `ns`",
+		},
+		{
+			name:  "no ON clause",
+			input: "SELECT load FROM `system.host.cpu` WHERE time >= 'now-1h'",
+			want:  "SELECT load FROM `system.host.cpu` WHERE time >= 'now-1h'",
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, normalizeLinDBSQL(tt.input))
+		})
+	}
 }

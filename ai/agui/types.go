@@ -22,8 +22,6 @@
 package agui
 
 import (
-	"encoding/json"
-
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -109,17 +107,6 @@ const (
 	StatusError MessageStatus = "error"
 )
 
-// Guidance carries structured render hints for tool results.
-// RenderType tells the frontend which rich component to use; RawData is the
-// unmodified, untruncated query result for the component to consume directly.
-type Guidance struct {
-	// RenderType is the suggested frontend component (e.g. "table", "list", "text").
-	RenderType string `json:"render_type"`
-	// RawData is the clean, unmodified structured payload for rich rendering.
-	// Omitted when the tool result is plain text.
-	RawData json.RawMessage `json:"raw_data,omitempty"`
-}
-
 // ToolCall is the AG-UI DTO representation of a single tool invocation.
 // It intentionally does not embed eino's schema.ToolCall so that the frontend
 // contract remains stable and can carry result fields alongside the Extra guidance.
@@ -136,9 +123,10 @@ type ToolCall struct {
 	// Status mirrors TOOL_CALL_RESULT.status (complete or error).
 	// Populated in snapshot, empty during live streaming.
 	Status MessageStatus `json:"status,omitempty"`
-	// Extra carries optional render guidance from the tool result.
-	// Non-nil only when the tool returned queryable structured data.
-	Extra *Guidance `json:"extra,omitempty"`
+	// Extra carries optional render hints and metadata from the tool result.
+	// Key conventions: "render_type" (string), "raw_data" (JSON), "icon" (string),
+	// "datasource_type" (string for datasource_query). Nil when the tool returned plain text.
+	Extra map[string]any `json:"extra,omitempty"`
 }
 
 // Event is the JSON envelope for all AG-UI event types.
@@ -154,14 +142,14 @@ type Event struct {
 	Title string `json:"title,omitempty"`
 
 	// TextMessage* and ToolCall* events
-	MessageID string          `json:"id,omitempty"`
+	MessageID string `json:"id,omitempty"`
 	// Status is the lifecycle state of the message referenced by MessageID.
 	// Set on TEXT_MESSAGE_START (streaming), TEXT_MESSAGE_END (complete),
 	// TOOL_CALL_START (processing), and TOOL_CALL_RESULT (complete).
 	// Empty for events that do not change message state.
-	Status    MessageStatus   `json:"status,omitempty"`
-	Role      schema.RoleType `json:"role,omitempty"`
-	Delta     string          `json:"delta,omitempty"`
+	Status MessageStatus   `json:"status,omitempty"`
+	Role   schema.RoleType `json:"role,omitempty"`
+	Delta  string          `json:"delta,omitempty"`
 
 	// ToolCall* events
 	ToolCallID      string `json:"toolCallId,omitempty"`
@@ -171,8 +159,9 @@ type Event struct {
 	// ToolCallResult
 	Content string `json:"content,omitempty"`
 
-	// ToolCallResult optional structured render hint
-	Guidance *Guidance `json:"guidance,omitempty"`
+	// ToolCallResult optional structured render hint and metadata.
+	// Mirrors ToolCall.Extra; populated after tool execution completes.
+	Extra map[string]any `json:"extra,omitempty"`
 
 	// RunError
 	Code    string `json:"code,omitempty"`
@@ -196,6 +185,7 @@ type Event struct {
 
 	// MessagesSnapshot (legacy — deprecated, use Events instead).
 	// Kept for backwards compatibility; will be removed in a future release.
+	// TODO: remove it?
 	Messages []Message `json:"messages,omitempty"`
 
 	// Events carries the ordered list of agui.Event entries for a MESSAGES_SNAPSHOT response.

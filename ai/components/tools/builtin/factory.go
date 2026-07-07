@@ -22,10 +22,8 @@ package builtin
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloudwego/eino/components/tool"
-	toolutils "github.com/cloudwego/eino/components/tool/utils"
 	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/model"
@@ -60,14 +58,15 @@ type pluginManager interface {
 	GetPlugin(datasource *model.Datasource) (plugin.DatasourcePlugin, error)
 }
 
-// BuiltinToolsFactory provides the three built-in observability tools.
+// BuiltinToolsFactory provides the built-in observability tools.
 // Unlike MCPToolsFactory the tool set is the same for all orgs, so the
 // tools slice is built once at construction time.
 type BuiltinToolsFactory struct {
 	tools []tool.BaseTool
 }
 
-// NewBuiltinToolsFactory constructs and registers the three built-in tools.
+// NewBuiltinToolsFactory constructs all builtin tools by iterating the registry
+// populated by each tool file's init() function.
 // Returns an error only if Eino fails to infer a tool's JSON schema, which
 // would indicate a programming error in the input struct definition.
 func NewBuiltinToolsFactory(
@@ -75,64 +74,24 @@ func NewBuiltinToolsFactory(
 	dashboardSrv dashboardSearcher,
 	datasourceMgr pluginManager,
 ) (*BuiltinToolsFactory, error) {
-	listDS, err := newListDatasourcesTool(datasourceSrv)
-	if err != nil {
-		return nil, fmt.Errorf("builtin: linsight_list_datasources: %w", err)
+	deps := BuiltinDeps{
+		DatasourceSrv: datasourceSrv,
+		DashboardSrv:  dashboardSrv,
+		DatasourceMgr: datasourceMgr,
 	}
-	query, err := newDatasourceQueryTool(datasourceSrv, datasourceMgr)
-	if err != nil {
-		return nil, fmt.Errorf("builtin: linsight_datasource_query: %w", err)
+	tools := make([]tool.BaseTool, 0, len(builtinRegistry))
+	for _, ctor := range builtinRegistry {
+		t, err := ctor(deps)
+		if err != nil {
+			return nil, err
+		}
+		tools = append(tools, t)
 	}
-	searchDash, err := newSearchDashboardsTool(dashboardSrv)
-	if err != nil {
-		return nil, fmt.Errorf("builtin: linsight_search_dashboards: %w", err)
-	}
-
-	return &BuiltinToolsFactory{
-		tools: []tool.BaseTool{listDS, query, searchDash},
-	}, nil
+	return &BuiltinToolsFactory{tools: tools}, nil
 }
 
 // GetToolsForOrg returns all built-in tools; built-in tools are org-agnostic.
 // The signature satisfies the ToolsProvider interface in the parent tools package.
 func (f *BuiltinToolsFactory) GetToolsForOrg(_ context.Context, _ int64) ([]tool.BaseTool, error) {
 	return f.tools, nil
-}
-
-// newListDatasourcesTool builds the linsight_list_datasources Eino tool.
-func newListDatasourcesTool(srv datasourceReader) (tool.BaseTool, error) {
-	return toolutils.InferTool(
-		"linsight_list_datasources",
-		"List all data sources accessible to the current user. "+
-			"Call this first to discover available data sources before querying data.",
-		func(ctx context.Context, _ struct{}) ([]datasourceInfo, error) {
-			return listDatasources(ctx, srv)
-		},
-	)
-}
-
-// newDatasourceQueryTool builds the linsight_datasource_query Eino tool.
-func newDatasourceQueryTool(srv datasourceReader, mgr pluginManager) (tool.BaseTool, error) {
-	return toolutils.InferTool(
-		"linsight_datasource_query",
-		"Execute a SQL query against a LinSight datasource. "+
-			"LinDB supports metrics, logs, and traces via SQL. "+
-			"REQUIRED: call linsight_list_datasources first to get the datasource_uid. "+
-			"Whenever a user provides a SQL query or asks about data, call this tool immediately.",
-		func(ctx context.Context, input datasourceQueryInput) (*queryResult, error) {
-			return queryDatasource(ctx, srv, mgr, input)
-		},
-	)
-}
-
-// newSearchDashboardsTool builds the linsight_search_dashboards Eino tool.
-func newSearchDashboardsTool(srv dashboardSearcher) (tool.BaseTool, error) {
-	return toolutils.InferTool(
-		"linsight_search_dashboards",
-		"Search for dashboards by title or tags. "+
-			"Returns a list of matching dashboards with their UIDs and titles.",
-		func(ctx context.Context, input searchDashboardsInput) ([]dashboardInfo, error) {
-			return searchDashboards(ctx, srv, input)
-		},
-	)
 }

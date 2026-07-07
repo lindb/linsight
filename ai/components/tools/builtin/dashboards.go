@@ -20,11 +20,35 @@ package builtin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
+	"github.com/cloudwego/eino/components/tool"
+	toolutils "github.com/cloudwego/eino/components/tool/utils"
 	"github.com/lindb/common/pkg/logger"
 
+	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	"github.com/lindb/linsight/model"
 )
+
+func init() {
+	register(func(deps BuiltinDeps) (tool.BaseTool, error) {
+		t, err := toolutils.InferTool(
+			"linsight_search_dashboards",
+			"Search for dashboards by title or tags. "+
+				"Returns a list of matching dashboards with their UIDs and titles.",
+			func(ctx context.Context, input searchDashboardsInput) (*toolscomp.ToolCallResult, error) {
+				return searchDashboards(ctx, deps.DashboardSrv, input)
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return withExtraInfo(t, map[string]any{
+			"icon":        "dashboard",
+			"render_type": "list",
+		}), nil
+	})
+}
 
 // maxDashboardResults caps the number of dashboards returned to the LLM.
 const maxDashboardResults = 20
@@ -44,7 +68,7 @@ type dashboardInfo struct {
 }
 
 // searchDashboards calls the service and maps the results to the LLM-friendly shape.
-func searchDashboards(ctx context.Context, srv dashboardSearcher, input searchDashboardsInput) ([]dashboardInfo, error) {
+func searchDashboards(ctx context.Context, srv dashboardSearcher, input searchDashboardsInput) (*toolscomp.ToolCallResult, error) {
 	toolsLog.Info("tool: search_dashboards called",
 		logger.String("title", input.Title),
 		logger.Int("limit", input.Limit),
@@ -80,5 +104,13 @@ func searchDashboards(ctx context.Context, srv dashboardSearcher, input searchDa
 		})
 	}
 	toolsLog.Info("tool: search_dashboards done", logger.Int("count", len(result)))
-	return result, nil
+
+	dataJSON, err := json.Marshal(result)
+	if err != nil {
+		return nil, fmt.Errorf("marshal dashboard list: %w", err)
+	}
+	return &toolscomp.ToolCallResult{
+		Data:  dataJSON,
+		Extra: map[string]any{"count": len(result)},
+	}, nil
 }

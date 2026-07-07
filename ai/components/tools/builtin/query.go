@@ -23,15 +23,35 @@ import (
 	"fmt"
 	"strings"
 
-	ljson "github.com/lindb/arrow/pkg/json"
+	"github.com/cloudwego/eino/components/tool"
+	toolutils "github.com/cloudwego/eino/components/tool/utils"
 	"github.com/lindb/common/pkg/logger"
 
+	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	"github.com/lindb/linsight/model"
 )
 
-// maxQueryRows is the maximum number of rows returned to the LLM to avoid
-// exhausting the context window.
-const maxQueryRows = 500
+func init() {
+	register(func(deps BuiltinDeps) (tool.BaseTool, error) {
+		t, err := toolutils.InferTool(
+			"linsight_datasource_query",
+			"Execute a SQL query against a LinSight datasource. "+
+				"LinDB supports metrics, logs, and traces via SQL. "+
+				"REQUIRED: call linsight_list_datasources first to get the datasource_uid. "+
+				"Whenever a user provides a SQL query or asks about data, call this tool immediately.",
+			func(ctx context.Context, input datasourceQueryInput) (*toolscomp.ToolCallResult, error) {
+				return queryDatasource(ctx, deps.DatasourceSrv, deps.DatasourceMgr, input)
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return withExtraInfo(t, map[string]any{
+			"icon":        "search",
+			"render_type": "DataQueryView",
+		}), nil
+	})
+}
 
 // datasourceQueryInput is the input struct for linsight_datasource_query.
 // Field descriptions become part of the tool's JSON schema sent to the LLM.
@@ -42,21 +62,13 @@ type datasourceQueryInput struct {
 	EndTime       string `json:"end_time"       jsonschema:"description=Query end time: Unix millisecond timestamp or relative string. Default: now."`
 }
 
-// queryResult is the response shape of linsight_datasource_query.
-type queryResult struct {
-	DatasourceType string                   `json:"datasource_type"`
-	Data           []map[string]interface{} `json:"data,omitempty"`
-	RowCount       int                      `json:"row_count,omitempty"`
-	Message        string                   `json:"message,omitempty"`
-}
-
 // queryDatasource executes a data query using the plugin layer.
 func queryDatasource(
 	ctx context.Context,
 	srv datasourceReader,
 	mgr pluginManager,
 	input datasourceQueryInput,
-) (*queryResult, error) {
+) (*toolscomp.ToolCallResult, error) {
 	toolsLog.Info("tool: datasource_query called",
 		logger.String("datasource_uid", input.DatasourceUID),
 		logger.String("params", truncateStr(input.Params, 200)),
@@ -101,7 +113,7 @@ func queryDatasource(
 	}
 
 	query := &model.Query{
-		Datasource: model.TargetDatasource{UID: input.DatasourceUID},
+		Datasource: model.TargetDatasource{UID: datasourceUID},
 		Params:     json.RawMessage(input.Params),
 	}
 
@@ -114,33 +126,39 @@ func queryDatasource(
 		return nil, fmt.Errorf("data query failed: %w", err)
 	}
 
-	result := &queryResult{DatasourceType: ds.Type}
+	extra := map[string]any{
+		"datasource_type": ds.Category,
+		"datasource_name": ds.Name,
+		"datasource_uid":  datasourceUID,
+	}
 
+	var dataJSON []byte
 	if rs == nil {
 		// LinGo DataQuery returns nil — known limitation; return helpful message.
-		result.Message = fmt.Sprintf(
-			"datasource type %q returned no data. This may be a known limitation of the plugin.", ds.Type)
+		dataJSON, err = json.Marshal(struct {
+			Message string `json:"message"`
+		}{
+			Message: fmt.Sprintf("datasource type %q returned no data. This may be a known limitation of the plugin.", ds.Type),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("marshal nil result message: %w", err)
+		}
 		toolsLog.Info("tool: datasource_query done (nil result set)",
 			logger.String("datasource_uid", datasourceUID),
 		)
-		return result, nil
+	} else {
+		extra["row_count"] = len(rs.Rows)
+		dataJSON, err = json.Marshal(rs)
+		if err != nil {
+			return nil, fmt.Errorf("marshal query result: %w", err)
+		}
+		toolsLog.Info("tool: datasource_query done",
+			logger.String("datasource_uid", datasourceUID),
+			logger.Int("row_count", len(rs.Rows)),
+		)
 	}
 
-	rows, truncated, err := convertResultSet(rs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert result: %w", err)
-	}
-	result.Data = rows
-	result.RowCount = len(rows)
-	if truncated {
-		result.Message = fmt.Sprintf(
-			"result truncated to %d rows (result set exceeded the %d-row limit)", maxQueryRows, maxQueryRows)
-	}
-	toolsLog.Info("tool: datasource_query done",
-		logger.String("datasource_uid", datasourceUID),
-		logger.Int("row_count", result.RowCount),
-	)
-	return result, nil
+	return &toolscomp.ToolCallResult{Data: dataJSON, Extra: extra}, nil
 }
 
 // isValidUID checks if a string looks like a valid UUID
@@ -182,32 +200,4 @@ func parseTimeRange(start, end string) (model.TimeRange, error) {
 		return model.TimeRange{}, err
 	}
 	return tr, nil
-}
-
-// convertResultSet converts an Arrow ResultSet into a slice of column→value maps.
-// At most maxQueryRows rows are returned; the second return value is true when
-// the result was truncated.
-func convertResultSet(rs *ljson.ResultSet) ([]map[string]interface{}, bool, error) {
-	if rs == nil || rs.Schema == nil || len(rs.Rows) == 0 {
-		return nil, false, nil
-	}
-	cols := rs.Schema.Columns
-	rows := rs.Rows
-	truncated := false
-	if len(rows) > maxQueryRows {
-		rows = rows[:maxQueryRows]
-		truncated = true
-	}
-
-	result := make([]map[string]interface{}, 0, len(rows))
-	for _, row := range rows {
-		m := make(map[string]interface{}, len(cols))
-		for i, col := range cols {
-			if i < len(row) {
-				m[col.Name] = row[i]
-			}
-		}
-		result = append(result, m)
-	}
-	return result, truncated, nil
 }

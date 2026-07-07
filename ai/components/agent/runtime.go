@@ -35,6 +35,7 @@ import (
 	agentapi "github.com/lindb/linsight/ai/api"
 	aievent "github.com/lindb/linsight/ai/components/event"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/ai/telemetry"
@@ -77,6 +78,7 @@ type chatRun struct {
 	assistantEvt    *aievent.AssistantTextEvent
 	toolEvtsMu      sync.Mutex                     // guards concurrent reads/writes to toolEvts
 	toolEvts        map[string]*aievent.ToolCallEvent
+	toolRuntimeExtras sync.Map                     // callID → runtime Extra from ToolCallResult; written by toolWithExtra.InvokableRun, read by OnEnd
 	currentStepID   string          // updated at the start of each model-call iteration
 	currentStepEvt  *aievent.StepEvent // step lifecycle for the current model-call iteration
 	pendingToolCalls int32           // atomic counter: outstanding tool calls in the current iteration
@@ -287,6 +289,7 @@ func (rt *chatRun) resolveTools() {
 	metaMap := buildSkillMetaMap(skillMeta)
 	rt.runCtx = telemetry.WithConversationID(rt.timeoutCtx, rt.conv.ID)
 	rt.runCtx = telemetry.WithSkillMetaMap(rt.runCtx, metaMap)
+	rt.runCtx = toolscomp.ContextWithExtraCache(rt.runCtx, &rt.toolRuntimeExtras)
 
 	// Store tools for deep mode Lambda nodes that inject tools per-request via context.
 	rt.orgTools = orgTools

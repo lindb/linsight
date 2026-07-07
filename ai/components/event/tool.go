@@ -77,14 +77,17 @@ func NewToolCallEvent(
 }
 
 // OnStart fires when Eino is about to invoke the tool.
-// Emits TOOL_CALL_START + TOOL_CALL_ARGS + TOOL_CALL_END and persists a tool_call
-// DB row so downstream tool_result rows are never orphaned.
+// Emits TOOL_CALL_START (with static extra for frontend pre-rendering) +
+// TOOL_CALL_ARGS + TOOL_CALL_END and persists a tool_call DB row so downstream
+// tool_result rows are never orphaned.
+// extra carries the static ToolInfo.Extra metadata (icon/render_type) from the tool
+// definition; raw_data is NOT included here — it is added by OnEnd/OnError.
 // STEP_STARTED is NOT emitted here — it is managed by StepEvent for the full iteration.
-func (e *ToolCallEvent) OnStart(ctx context.Context, args string) {
+func (e *ToolCallEvent) OnStart(ctx context.Context, args string, extra map[string]any) {
 	e.startTime = time.Now()
 
 	// SSE: tool call lifecycle.
-	e.writer.WriteToolCallStart(e.callID, e.toolName, e.parentMsgUID)
+	e.writer.WriteToolCallStart(e.callID, e.toolName, e.parentMsgUID, extra)
 	e.writer.WriteToolCallArgs(e.callID, args)
 	e.writer.WriteToolCallEnd(e.callID)
 
@@ -109,6 +112,7 @@ func (e *ToolCallEvent) OnStart(ctx context.Context, args string) {
 		withToolCallID(e.callID),
 		withToolName(e.toolName),
 		withRawMessage(assistantMsg),
+		withExtra(extra),
 	)
 	if err := e.saver.SaveEvent(ctx, toolCallEvt); err != nil {
 		toolLog.Warn("failed to persist tool_call event",
@@ -118,14 +122,14 @@ func (e *ToolCallEvent) OnStart(ctx context.Context, args string) {
 
 // OnEnd fires when the tool returns successfully.
 // Emits TOOL_CALL_RESULT + STEP_FINISHED and persists tool_result + step_finished DB rows.
-func (e *ToolCallEvent) OnEnd(ctx context.Context, result string, guidance *agui.Guidance) {
+func (e *ToolCallEvent) OnEnd(ctx context.Context, result string, extra map[string]any) {
 	var elapsed int64
 	if !e.startTime.IsZero() {
 		elapsed = time.Since(e.startTime).Milliseconds()
 	}
 
 	toolMsgUID := uuid.GenerateShortUUID()
-	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusComplete, result, guidance, elapsed)
+	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusComplete, result, extra, elapsed)
 
 	// DB: tool_result row.
 	toolMsg := &schema.Message{
@@ -142,7 +146,7 @@ func (e *ToolCallEvent) OnEnd(ctx context.Context, result string, guidance *agui
 		elapsed,
 		withToolCallID(e.callID),
 		withToolName(e.toolName),
-		withGuidance(guidance),
+		withExtra(extra),
 		withRawMessage(toolMsg),
 	)
 	if err := e.saver.SaveEvent(ctx, toolResultEvt); err != nil {
@@ -164,11 +168,11 @@ func (e *ToolCallEvent) OnError(ctx context.Context, err error) {
 	errContent := err.Error()
 
 	toolMsgUID := uuid.GenerateShortUUID()
-	errGuidance := &agui.Guidance{
-		RenderType: "error",
-		RawData:    json.RawMessage(fmt.Sprintf(`{"error_msg":%s}`, jsonString(errContent))),
+	errExtra := map[string]any{
+		"render_type": "error",
+		"raw_data":    json.RawMessage(fmt.Sprintf(`{"error_msg":%s}`, jsonString(errContent))),
 	}
-	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusError, errContent, errGuidance, elapsed)
+	e.writer.WriteToolCallResult(toolMsgUID, e.callID, e.toolName, agui.StatusError, errContent, errExtra, elapsed)
 
 	// DB: tool_result row with error status.
 	toolMsg := &schema.Message{
@@ -186,7 +190,7 @@ func (e *ToolCallEvent) OnError(ctx context.Context, err error) {
 		withStatus(agui.StatusError),
 		withToolCallID(e.callID),
 		withToolName(e.toolName),
-		withGuidance(errGuidance),
+		withExtra(errExtra),
 		withRawMessage(toolMsg),
 	)
 	if err2 := e.saver.SaveEvent(ctx, toolResultEvt); err2 != nil {

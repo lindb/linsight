@@ -20,6 +20,7 @@ package lindb
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -116,11 +117,11 @@ func (b *DataQueryBuilder) ToSQL() (sql string, err error) {
 
 	sqlBuf.WriteString(strings.Join(b.fields, ","))
 	sqlBuf.WriteString(" FROM ")
-	fmt.Fprintf(sqlBuf, "'%s'", b.metric)
+	fmt.Fprintf(sqlBuf, "`%s`", b.metric)
 
 	if len(b.namespace) > 0 {
 		sqlBuf.WriteString(" ON ")
-		fmt.Fprintf(sqlBuf, "'%s'", b.namespace)
+		fmt.Fprintf(sqlBuf, "`%s`", b.namespace)
 	}
 
 	if len(b.where) > 0 {
@@ -156,4 +157,38 @@ func (b *DataQueryBuilder) setTimeCondition(timestamp string, op Operator) {
 	if timestamp != "" {
 		b.Where(Expr{Key: "time", Op: op, Value: timestamp})
 	}
+}
+
+// fromOnQuoteRe matches FROM/ON keywords followed by an optionally-quoted identifier.
+// Handles backtick, double-quote, single-quote, and bare (unquoted) forms.
+var fromOnQuoteRe = regexp.MustCompile(
+	"(?i)\\b(FROM|ON)\\s+(`[^`]+`|\"[^\"]+\"|'[^']+'|[\\w.-]+)")
+
+// normalizeLinDBSQL normalizes table/metric name quoting in LinDB SQL to backtick format.
+// LinDB requires backtick-quoted names in FROM and ON clauses.
+// Only the SQL preamble (before WHERE) is processed to avoid false matches
+// inside WHERE string literals (e.g. WHERE key = 'from_cache').
+func normalizeLinDBSQL(sql string) string {
+	if sql == "" {
+		return sql
+	}
+	upperSQL := strings.ToUpper(sql)
+	whereIdx := strings.Index(upperSQL, " WHERE ")
+
+	preamble, remainder := sql, ""
+	if whereIdx >= 0 {
+		preamble = sql[:whereIdx]
+		remainder = sql[whereIdx:]
+	}
+
+	normalized := fromOnQuoteRe.ReplaceAllStringFunc(preamble, func(match string) string {
+		subs := fromOnQuoteRe.FindStringSubmatch(match)
+		if len(subs) < 3 {
+			return match
+		}
+		keyword := subs[1]
+		identifier := strings.Trim(subs[2], "`\"'")
+		return keyword + " `" + identifier + "`"
+	})
+	return normalized + remainder
 }

@@ -103,7 +103,7 @@ func (cli *client) DataQuery(ctx context.Context, req *model.Query, timeRange mo
 		return nil, err0
 	}
 	if dataQueryReq.SQL != "" {
-		sql = dataQueryReq.SQL
+		sql = normalizeLinDBSQL(dataQueryReq.SQL)
 	}
 	if dataQueryReq.Database != "" {
 		database = dataQueryReq.Database

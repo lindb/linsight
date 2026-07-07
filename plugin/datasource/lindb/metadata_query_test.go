@@ -39,27 +39,27 @@ func TestMetadata_Metric(t *testing.T) {
 
 	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: Metric, Namespace: "ns"})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW METRICS ON 'ns'", sql)
+	assert.Equal(t, "SHOW METRICS ON `ns`", sql)
 }
 
 func TestMetadata_Field(t *testing.T) {
 	sql, err := buildMetadataQuerySQL(&MetadataQueryRequest{Type: Field, Metric: "cpu"})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW FIELDS FROM 'cpu'", sql)
+	assert.Equal(t, "SHOW FIELDS FROM `cpu`", sql)
 
 	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: Field, Metric: "cpu", Namespace: "ns"})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW FIELDS FROM 'cpu' ON 'ns'", sql)
+	assert.Equal(t, "SHOW FIELDS FROM `cpu` ON `ns`", sql)
 }
 
 func TestMetadata_TagKey(t *testing.T) {
 	sql, err := buildMetadataQuerySQL(&MetadataQueryRequest{Type: TagKey, Metric: "cpu"})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW TAG KEYS FROM 'cpu'", sql)
+	assert.Equal(t, "SHOW TAG KEYS FROM `cpu`", sql)
 
 	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: TagKey, Metric: "cpu", Namespace: "ns"})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW TAG KEYS FROM 'cpu' ON 'ns'", sql)
+	assert.Equal(t, "SHOW TAG KEYS FROM `cpu` ON `ns`", sql)
 }
 
 func TestMetadata_TagValue(t *testing.T) {
@@ -70,9 +70,9 @@ func TestMetadata_TagValue(t *testing.T) {
 		Where:  []Expr{{Key: "ip", Op: Like, Value: "1.1.*"}, {}, {Key: "region", Op: Eq, Value: "bj"}},
 	})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW TAG VALUES FROM 'cpu' WITH KEY = 'ip' WHERE ip like '1.1.*' AND region = 'bj'", sql)
+	assert.Equal(t, "SHOW TAG VALUES FROM `cpu` WITH KEY = `ip` WHERE ip like '1.1.*' AND region = 'bj'", sql)
 
 	sql, err = buildMetadataQuerySQL(&MetadataQueryRequest{Type: TagValue, Metric: "cpu", TagKey: "ip", Namespace: "ns"})
 	assert.NoError(t, err)
-	assert.Equal(t, "SHOW TAG VALUES FROM 'cpu' ON 'ns' WITH KEY = 'ip'", sql)
+	assert.Equal(t, "SHOW TAG VALUES FROM `cpu` ON `ns` WITH KEY = `ip`", sql)
 }

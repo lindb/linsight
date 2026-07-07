@@ -66,10 +66,10 @@ type Message struct {
 	// schema.Message.ToolCallID. Stored separately to avoid JSON parsing in queries
 	// (e.g. building the guidanceMap in GetAgUiHistory).
 	ToolCallID string `json:"-" gorm:"column:tool_call_id;index"`
-	// Guidance stores the structured render hint for tool-result messages.
+	// Extra stores the structured render hints and metadata for tool-result messages.
 	// Populated by the agent callback when a tool returns queryable structured data.
 	// MySQL/PostgreSQL: native JSON column; SQLite: TEXT.
-	Guidance json.RawMessage `json:"-" gorm:"column:guidance;type:json"`
+	Extra json.RawMessage `json:"-" gorm:"column:extra;type:json"`
 	// TurnUID groups all messages belonging to the same logical turn
 	// (one user request → tool chain → final assistant reply).
 	// Empty for messages written before this column was introduced.
@@ -114,8 +114,11 @@ type Event struct {
 	// RawMessage is the schema.Message JSON for LLM context reconstruction (user/assistant/tool roles).
 	// Populated for event types that contribute to LLM context; empty for step and reasoning events.
 	RawMessage json.RawMessage `gorm:"column:raw_message;type:json"`
-	// Guidance carries the structured render hint for tool_result events.
-	Guidance   json.RawMessage `gorm:"column:guidance;type:json"`
+	// Extra carries the structured render hints and metadata for tool_result and
+	// tool_call events. tool_result: render hints + raw_data from tool execution.
+	// tool_call: static ToolInfo.Extra (icon/render_type) for frontend pre-rendering.
+	// DB column name kept as "guidance" to avoid schema migration.
+	Extra   json.RawMessage `gorm:"column:extra;type:json"`
 	// Sequence is the run-scoped insertion order for deterministic replay.
 	Sequence   int             `gorm:"column:sequence;default:0"`
 	// ElapsedMs is the time from first content to persist (text/reasoning) or from

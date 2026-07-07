@@ -90,20 +90,20 @@ func (b *MetadataQueryBuilder) ToSQL() (sql string, err error) {
 	case Field:
 		sqlBuf.WriteString("SHOW FIELDS")
 		sqlBuf.WriteString(" FROM ")
-		fmt.Fprintf(sqlBuf, "'%s'", b.metric)
+		fmt.Fprintf(sqlBuf, "`%s`", b.metric)
 		b.buildNamespace(sqlBuf)
 	case TagKey:
 		sqlBuf.WriteString("SHOW TAG KEYS")
 		sqlBuf.WriteString(" FROM ")
-		fmt.Fprintf(sqlBuf, "'%s'", b.metric)
+		fmt.Fprintf(sqlBuf, "`%s`", b.metric)
 		b.buildNamespace(sqlBuf)
 	case TagValue:
 		sqlBuf.WriteString("SHOW TAG VALUES")
 		sqlBuf.WriteString(" FROM ")
-		fmt.Fprintf(sqlBuf, "'%s'", b.metric)
+		fmt.Fprintf(sqlBuf, "`%s`", b.metric)
 		b.buildNamespace(sqlBuf)
 		sqlBuf.WriteString(" WITH KEY =")
-		fmt.Fprintf(sqlBuf, " '%s'", b.tagKey)
+		fmt.Fprintf(sqlBuf, " `%s`", b.tagKey)
 	}
 	if len(b.where) > 0 {
 		sqlBuf.WriteString(" WHERE ")
@@ -116,7 +116,7 @@ func (b *MetadataQueryBuilder) ToSQL() (sql string, err error) {
 func (b *MetadataQueryBuilder) buildNamespace(sqlBuf *bytes.Buffer) {
 	if len(b.namespace) > 0 {
 		sqlBuf.WriteString(" ON ")
-		fmt.Fprintf(sqlBuf, "'%s'", b.namespace)
+		fmt.Fprintf(sqlBuf, "`%s`", b.namespace)
 	}
 }
 

@@ -19,6 +19,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -34,6 +35,7 @@ import (
 	"github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentservice "github.com/lindb/linsight/ai/service"
 	"github.com/lindb/linsight/pkg/uuid"
@@ -235,7 +237,8 @@ func createToolsNode() *compose.Lambda {
 				rt.assistantMsgUID, rt.currentStepID,
 				rt.writer, rt.agent.convSrv, rt.convCtx,
 			)
-			toolEvt.OnStart(ctx, tc.Function.Arguments)
+			staticExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
+			toolEvt.OnStart(ctx, tc.Function.Arguments, staticExtra)
 
 			it, ok := toolMap[tc.Function.Name]
 			if !ok {
@@ -260,10 +263,25 @@ func createToolsNode() *compose.Lambda {
 					ToolName:   tc.Function.Name,
 				})
 			} else {
-				toolEvt.OnEnd(ctx, result, nil)
+				llmContent := result
+				var extra map[string]any
+				if tcr, ok := toolscomp.ParseToolCallResult(result); ok {
+					llmContent = string(tcr.Data)
+					extra = tcr.Extra
+					// Mirror ReAct callback.go OnEnd: inject raw_data so the frontend
+					// can render rich components (e.g. DataQueryView table) in deep mode.
+					if extra == nil {
+						extra = make(map[string]any)
+					}
+					var rawData json.RawMessage
+					if json.Unmarshal(tcr.Data, &rawData) == nil {
+						extra["raw_data"] = rawData
+					}
+				}
+				toolEvt.OnEnd(ctx, llmContent, extra)
 				messages = append(messages, &schema.Message{
 					Role:       schema.Tool,
-					Content:    result,
+					Content:    llmContent,
 					ToolCallID: tc.ID,
 					ToolName:   tc.Function.Name,
 				})

@@ -182,9 +182,9 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 
 	// Pass 1: index tool-result rows by tool_call_id.
 	type toolResult struct {
-		content  string
-		status   agui.MessageStatus
-		guidance *agui.Guidance
+		content string
+		status  agui.MessageStatus
+		extra   map[string]any
 	}
 	toolResultMap := make(map[string]*toolResult, len(msgs))
 	for _, m := range msgs {
@@ -199,10 +199,10 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 		if m.Status == string(agui.StatusError) {
 			res.status = agui.StatusError
 		}
-		if len(m.Guidance) > 0 {
-			var g agui.Guidance
-			if json.Unmarshal(m.Guidance, &g) == nil {
-				res.guidance = &g
+		if len(m.Extra) > 0 {
+			var extra map[string]any
+			if json.Unmarshal(m.Extra, &extra) == nil {
+				res.extra = extra
 			}
 		}
 		toolResultMap[m.ToolCallID] = res
@@ -271,7 +271,7 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 						if res, ok := toolResultMap[tc.ID]; ok {
 							call.Content = res.content
 							call.Status = res.status
-							call.Extra = res.guidance
+							call.Extra = res.extra
 						}
 						toolCalls = append(toolCalls, call)
 					}
@@ -471,18 +471,23 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 			}
 			tc := sm.ToolCalls[0]
 			parentMsgUID := assistantMsgByRun[r.RunID]
+			// Read static tool metadata (icon/render_type) stored at call time for pre-rendering.
+			var extra map[string]any
+			if len(r.Extra) > 0 {
+				_ = json.Unmarshal(r.Extra, &extra)
+			}
 			result = append(result,
-				agui.Event{Type: agui.ToolCallStart, ToolCallID: tc.ID, ToolCallName: tc.Function.Name, ParentMessageID: parentMsgUID, Status: agui.StatusProcessing, RunID: r.RunID, Sequence: r.Sequence},
+				agui.Event{Type: agui.ToolCallStart, ToolCallID: tc.ID, ToolCallName: tc.Function.Name, ParentMessageID: parentMsgUID, Status: agui.StatusProcessing, Extra: extra, RunID: r.RunID, Sequence: r.Sequence},
 				agui.Event{Type: agui.ToolCallArgs, ToolCallID: tc.ID, Delta: tc.Function.Arguments},
 				agui.Event{Type: agui.ToolCallEnd, ToolCallID: tc.ID},
 			)
 
 		case agentmodel.EventTypeToolResult:
-			var guidance *agui.Guidance
-			if len(r.Guidance) > 0 {
-				var g agui.Guidance
-				if json.Unmarshal(r.Guidance, &g) == nil {
-					guidance = &g
+			var extra map[string]any
+			if len(r.Extra) > 0 {
+				var m map[string]any
+				if json.Unmarshal(r.Extra, &m) == nil {
+					extra = m
 				}
 			}
 			status := agui.StatusComplete
@@ -495,7 +500,7 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 				ToolCallID:   r.ToolCallID,
 				ToolCallName: r.ToolName,
 				Content:      r.Content,
-				Guidance:     guidance,
+				Extra:        extra,
 				Status:       status,
 				RunID:        r.RunID,
 				ElapsedMs:    r.ElapsedMs,
