@@ -229,9 +229,6 @@ func createToolsNode() *compose.Lambda {
 		}
 
 		lastMsg := messages[len(messages)-1]
-		// Flush the deferred step_started DB row now that tool calls are confirmed.
-		// Idempotent: safe to call even if Flush was already invoked earlier.
-		rt.currentStepEvt.Flush(ctx)
 		for _, tc := range lastMsg.ToolCalls {
 			toolEvt := aievent.NewToolCallEvent(
 				tc.ID, tc.Function.Name,

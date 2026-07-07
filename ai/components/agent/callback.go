@@ -56,9 +56,6 @@ func newSSECallback(rt *chatRun) callbacks.Handler {
 			// compose.GetToolCallID reads the call_id injected by Eino before the
 			// callback fires, replacing the previous sync.Map lookup (race-prone).
 			callID := compose.GetToolCallID(ctx)
-			// Flush the deferred step_started DB row now that tool calls are confirmed.
-			// Idempotent: only writes once even if multiple tools fire concurrently.
-			rt.currentStepEvt.Flush(ctx)
 			toolEvt := aievent.NewToolCallEvent(callID, info.Name, rt.assistantMsgUID, rt.currentStepID, rt.writer, rt.agent.convSrv, rt.convCtx)
 			rt.toolEvtsMu.Lock()
 			rt.toolEvts[callID] = toolEvt
