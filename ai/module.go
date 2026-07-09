@@ -158,7 +158,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 
 	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillRegistry, proxy, memoryStore, ruleEngine)
 	if err != nil {
-		panic(fmt.Sprintf("ai: failed to compile react graph: %v", err))
+		panic(fmt.Sprintf("ai: failed to compile agent graph: %v", err))
 	}
 
 	// Register the Eino global callback that annotates each component with org/user IDs.

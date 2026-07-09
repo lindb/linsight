@@ -25,16 +25,6 @@ import (
 	"github.com/lindb/common/pkg/ltoml"
 )
 
-// AgentMode identifies the agent execution strategy.
-type AgentMode string
-
-const (
-	// AgentModeReact is the standard ReAct loop with tool calling.
-	AgentModeReact AgentMode = "react"
-	// AgentModeDeep is the explicit Graph with three Lambda nodes for fault diagnosis.
-	AgentModeDeep AgentMode = "deep"
-)
-
 // Config holds all configuration for the agent sub-module.
 // Enabled must be the first field; when false, Bootstrap is a no-op.
 // LLM model credentials (provider, API key, base URL, etc.) are managed entirely
@@ -43,7 +33,7 @@ type Config struct {
 	// Enabled gates the entire agent feature. Default: false.
 	Enabled bool `env:"ENABLED" toml:"enabled"`
 
-	// MaxStep is the maximum number of ReAct reasoning steps before the agent
+	// MaxStep is the maximum number of reasoning steps before the agent
 	// returns an error. Prevents infinite tool-call loops.
 	MaxStep int `env:"MAX_STEP" toml:"max-step"`
 
@@ -67,10 +57,6 @@ type Config struct {
 	// Requests exceeding this are rejected with HTTP 400.
 	MaxMessageLength int `env:"MAX_MESSAGE_LENGTH" toml:"max-message-length"`
 
-	// SystemPrompt is prepended to every conversation as a system message.
-	// Override this to customise the agent persona.
-	SystemPrompt string `env:"SYSTEM_PROMPT" toml:"system-prompt"`
-
 	// MemoryStoreType specifies the storage backend for conversation state.
 	// Options: "db" (default), "redis" (future)
 	MemoryStoreType string `env:"MEMORY_STORE_TYPE" toml:"memory-store-type"`
@@ -91,13 +77,6 @@ type Config struct {
 	// MaxContextWindowSize specifies the maximum number of messages to include in context window.
 	MaxContextWindowSize int `env:"MAX_CONTEXT_WINDOW_SIZE" toml:"max-context-window-size"`
 
-	// AgentMode selects the agent execution strategy.
-	// AgentModeReact (default) uses a standard ReAct loop with tool calling.
-	// AgentModeDeep uses an explicit Graph with three Lambda nodes (thinking → execution → tools)
-	// designed for observability fault diagnosis: the model produces [DEEP THINKING] analysis
-	// before each [ACTION] decision, enabling more deliberate root-cause reasoning.
-	AgentMode AgentMode `env:"AGENT_MODE" toml:"agent-mode"`
-
 	// RuleRefreshInterval is how often the DB-backed rule engine reloads its in-memory
 	// cache from the agent_rules table. A non-positive value disables periodic refresh
 	// (writes still trigger an immediate refresh). Default: 30s.
@@ -115,10 +94,6 @@ func NewDefaultConfig() *Config {
 		MaxConcurrentPerOrg: 5,
 		MemorySize:          20,
 		MaxMessageLength:    8192,
-		SystemPrompt: "You are a helpful observability assistant for LinSight." +
-			" When users provide SQL queries or mention data sources, you MUST immediately call the appropriate tools to execute queries and return results." +
-			" NEVER output verbal promises without corresponding tool calls." +
-			" When the user asks to list datasources, you MUST call linsight_list_datasources immediately.",
 
 		// MemoryStore configuration defaults
 		MemoryStoreType:        "db",
@@ -127,7 +102,6 @@ func NewDefaultConfig() *Config {
 		PromptRigidityLevel:    "strict",
 		EnableMultiTurnContext: true,
 		MaxContextWindowSize:   50,
-		AgentMode:              AgentModeReact,
 		RuleRefreshInterval:    ltoml.Duration(30 * time.Second),
 	}
 }
@@ -139,7 +113,7 @@ func (c *Config) TOML() string {
 ## Env: LINSIGHT_AI_ENABLED
 enabled = %v
 
-## Maximum ReAct reasoning steps before giving up. Default: %d
+## Maximum reasoning steps before giving up. Default: %d
 ## Env: LINSIGHT_AI_MAX_STEP
 max-step = %d
 
@@ -162,10 +136,6 @@ memory-size = %d
 ## Max byte length of the user message. Excess returns 400. Default: %d
 ## Env: LINSIGHT_AI_MAX_MESSAGE_LENGTH
 max-message-length = %d
-
-## System prompt prepended to every conversation.
-## Env: LINSIGHT_AI_SYSTEM_PROMPT
-system-prompt = "%s"
 
 ## Storage backend for conversation state. Options: "db" (default), "redis" (future)
 ## Env: LINSIGHT_AI_MEMORY_STORE_TYPE
@@ -191,11 +161,6 @@ enable-multi-turn-context = %v
 ## Env: LINSIGHT_AI_MAX_CONTEXT_WINDOW_SIZE
 max-context-window-size = %d
 
-## Agent execution strategy. Options: "react" (default), "deep-react"
-## deep-react mode produces structured [DEEP THINKING]/[ACTION] output for observability fault diagnosis.
-## Env: LINSIGHT_AI_AGENT_MODE
-agent-mode = "%s"
-
 ## How often the DB-backed rule engine reloads its in-memory cache. Default: %s
 ## Env: LINSIGHT_AI_RULE_REFRESH_INTERVAL
 rule-refresh-interval = "%s"`,
@@ -206,14 +171,12 @@ rule-refresh-interval = "%s"`,
 		c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
 		c.MemorySize, c.MemorySize,
 		c.MaxMessageLength, c.MaxMessageLength,
-		escapeTOMLString(c.SystemPrompt),
 		escapeTOMLString(c.MemoryStoreType),
 		c.MemoryStoreTTL.Duration().String(), c.MemoryStoreTTL.Duration().String(),
 		c.EnableStateLocking, c.EnableStateLocking,
 		escapeTOMLString(c.PromptRigidityLevel),
 		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
 		c.MaxContextWindowSize, c.MaxContextWindowSize,
-		escapeTOMLString(string(c.AgentMode)),
 		c.RuleRefreshInterval.Duration().String(), c.RuleRefreshInterval.Duration().String(),
 	)
 }

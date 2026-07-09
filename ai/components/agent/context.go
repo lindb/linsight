@@ -26,7 +26,6 @@ import (
 	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/ai/components/memory"
-	agentconfig "github.com/lindb/linsight/ai/config"
 	agentmodel "github.com/lindb/linsight/ai/model"
 )
 
@@ -96,9 +95,9 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) []*schema.Message {
 	msgs := make([]*schema.Message, 0, len(history)+1)
 
-	systemPrompt := a.buildSystemPrompt()
-	if systemPrompt != "" {
-		msgs = append(msgs, &schema.Message{Role: schema.System, Content: systemPrompt})
+	sysPrompt := a.buildSystemPrompt()
+	if sysPrompt != "" {
+		msgs = append(msgs, &schema.Message{Role: schema.System, Content: sysPrompt})
 	}
 
 	for _, m := range history {
@@ -125,10 +124,10 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) []*schema.M
 func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationState) []*schema.Message {
 	messages := make([]*schema.Message, 0, len(state.ContextWindow)+1)
 
-	systemPrompt := a.buildSystemPrompt()
-	if systemPrompt != "" {
-		messages = append(messages, &schema.Message{Role: schema.System, Content: systemPrompt})
-		preview := systemPrompt
+	sysPrompt := a.buildSystemPrompt()
+	if sysPrompt != "" {
+		messages = append(messages, &schema.Message{Role: schema.System, Content: sysPrompt})
+		preview := sysPrompt
 		if len(preview) > 80 {
 			preview = preview[:80] + "..."
 		}
@@ -152,12 +151,8 @@ func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationSt
 	return messages
 }
 
-// buildSystemPrompt returns the system prompt for the current agent mode.
-// "deep-react" uses a structured fault-diagnosis prompt; all other modes use
-// the configured system prompt from cfg.SystemPrompt.
+// buildSystemPrompt returns the system prompt injected at the head of every
+// conversation. It is a structured fault-diagnosis prompt (see system_prompt.go).
 func (a *agentRuntime) buildSystemPrompt() string {
-	if a.agentMode == agentconfig.AgentModeDeep {
-		return deepReactSystemPrompt
-	}
-	return a.cfg.SystemPrompt
+	return systemPrompt
 }

@@ -18,15 +18,8 @@
 package tools
 
 import (
-	"context"
 	"encoding/json"
-	"sync"
 )
-
-// contextKey is an unexported type for context keys in this package.
-type contextKey int8
-
-const extraCacheKey contextKey = 0
 
 // ToolCallResult is the universal return shape for all builtin tools.
 // Data is the LLM-visible payload; Extra carries runtime-generated metadata
@@ -55,21 +48,4 @@ func ParseToolCallResult(s string) (ToolCallResult, bool) {
 		return ToolCallResult{}, false
 	}
 	return tcr, true
-}
-
-// ContextWithExtraCache injects cache into ctx so that InvokableRun wrappers
-// can store per-callID runtime Extra, and the Eino OnEnd callback can read it back.
-func ContextWithExtraCache(ctx context.Context, cache *sync.Map) context.Context {
-	return context.WithValue(ctx, extraCacheKey, cache)
-}
-
-// ExtraCacheFromContext retrieves the extra cache previously injected by
-// ContextWithExtraCache. Returns (nil, false) when no cache is present.
-func ExtraCacheFromContext(ctx context.Context) (*sync.Map, bool) {
-	v := ctx.Value(extraCacheKey)
-	if v == nil {
-		return nil, false
-	}
-	m, ok := v.(*sync.Map)
-	return m, ok
 }

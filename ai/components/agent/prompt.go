@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
@@ -35,45 +34,14 @@ import (
 // block the response path beyond a fixed budget.
 const titleGenTimeout = 10 * time.Second
 
-// langAlignInstruction is appended to the system message on every model call to keep
-// both reasoning tokens and final text in the same language as the user's input.
-const langAlignInstruction = "\n\nIMPORTANT: Always use the SAME language as the user's message for BOTH your reasoning/thinking AND your final response. If the user writes in Chinese, think and respond in Chinese. If the user writes in English, think and respond in English."
-
-// buildLanguageAlignModifier returns a MessageModifier that appends langAlignInstruction
-// to the system message before each LLM call, ensuring the model reasons and responds
-// in the same language the user wrote in.
-// If no system message is present (empty SystemPrompt), a new one is prepended.
-func buildLanguageAlignModifier() react.MessageModifier {
-	return func(_ context.Context, input []*schema.Message) []*schema.Message {
-		for i, msg := range input {
-			if msg.Role != schema.System {
-				continue
-			}
-			// Copy to avoid mutating the caller's slice.
-			updated := *msg
-			updated.Content += langAlignInstruction
-			out := make([]*schema.Message, len(input))
-			copy(out, input)
-			out[i] = &updated
-			return out
-		}
-		// No system message found; prepend a minimal one with just the language instruction.
-		out := make([]*schema.Message, 0, len(input)+1)
-		out = append(out, &schema.Message{Role: schema.System, Content: strings.TrimPrefix(langAlignInstruction, "\n\n")})
-		out = append(out, input...)
-		return out
-	}
-}
-
 // rulesInjectionHeader precedes injected rule text inside the system message so the
 // model can distinguish operator-defined rules from the base persona prompt.
 const rulesInjectionHeader = "\n\n# Global Rules\nThe following rules are configured by the operator and MUST be strictly followed:\n\n"
 
 // injectRulesIntoSystem returns a NEW message slice with rulesText appended to the
 // system message (or a new system message prepended if none exists). It performs a
-// copy-on-write so the caller's `messages` slice — which is reused across deep-mode
-// graph iterations — is never mutated; otherwise rule blocks would stack up on every
-// loop. Mirrors buildLanguageAlignModifier's copy-on-write approach.
+// copy-on-write so the caller's `messages` slice — which is reused across graph
+// iterations — is never mutated; otherwise rule blocks would stack up on every loop.
 func injectRulesIntoSystem(messages []*schema.Message, rulesText string) []*schema.Message {
 	if rulesText == "" {
 		return messages

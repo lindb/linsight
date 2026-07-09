@@ -33,30 +33,25 @@ import (
 
 	"github.com/lindb/linsight/ai/agui"
 	aievent "github.com/lindb/linsight/ai/components/event"
-	"github.com/lindb/linsight/ai/components/memory"
-	modelcomp "github.com/lindb/linsight/ai/components/model"
-	rulescomp "github.com/lindb/linsight/ai/components/rules"
-	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentmodel "github.com/lindb/linsight/ai/model"
-	agentservice "github.com/lindb/linsight/ai/service"
 	"github.com/lindb/linsight/pkg/uuid"
 )
 
-// deepCtxKey is the key type for deep mode per-request context values.
-type deepCtxKey int8
+// ctxKey is the key type for per-request context values.
+type ctxKey int8
 
 const (
-	// deepCtxChatRun injects *chatRun into Lambda node contexts.
+	// ctxChatRun injects *chatRun into Lambda node contexts.
 	// All per-request state (proxy, tools, events, writer) is accessed through this
 	// single key to minimize coupling between the graph nodes and the agent runtime.
-	deepCtxChatRun deepCtxKey = 0
+	ctxChatRun ctxKey = 0
 )
 
-// deepAgentState is the per-run mutable state threaded through the graph via compose.ProcessState.
-// Using a pointer (*deepAgentState) as the type parameter ensures mutations propagate across nodes.
-type deepAgentState struct {
+// agentState is the per-run mutable state threaded through the graph via compose.ProcessState.
+// Using a pointer (*agentState) as the type parameter ensures mutations propagate across nodes.
+type agentState struct {
 	// IsFinished is true when the LLM produced "Conclusion: [FINISHED]" (RCA path) or a
 	// text-only response with no tool calls; decideBranch then terminates the graph.
 	IsFinished bool
@@ -101,9 +96,9 @@ func getToolPublicExtra(extra map[string]any) map[string]any {
 	return result
 }
 
-// parseDeepToolResult unwraps a ToolCallResult envelope (if present) and injects
+// parseToolResult unwraps a ToolCallResult envelope (if present) and injects
 // raw_data into extra for rich frontend rendering (e.g. DataQueryView table).
-func parseDeepToolResult(result string) (llmContent string, extra map[string]any) {
+func parseToolResult(result string) (llmContent string, extra map[string]any) {
 	if tcr, ok := toolscomp.ParseToolCallResult(result); ok {
 		llmContent = string(tcr.Data)
 		extra = tcr.Extra
@@ -119,17 +114,17 @@ func parseDeepToolResult(result string) (llmContent string, extra map[string]any
 	return result, nil
 }
 
-// createThinkingNode builds the first Lambda in the deep graph.
+// createThinkingNode builds the first Lambda in the graph.
 // It opens a new StepEvent for the current model-call iteration and resets IsFinished
 // so a completion signal from a prior tool-less pass does not short-circuit the next cycle.
 func createThinkingNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
-		rt := ctx.Value(deepCtxChatRun).(*chatRun)
+		rt := ctx.Value(ctxChatRun).(*chatRun)
 
 		// Reset per-iteration flags so stale values from a previous loop cannot
 		// short-circuit or repeat special-case logic (e.g. a prior "FINISHED", or the
 		// GoToThinking set by a rejection branch that already looped back here).
-		if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
+		if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
 			s.IsFinished = false
 			s.GoToThinking = false
 			s.InterruptIssued = false
@@ -155,7 +150,7 @@ func createThinkingNode() *compose.Lambda {
 // If no tool calls are produced, the step is closed here (text-only iteration).
 func createExecutionNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
-		rt := ctx.Value(deepCtxChatRun).(*chatRun)
+		rt := ctx.Value(ctxChatRun).(*chatRun)
 
 		// Resume first pass: skip the LLM entirely. On a resume run the ToolCalls were
 		// already produced by the LLM in run 1 and are reconstructed from pendingInterrupt
@@ -265,7 +260,7 @@ func createExecutionNode() *compose.Lambda {
 
 		// Detect explicit completion signal; set state so decideBranch can terminate the loop.
 		if strings.Contains(contentSB.String(), "Conclusion: [FINISHED]") {
-			if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
+			if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
 				s.IsFinished = true
 				return nil
 			}); err != nil {
@@ -377,7 +372,7 @@ func processInterrupt(ctx context.Context, messages []*schema.Message, rt *chatR
 	rt.interruptPayload = payload
 	rt.interruptHandled = true
 
-	if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
+	if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
 		s.InterruptIssued = true
 		return nil
 	}); err != nil {
@@ -429,7 +424,7 @@ func processResumeDecision(ctx context.Context, messages []*schema.Message, rt *
 			agentLog.Warn("resume: failed to update interrupt status to rejected", logger.Error(err))
 		}
 
-		if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
+		if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
 			s.GoToThinking = true
 			return nil
 		}); err != nil {
@@ -470,7 +465,7 @@ func processResumeDecision(ctx context.Context, messages []*schema.Message, rt *
 //   - Case D (interrupt): ToolCalls present, at least one _gov_need_approval=true, AutoApprove=false → processInterrupt
 func createInterruptCheckNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
-		rt := ctx.Value(deepCtxChatRun).(*chatRun)
+		rt := ctx.Value(ctxChatRun).(*chatRun)
 
 		// Case A: LLM produced a text-only response — nothing to gate.
 		if len(messages) == 0 {
@@ -511,7 +506,7 @@ func createInterruptCheckNode() *compose.Lambda {
 // already emitted TOOL_CALL_START + persisted the tool_call DB row.
 func createToolsNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
-		rt := ctx.Value(deepCtxChatRun).(*chatRun)
+		rt := ctx.Value(ctxChatRun).(*chatRun)
 
 		if len(messages) == 0 {
 			return messages, nil
@@ -590,7 +585,7 @@ func createToolsNode() *compose.Lambda {
 					ToolName:   tc.Function.Name,
 				})
 			} else {
-				llmContent, extra := parseDeepToolResult(result)
+				llmContent, extra := parseToolResult(result)
 				toolEvt.OnEnd(ctx, llmContent, extra)
 				messages = append(messages, &schema.Message{
 					Role:       schema.Tool,
@@ -618,8 +613,8 @@ func createToolsNode() *compose.Lambda {
 //   - "tools"      when the last message carries ToolCalls (normal execution, Case C)
 //   - compose.END  otherwise
 func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
-	var state deepAgentState
-	if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
+	var state agentState
+	if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
 		state = *s
 		return nil
 	}); err != nil {
@@ -636,7 +631,7 @@ func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 		return "thinking", nil
 	}
 
-	rt := ctx.Value(deepCtxChatRun).(*chatRun)
+	rt := ctx.Value(ctxChatRun).(*chatRun)
 	if len(rt.pendingToolCallsToExecute) > 0 {
 		return "tools", nil
 	}
@@ -650,7 +645,7 @@ func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 	return compose.END, nil
 }
 
-// buildDeepGraph compiles the explicit four-node Lambda graph for deep mode.
+// buildGraph compiles the explicit four-node Lambda graph.
 // The interruptCheck node implements AG-UI tool-bound interrupts (human-in-the-loop approval).
 // MaxRunSteps is multiplied by 4 because each full iteration consumes four steps.
 //
@@ -678,15 +673,15 @@ func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 //	                           (emits TOOL_CALL_START + RUN_FINISHED[outcome=interrupt], halts)
 //	tools          — executes tool calls (TOOL_CALL_RESULT), then loops back to thinking.
 //
-// decideBranch reads deepAgentState after interruptCheck and routes to one of:
+// decideBranch reads agentState after interruptCheck and routes to one of:
 //
 //	END       InterruptIssued=true (Case D) | IsFinished=true (Case A)
 //	thinking  GoToThinking=true (rejected resume → LLM apologises / re-plans)
 //	tools     approved resume (pendingToolCallsToExecute) | Case C (fresh tool calls)
-func buildDeepGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message, []*schema.Message], error) {
+func buildGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message, []*schema.Message], error) {
 	g := compose.NewGraph[[]*schema.Message, []*schema.Message](
-		compose.WithGenLocalState(func(_ context.Context) *deepAgentState {
-			return &deepAgentState{}
+		compose.WithGenLocalState(func(_ context.Context) *agentState {
+			return &agentState{}
 		}),
 	)
 
@@ -733,30 +728,24 @@ func buildDeepGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message
 	return g.Compile(context.Background(), compose.WithMaxRunSteps(maxSteps))
 }
 
-// newDeepAgent creates an agentRuntime configured for deep mode.
-// The deep graph is compiled once at startup; per-request state is injected via context.
-func newDeepAgent(
-	cfg *agentconfig.Config,
-	convSrv agentservice.ConversationService,
-	modelFactory *modelcomp.ModelFactory,
-	skillRegistry *skillscomp.SkillRegistry,
-	proxy *modelcomp.DynamicModelProxy,
-	memoryStore memory.MemoryStore,
-	ruleEngine rulescomp.RuleEngine,
-) (Agent, error) {
-	deepGraph, err := buildDeepGraph(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("compile deep graph: %w", err)
+// cloneToolExtra returns a shallow copy of the named tool's ToolInfo.Extra,
+// or nil if the tool is not found or has no Extra. Used to attach display metadata
+// (icon, render_type) to tool events without coupling the graph nodes to specific
+// tool implementations.
+func cloneToolExtra(tools []tool.BaseTool, name string) map[string]any {
+	for _, t := range tools {
+		info, err := t.Info(context.Background())
+		if err != nil || info == nil || info.Name != name {
+			continue
+		}
+		if len(info.Extra) == 0 {
+			return nil
+		}
+		m := make(map[string]any, len(info.Extra))
+		for k, v := range info.Extra {
+			m[k] = v
+		}
+		return m
 	}
-	return &agentRuntime{
-		cfg:           cfg,
-		convSrv:       convSrv,
-		modelFactory:  modelFactory,
-		skillRegistry: skillRegistry,
-		proxy:         proxy,
-		memoryStore:   memoryStore,
-		ruleEngine:    ruleEngine,
-		deepGraph:     deepGraph,
-		agentMode:     agentconfig.AgentModeDeep,
-	}, nil
+	return nil
 }

@@ -23,22 +23,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/compose"
-	einoagent "github.com/cloudwego/eino/flow/agent"
-	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
-	agentapi "github.com/lindb/linsight/ai/api"
 	"github.com/lindb/linsight/ai/agui"
+	agentapi "github.com/lindb/linsight/ai/api"
 	aievent "github.com/lindb/linsight/ai/components/event"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
-	toolscomp "github.com/lindb/linsight/ai/components/tools"
-	agentconfig "github.com/lindb/linsight/ai/config"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/ai/telemetry"
 	"github.com/lindb/linsight/pkg/util"
@@ -69,30 +63,23 @@ type chatRun struct {
 	timeoutCtx context.Context
 	cancel     context.CancelFunc
 
-	// enriched context forwarded to the ReAct graph (conversation + skill telemetry)
+	// enriched context forwarded to the graph (conversation + skill telemetry)
 	runCtx context.Context
 
-	// tool + SSE callback options built up by resolveTools and run()
-	agentOpts []einoagent.AgentOption
-
 	// event lifecycle objects; initialized in run() after conversation is resolved
-	convCtx         *aievent.ConvContext
-	assistantEvt    *aievent.AssistantTextEvent
-	toolEvtsMu      sync.Mutex                     // guards concurrent reads/writes to toolEvts
-	toolEvts        map[string]*aievent.ToolCallEvent
-	toolRuntimeExtras sync.Map                     // callID → runtime Extra from ToolCallResult; written by toolWithExtra.InvokableRun, read by OnEnd
-	currentStepID   string          // updated at the start of each model-call iteration
-	currentStepEvt  *aievent.StepEvent // step lifecycle for the current model-call iteration
-	pendingToolCalls int32           // atomic counter: outstanding tool calls in the current iteration
+	convCtx        *aievent.ConvContext
+	assistantEvt   *aievent.AssistantTextEvent
+	currentStepID  string             // updated at the start of each model-call iteration
+	currentStepEvt *aievent.StepEvent // step lifecycle for the current model-call iteration
 
-	// orgTools holds the resolved tool set; used by deep Lambda nodes via context.
+	// orgTools holds the resolved tool set; used by the graph Lambda nodes via context.
 	orgTools []tool.BaseTool
 
 	// pre-generated UIDs known before streaming begins
 	assistantMsgUID string
 	userMsgUID      string
 
-	// interrupt / resume state (general mode only)
+	// interrupt / resume state.
 	// isResume is true when req.Resume != nil; set before run() enters the graph.
 	isResume bool
 	// resumeConsumed prevents the LLM-skip optimisation from firing on subsequent
@@ -108,7 +95,7 @@ type chatRun struct {
 	// interruptPayload is built by processInterrupt and consumed by finalize().
 	interruptPayload *agui.InterruptPayload
 	// pendingToolCallsToExecute carries the approved (and possibly arg-edited)
-	// tool calls from processResumeDecision to createGeneralToolsNode.
+	// tool calls from processResumeDecision to createToolsNode.
 	pendingToolCallsToExecute []schema.ToolCall
 }
 
@@ -140,7 +127,7 @@ func newChatRun(
 //  5. persistErrorMessage
 //  6. persistAssistantMessage on error
 //  7. WriteTextMessageEnd on error
-//  8. reader.Close  (registered inside executeStream)
+//  8. reader.Close  (registered inside executeGraph)
 func (rt *chatRun) run() (retErr error) {
 	rt.runID = uuid.GenerateShortUUID()
 	rt.start = time.Now()
@@ -245,7 +232,6 @@ func (rt *chatRun) run() (retErr error) {
 			rt.convCtx.SetSeq(maxSeq)
 		}
 	}
-	rt.toolEvts = make(map[string]*aievent.ToolCallEvent)
 	rt.assistantEvt = aievent.NewAssistantTextEvent(rt.assistantMsgUID, rt.writer, rt.agent.convSrv, rt.convCtx)
 
 	// Resume turns carry no new user content; skip persisting a user message.
@@ -288,19 +274,9 @@ func (rt *chatRun) run() (retErr error) {
 		}
 	}()
 
-	// Deep mode runs the explicit four-node Lambda graph, which also handles
+	// The graph runs the explicit four-node Lambda pipeline, which also handles
 	// AG-UI tool-bound interrupts and resume (human-in-the-loop approval).
-	if rt.agent.agentMode == agentconfig.AgentModeDeep {
-		if err := rt.executeDeepGraph(messages); err != nil {
-			return err
-		}
-		return rt.finalize()
-	}
-
-	sseCallback := newSSECallback(rt)
-	rt.agentOpts = append(rt.agentOpts, einoagent.WithComposeOptions(compose.WithCallbacks(sseCallback)))
-
-	if err := rt.executeStream(messages); err != nil {
+	if err := rt.executeGraph(messages); err != nil {
 		return err
 	}
 	return rt.finalize()
@@ -353,8 +329,8 @@ func (rt *chatRun) pendingInterruptToolCalls() []schema.ToolCall {
 	return tcs
 }
 
-// resolveTools loads the governance-filtered tool set, wires it into agentOpts, and
-// sets up the enriched run context with conversation and skill-metadata telemetry.
+// resolveTools loads the governance-filtered tool set and sets up the enriched run
+// context with conversation and skill-metadata telemetry.
 // Non-fatal: logs a warning and continues with an empty tool set on failure.
 func (rt *chatRun) resolveTools() {
 	orgTools, skillMeta, err := rt.agent.skillRegistry.LoadConversationTools(rt.timeoutCtx, rt.orgID, rt.conv.ID)
@@ -373,53 +349,17 @@ func (rt *chatRun) resolveTools() {
 	metaMap := buildSkillMetaMap(skillMeta)
 	rt.runCtx = telemetry.WithConversationID(rt.timeoutCtx, rt.conv.ID)
 	rt.runCtx = telemetry.WithSkillMetaMap(rt.runCtx, metaMap)
-	rt.runCtx = toolscomp.ContextWithExtraCache(rt.runCtx, &rt.toolRuntimeExtras)
 
-	// Store tools for deep mode Lambda nodes that inject tools per-request via context.
+	// Store tools for the graph Lambda nodes, which bind them per-request via context.
 	rt.orgTools = orgTools
-
-	if len(orgTools) == 0 {
-		return
-	}
-	toolOpts, toolErr := react.WithTools(rt.runCtx, orgTools...)
-	if toolErr != nil {
-		agentLog.Warn("react.WithTools failed, proceeding without tools", logger.Error(toolErr))
-		return
-	}
-	rt.agentOpts = append(rt.agentOpts, toolOpts...)
-}
-
-// executeStream starts the ReAct graph and drains the output stream until completion.
-// All SSE delivery and DB persistence are handled inside Eino callbacks (sseCallback).
-// This loop acts as a completion barrier and prevents backpressure on the internal
-// stream channel by consuming all chunks, even though their content is unused here.
-func (rt *chatRun) executeStream(messages []*schema.Message) error {
-	reader, err := rt.agent.compiled.Stream(rt.runCtx, messages, rt.agentOpts...)
-	if err != nil {
-		agentLog.Error("failed to start agent stream", logger.Error(err))
-		return fmt.Errorf("agent stream: %w", err)
-	}
-	defer reader.Close()
-
-	for {
-		_, recvErr := reader.Recv()
-		if errors.Is(recvErr, io.EOF) {
-			break
-		}
-		if recvErr != nil {
-			agentLog.Error("stream recv error", logger.Error(recvErr))
-			return fmt.Errorf("stream recv: %w", recvErr)
-		}
-	}
-	return nil
 }
 
 // finalize persists the completed assistant message (via AssistantTextEvent.Persist),
 // generates a title for new conversations, and emits RUN_FINISHED or RUN_INTERRUPT.
 func (rt *chatRun) finalize() error {
-	// Close any open step — idempotent; handles the edge case in deep mode where
-	// IsFinished=true is detected alongside tool calls, causing decideBranch to
-	// terminate before createToolsNode ran and closed the step.
+	// Close any open step — idempotent; handles the edge case where IsFinished=true
+	// is detected alongside tool calls, causing decideBranch to terminate before
+	// createToolsNode ran and closed the step.
 	if rt.currentStepEvt != nil {
 		rt.currentStepEvt.OnFinish(rt.timeoutCtx)
 	}
@@ -461,20 +401,20 @@ func buildSkillMetaMap(meta []skillscomp.SkillMeta) map[string]agentmodel.SkillC
 	return m
 }
 
-// enrichDeepRunCtx injects the current *chatRun into the run context so that
-// deep mode Lambda nodes can access all per-request state (tools, events, writer)
+// enrichRunCtx injects the current *chatRun into the run context so that the
+// graph Lambda nodes can access all per-request state (tools, events, writer)
 // via a single context key without additional coupling.
-func (rt *chatRun) enrichDeepRunCtx() context.Context {
-	return context.WithValue(rt.runCtx, deepCtxChatRun, rt)
+func (rt *chatRun) enrichRunCtx() context.Context {
+	return context.WithValue(rt.runCtx, ctxChatRun, rt)
 }
 
-// executeDeepGraph runs the explicit four-node Lambda graph for deep mode and
-// drains the output stream. All SSE delivery and DB persistence are handled
-// inside the Lambda nodes themselves; we only check for stream errors here.
-func (rt *chatRun) executeDeepGraph(messages []*schema.Message) error {
-	reader, err := rt.agent.deepGraph.Stream(rt.enrichDeepRunCtx(), messages)
+// executeGraph runs the explicit four-node Lambda graph and drains the output
+// stream. All SSE delivery and DB persistence are handled inside the Lambda
+// nodes themselves; we only check for stream errors here.
+func (rt *chatRun) executeGraph(messages []*schema.Message) error {
+	reader, err := rt.agent.graph.Stream(rt.enrichRunCtx(), messages)
 	if err != nil {
-		return fmt.Errorf("deep graph stream: %w", err)
+		return fmt.Errorf("graph stream: %w", err)
 	}
 	defer reader.Close()
 
@@ -484,7 +424,7 @@ func (rt *chatRun) executeDeepGraph(messages []*schema.Message) error {
 			break
 		}
 		if recvErr != nil {
-			return fmt.Errorf("deep graph recv: %w", recvErr)
+			return fmt.Errorf("graph recv: %w", recvErr)
 		}
 	}
 	return nil
