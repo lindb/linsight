@@ -102,6 +102,24 @@ type SaveOrgModelConfigRequest struct {
 	AutoStrategy  string `json:"autoStrategy" binding:"omitempty,oneof=failover cost round_robin capability"`
 }
 
+// RuleRequest is the unified body for POST /ai/settings/rules and
+// PUT /ai/settings/rules/:uid. The Content field is a full Markdown document whose
+// optional YAML frontmatter carries trigger_tools / trigger_keywords / variables;
+// the API layer stores it verbatim and never parses it. Creating or editing a global
+// rule (IsGlobal=true) requires super-admin (RoleLin); the service layer enforces this.
+type RuleRequest struct {
+	// RuleName is the human-readable unique name within the rule's scope. Required.
+	RuleName string `json:"ruleName"`
+	// Content is the full Markdown rule body (with optional frontmatter). Required.
+	Content string `json:"content"`
+	// IsGlobal marks the rule as applying to all orgs (org_id=0). Super-admin only.
+	IsGlobal bool `json:"isGlobal"`
+	// Priority orders rules when multiple are matched and concatenated (asc).
+	Priority int `json:"priority"`
+	// IsEnabled gates whether the rule is loaded into the runtime cache.
+	IsEnabled bool `json:"isEnabled"`
+}
+
 // CreateMCPServerRequest is the body for POST /agent/settings/mcp.
 type CreateMCPServerRequest struct {
 	Name    string `json:"name" binding:"required"`

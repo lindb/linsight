@@ -32,4 +32,5 @@ type Deps struct {
 	MCPSrv      agentservice.MCPService
 	ConvSrv     agentservice.ConversationService
 	FeedbackSrv agentservice.FeedbackService
+	RuleSrv     agentservice.RuleService
 }

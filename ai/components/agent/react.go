@@ -30,6 +30,7 @@ import (
 	agentapi "github.com/lindb/linsight/ai/api"
 	"github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
+	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentservice "github.com/lindb/linsight/ai/service"
@@ -47,6 +48,9 @@ type agentRuntime struct {
 	skillRegistry *skillscomp.SkillRegistry
 	proxy         *modelcomp.DynamicModelProxy
 	memoryStore   memory.MemoryStore
+	// ruleEngine injects DB-backed global/per-org rules into the LLM context.
+	// It is nil when rule injection is not wired (e.g. react mode); callers must nil-check.
+	ruleEngine rulescomp.RuleEngine
 	// compiled is the singleton ReAct agent graph built once at startup.
 	compiled *react.Agent
 	// deepGraph is the explicit compose.Graph used in AgentModeDeep. It also handles
@@ -66,6 +70,7 @@ func newReactAgent(
 	skillRegistry *skillscomp.SkillRegistry,
 	proxy *modelcomp.DynamicModelProxy,
 	memoryStore memory.MemoryStore,
+	ruleEngine rulescomp.RuleEngine,
 ) (Agent, error) {
 	compiled, err := react.NewAgent(context.Background(), &react.AgentConfig{
 		ToolCallingModel:      proxy,
@@ -90,6 +95,7 @@ func newReactAgent(
 		skillRegistry: skillRegistry,
 		proxy:         proxy,
 		memoryStore:   memoryStore,
+		ruleEngine:    ruleEngine,
 		compiled:      compiled,
 		agentMode:     agentconfig.AgentModeReact,
 	}, nil

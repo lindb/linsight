@@ -20,14 +20,17 @@
 package ai
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lindb/common/pkg/logger"
 
 	"github.com/lindb/linsight/accesscontrol"
 	agentcomp "github.com/lindb/linsight/ai/components/agent"
 	memorycomp "github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
+	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	builtintools "github.com/lindb/linsight/ai/components/tools/builtin"
@@ -61,10 +64,14 @@ type aiModule struct {
 	model    *agenthandler.ModelHandler
 	mcp      *agenthandler.MCPHandler
 	feedback *agenthandler.FeedbackHandler
+	rule     *agenthandler.RuleHandler
 }
 
 // mod is the package-level singleton; nil if AI is disabled.
 var mod *aiModule
+
+// moduleLog logs module-level bootstrap events (e.g. initial rule cache load).
+var moduleLog = logger.GetLogger("ai", "module")
 
 // builtinSkillNames are the tool names seeded into the skills table on every
 // startup with is_global=true so they pass the three-level governance funnel
@@ -99,6 +106,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		&agentmodel.MessageFeedback{},
 		&agentmodel.Event{},
 		&agentmodel.InterruptRecord{},
+		&agentmodel.AgentRule{},
 	); err != nil {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
 	}
@@ -137,7 +145,18 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	memoryStoreFactory := memorycomp.NewMemoryStoreFactory(db, convSrv, cfg.AI)
 	memoryStore := memoryStoreFactory.GetDefaultStore()
 
-	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
+	// Build the DB-backed rule engine: load the cache once now (fail-soft) and start
+	// the periodic refresh so DB rule edits propagate without a restart. The engine is
+	// injected into the agent (used in deep-react mode) and wired into RuleService so
+	// management writes trigger an immediate cache refresh.
+	ruleEngine := rulescomp.NewDBRuleEngine(db, cfg.AI.RuleRefreshInterval.Duration())
+	if err := ruleEngine.RefreshCache(context.Background()); err != nil {
+		moduleLog.Warn("ai: initial rule cache load failed", logger.Error(err))
+	}
+	ruleEngine.StartAutoRefresh(context.Background())
+	ruleSrv := agentservice.NewRuleService(db, ruleEngine)
+
+	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillRegistry, proxy, memoryStore, ruleEngine)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to compile react graph: %v", err))
 	}
@@ -152,12 +171,14 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		MCPSrv:      mcpSrv,
 		ConvSrv:     convSrv,
 		FeedbackSrv: feedbackSrv,
+		RuleSrv:     ruleSrv,
 	}
 	mod = &aiModule{
 		chat:     agenthandler.NewChatHandler(deps),
 		model:    agenthandler.NewModelHandler(deps),
 		mcp:      agenthandler.NewMCPHandler(deps),
 		feedback: agenthandler.NewFeedbackHandler(deps),
+		rule:     agenthandler.NewRuleHandler(deps),
 	}
 }
 
@@ -224,4 +245,19 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, mcp.CreateMCPServer)...)
 	router.DELETE("/ai/settings/mcp/:uid",
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, mcp.DeleteMCPServer)...)
+
+	// Rule CRUD — admin-level. Global rules (is_global=true) are further gated to
+	// super admins (RoleLin) inside RuleService; regular org admins manage only their
+	// own org's rules.
+	rule := mod.rule
+	router.GET("/ai/settings/rules",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, rule.ListRules)...)
+	router.POST("/ai/settings/rules",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, rule.CreateRule)...)
+	router.GET("/ai/settings/rules/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, rule.GetRule)...)
+	router.PUT("/ai/settings/rules/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, rule.UpdateRule)...)
+	router.DELETE("/ai/settings/rules/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, rule.DeleteRule)...)
 }

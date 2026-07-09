@@ -27,6 +27,7 @@ import (
 	agentapi "github.com/lindb/linsight/ai/api"
 	"github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
+	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentservice "github.com/lindb/linsight/ai/service"
@@ -50,12 +51,13 @@ func New(
 	skillRegistry *skillscomp.SkillRegistry,
 	proxy *modelcomp.DynamicModelProxy,
 	memoryStore memory.MemoryStore,
+	ruleEngine rulescomp.RuleEngine,
 ) (Agent, error) {
 	switch cfg.AgentMode {
 	case agentconfig.AgentModeDeep:
-		return newDeepAgent(cfg, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
+		return newDeepAgent(cfg, convSrv, modelFactory, skillRegistry, proxy, memoryStore, ruleEngine)
 	case agentconfig.AgentModeReact, "":
-		return newReactAgent(cfg, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
+		return newReactAgent(cfg, convSrv, modelFactory, skillRegistry, proxy, memoryStore, ruleEngine)
 	default:
 		return nil, fmt.Errorf("unknown agent mode %q: must be one of %q or %q",
 			cfg.AgentMode, agentconfig.AgentModeReact, agentconfig.AgentModeDeep)

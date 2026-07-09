@@ -35,6 +35,7 @@ import (
 	aievent "github.com/lindb/linsight/ai/components/event"
 	"github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
+	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	agentconfig "github.com/lindb/linsight/ai/config"
@@ -182,7 +183,22 @@ func createExecutionNode() *compose.Lambda {
 			modelOpts = append(modelOpts, einomodel.WithTools(toolInfos))
 		}
 
-		reader, err := rt.agent.proxy.Stream(ctx, messages, modelOpts...)
+		// Dynamic rule injection: match DB-backed rules against the tools invoked so far
+		// and the conversation text, then splice the compiled rule text into a COPY of the
+		// system message. injectRulesIntoSystem never mutates the thread-state `messages`
+		// slice, so multi-iteration loops do not stack rule blocks on top of each other.
+		msgsForLLM := messages
+		if rt.agent.ruleEngine != nil {
+			rulesText, rerr := rt.agent.ruleEngine.MatchAndCompile(ctx,
+				&einomodel.CallbackInput{Messages: messages, Tools: toolInfos})
+			if rerr != nil {
+				agentLog.Warn("deep: rule match failed, proceeding without rules", logger.Error(rerr))
+			} else if rulesText != "" {
+				msgsForLLM = injectRulesIntoSystem(messages, rulesText)
+			}
+		}
+
+		reader, err := rt.agent.proxy.Stream(ctx, msgsForLLM, modelOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("deep execution stream: %w", err)
 		}
@@ -726,6 +742,7 @@ func newDeepAgent(
 	skillRegistry *skillscomp.SkillRegistry,
 	proxy *modelcomp.DynamicModelProxy,
 	memoryStore memory.MemoryStore,
+	ruleEngine rulescomp.RuleEngine,
 ) (Agent, error) {
 	deepGraph, err := buildDeepGraph(cfg)
 	if err != nil {
@@ -738,6 +755,7 @@ func newDeepAgent(
 		skillRegistry: skillRegistry,
 		proxy:         proxy,
 		memoryStore:   memoryStore,
+		ruleEngine:    ruleEngine,
 		deepGraph:     deepGraph,
 		agentMode:     agentconfig.AgentModeDeep,
 	}, nil

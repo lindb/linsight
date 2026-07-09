@@ -93,6 +93,14 @@
         "page": "ai_model_routing",
         "icon": "route",
         "role": "Admin"
+      },
+      {
+        "uid": "ai_rules",
+        "label": "Rules",
+        "path": "/ai/settings/rules/*",
+        "page": "ai_rules",
+        "icon": "ai-rule",
+        "role": "Admin"
       }
     ]
   },

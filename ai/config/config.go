@@ -97,6 +97,11 @@ type Config struct {
 	// designed for observability fault diagnosis: the model produces [DEEP THINKING] analysis
 	// before each [ACTION] decision, enabling more deliberate root-cause reasoning.
 	AgentMode AgentMode `env:"AGENT_MODE" toml:"agent-mode"`
+
+	// RuleRefreshInterval is how often the DB-backed rule engine reloads its in-memory
+	// cache from the agent_rules table. A non-positive value disables periodic refresh
+	// (writes still trigger an immediate refresh). Default: 30s.
+	RuleRefreshInterval ltoml.Duration `env:"RULE_REFRESH_INTERVAL" toml:"rule-refresh-interval"`
 }
 
 // NewDefaultConfig returns a Config with conservative, safe defaults.
@@ -123,6 +128,7 @@ func NewDefaultConfig() *Config {
 		EnableMultiTurnContext: true,
 		MaxContextWindowSize:   50,
 		AgentMode:              AgentModeReact,
+		RuleRefreshInterval:    ltoml.Duration(30 * time.Second),
 	}
 }
 
@@ -188,7 +194,11 @@ max-context-window-size = %d
 ## Agent execution strategy. Options: "react" (default), "deep-react"
 ## deep-react mode produces structured [DEEP THINKING]/[ACTION] output for observability fault diagnosis.
 ## Env: LINSIGHT_AI_AGENT_MODE
-agent-mode = "%s"`,
+agent-mode = "%s"
+
+## How often the DB-backed rule engine reloads its in-memory cache. Default: %s
+## Env: LINSIGHT_AI_RULE_REFRESH_INTERVAL
+rule-refresh-interval = "%s"`,
 		c.Enabled, c.Enabled,
 		c.MaxStep, c.MaxStep,
 		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
@@ -204,6 +214,7 @@ agent-mode = "%s"`,
 		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
 		c.MaxContextWindowSize, c.MaxContextWindowSize,
 		escapeTOMLString(string(c.AgentMode)),
+		c.RuleRefreshInterval.Duration().String(), c.RuleRefreshInterval.Duration().String(),
 	)
 }
 

@@ -65,6 +65,39 @@ func buildLanguageAlignModifier() react.MessageModifier {
 	}
 }
 
+// rulesInjectionHeader precedes injected rule text inside the system message so the
+// model can distinguish operator-defined rules from the base persona prompt.
+const rulesInjectionHeader = "\n\n# Global Rules\nThe following rules are configured by the operator and MUST be strictly followed:\n\n"
+
+// injectRulesIntoSystem returns a NEW message slice with rulesText appended to the
+// system message (or a new system message prepended if none exists). It performs a
+// copy-on-write so the caller's `messages` slice — which is reused across deep-mode
+// graph iterations — is never mutated; otherwise rule blocks would stack up on every
+// loop. Mirrors buildLanguageAlignModifier's copy-on-write approach.
+func injectRulesIntoSystem(messages []*schema.Message, rulesText string) []*schema.Message {
+	if rulesText == "" {
+		return messages
+	}
+	for i, msg := range messages {
+		if msg.Role != schema.System {
+			continue
+		}
+		updated := *msg
+		updated.Content += rulesInjectionHeader + rulesText
+		out := make([]*schema.Message, len(messages))
+		copy(out, messages)
+		out[i] = &updated
+		return out
+	}
+	// No system message present; prepend one carrying just the rules.
+	out := make([]*schema.Message, 0, len(messages)+1)
+	out = append(out, &schema.Message{
+		Role:    schema.System,
+		Content: strings.TrimPrefix(rulesInjectionHeader, "\n\n") + rulesText,
+	})
+	return append(out, messages...)
+}
+
 // titleFallback truncates msg to 40 runes as a best-effort conversation title.
 func titleFallback(msg string) string {
 	const maxRunes = 40

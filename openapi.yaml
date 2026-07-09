@@ -2951,6 +2951,128 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/ai/settings/rules:
+    get:
+      tags: [AISettings]
+      summary: List agent rules visible to the org (global rules + own-org rules)
+      responses:
+        '200':
+          description: Global rules plus the caller org's rules
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentRule'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AISettings]
+      summary: Create an agent rule
+      description: >
+        Creates a DB-backed rule injected into the LLM context. Content is a full
+        Markdown document whose optional YAML frontmatter carries trigger_tools /
+        trigger_keywords / variables. Creating a global rule (isGlobal=true) requires
+        super admin (RoleLin); regular org admins may only create own-org rules.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleRequest'
+      responses:
+        '200':
+          description: UID of the created rule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/ai/settings/rules/{uid}:
+    get:
+      tags: [AISettings]
+      summary: Get a single agent rule by UID
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRule'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AISettings]
+      summary: Update an agent rule
+      description: >
+        Editing a global rule requires super admin (RoleLin). Per-org rules are scoped
+        to the caller's org. Note: isGlobal is ignored on update — a rule's scope is
+        immutable after creation.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuleRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [AISettings]
+      summary: Delete an agent rule
+      description: >
+        Deleting a global rule requires super admin (RoleLin). Per-org rules are scoped
+        to the caller's org.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
 # ─── Components ──────────────────────────────────────────────────────────────
 components:
   securitySchemes:
@@ -4855,4 +4977,52 @@ components:
         args:
           type: string
         enabled:
+          type: boolean
+
+    AgentRule:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            orgId:
+              type: integer
+              format: int64
+              description: 0 for a global rule; a positive value scopes it to that org.
+            isGlobal:
+              type: boolean
+              description: True when the rule applies to all orgs (orgId=0).
+            ruleName:
+              type: string
+              description: Unique rule name within its scope.
+            content:
+              type: string
+              description: >
+                Full Markdown rule body. An optional leading YAML frontmatter block
+                (trigger_tools / trigger_keywords / variables) drives dynamic clipping;
+                it is stored verbatim and parsed only by the runtime rule engine.
+            priority:
+              type: integer
+              description: Injection/display order when multiple rules match (asc).
+            isEnabled:
+              type: boolean
+
+    RuleRequest:
+      type: object
+      required: [ruleName, content]
+      properties:
+        ruleName:
+          type: string
+        content:
+          type: string
+          description: >
+            Full Markdown rule body with optional YAML frontmatter carrying
+            trigger_tools / trigger_keywords / variables.
+        isGlobal:
+          type: boolean
+          description: Create/edit a global rule. Requires super admin (RoleLin).
+        priority:
+          type: integer
+        isEnabled:
           type: boolean
