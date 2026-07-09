@@ -58,6 +58,12 @@ type pluginManager interface {
 	GetPlugin(datasource *model.Datasource) (plugin.DatasourcePlugin, error)
 }
 
+// alertRuleCreator is the minimal AlertRuleService surface that the create-alert-rule
+// tool requires. Defined locally to avoid an import cycle with the service package.
+type alertRuleCreator interface {
+	CreateAlertRule(ctx context.Context, req *model.CreateAlertRuleRequest) (string, error)
+}
+
 // BuiltinToolsFactory provides the built-in observability tools.
 // Unlike MCPToolsFactory the tool set is the same for all orgs, so the
 // tools slice is built once at construction time.
@@ -73,11 +79,13 @@ func NewBuiltinToolsFactory(
 	datasourceSrv datasourceReader,
 	dashboardSrv dashboardSearcher,
 	datasourceMgr pluginManager,
+	alertRuleSrv alertRuleCreator,
 ) (*BuiltinToolsFactory, error) {
 	deps := BuiltinDeps{
 		DatasourceSrv: datasourceSrv,
 		DashboardSrv:  dashboardSrv,
 		DatasourceMgr: datasourceMgr,
+		AlertRuleSrv:  alertRuleSrv,
 	}
 	tools := make([]tool.BaseTool, 0, len(builtinRegistry))
 	for _, ctor := range builtinRegistry {

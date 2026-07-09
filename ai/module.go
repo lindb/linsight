@@ -50,6 +50,8 @@ type ObservabilityDeps struct {
 	DatasourceSrv servicepkg.DatasourceService
 	DashboardSrv  servicepkg.DashboardService
 	DatasourceMgr datasourcepkg.Manager
+	// AlertRuleSrv backs the linsight_create_alert_rule tool (approval-gated).
+	AlertRuleSrv servicepkg.AlertRuleService
 }
 
 // aiModule holds the domain handlers wired up during Bootstrap.
@@ -71,6 +73,7 @@ var builtinSkillNames = []string{
 	"linsight_list_datasources",
 	"linsight_datasource_query",
 	"linsight_search_dashboards",
+	"linsight_create_alert_rule",
 }
 
 // Bootstrap wires up all agent services, runs DB migrations, and registers the
@@ -95,6 +98,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		&agentmodel.ConversationSkill{},
 		&agentmodel.MessageFeedback{},
 		&agentmodel.Event{},
+		&agentmodel.InterruptRecord{},
 	); err != nil {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
 	}
@@ -121,6 +125,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		obsDeps.DatasourceSrv,
 		obsDeps.DashboardSrv,
 		obsDeps.DatasourceMgr,
+		obsDeps.AlertRuleSrv,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to build builtin tools: %v", err))

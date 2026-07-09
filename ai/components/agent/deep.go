@@ -31,12 +31,14 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
+	"github.com/lindb/linsight/ai/agui"
 	aievent "github.com/lindb/linsight/ai/components/event"
 	"github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	agentconfig "github.com/lindb/linsight/ai/config"
+	agentmodel "github.com/lindb/linsight/ai/model"
 	agentservice "github.com/lindb/linsight/ai/service"
 	"github.com/lindb/linsight/pkg/uuid"
 )
@@ -52,10 +54,68 @@ const (
 )
 
 // deepAgentState is the per-run mutable state threaded through the graph via compose.ProcessState.
-// IsFinished signals that the LLM produced "Conclusion: [FINISHED]" and the graph should stop.
 // Using a pointer (*deepAgentState) as the type parameter ensures mutations propagate across nodes.
 type deepAgentState struct {
+	// IsFinished is true when the LLM produced "Conclusion: [FINISHED]" (RCA path) or a
+	// text-only response with no tool calls; decideBranch then terminates the graph.
 	IsFinished bool
+	// GoToThinking is set by the rejection branch (processResumeDecision) so decideBranch
+	// routes back to "thinking" for another LLM call instead of going to END.
+	GoToThinking bool
+	// InterruptIssued is set when processInterrupt fires so decideBranch routes to END
+	// (the run terminates immediately; the client must send a resume request).
+	InterruptIssued bool
+}
+
+// toolNeedsApproval checks ToolInfo.Extra for _gov_need_approval=true.
+// Returns false if extra is nil, the key is absent, or the value is not a bool.
+func toolNeedsApproval(extra map[string]any) bool {
+	if extra == nil {
+		return false
+	}
+	v, ok := extra["_gov_need_approval"]
+	if !ok {
+		return false
+	}
+	b, ok := v.(bool)
+	return ok && b
+}
+
+// getToolPublicExtra returns a shallow copy of extra with all _gov_* keys stripped.
+// This prevents governance metadata from leaking to SSE frames or DB rows visible
+// to the frontend. Returns nil if the result would be empty.
+func getToolPublicExtra(extra map[string]any) map[string]any {
+	if len(extra) == 0 {
+		return extra
+	}
+	result := make(map[string]any, len(extra))
+	for k, v := range extra {
+		if !strings.HasPrefix(k, "_gov_") {
+			result[k] = v
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+// parseDeepToolResult unwraps a ToolCallResult envelope (if present) and injects
+// raw_data into extra for rich frontend rendering (e.g. DataQueryView table).
+func parseDeepToolResult(result string) (llmContent string, extra map[string]any) {
+	if tcr, ok := toolscomp.ParseToolCallResult(result); ok {
+		llmContent = string(tcr.Data)
+		extra = tcr.Extra
+		if extra == nil {
+			extra = make(map[string]any)
+		}
+		var rawData json.RawMessage
+		if json.Unmarshal(tcr.Data, &rawData) == nil {
+			extra["raw_data"] = rawData
+		}
+		return llmContent, extra
+	}
+	return result, nil
 }
 
 // createThinkingNode builds the first Lambda in the deep graph.
@@ -65,10 +125,13 @@ func createThinkingNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
 		rt := ctx.Value(deepCtxChatRun).(*chatRun)
 
-		// Reset IsFinished for this new iteration so a previous "FINISHED" cannot block
-		// future iterations if the graph re-enters thinking after tool execution.
+		// Reset per-iteration flags so stale values from a previous loop cannot
+		// short-circuit or repeat special-case logic (e.g. a prior "FINISHED", or the
+		// GoToThinking set by a rejection branch that already looped back here).
 		if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
 			s.IsFinished = false
+			s.GoToThinking = false
+			s.InterruptIssued = false
 			return nil
 		}); err != nil {
 			return nil, fmt.Errorf("thinking: reset state: %w", err)
@@ -92,6 +155,16 @@ func createThinkingNode() *compose.Lambda {
 func createExecutionNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
 		rt := ctx.Value(deepCtxChatRun).(*chatRun)
+
+		// Resume first pass: skip the LLM entirely. On a resume run the ToolCalls were
+		// already produced by the LLM in run 1 and are reconstructed from pendingInterrupt
+		// by the interruptCheck node; calling the LLM again would discard the user's
+		// approval decision. Subsequent thinking iterations (e.g. after a rejection loops
+		// back) fall through and call the LLM normally.
+		if rt.isResume && !rt.resumeConsumed {
+			rt.resumeConsumed = true
+			return messages, nil
+		}
 
 		// Collect tool schemas for per-request binding so the LLM knows available tools.
 		toolInfos := make([]*schema.ToolInfo, 0, len(rt.orgTools))
@@ -205,9 +278,221 @@ func createExecutionNode() *compose.Lambda {
 	})
 }
 
+// processInterrupt handles the interrupt case: one or more tool calls need approval and
+// AutoApprove is false. It maps to the AG-UI timeline moment "agent pauses, emits
+// RUN_FINISHED(outcome=interrupt)". For each pending tool call it emits TOOL_CALL_START
+// SSE and persists the tool_call DB row (so the frontend can render the approval card),
+// then persists the assistant message, closes the step, saves an InterruptRecord, and
+// sets InterruptIssued=true so decideBranch routes to END.
+func processInterrupt(ctx context.Context, messages []*schema.Message, rt *chatRun) ([]*schema.Message, error) {
+	lastMsg := messages[len(messages)-1]
+	pendingCalls := make([]agui.PendingToolCall, 0, len(lastMsg.ToolCalls))
+
+	for _, tc := range lastMsg.ToolCalls {
+		rawExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
+		publicExtra := getToolPublicExtra(rawExtra)
+
+		// Emit TOOL_CALL_START SSE + persist tool_call DB row so the frontend can
+		// render the approval card with the correct tool name and arguments.
+		toolEvt := aievent.NewToolCallEvent(
+			tc.ID, tc.Function.Name,
+			rt.assistantMsgUID, rt.currentStepID,
+			rt.writer, rt.agent.convSrv, rt.convCtx,
+		)
+		toolEvt.OnStart(ctx, tc.Function.Arguments, publicExtra)
+
+		var cardType string
+		if rawExtra != nil {
+			if ct, ok := rawExtra["_gov_card_type"]; ok {
+				cardType, _ = ct.(string)
+			}
+		}
+		pendingCalls = append(pendingCalls, agui.PendingToolCall{
+			ID:        tc.ID,
+			Name:      tc.Function.Name,
+			Arguments: tc.Function.Arguments,
+			CardType:  cardType,
+		})
+	}
+
+	// Persist the assistant message before closing the step so the tool_call rows
+	// written above always have a parent in the event table.
+	rt.assistantEvt.Persist(ctx, rt.currentStepID)
+	rt.currentStepEvt.OnFinish(ctx)
+
+	// Serialize the full []schema.ToolCall for later resume (args may be edited by user).
+	pendingJSON, err := json.Marshal(lastMsg.ToolCalls)
+	if err != nil {
+		return nil, fmt.Errorf("interrupt: marshal tool calls: %w", err)
+	}
+
+	interruptUID := uuid.GenerateShortUUID()
+	payload := &agui.InterruptPayload{
+		InterruptID: interruptUID,
+		ToolCalls:   pendingCalls,
+	}
+	// Persist the client-facing payload verbatim (including per-tool CardType, which is
+	// stripped from the events table) so history replay can reproduce the interrupt frame
+	// without access to the tool registry. Status is refreshed from the record on replay.
+	clientPayloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("interrupt: marshal client payload: %w", err)
+	}
+
+	rec := &agentmodel.InterruptRecord{
+		UID:              interruptUID,
+		ConvUID:          rt.conv.UID,
+		ConvID:           rt.conv.ID,
+		OrgID:            rt.orgID,
+		UserID:           rt.userID,
+		OrigRunID:        rt.runID,
+		Status:           agentmodel.InterruptStatusPending,
+		PendingToolCalls: json.RawMessage(pendingJSON),
+		ClientPayload:    json.RawMessage(clientPayloadJSON),
+		AssistantMsgUID:  rt.assistantMsgUID,
+		StepID:           rt.currentStepID,
+	}
+	rec.CreatedBy = rt.userID
+	rec.UpdatedBy = rt.userID
+	if err := rt.agent.convSrv.SaveInterruptRecord(ctx, rec); err != nil {
+		return nil, fmt.Errorf("interrupt: save record: %w", err)
+	}
+
+	rt.interruptPayload = payload
+	rt.interruptHandled = true
+
+	if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
+		s.InterruptIssued = true
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("interrupt: set state: %w", err)
+	}
+	return messages, nil
+}
+
+// processResumeDecision handles a resume request. It maps to the AG-UI timeline moment
+// "client sends resume payload with approved/editedArgs".
+//   - Rejection: append a rejection tool message per pending TC, emit TOOL_CALL_RESULT(error),
+//     close the step, mark the record rejected, and set GoToThinking so the graph loops
+//     back to the LLM for an apology/alternative.
+//   - Approval: apply optional editedArgs overrides and stage the resolved []schema.ToolCall
+//     in rt.pendingToolCallsToExecute for the tools node.
+func processResumeDecision(ctx context.Context, messages []*schema.Message, rt *chatRun) ([]*schema.Message, error) {
+	rt.resumeHandled = true
+	ir := rt.pendingInterrupt
+
+	var pendingTCs []schema.ToolCall
+	if err := json.Unmarshal(ir.PendingToolCalls, &pendingTCs); err != nil {
+		return nil, fmt.Errorf("resume: unmarshal pending tool calls: %w", err)
+	}
+
+	resume := rt.req.Resume
+
+	if !resume.Approved {
+		// Rejection: emit error TOOL_CALL_RESULT for each TC (no OnStart — run 1's
+		// processInterrupt already emitted TOOL_CALL_START + persisted the tool_call DB row).
+		rejectionErr := errors.New("user rejected the tool invocation")
+		for _, tc := range pendingTCs {
+			toolEvt := aievent.NewToolCallEvent(
+				tc.ID, tc.Function.Name,
+				ir.AssistantMsgUID, ir.StepID,
+				rt.writer, rt.agent.convSrv, rt.convCtx,
+			)
+			toolEvt.OnError(ctx, rejectionErr)
+			messages = append(messages, &schema.Message{
+				Role:       schema.Tool,
+				Content:    rejectionErr.Error(),
+				ToolCallID: tc.ID,
+				ToolName:   tc.Function.Name,
+			})
+		}
+		rt.currentStepEvt.OnFinish(ctx)
+
+		if err := rt.agent.convSrv.UpdateInterruptStatus(ctx, ir.UID,
+			agentmodel.InterruptStatusRejected, resume.Comment); err != nil {
+			agentLog.Warn("resume: failed to update interrupt status to rejected", logger.Error(err))
+		}
+
+		if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
+			s.GoToThinking = true
+			return nil
+		}); err != nil {
+			return nil, fmt.Errorf("resume: set GoToThinking: %w", err)
+		}
+		return messages, nil
+	}
+
+	// Approval: apply any per-tool argument overrides the user submitted.
+	toolCalls := make([]schema.ToolCall, len(pendingTCs))
+	copy(toolCalls, pendingTCs)
+	if len(resume.EditedArgs) > 0 {
+		for i := range toolCalls {
+			if overrideRaw, ok := resume.EditedArgs[toolCalls[i].ID]; ok {
+				overrideBytes, err := json.Marshal(overrideRaw)
+				if err != nil {
+					return nil, fmt.Errorf("resume: marshal edited args for %s: %w", toolCalls[i].ID, err)
+				}
+				toolCalls[i].Function.Arguments = string(overrideBytes)
+			}
+		}
+	}
+	rt.pendingToolCallsToExecute = toolCalls
+
+	if err := rt.agent.convSrv.UpdateInterruptStatus(ctx, ir.UID,
+		agentmodel.InterruptStatusApproved, resume.Comment); err != nil {
+		agentLog.Warn("resume: failed to update interrupt status to approved", logger.Error(err))
+	}
+	return messages, nil
+}
+
+// createInterruptCheckNode implements the four-case governance gate that sits between
+// the execution (LLM) node and the tools node. Each case maps to an AG-UI timeline moment:
+//
+//   - Case A (text-only / FINISHED): no ToolCalls on last message → pass through → decideBranch ends the run
+//   - Case B (resume): pending interrupt from a previous run → processResumeDecision (approve/reject)
+//   - Case C (normal, no approval needed): ToolCalls present and none flagged _gov_need_approval → pass to tools
+//   - Case D (interrupt): ToolCalls present, at least one _gov_need_approval=true, AutoApprove=false → processInterrupt
+func createInterruptCheckNode() *compose.Lambda {
+	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
+		rt := ctx.Value(deepCtxChatRun).(*chatRun)
+
+		// Case A: LLM produced a text-only response — nothing to gate.
+		if len(messages) == 0 {
+			return messages, nil
+		}
+		lastMsg := messages[len(messages)-1]
+		if lastMsg.Role != schema.Assistant || len(lastMsg.ToolCalls) == 0 {
+			return messages, nil
+		}
+
+		// Case B: this is a resume run and we have not yet consumed the interrupt decision.
+		if rt.isResume && !rt.resumeHandled && rt.pendingInterrupt != nil {
+			return processResumeDecision(ctx, messages, rt)
+		}
+
+		// Cases C & D: fresh ToolCalls. If ANY tool needs approval and AutoApprove is
+		// false, trigger the interrupt (Case D); otherwise fall through to tools (Case C).
+		if !rt.req.AutoApprove {
+			for _, tc := range lastMsg.ToolCalls {
+				rawExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
+				if toolNeedsApproval(rawExtra) {
+					return processInterrupt(ctx, messages, rt)
+				}
+			}
+		}
+
+		// Case C: all tools are pre-approved; let the tools node execute normally.
+		return messages, nil
+	})
+}
+
 // createToolsNode builds the tool-execution Lambda.
 // It runs each tool call from the last assistant message, emits TOOL_CALL_* SSE events,
 // appends tool result messages, and closes the current step when done.
+//
+// On an approved resume run the ToolCalls come from rt.pendingToolCallsToExecute (possibly
+// carrying user-edited arguments) and OnStart is skipped, because run 1's processInterrupt
+// already emitted TOOL_CALL_START + persisted the tool_call DB row.
 func createToolsNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
 		rt := ctx.Value(deepCtxChatRun).(*chatRun)
@@ -230,15 +515,41 @@ func createToolsNode() *compose.Lambda {
 			toolMap[info.Name] = it
 		}
 
-		lastMsg := messages[len(messages)-1]
-		for _, tc := range lastMsg.ToolCalls {
+		// Determine which tool calls to execute and whether to skip OnStart.
+		// Approved resume: use pendingToolCallsToExecute (args may have been edited) and
+		// skip OnStart because run 1's processInterrupt already emitted TOOL_CALL_START.
+		isResumeApproved := rt.isResume && len(rt.pendingToolCallsToExecute) > 0
+		var toolCalls []schema.ToolCall
+		if isResumeApproved {
+			toolCalls = rt.pendingToolCallsToExecute
+		} else {
+			lastMsg := messages[len(messages)-1]
+			toolCalls = lastMsg.ToolCalls
+		}
+
+		// parentMsgUID / stepID link tool_result events to their parent assistant message
+		// and step. On resume, reuse the UIDs from the original interrupted run.
+		parentMsgUID := rt.assistantMsgUID
+		stepID := rt.currentStepID
+		if isResumeApproved && rt.pendingInterrupt != nil {
+			parentMsgUID = rt.pendingInterrupt.AssistantMsgUID
+			stepID = rt.pendingInterrupt.StepID
+		}
+
+		for _, tc := range toolCalls {
 			toolEvt := aievent.NewToolCallEvent(
 				tc.ID, tc.Function.Name,
-				rt.assistantMsgUID, rt.currentStepID,
+				parentMsgUID, stepID,
 				rt.writer, rt.agent.convSrv, rt.convCtx,
 			)
-			staticExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
-			toolEvt.OnStart(ctx, tc.Function.Arguments, staticExtra)
+
+			if !isResumeApproved {
+				// Normal execution path: emit TOOL_CALL_START + persist tool_call DB row.
+				staticExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
+				publicExtra := getToolPublicExtra(staticExtra)
+				toolEvt.OnStart(ctx, tc.Function.Arguments, publicExtra)
+			}
+			// Resume+approved: run 1's processInterrupt already called OnStart.
 
 			it, ok := toolMap[tc.Function.Name]
 			if !ok {
@@ -263,21 +574,7 @@ func createToolsNode() *compose.Lambda {
 					ToolName:   tc.Function.Name,
 				})
 			} else {
-				llmContent := result
-				var extra map[string]any
-				if tcr, ok := toolscomp.ParseToolCallResult(result); ok {
-					llmContent = string(tcr.Data)
-					extra = tcr.Extra
-					// Mirror ReAct callback.go OnEnd: inject raw_data so the frontend
-					// can render rich components (e.g. DataQueryView table) in deep mode.
-					if extra == nil {
-						extra = make(map[string]any)
-					}
-					var rawData json.RawMessage
-					if json.Unmarshal(tcr.Data, &rawData) == nil {
-						extra["raw_data"] = rawData
-					}
-				}
+				llmContent, extra := parseDeepToolResult(result)
 				toolEvt.OnEnd(ctx, llmContent, extra)
 				messages = append(messages, &schema.Message{
 					Role:       schema.Tool,
@@ -290,36 +587,86 @@ func createToolsNode() *compose.Lambda {
 
 		// All tools in this iteration are done; close the step.
 		rt.currentStepEvt.OnFinish(ctx)
+
+		// Clear the resume tool calls so subsequent loop iterations use the normal path.
+		rt.pendingToolCallsToExecute = nil
 		return messages, nil
 	})
 }
 
-// decideBranch routes to "tools" if the last message carries tool calls, or to
-// compose.END when the model has finished (IsFinished=true) or produced a text-only response.
+// decideBranch routes after the interruptCheck node:
+//   - compose.END  when InterruptIssued=true (run halted for human approval)
+//   - compose.END  when IsFinished=true (RCA "FINISHED" or text-only response)
+//   - "thinking"   when GoToThinking=true (rejection → loop back to the LLM)
+//   - "tools"      when rt.pendingToolCallsToExecute is non-empty (approved resume)
+//   - "tools"      when the last message carries ToolCalls (normal execution, Case C)
+//   - compose.END  otherwise
 func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
-	var isFinished bool
+	var state deepAgentState
 	if err := compose.ProcessState[*deepAgentState](ctx, func(_ context.Context, s *deepAgentState) error {
-		isFinished = s.IsFinished
+		state = *s
 		return nil
 	}); err != nil {
 		return "", fmt.Errorf("decideBranch: read state: %w", err)
 	}
-	if isFinished {
+
+	if state.InterruptIssued {
 		return compose.END, nil
 	}
-	if len(msgs) == 0 {
+	if state.IsFinished {
 		return compose.END, nil
 	}
-	lastMsg := msgs[len(msgs)-1]
-	if lastMsg.Role == schema.Assistant && len(lastMsg.ToolCalls) > 0 {
+	if state.GoToThinking {
+		return "thinking", nil
+	}
+
+	rt := ctx.Value(deepCtxChatRun).(*chatRun)
+	if len(rt.pendingToolCallsToExecute) > 0 {
 		return "tools", nil
+	}
+
+	if len(msgs) > 0 {
+		lastMsg := msgs[len(msgs)-1]
+		if lastMsg.Role == schema.Assistant && len(lastMsg.ToolCalls) > 0 {
+			return "tools", nil
+		}
 	}
 	return compose.END, nil
 }
 
-// buildDeepGraph compiles the explicit three-node Lambda graph for deep mode.
-// The graph topology is: START → thinking → execution → [branch] → tools → thinking (loop).
-// MaxRunSteps is multiplied by 3 because each full iteration consumes three steps.
+// buildDeepGraph compiles the explicit four-node Lambda graph for deep mode.
+// The interruptCheck node implements AG-UI tool-bound interrupts (human-in-the-loop approval).
+// MaxRunSteps is multiplied by 4 because each full iteration consumes four steps.
+//
+// Graph topology (nodes = Lambda; [branch] = decideBranch conditional edge):
+//
+//	          ┌─────────────────────────── tools ◀────────────┐ (Case C / approved resume)
+//	          │                              │                 │
+//	          ▼                              ▼                 │
+//	START → thinking → execution → interruptCheck → [branch] ──┤
+//	          ▲                                                 │
+//	          └──────────────── thinking ◀──────────────────── │ (GoToThinking: rejected resume)
+//	                                                            │
+//	                                                    END ◀───┘ (IsFinished / InterruptIssued)
+//
+// Node roles and their AG-UI timeline mapping:
+//
+//	thinking       — opens a STEP; resets per-iteration state flags.
+//	execution      — streams the LLM (REASONING_* / TEXT_MESSAGE_*); on a resume first
+//	                 pass it skips the LLM and reuses the ToolCalls from the interrupt.
+//	interruptCheck — the governance gate, one branch per AG-UI moment:
+//	                   Case A  text-only / "Conclusion: [FINISHED]"  → pass through → END
+//	                   Case B  resume payload (approve / reject)      → processResumeDecision
+//	                   Case C  tool calls, none need approval         → pass through → tools
+//	                   Case D  tool call needs approval, no auto-ok   → processInterrupt
+//	                           (emits TOOL_CALL_START + RUN_FINISHED[outcome=interrupt], halts)
+//	tools          — executes tool calls (TOOL_CALL_RESULT), then loops back to thinking.
+//
+// decideBranch reads deepAgentState after interruptCheck and routes to one of:
+//
+//	END       InterruptIssued=true (Case D) | IsFinished=true (Case A)
+//	thinking  GoToThinking=true (rejected resume → LLM apologises / re-plans)
+//	tools     approved resume (pendingToolCallsToExecute) | Case C (fresh tool calls)
 func buildDeepGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message, []*schema.Message], error) {
 	g := compose.NewGraph[[]*schema.Message, []*schema.Message](
 		compose.WithGenLocalState(func(_ context.Context) *deepAgentState {
@@ -333,6 +680,9 @@ func buildDeepGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message
 	if err := g.AddLambdaNode("execution", createExecutionNode()); err != nil {
 		return nil, fmt.Errorf("add execution node: %w", err)
 	}
+	if err := g.AddLambdaNode("interruptCheck", createInterruptCheckNode()); err != nil {
+		return nil, fmt.Errorf("add interruptCheck node: %w", err)
+	}
 	if err := g.AddLambdaNode("tools", createToolsNode()); err != nil {
 		return nil, fmt.Errorf("add tools node: %w", err)
 	}
@@ -343,22 +693,26 @@ func buildDeepGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message
 	if err := g.AddEdge("thinking", "execution"); err != nil {
 		return nil, fmt.Errorf("add edge thinking→execution: %w", err)
 	}
+	if err := g.AddEdge("execution", "interruptCheck"); err != nil {
+		return nil, fmt.Errorf("add edge execution→interruptCheck: %w", err)
+	}
 
 	branch := compose.NewGraphBranch(decideBranch, map[string]bool{
 		"tools":     true,
+		"thinking":  true,
 		compose.END: true,
 	})
-	if err := g.AddBranch("execution", branch); err != nil {
-		return nil, fmt.Errorf("add branch execution→tools/END: %w", err)
+	if err := g.AddBranch("interruptCheck", branch); err != nil {
+		return nil, fmt.Errorf("add branch interruptCheck→tools/thinking/END: %w", err)
 	}
 
 	if err := g.AddEdge("tools", "thinking"); err != nil {
 		return nil, fmt.Errorf("add edge tools→thinking: %w", err)
 	}
 
-	maxSteps := cfg.MaxStep * 3
+	maxSteps := cfg.MaxStep * 4
 	if maxSteps <= 0 {
-		maxSteps = 36 // defensive default: 12 iterations × 3 nodes
+		maxSteps = 48 // defensive default: 12 iterations × 4 nodes
 	}
 	return g.Compile(context.Background(), compose.WithMaxRunSteps(maxSteps))
 }

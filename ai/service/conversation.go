@@ -64,6 +64,23 @@ type ConversationService interface {
 	// Reasoning and step events are excluded at the query level so callers never need to
 	// filter them. Error-status rows are also excluded.
 	GetRecentEvents(ctx context.Context, convUID string, limit int) ([]*agentmodel.Event, error)
+	// GetMaxEventSequence returns the highest sequence number among events already persisted
+	// for the given (convUID, runID). Returns 0 when the run has no events yet. Used by a
+	// resume run that reuses the interrupted run's RunID to continue its monotonic sequence
+	// instead of restarting from 1.
+	GetMaxEventSequence(ctx context.Context, convUID, runID string) (int, error)
+
+	// Interrupt lifecycle methods — used by the general agent mode.
+
+	// SaveInterruptRecord persists a new interrupt record with status=pending.
+	// Called when the agent detects a tool with _gov_need_approval=true and AutoApprove is false.
+	SaveInterruptRecord(ctx context.Context, rec *agentmodel.InterruptRecord) error
+	// GetInterruptRecord loads an interrupt record by UID, enforcing org ownership.
+	// Returns an error if the record does not exist or belongs to a different org.
+	GetInterruptRecord(ctx context.Context, uid string) (*agentmodel.InterruptRecord, error)
+	// UpdateInterruptStatus transitions an interrupt record to approved, rejected, or expired.
+	// decision carries optional free-text from the reviewer.
+	UpdateInterruptStatus(ctx context.Context, uid string, status agentmodel.InterruptStatus, decision string) error
 }
 
 type conversationService struct {
@@ -143,6 +160,10 @@ func (s *conversationService) DeleteConversation(ctx context.Context, uid string
 		}
 		// Delete all feedback records for this conversation (no FK constraint assumed).
 		if err := tx.Delete(&agentmodel.MessageFeedback{}, "conversation_id = ?", conv.ID); err != nil {
+			return err
+		}
+		// Delete all interrupt records for this conversation (read by GetConversationEvents).
+		if err := tx.Delete(&agentmodel.InterruptRecord{}, "conv_uid = ?", conv.UID); err != nil {
 			return err
 		}
 		return tx.Delete(&agentmodel.Conversation{}, "id = ?", conv.ID)
@@ -419,13 +440,68 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 		return nil, err
 	}
 
-	// First pass: build run_id → assistant text messageUID map so tool_call rows can
-	// reference the correct parentMessageId when emitting TOOL_CALL_START.
+	// First pass: map assistant text rows so tool_call rows can reference the correct
+	// parentMessageId when emitting TOOL_CALL_START.
+	//
+	// Keyed primarily by step_id: a resume run reuses the interrupted run's run_id, so a
+	// single run can contain multiple assistant text rows (the interrupted turn plus the
+	// post-approval continuation, each in its own step). Keying by run_id alone would let the
+	// continuation's messageUID overwrite the interrupt step's, mis-pointing the interrupted
+	// tool calls. run_id remains as a fallback for pre-migration rows with an empty step_id.
+	assistantMsgByStep := make(map[string]string, len(rows))
 	assistantMsgByRun := make(map[string]string, len(rows))
 	for _, r := range rows {
 		if r.Type == agentmodel.EventTypeAssistantText {
+			if r.StepID != "" {
+				assistantMsgByStep[r.StepID] = r.MessageUID
+			}
 			assistantMsgByRun[r.RunID] = r.MessageUID
 		}
+	}
+
+	// Load interrupt records for this conversation so history replay can re-emit the
+	// RUN_FINISHED(outcome=interrupt) frame that live SSE produced. Keyed by StepID: the
+	// interrupt fires at the end of a specific model-call step, and a resume reuses that
+	// step's ID for the tool_result rows it writes. The frame is injected right before the
+	// first tool_result row of that step — i.e. after the step's tool_call + assistant_text +
+	// step_finished rows and before the (post-approval) tool_result rows — which reproduces
+	// the live timeline "…step_finished → interrupt card → tool results…". A pending interrupt
+	// has no tool_result rows yet, so its frame is appended by the tail fallback instead,
+	// ensuring a pending approval card is never silently dropped (which would block resume).
+	var interruptRecs []*agentmodel.InterruptRecord
+	if err := s.db.Find(&interruptRecs, "conv_uid = ?", conv.UID); err != nil {
+		return nil, err
+	}
+	interruptByStep := make(map[string]*agentmodel.InterruptRecord, len(interruptRecs))
+	for _, ir := range interruptRecs {
+		if ir.StepID != "" {
+			interruptByStep[ir.StepID] = ir
+		}
+	}
+	// injectedInterrupts tracks interrupt UIDs already emitted inline, so the tail fallback
+	// does not double-emit an interrupt whose tool_result boundary was inside the window.
+	injectedInterrupts := make(map[string]bool, len(interruptRecs))
+
+	// interruptEventFor builds the snapshot RUN_FINISHED(interrupt) event from a record.
+	// It reuses the persisted client payload verbatim (preserving per-tool CardType) and
+	// refreshes Status from the record so the frontend renders the card as pending or
+	// resolved. Returns false when the record predates the client_payload column.
+	interruptEventFor := func(ir *agentmodel.InterruptRecord) (agui.Event, bool) {
+		if len(ir.ClientPayload) == 0 {
+			return agui.Event{}, false
+		}
+		var payload agui.InterruptPayload
+		if err := json.Unmarshal(ir.ClientPayload, &payload); err != nil {
+			return agui.Event{}, false
+		}
+		payload.Status = string(ir.Status)
+		return agui.Event{
+			Type:            agui.RunFinished,
+			RunID:           ir.OrigRunID,
+			ConversationUID: ir.ConvUID,
+			Outcome:         agui.RunOutcomeInterrupt,
+			Interrupt:       &payload,
+		}, true
 	}
 
 	// Second pass: expand each DB row to one or more agui.Event values.
@@ -435,6 +511,20 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 	stepStack := make([]string, 0, 4)
 
 	for _, r := range rows {
+		// Inject the interrupt frame right before the FIRST tool_result row of the step it
+		// belongs to. On resume the tool_result rows reuse the interrupt's step_id and are
+		// written after the approval, so this reproduces the live order "step_finished →
+		// interrupt card → tool results". Guarded by injectedInterrupts so only the first
+		// tool_result of the step triggers it.
+		if r.Type == agentmodel.EventTypeToolResult && r.StepID != "" {
+			if ir, ok := interruptByStep[r.StepID]; ok && !injectedInterrupts[ir.UID] {
+				if evt, built := interruptEventFor(ir); built {
+					result = append(result, evt)
+				}
+				injectedInterrupts[ir.UID] = true
+			}
+		}
+
 		switch r.Type {
 		case agentmodel.EventTypeUserMessage:
 			// User messages are never streamed; use a single flat USER_MESSAGE event
@@ -470,7 +560,12 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 				continue
 			}
 			tc := sm.ToolCalls[0]
-			parentMsgUID := assistantMsgByRun[r.RunID]
+			// Prefer the assistant text from the SAME step; fall back to the run-level entry
+			// for pre-migration rows whose step_id is empty.
+			parentMsgUID := assistantMsgByStep[r.StepID]
+			if parentMsgUID == "" {
+				parentMsgUID = assistantMsgByRun[r.RunID]
+			}
 			// Read static tool metadata (icon/render_type) stored at call time for pre-rendering.
 			var extra map[string]any
 			if len(r.Extra) > 0 {
@@ -546,6 +641,22 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 			})
 		}
 	}
+
+	// Tail fallback: append any interrupt not injected inline. This covers a still-pending
+	// interrupt (no tool_result rows exist yet, so the inline hook never fired) and the case
+	// where the interrupt step's tool_result rows fall outside the loaded window (limit
+	// truncation). Without this a pending approval card would be silently dropped, blocking
+	// resume. Iteration order over interruptRecs is not significant here: at most one
+	// interrupt is typically unresolved, and resolved ones were already injected inline.
+	for _, ir := range interruptRecs {
+		if injectedInterrupts[ir.UID] {
+			continue
+		}
+		if evt, built := interruptEventFor(ir); built {
+			result = append(result, evt)
+			injectedInterrupts[ir.UID] = true
+		}
+	}
 	return result, nil
 }
 
@@ -570,4 +681,53 @@ func (s *conversationService) GetRecentEvents(ctx context.Context, convUID strin
 		evts[i], evts[j] = evts[j], evts[i]
 	}
 	return evts, nil
+}
+
+// GetMaxEventSequence returns the highest sequence number among events already persisted
+// for the given (convUID, runID), or 0 when none exist. A resume run reuses the interrupted
+// run's RunID and primes its sequence counter with this value so resumed events continue the
+// original run's monotonic ordering.
+func (s *conversationService) GetMaxEventSequence(_ context.Context, convUID, runID string) (int, error) {
+	var evts []*agentmodel.Event
+	if err := s.db.FindForPaging(&evts, 0, 1, "sequence desc",
+		"conv_uid = ? AND run_id = ?", convUID, runID); err != nil {
+		return 0, err
+	}
+	if len(evts) == 0 {
+		return 0, nil
+	}
+	return evts[0].Sequence, nil
+}
+
+// SaveInterruptRecord persists a new interrupt record with status=pending.
+func (s *conversationService) SaveInterruptRecord(_ context.Context, rec *agentmodel.InterruptRecord) error {
+	return s.db.Create(rec)
+}
+
+// GetInterruptRecord loads an interrupt record by UID, validating org ownership.
+// Returns an error if the record does not exist or belongs to a different org.
+func (s *conversationService) GetInterruptRecord(ctx context.Context, uid string) (*agentmodel.InterruptRecord, error) {
+	user := util.GetUser(ctx)
+	var rec agentmodel.InterruptRecord
+	if err := s.db.Get(&rec, "uid = ? AND org_id = ?", uid, user.Org.ID); err != nil {
+		return nil, err
+	}
+	return &rec, nil
+}
+
+// UpdateInterruptStatus transitions an interrupt record to the given status.
+// decision is stored in InterruptRecord.Decision for audit trail purposes.
+func (s *conversationService) UpdateInterruptStatus(ctx context.Context, uid string, status agentmodel.InterruptStatus, decision string) error {
+	user := util.GetUser(ctx)
+	return s.db.Transaction(func(tx dbpkg.DB) error {
+		if err := tx.UpdateSingle(&agentmodel.InterruptRecord{}, "status", string(status),
+			"uid = ? AND org_id = ?", uid, user.Org.ID); err != nil {
+			return err
+		}
+		if decision == "" {
+			return nil
+		}
+		return tx.UpdateSingle(&agentmodel.InterruptRecord{}, "decision", decision,
+			"uid = ? AND org_id = ?", uid, user.Org.ID)
+	})
 }

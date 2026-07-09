@@ -31,8 +31,31 @@ var ErrTooManyRequests = errors.New("too many concurrent requests for this org")
 // ChatRequest is the request body for POST /agent/chat and
 // POST /agent/conversations/:uid/chat.
 type ChatRequest struct {
-	// Content is the user's plain-text message.
-	Content string `json:"content" binding:"required"`
+	// Content is the user's plain-text message. Required on the initial turn;
+	// may be empty on resume turns (where Resume carries all the necessary state).
+	Content string `json:"content"`
+	// Resume carries the approval decision when the client resumes an interrupted run.
+	// Mutually exclusive with Content (service layer validates the combination).
+	Resume *ResumePayload `json:"resume,omitempty"`
+	// AutoApprove, when true, skips approval for tools that have _gov_need_approval=true
+	// in this single request only. Request-level (not conversation-level) so that each
+	// turn that bypasses governance is an explicit, auditable opt-in.
+	AutoApprove bool `json:"autoApprove,omitempty"`
+}
+
+// ResumePayload carries the client's decision for a previously interrupted run.
+// The client echoes back the interruptId it received in the RUN_FINISHED event.
+type ResumePayload struct {
+	// InterruptID is the server-generated UUID from InterruptPayload.InterruptID.
+	InterruptID string `json:"interruptId" binding:"required"`
+	// Approved is true if the user approved the pending tool invocations.
+	Approved bool `json:"approved"`
+	// EditedArgs is an optional map[toolCallID]json.RawMessage of edited arguments.
+	// When present, the agent will override the LLM-generated arguments with these values
+	// before executing the tool. Ignored when Approved is false.
+	EditedArgs map[string]any `json:"editedArgs,omitempty"`
+	// Comment is optional free-text from the reviewer (stored in InterruptRecord.Decision).
+	Comment string `json:"comment,omitempty"`
 }
 
 // SSEErrorCode categorises the error so clients can show actionable guidance

@@ -32,7 +32,15 @@ import (
 
 // buildLLMMessages assembles the []*schema.Message slice for the LLM from either the
 // MemoryStore (if enabled) or a direct DB history load.
-func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Conversation, _ string) ([]*schema.Message, error) {
+//
+// pendingToolCalls carries the tool calls of an unresolved interrupt on a resume run; it is
+// nil for ordinary turns. It is forwarded to SanitizeMessages, which re-appends them as the
+// trailing assistant message so the resume graph's Case-B guard always matches. Sanitization
+// is applied exactly once here (not inside assembleMessages / convertEventsToSchema) so the
+// pending calls are known at the single point where the invariant is enforced.
+func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Conversation,
+	pendingToolCalls []schema.ToolCall,
+) ([]*schema.Message, error) {
 	var messages []*schema.Message
 
 	if a.memoryStore != nil && a.cfg.EnableMultiTurnContext {
@@ -47,11 +55,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 			if histErr != nil {
 				return nil, fmt.Errorf("load history fallback: %w", histErr)
 			}
-			var assembleErr error
-			messages, assembleErr = a.assembleMessages(history)
-			if assembleErr != nil {
-				return nil, assembleErr
-			}
+			messages = a.assembleMessages(history)
 		} else {
 			agentLog.Info("memory: conversation state restored",
 				logger.String("conv.uid", conv.UID),
@@ -64,12 +68,21 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 		if histErr != nil {
 			return nil, fmt.Errorf("load history: %w", histErr)
 		}
-		var assembleErr error
-		messages, assembleErr = a.assembleMessages(history)
-		if assembleErr != nil {
-			return nil, assembleErr
-		}
+		messages = a.assembleMessages(history)
 	}
+
+	// Enforce the tool_call/tool_result pairing invariant exactly once, after the raw message
+	// list is assembled and the pending interrupt (if any) is known. This drops unanswered
+	// tool_calls / orphaned tool messages and re-appends the pending interrupt's tool_calls.
+	messages = memory.SanitizeMessages(conv.UID, messages, pendingToolCalls)
+
+	// Log the exact history context handed to the LLM so tool-call/result pairing problems
+	// (which surface as opaque 400 errors from the provider) can be diagnosed from logs alone.
+	agentLog.Info("prompt: history context assembled",
+		logger.String("conv.uid", conv.UID),
+		logger.Int("total_messages", len(messages)),
+		logger.Int("pending_tool_calls", len(pendingToolCalls)),
+		logger.String("summary", memory.SummarizeMessages(messages)))
 	return messages, nil
 }
 
@@ -77,32 +90,15 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 // RawMessage stores eino schema.Message JSON (snake_case keys), so direct
 // unmarshal to schema.Message is lossless — ToolCalls, ToolCallID, and ToolName
 // are preserved exactly.
-// GetRecentEvents already excludes reasoning, step, and error-status rows at query
-// level, so no additional filtering is needed here.
-func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) ([]*schema.Message, error) {
+// GetRecentEvents already excludes reasoning, step, and error-status rows at query level.
+// The tool_call/tool_result pairing invariant is enforced once by the caller
+// (buildLLMMessages via SanitizeMessages), not here.
+func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) []*schema.Message {
 	msgs := make([]*schema.Message, 0, len(history)+1)
 
 	systemPrompt := a.buildSystemPrompt()
 	if systemPrompt != "" {
 		msgs = append(msgs, &schema.Message{Role: schema.System, Content: systemPrompt})
-	}
-
-	// Collect all tool call_ids referenced by tool_call events so we can detect
-	// orphaned tool-result rows (those whose call_id has no matching parent).
-	knownCallIDs := make(map[string]bool)
-	for _, m := range history {
-		if m.Type != agentmodel.EventTypeToolCall {
-			continue
-		}
-		var sm schema.Message
-		if err := json.Unmarshal(m.RawMessage, &sm); err != nil {
-			continue
-		}
-		for _, tc := range sm.ToolCalls {
-			if tc.ID != "" {
-				knownCallIDs[tc.ID] = true
-			}
-		}
 	}
 
 	for _, m := range history {
@@ -115,19 +111,12 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) ([]*schema.
 				logger.Int64("id", m.ID), logger.Error(err))
 			continue
 		}
-		// Drop orphaned tool messages; sending them to the LLM causes an API validation
-		// error because their ToolCallID references a non-existent parent ToolCall.
-		if sm.Role == schema.Tool && !knownCallIDs[sm.ToolCallID] {
-			agentLog.Warn("skipping orphaned tool event",
-				logger.Int64("id", m.ID), logger.String("tool_call_id", sm.ToolCallID))
-			continue
-		}
 		// Strip reasoning_content: OpenAI-compatible APIs reject messages that carry
 		// reasoning tokens in history, returning a 400 validation error.
 		sm.ReasoningContent = ""
 		msgs = append(msgs, &sm)
 	}
-	return msgs, nil
+	return msgs
 }
 
 // buildMessagesWithMemoryState builds messages using MemoryStore conversation state.

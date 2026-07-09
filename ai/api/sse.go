@@ -36,6 +36,10 @@ type SSEWriter interface {
 	WriteRunStarted(runID, conversationUID string)
 	WriteRunFinished(runID, conversationUID, title string)
 	WriteRunError(runID string, code agui.ErrorCode, message string)
+	// WriteRunInterrupt signals that the agent paused for human approval.
+	// It sends a RUN_FINISHED frame with Outcome=interrupt and the interrupt payload
+	// so the frontend can render the approval card(s) and know which interruptId to echo back.
+	WriteRunInterrupt(runID, conversationUID string, payload *agui.InterruptPayload)
 
 	// Streaming text message
 	WriteTextMessageStart(messageID string, role schema.RoleType)
@@ -103,6 +107,16 @@ func (w *ginSSEWriter) WriteRunError(runID string, code agui.ErrorCode, message 
 		RunID:   runID,
 		Code:    string(code),
 		Message: message,
+	})
+}
+
+func (w *ginSSEWriter) WriteRunInterrupt(runID, conversationUID string, payload *agui.InterruptPayload) {
+	_ = w.writeEvent(agui.Event{
+		Type:            agui.RunFinished,
+		RunID:           runID,
+		ConversationUID: conversationUID,
+		Outcome:         agui.RunOutcomeInterrupt,
+		Interrupt:       payload,
 	})
 }
 

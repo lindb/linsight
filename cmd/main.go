@@ -32,11 +32,11 @@ import (
 	"gopkg.in/yaml.v3"
 
 	linsight "github.com/lindb/linsight"
+	aimodule "github.com/lindb/linsight/ai"
 	_ "github.com/lindb/linsight/alerting"
 	"github.com/lindb/linsight/alerting/manager"
 	"github.com/lindb/linsight/alerting/schedule"
 	alerttemplate "github.com/lindb/linsight/alerting/template"
-	aimodule "github.com/lindb/linsight/ai"
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
@@ -269,6 +269,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DatasourceSrv: datasourceSrv,
 		DashboardSrv:  dashboardSrv,
 		DatasourceMgr: datasourceMgr,
+		AlertRuleSrv:  service.NewAlertRuleService(db, alertRuleGroupSrv),
 	})
 
 	return &deps.API{

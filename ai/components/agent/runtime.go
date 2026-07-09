@@ -19,6 +19,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -33,6 +34,7 @@ import (
 	"github.com/lindb/common/pkg/logger"
 
 	agentapi "github.com/lindb/linsight/ai/api"
+	"github.com/lindb/linsight/ai/agui"
 	aievent "github.com/lindb/linsight/ai/components/event"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
@@ -89,6 +91,25 @@ type chatRun struct {
 	// pre-generated UIDs known before streaming begins
 	assistantMsgUID string
 	userMsgUID      string
+
+	// interrupt / resume state (general mode only)
+	// isResume is true when req.Resume != nil; set before run() enters the graph.
+	isResume bool
+	// resumeConsumed prevents the LLM-skip optimisation from firing on subsequent
+	// thinking iterations (e.g. after a rejection routes back to thinking).
+	resumeConsumed bool
+	// resumeHandled is set by processResumeDecision to prevent re-entry into Case B.
+	resumeHandled bool
+	// interruptHandled is set when processInterrupt issues an interrupt; tells
+	// finalize() to emit WriteRunInterrupt instead of WriteRunFinished.
+	interruptHandled bool
+	// pendingInterrupt holds the InterruptRecord loaded from DB on a resume run.
+	pendingInterrupt *agentmodel.InterruptRecord
+	// interruptPayload is built by processInterrupt and consumed by finalize().
+	interruptPayload *agui.InterruptPayload
+	// pendingToolCallsToExecute carries the approved (and possibly arg-edited)
+	// tool calls from processResumeDecision to createGeneralToolsNode.
+	pendingToolCallsToExecute []schema.ToolCall
 }
 
 // newChatRun allocates a chatRun for one conversation turn.
@@ -156,6 +177,31 @@ func (rt *chatRun) run() (retErr error) {
 	if err := rt.initConversation(); err != nil {
 		return err
 	}
+
+	// For resume runs, load and validate the interrupt record before emitting
+	// RUN_STARTED so the caller gets a clean error on invalid interrupt IDs.
+	if rt.req.Resume != nil {
+		ir, irErr := rt.agent.convSrv.GetInterruptRecord(rt.timeoutCtx, rt.req.Resume.InterruptID)
+		if irErr != nil {
+			return fmt.Errorf("load interrupt record: %w", irErr)
+		}
+		if ir.ConvUID != rt.conv.UID {
+			return fmt.Errorf("interrupt %q does not belong to conversation %q",
+				rt.req.Resume.InterruptID, rt.conv.UID)
+		}
+		rt.isResume = true
+		rt.pendingInterrupt = ir
+
+		// Reuse the interrupted run's RunID so the resumed events (tool results + the
+		// continuation text) are grouped into the SAME run as the original turn. The
+		// frontend groups bubbles by runId; a fresh RunID here would render the
+		// continuation as a brand-new conversation turn instead of an extension of the
+		// interrupted one. Must happen before WriteRunStarted and convCtx creation below.
+		if ir.OrigRunID != "" {
+			rt.runID = ir.OrigRunID
+		}
+	}
+
 	rt.writer.WriteRunStarted(rt.runID, rt.conv.UID)
 
 	// For new conversations: persist a fallback title when we exit with an error so
@@ -186,11 +232,27 @@ func (rt *chatRun) run() (retErr error) {
 		UserID:  rt.userID,
 		RunID:   rt.runID,
 	}
+	// Resume reuses the interrupted run's RunID; prime the sequence counter with that run's
+	// existing max sequence so resumed events continue its monotonic order instead of
+	// colliding from 1. Non-fatal: on error we fall back to 0 (the pre-existing behaviour).
+	if rt.isResume {
+		maxSeq, seqErr := rt.agent.convSrv.GetMaxEventSequence(rt.timeoutCtx, rt.conv.UID, rt.runID)
+		if seqErr != nil {
+			agentLog.Warn("resume: failed to load max event sequence, starting from 0",
+				logger.String("conv.uid", rt.conv.UID), logger.String("run.id", rt.runID),
+				logger.Error(seqErr))
+		} else {
+			rt.convCtx.SetSeq(maxSeq)
+		}
+	}
 	rt.toolEvts = make(map[string]*aievent.ToolCallEvent)
 	rt.assistantEvt = aievent.NewAssistantTextEvent(rt.assistantMsgUID, rt.writer, rt.agent.convSrv, rt.convCtx)
 
-	if err := rt.persistUserMessage(rt.timeoutCtx); err != nil {
-		return err
+	// Resume turns carry no new user content; skip persisting a user message.
+	if !rt.isResume {
+		if err := rt.persistUserMessage(rt.timeoutCtx); err != nil {
+			return err
+		}
 	}
 
 	messages, err := rt.buildContext()
@@ -226,7 +288,8 @@ func (rt *chatRun) run() (retErr error) {
 		}
 	}()
 
-	// Deep mode bypasses the ReAct graph and runs the explicit three-node Lambda graph.
+	// Deep mode runs the explicit four-node Lambda graph, which also handles
+	// AG-UI tool-bound interrupts and resume (human-in-the-loop approval).
 	if rt.agent.agentMode == agentconfig.AgentModeDeep {
 		if err := rt.executeDeepGraph(messages); err != nil {
 			return err
@@ -260,13 +323,34 @@ func (rt *chatRun) initConversation() error {
 }
 
 // buildContext loads conversation history and assembles the LLM message list.
+// On a resume run it forwards the pending interrupt's tool calls so the history assembler
+// can re-append them as the trailing assistant message (the resume graph relies on the last
+// message being an assistant-with-tool_calls).
 func (rt *chatRun) buildContext() ([]*schema.Message, error) {
-	messages, err := rt.agent.buildLLMMessages(rt.timeoutCtx, rt.conv, rt.req.Content)
+	pendingToolCalls := rt.pendingInterruptToolCalls()
+	messages, err := rt.agent.buildLLMMessages(rt.timeoutCtx, rt.conv, pendingToolCalls)
 	if err != nil {
 		agentLog.Error("failed to build LLM messages", logger.Error(err))
 		return nil, fmt.Errorf("build messages: %w", err)
 	}
 	return messages, nil
+}
+
+// pendingInterruptToolCalls returns the tool calls of the interrupt being resumed, or nil
+// when this is not a resume run. Unmarshal failures are logged and treated as "no pending
+// calls" so a corrupt record degrades to the ordinary sanitize path instead of aborting the
+// turn (the resume graph will then simply find nothing to execute).
+func (rt *chatRun) pendingInterruptToolCalls() []schema.ToolCall {
+	if !rt.isResume || rt.pendingInterrupt == nil || len(rt.pendingInterrupt.PendingToolCalls) == 0 {
+		return nil
+	}
+	var tcs []schema.ToolCall
+	if err := json.Unmarshal(rt.pendingInterrupt.PendingToolCalls, &tcs); err != nil {
+		agentLog.Warn("resume: failed to unmarshal pending tool calls for context",
+			logger.String("interrupt.uid", rt.pendingInterrupt.UID), logger.Error(err))
+		return nil
+	}
+	return tcs
 }
 
 // resolveTools loads the governance-filtered tool set, wires it into agentOpts, and
@@ -331,7 +415,7 @@ func (rt *chatRun) executeStream(messages []*schema.Message) error {
 }
 
 // finalize persists the completed assistant message (via AssistantTextEvent.Persist),
-// generates a title for new conversations, and emits RUN_FINISHED.
+// generates a title for new conversations, and emits RUN_FINISHED or RUN_INTERRUPT.
 func (rt *chatRun) finalize() error {
 	// Close any open step — idempotent; handles the edge case in deep mode where
 	// IsFinished=true is detected alongside tool calls, causing decideBranch to
@@ -339,7 +423,12 @@ func (rt *chatRun) finalize() error {
 	if rt.currentStepEvt != nil {
 		rt.currentStepEvt.OnFinish(rt.timeoutCtx)
 	}
-	rt.assistantEvt.Persist(rt.timeoutCtx, rt.currentStepID)
+
+	// Interrupt path: processInterrupt already called assistantEvt.Persist; skip the
+	// second call to avoid a duplicate DB row.
+	if !rt.interruptHandled {
+		rt.assistantEvt.Persist(rt.timeoutCtx, rt.currentStepID)
+	}
 
 	var title string
 	if rt.isNew {
@@ -351,7 +440,11 @@ func (rt *chatRun) finalize() error {
 		logger.String("elapsed", time.Since(rt.start).String()),
 	)
 
-	rt.writer.WriteRunFinished(rt.runID, rt.conv.UID, title)
+	if rt.interruptHandled && rt.interruptPayload != nil {
+		rt.writer.WriteRunInterrupt(rt.runID, rt.conv.UID, rt.interruptPayload)
+	} else {
+		rt.writer.WriteRunFinished(rt.runID, rt.conv.UID, title)
+	}
 	return nil
 }
 
@@ -375,7 +468,7 @@ func (rt *chatRun) enrichDeepRunCtx() context.Context {
 	return context.WithValue(rt.runCtx, deepCtxChatRun, rt)
 }
 
-// executeDeepGraph runs the explicit three-node Lambda graph for deep mode and
+// executeDeepGraph runs the explicit four-node Lambda graph for deep mode and
 // drains the output stream. All SSE delivery and DB persistence are handled
 // inside the Lambda nodes themselves; we only check for stream errors here.
 func (rt *chatRun) executeDeepGraph(messages []*schema.Message) error {

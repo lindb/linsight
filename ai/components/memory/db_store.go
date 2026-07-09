@@ -225,26 +225,11 @@ func (s *dbMemoryStore) listConversationStateKeys(ctx context.Context) ([]string
 // GetRecentEvents already excludes reasoning, step, and error-status rows, so this
 // method only needs to handle user/assistant/tool events.
 //
-// Orphaned tool messages (ToolCallID not referenced by any tool_call event) are
-// filtered to prevent LLM API validation errors on the next conversation turn.
+// The tool_call/tool_result pairing invariant is NOT enforced here; SanitizeMessages is
+// applied once at the single assembly entry point (agentRuntime.buildLLMMessages), where
+// the pending-interrupt tool calls are also known. Enforcing it here as well would strip
+// an in-flight interrupt's tool_calls before the resume path can re-append them.
 func (s *dbMemoryStore) convertEventsToSchema(events []*agentmodel.Event) []*schema.Message {
-	// Collect all call_ids referenced by tool_call events to detect orphaned tool rows.
-	knownCallIDs := make(map[string]bool)
-	for _, evt := range events {
-		if evt.Type != agentmodel.EventTypeToolCall {
-			continue
-		}
-		var sm schema.Message
-		if err := json.Unmarshal(evt.RawMessage, &sm); err != nil {
-			continue
-		}
-		for _, tc := range sm.ToolCalls {
-			if tc.ID != "" {
-				knownCallIDs[tc.ID] = true
-			}
-		}
-	}
-
 	result := make([]*schema.Message, 0, len(events))
 	for _, evt := range events {
 		if len(evt.RawMessage) == 0 {
@@ -255,15 +240,6 @@ func (s *dbMemoryStore) convertEventsToSchema(events []*agentmodel.Event) []*sch
 			dbMemoryLog.Warn("memory: skipping event with malformed raw_message",
 				logger.Int64("evt.id", evt.ID),
 				logger.Error(err),
-			)
-			continue
-		}
-		// Drop orphaned tool messages; sending them to the LLM causes an API validation
-		// error because their ToolCallID references a non-existent parent ToolCall.
-		if sm.Role == schema.Tool && !knownCallIDs[sm.ToolCallID] {
-			dbMemoryLog.Warn("memory: skipping orphaned tool event",
-				logger.Int64("evt.id", evt.ID),
-				logger.String("tool_call_id", sm.ToolCallID),
 			)
 			continue
 		}

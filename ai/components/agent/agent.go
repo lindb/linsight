@@ -57,7 +57,7 @@ func New(
 	case agentconfig.AgentModeReact, "":
 		return newReactAgent(cfg, convSrv, modelFactory, skillRegistry, proxy, memoryStore)
 	default:
-		return nil, fmt.Errorf("unknown agent mode %q: must be %q or %q",
+		return nil, fmt.Errorf("unknown agent mode %q: must be one of %q or %q",
 			cfg.AgentMode, agentconfig.AgentModeReact, agentconfig.AgentModeDeep)
 	}
 }

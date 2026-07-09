@@ -4483,6 +4483,54 @@ components:
           description: Full message list (present on MESSAGES_SNAPSHOT only).
           items:
             $ref: '#/components/schemas/AGUIMessage'
+        outcome:
+          type: string
+          enum: [complete, interrupt]
+          description: >
+            Why the run ended (present on RUN_FINISHED). Omitted value is equivalent to
+            `complete`. `interrupt` means the agent paused waiting for human approval of one
+            or more tool calls; the `interrupt` field then carries the pending calls.
+        interrupt:
+          $ref: '#/components/schemas/AGUIInterruptPayload'
+
+    AGUIInterruptPayload:
+      type: object
+      description: >
+        Pending tool calls that triggered an interrupt, embedded in a RUN_FINISHED event
+        with outcome=interrupt. On history replay the same payload is returned so the frontend
+        renders approval cards; `status` reflects the current resolution state.
+      properties:
+        interruptId:
+          type: string
+          description: Server-generated interrupt ID; the client echoes it back when resuming.
+        status:
+          type: string
+          enum: [pending, approved, rejected, expired]
+          description: >
+            Interrupt lifecycle state. Omitted on the live SSE frame (always pending at emit
+            time); populated on history replay so resolved interrupts render as non-actionable.
+        toolCalls:
+          type: array
+          description: Tool invocations waiting for approval.
+          items:
+            $ref: '#/components/schemas/AGUIPendingToolCall'
+
+    AGUIPendingToolCall:
+      type: object
+      description: A single tool invocation awaiting human approval.
+      properties:
+        id:
+          type: string
+          description: Tool call ID assigned by the LLM; echoed back in the resume request.
+        name:
+          type: string
+          description: Tool function name.
+        arguments:
+          type: string
+          description: JSON-encoded argument string produced by the LLM.
+        cardType:
+          type: string
+          description: Frontend component hint for rendering the approval card (e.g. alert_rule_card).
 
     AGUIMessage:
       type: object

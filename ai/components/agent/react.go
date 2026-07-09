@@ -49,7 +49,8 @@ type agentRuntime struct {
 	memoryStore   memory.MemoryStore
 	// compiled is the singleton ReAct agent graph built once at startup.
 	compiled *react.Agent
-	// deepGraph is the explicit compose.Graph used in AgentModeDeep.
+	// deepGraph is the explicit compose.Graph used in AgentModeDeep. It also handles
+	// AG-UI tool-bound interrupts with human-in-the-loop approval.
 	deepGraph compose.Runnable[[]*schema.Message, []*schema.Message]
 	// sems maps orgID (int64) → chan struct{} (buffered semaphore).
 	sems sync.Map

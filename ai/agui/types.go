@@ -79,6 +79,48 @@ const (
 	UserMessage EventType = "USER_MESSAGE"
 )
 
+// RunOutcome describes why a run ended. "complete" is the normal path; "interrupt" means
+// the agent stopped to wait for human approval before executing one or more tools.
+type RunOutcome string
+
+const (
+	// RunOutcomeComplete is the normal successful completion path.
+	RunOutcomeComplete RunOutcome = "complete"
+	// RunOutcomeInterrupt means the run paused waiting for human approval.
+	RunOutcomeInterrupt RunOutcome = "interrupt"
+)
+
+// PendingToolCall describes a single tool invocation waiting for human approval.
+// Sent inside InterruptPayload so the frontend can render an approval card with
+// the correct input schema and echo back the tool call ID on resume.
+type PendingToolCall struct {
+	// ID is the LLM-assigned tool_call_id; echoed back in ResumePayload to correlate.
+	ID string `json:"id"`
+	// Name is the tool function name (e.g. "create_alert_rule").
+	Name string `json:"name"`
+	// Arguments is the JSON-encoded argument string the LLM produced.
+	Arguments string `json:"arguments"`
+	// CardType is the frontend component hint (e.g. "alert_rule_card").
+	// Sourced from the "_gov_card_type" key in ToolInfo.Extra.
+	CardType string `json:"cardType,omitempty"`
+}
+
+// InterruptPayload carries the pending tool calls that triggered the interrupt.
+// Embedded in a RUN_FINISHED event (outcome=interrupt) so the frontend renders
+// approval cards and echoes back interruptId when resuming.
+type InterruptPayload struct {
+	// InterruptID is the server-generated UUID for this interrupt instance.
+	// The client must echo it back in ResumePayload.InterruptID.
+	InterruptID string `json:"interruptId"`
+	// ToolCalls lists the pending tool invocations waiting for approval.
+	ToolCalls []PendingToolCall `json:"toolCalls"`
+	// Status is the interrupt lifecycle state (pending/approved/rejected/expired).
+	// Omitted on the live SSE frame (the interrupt is always pending at emit time);
+	// populated on history replay so the frontend can render the approval card as
+	// actionable (pending) or resolved (approved/rejected/expired).
+	Status string `json:"status,omitempty"`
+}
+
 // ErrorCode classifies RUN_ERROR events so clients can show actionable guidance.
 type ErrorCode string
 
@@ -193,6 +235,13 @@ type Event struct {
 	// frontend can replay the full conversation using the same event-processing path as
 	// live streaming.
 	Events []Event `json:"events,omitempty"`
+
+	// Outcome describes why the run ended. Empty string is equivalent to RunOutcomeComplete
+	// (backwards compatible). Set to RunOutcomeInterrupt when the agent paused for approval.
+	Outcome RunOutcome `json:"outcome,omitempty"`
+	// Interrupt carries the pending tool calls when Outcome == RunOutcomeInterrupt.
+	// Nil for normal RUN_FINISHED events.
+	Interrupt *InterruptPayload `json:"interrupt,omitempty"`
 }
 
 // Message is the unified representation of a single conversation turn.

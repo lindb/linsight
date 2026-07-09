@@ -129,6 +129,63 @@ type Event struct {
 // TableName specifies the GORM table name.
 func (Event) TableName() string { return "events" }
 
+// InterruptStatus is the lifecycle state of an InterruptRecord.
+type InterruptStatus string
+
+const (
+	// InterruptStatusPending means the agent paused; no decision yet.
+	InterruptStatusPending InterruptStatus = "pending"
+	// InterruptStatusApproved means the user approved the pending tool calls.
+	InterruptStatusApproved InterruptStatus = "approved"
+	// InterruptStatusRejected means the user rejected the pending tool calls.
+	InterruptStatusRejected InterruptStatus = "rejected"
+	// InterruptStatusExpired means the interrupt was never resolved (TTL exceeded or conv deleted).
+	InterruptStatusExpired InterruptStatus = "expired"
+)
+
+// InterruptRecord tracks one interrupt instance from proposal through resolution.
+// An interrupt is created when the agent detects a tool with _gov_need_approval=true
+// and AutoApprove is false; the record is updated when the client sends a resume request.
+// Stored in a dedicated table (not reusing Message) because the payload is a
+// []schema.ToolCall (not a schema.Message shape) and the status lifecycle requires
+// mutable columns that the append-only Message table does not support.
+type InterruptRecord struct {
+	basemodel.BaseModel
+	// UID is the public identifier echoed back to the client as InterruptPayload.InterruptID.
+	UID string `gorm:"column:uid;uniqueIndex"`
+	// ConvUID is the public identifier of the owning conversation.
+	ConvUID string `gorm:"column:conv_uid;index"`
+	// ConvID is the internal conversation FK.
+	ConvID int64 `gorm:"column:conv_id;index"`
+	// OrgID partitions interrupt records by tenant for ownership validation.
+	OrgID int64 `gorm:"column:org_id;index"`
+	// UserID is the user who triggered the agent run.
+	UserID int64 `gorm:"column:user_id;index"`
+	// OrigRunID is the runID of the interrupted run, for audit correlation.
+	OrigRunID string `gorm:"column:orig_run_id;index"`
+	// Status tracks the approval lifecycle: pending → approved | rejected | expired.
+	Status InterruptStatus `gorm:"column:status;index"`
+	// PendingToolCalls stores the serialised []schema.ToolCall that need approval.
+	// JSON column; parsed by the agent on resume to reconstruct tool invocations.
+	PendingToolCalls json.RawMessage `gorm:"column:pending_tool_calls;type:json"`
+	// ClientPayload stores the serialised agui.InterruptPayload in the exact shape the
+	// frontend renders (including per-tool CardType, which is stripped from the events
+	// table by getToolPublicExtra). History replay reuses this verbatim so the snapshot
+	// interrupt frame is byte-identical to the live SSE frame, with Status refreshed from
+	// the current record status. Empty for pre-migration records.
+	ClientPayload json.RawMessage `gorm:"column:client_payload;type:json"`
+	// AssistantMsgUID ties this interrupt to the assistant message row that holds
+	// the tool_call events, enabling full event-sourcing replay on history load.
+	AssistantMsgUID string `gorm:"column:assistant_msg_uid;index"`
+	// StepID is the step that was open when the interrupt was issued.
+	StepID string `gorm:"column:step_id"`
+	// Decision stores the optional free-text comment from the reviewer.
+	Decision string `gorm:"column:decision;type:text"`
+}
+
+// TableName specifies the GORM table name.
+func (InterruptRecord) TableName() string { return "interrupt_records" }
+
 // Event type categories stored in the Event.Type column.
 const (
 	// EventTypeUserMessage is the incoming user request.

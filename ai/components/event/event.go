@@ -50,6 +50,14 @@ func (c *ConvContext) NextSeq() int {
 	return int(c.seq.Add(1))
 }
 
+// SetSeq resets the sequence counter to n so the next NextSeq() returns n+1.
+// Used on a resume run that reuses the interrupted run's RunID: the counter is
+// primed with that run's existing max sequence so resumed events continue the
+// original run's monotonic ordering instead of colliding from 1.
+func (c *ConvContext) SetSeq(n int) {
+	c.seq.Store(int32(n))
+}
+
 // EventSaver abstracts DB persistence so the event package does not import the
 // service layer directly, which would create a circular dependency.
 type EventSaver interface {
