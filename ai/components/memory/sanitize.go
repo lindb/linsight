@@ -29,14 +29,25 @@ var sanitizeLog = logger.GetLogger("agent", "history_sanitize")
 
 // SanitizeMessages enforces the tool-call/tool-result pairing invariant required by
 // OpenAI-compatible chat APIs: every assistant message that carries tool_calls MUST be
-// followed by a tool message responding to each tool_call_id, and every tool message MUST
-// reference a tool_call emitted by a preceding assistant message.
+// IMMEDIATELY followed by a tool message responding to each tool_call_id, and every tool
+// message MUST reference a tool_call emitted by a preceding assistant message.
 //
-// History rebuilt from the DB can violate this invariant in either direction:
+// History rebuilt from the DB can violate this invariant in three ways:
 //   - A tool_call survives but its tool_result was dropped (truncated by MemorySize, filtered
 //     out because it had error status, or never persisted) -> the assistant would be sent with
 //     an unanswered tool_call, producing "insufficient tool messages following tool_calls".
 //   - A tool_result survives but its parent tool_call was dropped -> an orphaned tool message.
+//   - A tool_call and its tool_result both survive but another message is INTERLEAVED between
+//     them. This happens on the interrupt/resume path: processInterrupt persists the
+//     assistant_text row the moment it pauses, while the tool_result row is written only after
+//     the resume is approved. Ordered by insert id the rows become
+//     tool_call -> assistant_text -> tool_result, so the reconstructed history has an assistant
+//     text message separating the tool_call from its answer -> same 400 as the first case.
+//
+// The first two are handled by dropping (see below). The third is handled by reordering: each
+// surviving tool_result is moved to sit immediately after the assistant message carrying its
+// tool_call, in the order the calls appear on that assistant. Interleaved messages keep their
+// relative order and follow the tool-call group.
 //
 // For an assistant message it keeps only the tool_calls whose result is present; if that
 // leaves no tool_calls and no textual content, the whole message is dropped. Tool messages
@@ -121,6 +132,11 @@ func SanitizeMessages(convUID string, msgs []*schema.Message, pendingToolCalls [
 		}
 	}
 
+	// Pass 3: repair interleaving. After dropping, a surviving tool_result may still be
+	// separated from its tool_call by another message (interrupt/resume ordering, see doc).
+	// Move each tool_result to sit immediately after the assistant message carrying its call.
+	out = reorderToolResults(out)
+
 	// Append the pending interrupt's tool calls as a single trailing assistant message so the
 	// resume graph's Case-B guard (lastMsg is assistant-with-tool_calls) always matches and the
 	// tool results appended during resume immediately follow their tool_calls.
@@ -129,6 +145,56 @@ func SanitizeMessages(convUID string, msgs []*schema.Message, pendingToolCalls [
 		sanitizeLog.Info("history: appended pending interrupt tool_calls at tail",
 			logger.String("conv.uid", convUID),
 			logger.Int("pending_count", len(pendingToolCalls)))
+	}
+	return out
+}
+
+// reorderToolResults performs a stable reorder that places every tool message immediately
+// after the assistant message carrying its tool_call, in the order the calls appear on that
+// assistant. It assumes the pairing invariant already holds (every tool message references a
+// tool_call on some earlier assistant, and every kept tool_call has a matching tool message) —
+// SanitizeMessages guarantees this before calling here.
+//
+// Messages that are neither assistant-with-tool_calls nor tool are emitted in place. An
+// assistant-with-tool_calls emits itself followed by all its tool results (collected from
+// anywhere later in the slice) before the next non-tool message, so any message interleaved
+// between the call and its result is pushed to after the tool-result group. Order among the
+// results of one assistant follows the assistant's ToolCalls declaration order.
+func reorderToolResults(msgs []*schema.Message) []*schema.Message {
+	// Index tool results by tool_call_id for O(1) lookup during emission. Normal history has at
+	// most one result per call; a duplicate id would collapse to the last row seen here, which is
+	// acceptable for such pathological input.
+	resultByID := make(map[string]*schema.Message)
+	for _, m := range msgs {
+		if m != nil && m.Role == schema.Tool && m.ToolCallID != "" {
+			resultByID[m.ToolCallID] = m
+		}
+	}
+
+	// emitted guards against writing the same result twice if the same tool_call_id somehow
+	// appears on two assistant messages — a second emission would reintroduce a pairing problem.
+	emitted := make(map[string]bool, len(resultByID))
+	out := make([]*schema.Message, 0, len(msgs))
+	for _, m := range msgs {
+		if m == nil {
+			continue
+		}
+		switch {
+		case m.Role == schema.Assistant && len(m.ToolCalls) > 0:
+			out = append(out, m)
+			// Emit this assistant's results right after it, in declaration order.
+			for _, tc := range m.ToolCalls {
+				if res, ok := resultByID[tc.ID]; ok && !emitted[tc.ID] {
+					out = append(out, res)
+					emitted[tc.ID] = true
+				}
+			}
+		case m.Role == schema.Tool:
+			// Already emitted (or will be) next to its parent assistant; skip here.
+			continue
+		default:
+			out = append(out, m)
+		}
 	}
 	return out
 }
