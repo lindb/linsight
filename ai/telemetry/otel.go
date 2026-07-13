@@ -42,7 +42,6 @@ import (
 	"github.com/cloudwego/eino/callbacks"
 	"github.com/lindb/common/pkg/logger"
 
-	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/pkg/util"
 )
 
@@ -72,17 +71,17 @@ func GetConversationID(ctx context.Context) int64 {
 	return v
 }
 
-// WithSkillMetaMap stores a tool-name → SkillControlLevel map in ctx.
+// WithSkillMetaMap stores a tool-name → control level string map in ctx.
 // The telemetry callback uses it to annotate each tool invocation with its
-// governance level ("global" or "conversation").
-func WithSkillMetaMap(ctx context.Context, m map[string]agentmodel.SkillControlLevel) context.Context {
+// governance level.
+func WithSkillMetaMap(ctx context.Context, m map[string]string) context.Context {
 	return context.WithValue(ctx, skillMetaMapKey, m)
 }
 
 // GetSkillControlLevel looks up the control level for a tool from the map stored by
 // WithSkillMetaMap. Returns an empty string if the map is absent or the tool is unknown.
-func GetSkillControlLevel(ctx context.Context, toolName string) agentmodel.SkillControlLevel {
-	m, _ := ctx.Value(skillMetaMapKey).(map[string]agentmodel.SkillControlLevel)
+func GetSkillControlLevel(ctx context.Context, toolName string) string {
+	m, _ := ctx.Value(skillMetaMapKey).(map[string]string)
 	return m[toolName]
 }
 
@@ -122,7 +121,6 @@ func onStart(ctx context.Context, info *callbacks.RunInfo, _ callbacks.CallbackI
 	controlLevel := GetSkillControlLevel(ctx, info.Name)
 
 	if controlLevel != "" {
-		// info.Name is a known tool name — emit a tool-specific log entry.
 		telLog.Debug("agent tool invocation",
 			logger.String("node", nodeLabel(info)),
 			logger.String("type", info.Type),
@@ -131,7 +129,7 @@ func onStart(ctx context.Context, info *callbacks.RunInfo, _ callbacks.CallbackI
 			logger.Int64("user.id", u.User.ID),
 			logger.Int64("conversation.id", convID),
 			logger.String("tool.name", info.Name),
-			logger.String("tool.control_level", string(controlLevel)),
+			logger.String("tool.control_level", controlLevel),
 		)
 	} else {
 		telLog.Debug("agent component start",

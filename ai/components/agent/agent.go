@@ -35,6 +35,7 @@ import (
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentservice "github.com/lindb/linsight/ai/service"
 )
@@ -53,12 +54,13 @@ type Agent interface {
 // four-node Lambda graph, which handles AG-UI tool-bound interrupts with human-in-the-loop
 // approval (see buildGraph in graph.go).
 type agentRuntime struct {
-	cfg           *agentconfig.Config
-	convSrv       agentservice.ConversationService
-	modelFactory  *modelcomp.ModelFactory
-	skillRegistry *skillscomp.SkillRegistry
-	proxy         *modelcomp.DynamicModelProxy
-	memoryStore   memory.MemoryStore
+	cfg          *agentconfig.Config
+	convSrv      agentservice.ConversationService
+	modelFactory *modelcomp.ModelFactory
+	skillBackend skillscomp.Backend
+	toolsFactory toolscomp.ToolsProvider
+	proxy        *modelcomp.DynamicModelProxy
+	memoryStore  memory.MemoryStore
 	// ruleEngine injects DB-backed global/per-org rules into the LLM context.
 	ruleEngine rulescomp.RuleEngine
 	// graph is the explicit compose.Graph compiled once at startup.
@@ -74,7 +76,8 @@ func New(
 	cfg *agentconfig.Config,
 	convSrv agentservice.ConversationService,
 	modelFactory *modelcomp.ModelFactory,
-	skillRegistry *skillscomp.SkillRegistry,
+	skillBackend skillscomp.Backend,
+	toolsFactory toolscomp.ToolsProvider,
 	proxy *modelcomp.DynamicModelProxy,
 	memoryStore memory.MemoryStore,
 	ruleEngine rulescomp.RuleEngine,
@@ -84,14 +87,15 @@ func New(
 		return nil, fmt.Errorf("compile agent graph: %w", err)
 	}
 	return &agentRuntime{
-		cfg:           cfg,
-		convSrv:       convSrv,
-		modelFactory:  modelFactory,
-		skillRegistry: skillRegistry,
-		proxy:         proxy,
-		memoryStore:   memoryStore,
-		ruleEngine:    ruleEngine,
-		graph:         graph,
+		cfg:          cfg,
+		convSrv:      convSrv,
+		modelFactory: modelFactory,
+		skillBackend: skillBackend,
+		toolsFactory: toolsFactory,
+		proxy:        proxy,
+		memoryStore:  memoryStore,
+		ruleEngine:   ruleEngine,
+		graph:        graph,
 	}, nil
 }
 

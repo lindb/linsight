@@ -33,4 +33,5 @@ type Deps struct {
 	ConvSrv     agentservice.ConversationService
 	FeedbackSrv agentservice.FeedbackService
 	RuleSrv     agentservice.RuleService
+	SkillSrv    agentservice.SkillService
 }

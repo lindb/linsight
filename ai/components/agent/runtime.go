@@ -329,13 +329,18 @@ func (rt *chatRun) pendingInterruptToolCalls() []schema.ToolCall {
 	return tcs
 }
 
-// resolveTools loads the governance-filtered tool set and sets up the enriched run
-// context with conversation and skill-metadata telemetry.
+// resolveTools assembles the tool set for this request: a nativeSkillTool backed by
+// the skill engine, plus any MCP/builtin tools available to the org.
 // Non-fatal: logs a warning and continues with an empty tool set on failure.
 func (rt *chatRun) resolveTools() {
-	orgTools, skillMeta, err := rt.agent.skillRegistry.LoadConversationTools(rt.timeoutCtx, rt.orgID, rt.conv.ID)
+	skillTool := skillscomp.NewSkillTool(rt.agent.skillBackend)
+	rt.orgTools = []tool.BaseTool{skillTool}
+
+	orgTools, err := rt.agent.toolsFactory.GetToolsForOrg(rt.timeoutCtx, rt.orgID)
 	if err != nil {
-		agentLog.Warn("failed to load conversation tools, proceeding without tools", logger.Error(err))
+		agentLog.Warn("failed to load org MCP tools, proceeding with skill tool only", logger.Error(err))
+	} else {
+		rt.orgTools = append(rt.orgTools, orgTools...)
 	}
 
 	agentLog.Info("chat session start",
@@ -343,15 +348,10 @@ func (rt *chatRun) resolveTools() {
 		logger.Int64("user.id", rt.userID),
 		logger.String("conv.uid", rt.conv.UID),
 		logger.Any("is_new", rt.isNew),
-		logger.Int("tools_count", len(orgTools)),
+		logger.Int("tools_count", len(rt.orgTools)),
 	)
 
-	metaMap := buildSkillMetaMap(skillMeta)
 	rt.runCtx = telemetry.WithConversationID(rt.timeoutCtx, rt.conv.ID)
-	rt.runCtx = telemetry.WithSkillMetaMap(rt.runCtx, metaMap)
-
-	// Store tools for the graph Lambda nodes, which bind them per-request via context.
-	rt.orgTools = orgTools
 }
 
 // finalize persists the completed assistant message (via AssistantTextEvent.Persist),
@@ -388,20 +388,7 @@ func (rt *chatRun) finalize() error {
 	return nil
 }
 
-// buildSkillMetaMap converts a SkillMeta slice into a name → ControlLevel lookup map
-// for telemetry annotation on the run context.
-func buildSkillMetaMap(meta []skillscomp.SkillMeta) map[string]agentmodel.SkillControlLevel {
-	if len(meta) == 0 {
-		return nil
-	}
-	m := make(map[string]agentmodel.SkillControlLevel, len(meta))
-	for _, sm := range meta {
-		m[sm.Name] = sm.ControlLevel
-	}
-	return m
-}
-
-// enrichRunCtx injects the current *chatRun into the run context so that the
+// enrichRunCtx injects the current *chatRun into the run contextso that the
 // graph Lambda nodes can access all per-request state (tools, events, writer)
 // via a single context key without additional coupling.
 func (rt *chatRun) enrichRunCtx() context.Context {

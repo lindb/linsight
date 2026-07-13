@@ -65,6 +65,7 @@ type aiModule struct {
 	mcp      *agenthandler.MCPHandler
 	feedback *agenthandler.FeedbackHandler
 	rule     *agenthandler.RuleHandler
+	skill    *agenthandler.SkillHandler
 }
 
 // mod is the package-level singleton; nil if AI is disabled.
@@ -72,16 +73,6 @@ var mod *aiModule
 
 // moduleLog logs module-level bootstrap events (e.g. initial rule cache load).
 var moduleLog = logger.GetLogger("ai", "module")
-
-// builtinSkillNames are the tool names seeded into the skills table on every
-// startup with is_global=true so they pass the three-level governance funnel
-// without any org subscription or per-conversation enablement.
-var builtinSkillNames = []string{
-	"linsight_list_datasources",
-	"linsight_datasource_query",
-	"linsight_search_dashboards",
-	"linsight_create_alert_rule",
-}
 
 // Bootstrap wires up all agent services, runs DB migrations, and registers the
 // OTel observability handler. It must be called once from cmd/main.go's buildDeps()
@@ -101,23 +92,12 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		&agentmodel.Conversation{},
 		&agentmodel.Message{},
 		&agentmodel.Skill{},
-		&agentmodel.OrgSkill{},
-		&agentmodel.ConversationSkill{},
 		&agentmodel.MessageFeedback{},
 		&agentmodel.Event{},
 		&agentmodel.InterruptRecord{},
 		&agentmodel.AgentRule{},
 	); err != nil {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
-	}
-
-	// Seed built-in skill entries so they pass the three-level governance funnel
-	// without requiring org subscription or per-conversation enablement.
-	// FirstOrCreate is idempotent: a second startup is a no-op.
-	for _, name := range builtinSkillNames {
-		db.RawDB().Where(agentmodel.Skill{Name: name}).
-			Attrs(agentmodel.Skill{IsGlobal: true, SkillType: "builtin"}).
-			FirstOrCreate(&agentmodel.Skill{})
 	}
 
 	// Wire service dependencies bottom-up.
@@ -139,7 +119,14 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		panic(fmt.Sprintf("ai: failed to build builtin tools: %v", err))
 	}
 	composite := toolscomp.NewCompositeToolsFactory(mcpFactory, builtinFactory)
-	skillRegistry := skillscomp.NewSkillRegistry(db, composite)
+
+	// Build the DB-backed skill backend with in-memory cache (like rule engine).
+	skillBackend := skillscomp.NewDBBackend(db, cfg.AI.SkillRefreshInterval.Duration())
+	if err := skillBackend.RefreshCache(context.Background()); err != nil {
+		moduleLog.Warn("ai: initial skill cache load failed", logger.Error(err))
+	}
+	skillBackend.StartAutoRefresh(context.Background())
+	skillSrv := agentservice.NewSkillService(db)
 
 	// Create MemoryStore factory and instance
 	memoryStoreFactory := memorycomp.NewMemoryStoreFactory(db, convSrv, cfg.AI)
@@ -156,7 +143,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	ruleEngine.StartAutoRefresh(context.Background())
 	ruleSrv := agentservice.NewRuleService(db, ruleEngine)
 
-	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillRegistry, proxy, memoryStore, ruleEngine)
+	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillBackend, composite, proxy, memoryStore, ruleEngine)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to compile agent graph: %v", err))
 	}
@@ -172,6 +159,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		ConvSrv:     convSrv,
 		FeedbackSrv: feedbackSrv,
 		RuleSrv:     ruleSrv,
+		SkillSrv:    skillSrv,
 	}
 	mod = &aiModule{
 		chat:     agenthandler.NewChatHandler(deps),
@@ -179,6 +167,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		mcp:      agenthandler.NewMCPHandler(deps),
 		feedback: agenthandler.NewFeedbackHandler(deps),
 		rule:     agenthandler.NewRuleHandler(deps),
+		skill:    agenthandler.NewSkillHandler(deps),
 	}
 }
 
@@ -194,6 +183,8 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 	model := mod.model
 	mcp := mod.mcp
 	fb := mod.feedback
+	rule := mod.rule
+	skill := mod.skill
 
 	// Viewer-level routes: any authenticated user may invoke the agent.
 	router.POST("/ai/chat",
@@ -249,7 +240,6 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 	// Rule CRUD — admin-level. Global rules (is_global=true) are further gated to
 	// super admins (RoleLin) inside RuleService; regular org admins manage only their
 	// own org's rules.
-	rule := mod.rule
 	router.GET("/ai/settings/rules",
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, rule.ListRules)...)
 	router.POST("/ai/settings/rules",
@@ -260,4 +250,18 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, rule.UpdateRule)...)
 	router.DELETE("/ai/settings/rules/:uid",
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, rule.DeleteRule)...)
+
+	// Skill CRUD — admin-level. Global skills (is_global=true) are further gated to
+	// super admins (RoleLin) inside SkillService; regular org admins manage only their
+	// own org's skills.
+	router.GET("/ai/settings/skills",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, skill.ListSkills)...)
+	router.POST("/ai/settings/skills",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, skill.CreateSkill)...)
+	router.GET("/ai/settings/skills/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, skill.GetSkill)...)
+	router.PUT("/ai/settings/skills/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, skill.UpdateSkill)...)
+	router.DELETE("/ai/settings/skills/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, skill.DeleteSkill)...)
 }

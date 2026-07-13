@@ -3073,6 +3073,129 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  # ─── Agent Skills ────────────────────────────────────────────────────────────
+  /api/v1/ai/settings/skills:
+    get:
+      tags: [AISettings]
+      summary: List skills visible to the org (global skills + own-org skills)
+      responses:
+        '200':
+          description: Global skills plus the caller org's skills
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  skills:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Skill'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AISettings]
+      summary: Create a skill
+      description: >
+        Creates a DB-backed skill. Content is a full Markdown document defining the
+        skill's instructions, workflows, and best practices. Creating a global skill
+        (isGlobal=true) requires super admin (RoleLin); regular org admins may only
+        create own-org skills.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRequest'
+      responses:
+        '200':
+          description: UID of the created skill
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/ai/settings/skills/{uid}:
+    get:
+      tags: [AISettings]
+      summary: Get a single skill by UID
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The skill
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AISettings]
+      summary: Update a skill
+      description: >
+        Editing a global skill requires super admin (RoleLin). Per-org skills are scoped
+        to the caller's org. Note: isGlobal is ignored on update — a skill's scope is
+        immutable after creation.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [AISettings]
+      summary: Delete a skill
+      description: >
+        Deleting a global skill requires super admin (RoleLin). Per-org skills are scoped
+        to the caller's org.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
 # ─── Components ──────────────────────────────────────────────────────────────
 components:
   securitySchemes:
@@ -5024,5 +5147,48 @@ components:
           description: Create/edit a global rule. Requires super admin (RoleLin).
         priority:
           type: integer
+        isEnabled:
+          type: boolean
+
+    Skill:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            orgId:
+              type: integer
+              format: int64
+              description: 0 for a global skill; a positive value scopes it to that org.
+            name:
+              type: string
+              description: Canonical skill name used as the tool parameter value.
+            content:
+              type: string
+              description: >
+                Full Markdown skill document. The optional YAML frontmatter carries
+                description, context_mode, and agent metadata; the body is the skill body.
+            isGlobal:
+              type: boolean
+              description: True when the skill applies to all orgs without subscription.
+            isEnabled:
+              type: boolean
+
+    SkillRequest:
+      type: object
+      required: [name, content]
+      properties:
+        name:
+          type: string
+          description: Canonical skill name.
+        content:
+          type: string
+          description: >
+            Full Markdown skill document (YAML frontmatter + body).
+            Frontmatter fields: description, context_mode, agent.
+        isGlobal:
+          type: boolean
+          description: Create/edit a global skill. Requires super admin (RoleLin).
         isEnabled:
           type: boolean

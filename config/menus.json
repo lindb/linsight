@@ -101,6 +101,14 @@
         "page": "ai_rules",
         "icon": "ai-rule",
         "role": "Admin"
+      },
+      {
+        "uid": "ai_skills",
+        "label": "Skills",
+        "path": "/ai/settings/skills/*",
+        "page": "ai_skills",
+        "icon": "ai-skill",
+        "role": "Admin"
       }
     ]
   },

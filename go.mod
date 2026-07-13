@@ -6,12 +6,16 @@ require (
 	github.com/caarlos0/env/v7 v7.1.0
 	github.com/casbin/casbin/v2 v2.64.0
 	github.com/casbin/gorm-adapter/v3 v3.14.0
+	github.com/cloudwego/eino v0.9.9
+	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
+	github.com/cloudwego/eino-ext/components/tool/mcp v0.0.8
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.0
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/golang/mock v1.4.4
 	github.com/lindb/arrow v0.0.0-20260202064253-f208202478a7
 	github.com/lindb/client_go v0.0.0-00010101000000-000000000000
+	github.com/mark3labs/mcp-go v0.43.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.11.1
@@ -27,16 +31,13 @@ require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/apache/arrow-go/v18 v18.5.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/eino v0.9.9 // indirect
-	github.com/cloudwego/eino-ext v0.0.1-alpha // indirect
-	github.com/cloudwego/eino-ext/components/model/openai v0.1.13 // indirect
-	github.com/cloudwego/eino-ext/components/tool/mcp v0.0.8 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -50,7 +51,6 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.4.6 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/mark3labs/mcp-go v0.43.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/meguminnnnnnnnn/go-openai v0.1.2 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
@@ -86,7 +86,6 @@ require (
 	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible
 	github.com/antonmedv/expr v1.15.3
 	github.com/bytedance/sonic v1.15.0 // indirect
-	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/glebarez/go-sqlite v1.19.1 // indirect

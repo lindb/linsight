@@ -120,6 +120,22 @@ type RuleRequest struct {
 	IsEnabled bool `json:"isEnabled"`
 }
 
+// SkillRequest is the unified body for POST /ai/settings/skills and
+// PUT /ai/settings/skills/:uid. Required-field validation is enforced by the
+// service layer (not gin binding) so that service calls made outside of
+// HTTP handlers are also validated correctly.
+// Description, context_mode, and agent are carried in the Content YAML frontmatter.
+type SkillRequest struct {
+	// Name is the canonical skill name used as the tool parameter value. Required.
+	Name string `json:"name"`
+	// Content is the full Markdown skill document (YAML frontmatter + body). Required.
+	Content string `json:"content"`
+	// IsGlobal marks the skill as available to all orgs. Super-admin only.
+	IsGlobal bool `json:"isGlobal"`
+	// IsEnabled gates whether the skill is active.
+	IsEnabled bool `json:"isEnabled"`
+}
+
 // CreateMCPServerRequest is the body for POST /agent/settings/mcp.
 type CreateMCPServerRequest struct {
 	Name    string `json:"name" binding:"required"`

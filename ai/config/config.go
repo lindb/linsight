@@ -81,6 +81,11 @@ type Config struct {
 	// cache from the agent_rules table. A non-positive value disables periodic refresh
 	// (writes still trigger an immediate refresh). Default: 30s.
 	RuleRefreshInterval ltoml.Duration `env:"RULE_REFRESH_INTERVAL" toml:"rule-refresh-interval"`
+
+	// SkillRefreshInterval is how often the DB-backed skill backend reloads its in-memory
+	// cache from the skills table. A non-positive value disables periodic refresh.
+	// Default: 30s.
+	SkillRefreshInterval ltoml.Duration `env:"SKILL_REFRESH_INTERVAL" toml:"skill-refresh-interval"`
 }
 
 // NewDefaultConfig returns a Config with conservative, safe defaults.
@@ -103,6 +108,7 @@ func NewDefaultConfig() *Config {
 		EnableMultiTurnContext: true,
 		MaxContextWindowSize:   50,
 		RuleRefreshInterval:    ltoml.Duration(30 * time.Second),
+		SkillRefreshInterval:   ltoml.Duration(30 * time.Second),
 	}
 }
 
@@ -163,8 +169,12 @@ max-context-window-size = %d
 
 ## How often the DB-backed rule engine reloads its in-memory cache. Default: %s
 ## Env: LINSIGHT_AI_RULE_REFRESH_INTERVAL
-rule-refresh-interval = "%s"`,
-		c.Enabled, c.Enabled,
+rule-refresh-interval = "%s"
+
+	## How often the DB-backed skill backend reloads its in-memory cache. Default: %s
+	## Env: LINSIGHT_AI_SKILL_REFRESH_INTERVAL
+	skill-refresh-interval = "%s"`,
+	c.Enabled, c.Enabled,
 		c.MaxStep, c.MaxStep,
 		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
 		c.ToolTimeout.Duration().String(), c.ToolTimeout.Duration().String(),
@@ -178,6 +188,7 @@ rule-refresh-interval = "%s"`,
 		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
 		c.MaxContextWindowSize, c.MaxContextWindowSize,
 		c.RuleRefreshInterval.Duration().String(), c.RuleRefreshInterval.Duration().String(),
+		c.SkillRefreshInterval.Duration().String(), c.SkillRefreshInterval.Duration().String(),
 	)
 }
 
