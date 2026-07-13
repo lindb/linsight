@@ -20,7 +20,9 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/gin-gonic/gin"
@@ -67,9 +69,13 @@ type SSEWriter interface {
 }
 
 // ginSSEWriter is the concrete SSEWriter implementation backed by gin.ResponseWriter.
+// rc extends the HTTP write deadline on every flush so the connection stays alive
+// across long-running agent runs whose wall-clock duration exceeds the server's
+// WriteTimeout (default 30s).
 type ginSSEWriter struct {
 	mu sync.Mutex
 	w  gin.ResponseWriter
+	rc *http.ResponseController
 }
 
 // NewSSEWriter prepares c for SSE delivery and returns an SSEWriter bound to it.
@@ -81,7 +87,10 @@ func NewSSEWriter(c *gin.Context) SSEWriter {
 	c.Header("Connection", "keep-alive")
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.Flush()
-	return &ginSSEWriter{w: c.Writer}
+	return &ginSSEWriter{
+		w:  c.Writer,
+		rc: http.NewResponseController(c.Writer),
+	}
 }
 
 func (w *ginSSEWriter) WriteRunStarted(runID, conversationUID string) {
@@ -235,6 +244,8 @@ func (w *ginSSEWriter) WriteStepFinished(stepID string, elapsedMs int64) {
 
 // writeEvent marshals evt to JSON and writes it as a single SSE data frame.
 // The frame format is: "data: <json>\n\n"
+// Before each flush the write deadline is extended by 30s so the connection
+// survives long-running agent runs that exceed the server's WriteTimeout.
 func (w *ginSSEWriter) writeEvent(evt agui.Event) error {
 	data, err := json.Marshal(evt)
 	if err != nil {
@@ -243,6 +254,14 @@ func (w *ginSSEWriter) writeEvent(evt agui.Event) error {
 
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
+	// Push the write deadline forward so the server does not kill the connection
+	// while the agent is still producing events. Default WriteTimeout is 30s;
+	// extending by 30s on each flush keeps the connection alive indefinitely
+	// as long as events continue to flow.
+	if w.rc != nil {
+		_ = w.rc.SetWriteDeadline(time.Now().Add(30 * time.Second))
+	}
 
 	if _, err = fmt.Fprintf(w.w, "data: %s\n\n", data); err != nil {
 		return err
