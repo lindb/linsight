@@ -90,6 +90,7 @@ func (e *ReasoningEvent) OnEnd(ctx context.Context) {
 		schema.Assistant,
 		e.rsb.String(),
 		elapsedMs,
+		withMessageUID(e.msgUID),
 	)
 	if err := e.saver.SaveEvent(ctx, evt); err != nil {
 		reasoningLog.Warn("failed to persist reasoning event", logger.Error(err))

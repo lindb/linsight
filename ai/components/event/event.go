@@ -74,6 +74,18 @@ func withStatus(status agui.MessageStatus) evtOption {
 	}
 }
 
+// withMessageUID overrides the auto-generated MessageUID so the persisted row carries
+// the same AG-UI message ID that was emitted over SSE. This keeps live-stream and
+// history-replay message IDs identical for events whose ID the frontend correlates
+// (assistant text, reasoning).
+func withMessageUID(uid string) evtOption {
+	return func(e *agentmodel.Event) {
+		if uid != "" {
+			e.MessageUID = uid
+		}
+	}
+}
+
 // withToolCallID sets the tool_call_id column on the DB event row.
 func withToolCallID(callID string) evtOption {
 	return func(e *agentmodel.Event) {

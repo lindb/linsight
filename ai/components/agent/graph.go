@@ -199,6 +199,13 @@ func createExecutionNode() *compose.Lambda {
 		}
 		defer reader.Close()
 
+		// Open a fresh text segment for this iteration: its own AG-UI message ID, timer,
+		// and DB row. currentAssistantMsgUID is the parentMessageId for any tool calls this
+		// step produces (both live SSE and history replay).
+		stepAsstMsgUID := uuid.GenerateShortUUID()
+		rt.currentAssistantMsgUID = stepAsstMsgUID
+		rt.assistantEvt.BeginSegment(stepAsstMsgUID, rt.currentStepID)
+
 		reasoningEvt := rt.assistantEvt.NewReasoningEvent(rt.currentStepID)
 
 		// toolCallsByIndex accumulates partial ToolCall fragments using the OpenAI streaming
@@ -307,7 +314,7 @@ func processInterrupt(ctx context.Context, messages []*schema.Message, rt *chatR
 		// render the approval card with the correct tool name and arguments.
 		toolEvt := aievent.NewToolCallEvent(
 			tc.ID, tc.Function.Name,
-			rt.assistantMsgUID, rt.currentStepID,
+			rt.currentAssistantMsgUID, rt.currentStepID,
 			rt.writer, rt.agent.convSrv, rt.convCtx,
 		)
 		toolEvt.OnStart(ctx, tc.Function.Arguments, publicExtra)
@@ -326,9 +333,9 @@ func processInterrupt(ctx context.Context, messages []*schema.Message, rt *chatR
 		})
 	}
 
-	// Persist the assistant message before closing the step so the tool_call rows
+	// The interrupted step's text segment was already persisted by the execution node's
+	// OnEnd (which runs before interruptCheck). Just close the step so the tool_call rows
 	// written above always have a parent in the event table.
-	rt.assistantEvt.Persist(ctx, rt.currentStepID)
 	rt.currentStepEvt.OnFinish(ctx)
 
 	// Serialize the full []schema.ToolCall for later resume (args may be edited by user).
@@ -360,7 +367,7 @@ func processInterrupt(ctx context.Context, messages []*schema.Message, rt *chatR
 		Status:           agentmodel.InterruptStatusPending,
 		PendingToolCalls: json.RawMessage(pendingJSON),
 		ClientPayload:    json.RawMessage(clientPayloadJSON),
-		AssistantMsgUID:  rt.assistantMsgUID,
+		AssistantMsgUID:  rt.currentAssistantMsgUID,
 		StepID:           rt.currentStepID,
 	}
 	rec.CreatedBy = rt.userID
@@ -540,7 +547,7 @@ func createToolsNode() *compose.Lambda {
 
 		// parentMsgUID / stepID link tool_result events to their parent assistant message
 		// and step. On resume, reuse the UIDs from the original interrupted run.
-		parentMsgUID := rt.assistantMsgUID
+		parentMsgUID := rt.currentAssistantMsgUID
 		stepID := rt.currentStepID
 		if isResumeApproved && rt.pendingInterrupt != nil {
 			parentMsgUID = rt.pendingInterrupt.AssistantMsgUID
