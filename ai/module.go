@@ -28,7 +28,7 @@ import (
 
 	"github.com/lindb/linsight/accesscontrol"
 	agentcomp "github.com/lindb/linsight/ai/components/agent"
-	memorycomp "github.com/lindb/linsight/ai/components/memory"
+	contextcomp "github.com/lindb/linsight/ai/components/context"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
@@ -128,9 +128,9 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	skillBackend.StartAutoRefresh(context.Background())
 	skillSrv := agentservice.NewSkillService(db)
 
-	// Create MemoryStore factory and instance
-	memoryStoreFactory := memorycomp.NewMemoryStoreFactory(db, convSrv, cfg.AI)
-	memoryStore := memoryStoreFactory.GetDefaultStore()
+	// Create ContextProvider factory and instance.
+	contextProviderFactory := contextcomp.NewContextProviderFactory(db, convSrv, cfg.AI)
+	contextProvider := contextProviderFactory.GetDefaultProvider()
 
 	// Build the DB-backed rule engine: load the cache once now (fail-soft) and start
 	// the periodic refresh so DB rule edits propagate without a restart. The engine is
@@ -143,7 +143,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	ruleEngine.StartAutoRefresh(context.Background())
 	ruleSrv := agentservice.NewRuleService(db, ruleEngine)
 
-	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillBackend, composite, proxy, memoryStore, ruleEngine)
+	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillBackend, composite, proxy, contextProvider, ruleEngine)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to compile agent graph: %v", err))
 	}

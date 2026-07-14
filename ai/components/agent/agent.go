@@ -31,7 +31,7 @@ import (
 	"github.com/lindb/common/pkg/logger"
 
 	agentapi "github.com/lindb/linsight/ai/api"
-	"github.com/lindb/linsight/ai/components/memory"
+	contextcomp "github.com/lindb/linsight/ai/components/context"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
@@ -60,7 +60,7 @@ type agentRuntime struct {
 	skillBackend skillscomp.Backend
 	toolsFactory toolscomp.ToolsProvider
 	proxy        *modelcomp.DynamicModelProxy
-	memoryStore  memory.MemoryStore
+	contextProvider contextcomp.ContextProvider
 	// ruleEngine injects DB-backed global/per-org rules into the LLM context.
 	ruleEngine rulescomp.RuleEngine
 	// graph is the explicit compose.Graph compiled once at startup.
@@ -79,7 +79,7 @@ func New(
 	skillBackend skillscomp.Backend,
 	toolsFactory toolscomp.ToolsProvider,
 	proxy *modelcomp.DynamicModelProxy,
-	memoryStore memory.MemoryStore,
+	contextProvider contextcomp.ContextProvider,
 	ruleEngine rulescomp.RuleEngine,
 ) (Agent, error) {
 	graph, err := buildGraph(cfg)
@@ -93,7 +93,7 @@ func New(
 		skillBackend: skillBackend,
 		toolsFactory: toolsFactory,
 		proxy:        proxy,
-		memoryStore:  memoryStore,
+		contextProvider: contextProvider,
 		ruleEngine:   ruleEngine,
 		graph:        graph,
 	}, nil

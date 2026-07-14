@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package memory
+package context
 
 import (
 	"context"
@@ -25,8 +25,15 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// MemoryStore Eino-standard key-value storage interface for conversation state management
-type MemoryStore interface {
+// ContextProvider builds the LLM context window from the authoritative data source
+// (DB event table). It exposes a subset of key-value operations sufficient for
+// conversation state retrieval, but the backing store is READ-ONLY: Set / Delete are
+// no-ops because the DB event table is the single source of truth for context.
+//
+// This is NOT an LLM "memory" system — it does NOT persist, compress, or summarise
+// knowledge across sessions. It simply derives the context window from persisted
+// conversation events and enriches it for the LLM API call.
+type ContextProvider interface {
 	// Basic key-value operations
 	Get(ctx context.Context, key string) ([]byte, error)
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
@@ -37,22 +44,21 @@ type MemoryStore interface {
 	// Conversation state management extensions
 	GetConversationState(ctx context.Context, conversationID string) (*ConversationState, error)
 	SetConversationState(ctx context.Context, conversationID string, state *ConversationState) error
-	LockConversation(ctx context.Context, conversationID string) error
-	UnlockConversation(ctx context.Context, conversationID string) error
 }
 
-// ConversationState Conversation state structure for persisting multi-turn dialogue context
+// ConversationState is a snapshot of the conversation context used to construct the
+// LLM context window for multi-turn dialogue.
 type ConversationState struct {
-	ConversationID   string            `json:"conversationId"`
-	OrgID           int64             `json:"orgId"`
-	UserID          int64             `json:"userId"`
-	LastActiveAt    time.Time         `json:"lastActiveAt"`
-	ContextWindow   []*schema.Message `json:"contextWindow"`
-	ActiveToolCalls []*ToolCall       `json:"activeToolCalls"`
-	Metadata        map[string]string `json:"metadata"`
+	ConversationID string            `json:"conversationId"`
+	OrgID          int64             `json:"orgId"`
+	UserID         int64             `json:"userId"`
+	LastActiveAt   time.Time         `json:"lastActiveAt"`
+	ContextWindow  []*schema.Message `json:"contextWindow"`
+	ActiveToolCalls []*ToolCall      `json:"activeToolCalls"`
+	Metadata       map[string]string `json:"metadata"`
 }
 
-// ToolCall Tool invocation record
+// ToolCall is a tool invocation record.
 type ToolCall struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
@@ -62,44 +68,38 @@ type ToolCall struct {
 	Status    string    `json:"status"` // pending, completed, failed
 }
 
-// StoreType Storage backend type
-type StoreType string
+// ProviderType is the context provider backend type.
+type ProviderType string
 
 const (
-	StoreTypeDB    StoreType = "db"
-	StoreTypeRedis StoreType = "redis"
+	ProviderTypeDB    ProviderType = "db"
+	ProviderTypeRedis ProviderType = "redis"
 )
 
-// DefaultStoreType Default storage type
-const DefaultStoreType = StoreTypeDB
+// DefaultProviderType is the default context provider type.
+const DefaultProviderType = ProviderTypeDB
 
-// DefaultTTL Default time-to-live
+// DefaultTTL is the default time-to-live.
 const DefaultTTL = 24 * time.Hour
 
-// Key patterns for conversation state management
+// Key patterns for conversation state management.
 const (
-	KeyPatternConversationState = "conv:%s:state"
-	KeyPatternConversationLock  = "conv:%s:lock"
+	KeyPatternConversationState   = "conv:%s:state"
 	KeyPatternConversationContext = "conv:%s:context"
-	KeyPatternActiveConversation = "org:%d:conv:%s:active"
+	KeyPatternActiveConversation  = "org:%d:conv:%s:active"
 )
 
-// BuildConversationStateKey Builds conversation state key
+// BuildConversationStateKey builds the conversation state key.
 func BuildConversationStateKey(conversationID string) string {
 	return fmt.Sprintf(KeyPatternConversationState, conversationID)
 }
 
-// BuildConversationLockKey Builds conversation lock key
-func BuildConversationLockKey(conversationID string) string {
-	return fmt.Sprintf(KeyPatternConversationLock, conversationID)
-}
-
-// BuildConversationContextKey Builds conversation context key
+// BuildConversationContextKey builds the conversation context key.
 func BuildConversationContextKey(conversationID string) string {
 	return fmt.Sprintf(KeyPatternConversationContext, conversationID)
 }
 
-// BuildActiveConversationKey Builds active conversation key
+// BuildActiveConversationKey builds the active conversation key.
 func BuildActiveConversationKey(orgID int64, conversationID string) string {
 	return fmt.Sprintf(KeyPatternActiveConversation, orgID, conversationID)
 }

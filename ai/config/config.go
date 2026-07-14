@@ -49,23 +49,20 @@ type Config struct {
 	// Requests that exceed this limit are rejected with HTTP 429.
 	MaxConcurrentPerOrg int `env:"MAX_CONCURRENT_PER_ORG" toml:"max-concurrent-per-org"`
 
-	// MemorySize is the number of historical messages loaded into the LLM context
+	// ContextSize is the number of historical messages loaded into the LLM context
 	// for each request (sliding window, newest first).
-	MemorySize int `env:"MEMORY_SIZE" toml:"memory-size"`
+	ContextSize int `env:"CONTEXT_SIZE" toml:"context-size"`
 
 	// MaxMessageLength is the maximum byte length of ChatRequest.Content.
 	// Requests exceeding this are rejected with HTTP 400.
 	MaxMessageLength int `env:"MAX_MESSAGE_LENGTH" toml:"max-message-length"`
 
-	// MemoryStoreType specifies the storage backend for conversation state.
+	// ContextProviderType specifies the storage backend for context derivation.
 	// Options: "db" (default), "redis" (future)
-	MemoryStoreType string `env:"MEMORY_STORE_TYPE" toml:"memory-store-type"`
+	ContextProviderType string `env:"CONTEXT_PROVIDER_TYPE" toml:"context-provider-type"`
 
-	// MemoryStoreTTL specifies the time-to-live for conversation state cache.
-	MemoryStoreTTL ltoml.Duration `env:"MEMORY_STORE_TTL" toml:"memory-store-ttl"`
-
-	// EnableStateLocking enables conversation state locking to prevent concurrent access.
-	EnableStateLocking bool `env:"ENABLE_STATE_LOCKING" toml:"enable-state-locking"`
+	// ContextProviderTTL specifies the time-to-live for conversation state cache.
+	ContextProviderTTL ltoml.Duration `env:"CONTEXT_PROVIDER_TTL" toml:"context-provider-ttl"`
 
 	// PromptRigidityLevel controls the strictness of prompt constraints to prevent planning drift.
 	// Options: "none", "basic", "strict" (default)
@@ -92,18 +89,17 @@ type Config struct {
 // All guards are enabled; the feature itself is disabled (Enabled: false).
 func NewDefaultConfig() *Config {
 	return &Config{
-		Enabled:             false,
-		MaxStep:             12,
-		RequestTimeout:      ltoml.Duration(120 * time.Second),
-		ToolTimeout:         ltoml.Duration(30 * time.Second),
-		MaxConcurrentPerOrg: 5,
-		MemorySize:          20,
-		MaxMessageLength:    8192,
+		Enabled:               false,
+		MaxStep:               12,
+		RequestTimeout:        ltoml.Duration(120 * time.Second),
+		ToolTimeout:           ltoml.Duration(30 * time.Second),
+		MaxConcurrentPerOrg:   5,
+		ContextSize:           20,
+		MaxMessageLength:      8192,
 
-		// MemoryStore configuration defaults
-		MemoryStoreType:        "db",
-		MemoryStoreTTL:         ltoml.Duration(24 * time.Hour),
-		EnableStateLocking:     true,
+		// Context provider configuration defaults
+		ContextProviderType:    "db",
+		ContextProviderTTL:     ltoml.Duration(24 * time.Hour),
 		PromptRigidityLevel:    "strict",
 		EnableMultiTurnContext: true,
 		MaxContextWindowSize:   50,
@@ -136,24 +132,21 @@ tool-timeout = "%s"
 max-concurrent-per-org = %d
 
 ## Number of historical messages to include in each request context. Default: %d
-## Env: LINSIGHT_AI_MEMORY_SIZE
-memory-size = %d
+## Env: LINSIGHT_AI_CONTEXT_SIZE
+context-size = %d
 
 ## Max byte length of the user message. Excess returns 400. Default: %d
 ## Env: LINSIGHT_AI_MAX_MESSAGE_LENGTH
 max-message-length = %d
 
-## Storage backend for conversation state. Options: "db" (default), "redis" (future)
-## Env: LINSIGHT_AI_MEMORY_STORE_TYPE
-memory-store-type = "%s"
+## Storage backend for context derivation. Options: "db" (default), "redis" (future)
+## Env: LINSIGHT_AI_CONTEXT_PROVIDER_TYPE
+context-provider-type = "%s"
 
 ## Time-to-live for conversation state cache. Default: %s
-## Env: LINSIGHT_AI_MEMORY_STORE_TTL
-memory-store-ttl = "%s"
+## Env: LINSIGHT_AI_CONTEXT_PROVIDER_TTL
+context-provider-ttl = "%s"
 
-## Enable conversation state locking to prevent concurrent access. Default: %v
-## Env: LINSIGHT_AI_ENABLE_STATE_LOCKING
-enable-state-locking = %v
 
 ## Strictness of prompt constraints to prevent planning drift. Options: "none", "basic", "strict" (default)
 ## Env: LINSIGHT_AI_PROMPT_RIGIDITY_LEVEL
@@ -179,11 +172,10 @@ rule-refresh-interval = "%s"
 		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
 		c.ToolTimeout.Duration().String(), c.ToolTimeout.Duration().String(),
 		c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
-		c.MemorySize, c.MemorySize,
+		c.ContextSize, c.ContextSize,
 		c.MaxMessageLength, c.MaxMessageLength,
-		escapeTOMLString(c.MemoryStoreType),
-		c.MemoryStoreTTL.Duration().String(), c.MemoryStoreTTL.Duration().String(),
-		c.EnableStateLocking, c.EnableStateLocking,
+		escapeTOMLString(c.ContextProviderType),
+		c.ContextProviderTTL.Duration().String(), c.ContextProviderTTL.Duration().String(),
 		escapeTOMLString(c.PromptRigidityLevel),
 		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
 		c.MaxContextWindowSize, c.MaxContextWindowSize,

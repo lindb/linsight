@@ -15,13 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package memory
+package context_test
 
 import (
 	"testing"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/lindb/linsight/ai/components/context"
 )
 
 func assistantWithToolCalls(content string, callIDs ...string) *schema.Message {
@@ -45,7 +47,7 @@ func TestSanitizeMessages(t *testing.T) {
 			toolResult("call_1", "ok"),
 			{Role: schema.Assistant, Content: "done"},
 		}
-		out := SanitizeMessages("c1", in, nil)
+		out := context.SanitizeMessages("c1", in, nil)
 		assert.Len(t, out, 4)
 		assert.Equal(t, "call_1", out[1].ToolCalls[0].ID)
 	})
@@ -58,7 +60,7 @@ func TestSanitizeMessages(t *testing.T) {
 			assistantWithToolCalls("", "call_missing"),
 			{Role: schema.User, Content: "next question"},
 		}
-		out := SanitizeMessages("c1", in, nil)
+		out := context.SanitizeMessages("c1", in, nil)
 		// The content-less assistant with an unanswered tool_call is dropped entirely.
 		assert.Len(t, out, 2)
 		assert.Equal(t, schema.User, out[0].Role)
@@ -69,7 +71,7 @@ func TestSanitizeMessages(t *testing.T) {
 		in := []*schema.Message{
 			assistantWithToolCalls("here is my analysis", "call_missing"),
 		}
-		out := SanitizeMessages("c1", in, nil)
+		out := context.SanitizeMessages("c1", in, nil)
 		assert.Len(t, out, 1)
 		assert.Empty(t, out[0].ToolCalls)
 		assert.Equal(t, "here is my analysis", out[0].Content)
@@ -81,7 +83,7 @@ func TestSanitizeMessages(t *testing.T) {
 			toolResult("call_1", "ok"),
 			// call_2 result missing
 		}
-		out := SanitizeMessages("c1", in, nil)
+		out := context.SanitizeMessages("c1", in, nil)
 		assert.Len(t, out, 2)
 		assert.Len(t, out[0].ToolCalls, 1)
 		assert.Equal(t, "call_1", out[0].ToolCalls[0].ID)
@@ -93,14 +95,14 @@ func TestSanitizeMessages(t *testing.T) {
 			{Role: schema.User, Content: "hi"},
 			toolResult("call_orphan", "stale result"),
 		}
-		out := SanitizeMessages("c1", in, nil)
+		out := context.SanitizeMessages("c1", in, nil)
 		assert.Len(t, out, 1)
 		assert.Equal(t, schema.User, out[0].Role)
 	})
 
 	t.Run("handles empty and nil input", func(t *testing.T) {
-		assert.Empty(t, SanitizeMessages("c1", nil, nil))
-		assert.Empty(t, SanitizeMessages("c1", []*schema.Message{nil}, nil))
+		assert.Empty(t, context.SanitizeMessages("c1", nil, nil))
+		assert.Empty(t, context.SanitizeMessages("c1", []*schema.Message{nil}, nil))
 	})
 
 	t.Run("resume: appends pending tool_calls at the tail as a single assistant message", func(t *testing.T) {
@@ -115,7 +117,7 @@ func TestSanitizeMessages(t *testing.T) {
 			toolResult("call_1", "ok"),
 			{Role: schema.Assistant, Content: "some analysis"},
 		}
-		out := SanitizeMessages("c1", in, pending)
+		out := context.SanitizeMessages("c1", in, pending)
 		last := out[len(out)-1]
 		assert.Equal(t, schema.Assistant, last.Role)
 		assert.Len(t, last.ToolCalls, 1)
@@ -133,7 +135,7 @@ func TestSanitizeMessages(t *testing.T) {
 			{Role: schema.User, Content: "hi"},
 			assistantWithToolCalls("", "call_pending"), // history row for the pending call
 		}
-		out := SanitizeMessages("c1", in, pending)
+		out := context.SanitizeMessages("c1", in, pending)
 		// user + single tail assistant-with-tool_calls; the mid-history duplicate is gone.
 		assert.Len(t, out, 2)
 		assert.Equal(t, schema.User, out[0].Role)
@@ -155,7 +157,7 @@ func TestSanitizeMessages(t *testing.T) {
 			{Role: schema.Assistant, Content: "some later text"},
 			toolResult("call_1", "created"),
 		}
-		out := SanitizeMessages("c1", in, nil)
+		out := context.SanitizeMessages("c1", in, nil)
 		assert.Len(t, out, 4)
 		assert.Equal(t, schema.User, out[0].Role)
 		// assistant-with-tool_calls, then its result immediately, then the interleaved text.
@@ -175,7 +177,7 @@ func TestSanitizeMessages(t *testing.T) {
 			toolResult("call_b", "b-result"), // results arrive out of declaration order
 			toolResult("call_a", "a-result"),
 		}
-		out := SanitizeMessages("c1", in, nil)
+		out := context.SanitizeMessages("c1", in, nil)
 		assert.Len(t, out, 4)
 		assert.Len(t, out[0].ToolCalls, 2)
 		// Results sit immediately after the call, ordered by ToolCalls declaration (a before b).
@@ -192,7 +194,7 @@ func TestSanitizeMessages(t *testing.T) {
 			{ID: "call_b", Type: "function", Function: schema.FunctionCall{Name: "list"}},
 		}
 		in := []*schema.Message{{Role: schema.User, Content: "hi"}}
-		out := SanitizeMessages("c1", in, pending)
+		out := context.SanitizeMessages("c1", in, pending)
 		last := out[len(out)-1]
 		assert.Len(t, last.ToolCalls, 2)
 		assert.Equal(t, "call_a", last.ToolCalls[0].ID)
@@ -206,7 +208,7 @@ func TestSummarizeMessages(t *testing.T) {
 		assistantWithToolCalls("", "call_1"),
 		toolResult("call_1", "result body"),
 	}
-	got := SummarizeMessages(in)
+	got := context.SummarizeMessages(in)
 	assert.Contains(t, got, "0:user")
 	assert.Contains(t, got, "tool_calls=[query(call_1)]")
 	assert.Contains(t, got, "tool call_id=call_1")

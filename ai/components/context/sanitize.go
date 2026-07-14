@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package memory
+package context
 
 import (
 	"fmt"
@@ -33,7 +33,7 @@ var sanitizeLog = logger.GetLogger("agent", "history_sanitize")
 // message MUST reference a tool_call emitted by a preceding assistant message.
 //
 // History rebuilt from the DB can violate this invariant in three ways:
-//   - A tool_call survives but its tool_result was dropped (truncated by MemorySize, filtered
+//   - A tool_call survives but its tool_result was dropped (truncated by context size, filtered
 //     out because it had error status, or never persisted) -> the assistant would be sent with
 //     an unanswered tool_call, producing "insufficient tool messages following tool_calls".
 //   - A tool_result survives but its parent tool_call was dropped -> an orphaned tool message.

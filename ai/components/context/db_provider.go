@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package memory
+package context
 
 import (
 	"context"
@@ -32,26 +32,29 @@ import (
 	"github.com/lindb/linsight/pkg/util"
 )
 
-var dbMemoryLog = logger.GetLogger("agent", "db_memory_store")
+var dbContextLog = logger.GetLogger("agent", "db_context_provider")
 
-// DBMemoryStore MemoryStore implementation based on database, adapting existing ConversationProvider
-type dbMemoryStore struct {
-	db         dbpkg.DB
-	convSrv    ConversationProvider
-	memorySize int
+// dbContextProvider implements ContextProvider backed by the database event table.
+// It derives the LLM context window from persisted conversation events — it does NOT
+// maintain its own mutable state. Set / Delete are no-ops because the event table is
+// the single source of truth.
+type dbContextProvider struct {
+	db          dbpkg.DB
+	convSrv     ConversationProvider
+	contextSize int
 }
 
-// NewDBMemoryStore creates a database-based MemoryStore instance
-func NewDBMemoryStore(db dbpkg.DB, convSrv ConversationProvider, memorySize int) MemoryStore {
-	return &dbMemoryStore{
-		db:         db,
-		convSrv:    convSrv,
-		memorySize: memorySize,
+// NewDBContextProvider creates a database-backed ContextProvider instance.
+func NewDBContextProvider(db dbpkg.DB, convSrv ConversationProvider, contextSize int) ContextProvider {
+	return &dbContextProvider{
+		db:          db,
+		convSrv:     convSrv,
+		contextSize: contextSize,
 	}
 }
 
-// Get retrieves the value for the specified key
-func (s *dbMemoryStore) Get(ctx context.Context, key string) ([]byte, error) {
+// Get retrieves the value for the specified key.
+func (s *dbContextProvider) Get(ctx context.Context, key string) ([]byte, error) {
 	// For conversation state keys, retrieve from ConversationProvider
 	if strings.HasPrefix(key, "conv:") && strings.HasSuffix(key, ":state") {
 		return s.getConversationState(ctx, key)
@@ -61,28 +64,30 @@ func (s *dbMemoryStore) Get(ctx context.Context, key string) ([]byte, error) {
 	return nil, fmt.Errorf("key type not supported: %s", key)
 }
 
-// Set sets the key-value pair
-func (s *dbMemoryStore) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
-	// For conversation state keys, update Conversation state
+// Set is a no-op: the DB event table is the authoritative source of context.
+// Context is derived on read, never written through this interface.
+func (s *dbContextProvider) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	if strings.HasPrefix(key, "conv:") && strings.HasSuffix(key, ":state") {
-		return s.setConversationState(ctx, key, value)
+		dbContextLog.Debug("context: state write ignored (read-only, derived from DB events)",
+			logger.String("key", key))
+		return nil
 	}
-
 	return fmt.Errorf("key type not supported: %s", key)
 }
 
-// Delete deletes the specified key
-func (s *dbMemoryStore) Delete(ctx context.Context, key string) error {
-	// For conversation state keys, clear Conversation state
+// Delete is a no-op: context is derived from DB events and cannot be deleted
+// through this interface.
+func (s *dbContextProvider) Delete(ctx context.Context, key string) error {
 	if strings.HasPrefix(key, "conv:") && strings.HasSuffix(key, ":state") {
-		return s.deleteConversationState(ctx, key)
+		dbContextLog.Debug("context: state delete ignored (read-only, derived from DB events)",
+			logger.String("key", key))
+		return nil
 	}
-
 	return fmt.Errorf("key type not supported: %s", key)
 }
 
-// Exists checks if the key exists
-func (s *dbMemoryStore) Exists(ctx context.Context, key string) (bool, error) {
+// Exists checks if the key exists.
+func (s *dbContextProvider) Exists(ctx context.Context, key string) (bool, error) {
 	if strings.HasPrefix(key, "conv:") && strings.HasSuffix(key, ":state") {
 		_, err := s.getConversationState(ctx, key)
 		return err == nil, nil
@@ -91,8 +96,8 @@ func (s *dbMemoryStore) Exists(ctx context.Context, key string) (bool, error) {
 	return false, fmt.Errorf("key type not supported: %s", key)
 }
 
-// ListKeys lists all keys matching the pattern
-func (s *dbMemoryStore) ListKeys(ctx context.Context, pattern string) ([]string, error) {
+// ListKeys lists all keys matching the pattern.
+func (s *dbContextProvider) ListKeys(ctx context.Context, pattern string) ([]string, error) {
 	// Currently only supports conversation state key listing
 	if pattern == "conv:*:state" {
 		return s.listConversationStateKeys(ctx)
@@ -101,8 +106,8 @@ func (s *dbMemoryStore) ListKeys(ctx context.Context, pattern string) ([]string,
 	return nil, fmt.Errorf("pattern not supported: %s", pattern)
 }
 
-// GetConversationState retrieves conversation state
-func (s *dbMemoryStore) GetConversationState(ctx context.Context, conversationID string) (*ConversationState, error) {
+// GetConversationState retrieves conversation state from the event table.
+func (s *dbContextProvider) GetConversationState(ctx context.Context, conversationID string) (*ConversationState, error) {
 	key := BuildConversationStateKey(conversationID)
 	data, err := s.Get(ctx, key)
 	if err != nil {
@@ -114,15 +119,15 @@ func (s *dbMemoryStore) GetConversationState(ctx context.Context, conversationID
 		return nil, fmt.Errorf("unmarshal conversation state: %w", err)
 	}
 
-	dbMemoryLog.Info("memory: state loaded from DB",
+	dbContextLog.Info("context: state loaded from DB events",
 		logger.String("conv.uid", conversationID),
 		logger.Int("contextWindow", len(state.ContextWindow)),
 	)
 	return &state, nil
 }
 
-// SetConversationState sets conversation state
-func (s *dbMemoryStore) SetConversationState(ctx context.Context, conversationID string, state *ConversationState) error {
+// SetConversationState is a no-op: state is derived from DB events on read.
+func (s *dbContextProvider) SetConversationState(ctx context.Context, conversationID string, state *ConversationState) error {
 	key := BuildConversationStateKey(conversationID)
 	data, err := json.Marshal(state)
 	if err != nil {
@@ -132,21 +137,8 @@ func (s *dbMemoryStore) SetConversationState(ctx context.Context, conversationID
 	return s.Set(ctx, key, data, DefaultTTL)
 }
 
-// LockConversation is a no-op for the DB-backed store.
-// SQLite does not support SELECT ... FOR UPDATE; its write-lock provides
-// sufficient serialization for single-node deployments.
-func (s *dbMemoryStore) LockConversation(ctx context.Context, conversationID string) error {
-	return nil
-}
-
-// UnlockConversation unlocks conversation
-func (s *dbMemoryStore) UnlockConversation(ctx context.Context, conversationID string) error {
-	dbMemoryLog.Info("memory: conversation unlocked", logger.String("conv.uid", conversationID))
-	return nil
-}
-
-// getConversationState retrieves conversation state from ConversationProvider
-func (s *dbMemoryStore) getConversationState(ctx context.Context, key string) ([]byte, error) {
+// getConversationState retrieves conversation state from ConversationProvider.
+func (s *dbContextProvider) getConversationState(ctx context.Context, key string) ([]byte, error) {
 	conversationID := extractConversationIDFromKey(key)
 	if conversationID == "" {
 		return nil, fmt.Errorf("invalid conversation state key: %s", key)
@@ -157,12 +149,12 @@ func (s *dbMemoryStore) getConversationState(ctx context.Context, key string) ([
 		return nil, fmt.Errorf("get conversation: %w", err)
 	}
 
-	messages, err := s.convSrv.GetRecentEvents(ctx, conv.UID, s.memorySize)
+	messages, err := s.convSrv.GetRecentEvents(ctx, conv.UID, s.contextSize)
 	if err != nil {
 		return nil, fmt.Errorf("get recent events: %w", err)
 	}
 
-	dbMemoryLog.Info("memory: building state from DB events",
+	dbContextLog.Info("context: building state from DB events",
 		logger.String("conv.uid", conversationID),
 		logger.Int64("conv.id", conv.ID),
 		logger.Int("events", len(messages)),
@@ -170,11 +162,11 @@ func (s *dbMemoryStore) getConversationState(ctx context.Context, key string) ([
 
 	state := &ConversationState{
 		ConversationID: conversationID,
-		OrgID:         conv.OrgID,
-		UserID:        conv.UserID,
-		LastActiveAt:  time.Now(),
-		ContextWindow: s.convertEventsToSchema(messages),
-		Metadata:      make(map[string]string),
+		OrgID:          conv.OrgID,
+		UserID:         conv.UserID,
+		LastActiveAt:   time.Now(),
+		ContextWindow:  s.convertEventsToSchema(messages),
+		Metadata:       make(map[string]string),
 	}
 
 	data, err := json.Marshal(state)
@@ -185,23 +177,8 @@ func (s *dbMemoryStore) getConversationState(ctx context.Context, key string) ([
 	return data, nil
 }
 
-// setConversationState updates conversation state
-func (s *dbMemoryStore) setConversationState(ctx context.Context, key string, value []byte) error {
-	// Conversation state is read-only, automatically built from ConversationProvider
-	// Here we only log state updates, actual state is managed by ConversationProvider
-	dbMemoryLog.Debug("conversation state updated", logger.String("key", key))
-	return nil
-}
-
-// deleteConversationState deletes conversation state
-func (s *dbMemoryStore) deleteConversationState(ctx context.Context, key string) error {
-	// Conversation state is read-only, delete operation only clears cache
-	dbMemoryLog.Debug("conversation state deleted", logger.String("key", key))
-	return nil
-}
-
-// listConversationStateKeys lists all conversation state keys
-func (s *dbMemoryStore) listConversationStateKeys(ctx context.Context) ([]string, error) {
+// listConversationStateKeys lists all conversation state keys.
+func (s *dbContextProvider) listConversationStateKeys(ctx context.Context) ([]string, error) {
 	user := util.GetUser(ctx)
 	if user == nil || user.Org == nil {
 		return nil, fmt.Errorf("user context required")
@@ -229,7 +206,7 @@ func (s *dbMemoryStore) listConversationStateKeys(ctx context.Context) ([]string
 // applied once at the single assembly entry point (agentRuntime.buildLLMMessages), where
 // the pending-interrupt tool calls are also known. Enforcing it here as well would strip
 // an in-flight interrupt's tool_calls before the resume path can re-append them.
-func (s *dbMemoryStore) convertEventsToSchema(events []*agentmodel.Event) []*schema.Message {
+func (s *dbContextProvider) convertEventsToSchema(events []*agentmodel.Event) []*schema.Message {
 	result := make([]*schema.Message, 0, len(events))
 	for _, evt := range events {
 		if len(evt.RawMessage) == 0 {
@@ -237,7 +214,7 @@ func (s *dbMemoryStore) convertEventsToSchema(events []*agentmodel.Event) []*sch
 		}
 		var sm schema.Message
 		if err := json.Unmarshal(evt.RawMessage, &sm); err != nil {
-			dbMemoryLog.Warn("memory: skipping event with malformed raw_message",
+			dbContextLog.Warn("context: skipping event with malformed raw_message",
 				logger.Int64("evt.id", evt.ID),
 				logger.Error(err),
 			)
@@ -248,7 +225,7 @@ func (s *dbMemoryStore) convertEventsToSchema(events []*agentmodel.Event) []*sch
 	return result
 }
 
-// extractConversationIDFromKey extracts conversation ID from key name
+// extractConversationIDFromKey extracts conversation ID from key name.
 func extractConversationIDFromKey(key string) string {
 	if !strings.HasPrefix(key, "conv:") || !strings.HasSuffix(key, ":state") {
 		return ""

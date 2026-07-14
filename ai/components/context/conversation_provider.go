@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package memory
+package context
 
 import (
 	"context"
@@ -23,9 +23,9 @@ import (
 	agentmodel "github.com/lindb/linsight/ai/model"
 )
 
-// ConversationProvider is the minimal interface that dbMemoryStore requires
+// ConversationProvider is the minimal interface that dbContextProvider requires
 // from the conversation layer. Defined here (not in ai/service) so that the
-// memory component has no upward dependency on the service package.
+// context component has no upward dependency on the service package.
 // ai/service.ConversationService satisfies this interface via Go structural typing.
 type ConversationProvider interface {
 	GetConversation(ctx context.Context, uid string) (*agentmodel.Conversation, error)

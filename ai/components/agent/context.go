@@ -25,12 +25,12 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
-	"github.com/lindb/linsight/ai/components/memory"
+	contextcomp "github.com/lindb/linsight/ai/components/context"
 	agentmodel "github.com/lindb/linsight/ai/model"
 )
 
 // buildLLMMessages assembles the []*schema.Message slice for the LLM from either the
-// MemoryStore (if enabled) or a direct DB history load.
+// ContextProvider (if enabled) or a direct DB history load.
 //
 // pendingToolCalls carries the tool calls of an unresolved interrupt on a resume run; it is
 // nil for ordinary turns. It is forwarded to SanitizeMessages, which re-appends them as the
@@ -42,28 +42,28 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 ) ([]*schema.Message, error) {
 	var messages []*schema.Message
 
-	if a.memoryStore != nil && a.cfg.EnableMultiTurnContext {
-		agentLog.Info("memory: using MemoryStore for multi-turn context",
+	if a.contextProvider != nil && a.cfg.EnableMultiTurnContext {
+		agentLog.Info("context: using ContextProvider for multi-turn context",
 			logger.String("conv.uid", conv.UID))
 
-		state, stateErr := a.memoryStore.GetConversationState(ctx, conv.UID)
+		state, stateErr := a.contextProvider.GetConversationState(ctx, conv.UID)
 		if stateErr != nil {
-			agentLog.Warn("memory: failed to restore conversation state, falling back to DB history",
+			agentLog.Warn("context: failed to restore conversation state, falling back to DB history",
 				logger.String("conv.uid", conv.UID), logger.Error(stateErr))
-			history, histErr := a.convSrv.GetRecentEvents(ctx, conv.UID, a.cfg.MemorySize)
+			history, histErr := a.convSrv.GetRecentEvents(ctx, conv.UID, a.cfg.ContextSize)
 			if histErr != nil {
 				return nil, fmt.Errorf("load history fallback: %w", histErr)
 			}
 			messages = a.assembleMessages(history)
 		} else {
-			agentLog.Info("memory: conversation state restored",
+			agentLog.Info("context: conversation state restored",
 				logger.String("conv.uid", conv.UID),
 				logger.Int("contextWindow", len(state.ContextWindow)))
-			messages = a.buildMessagesWithMemoryState(state)
+			messages = a.buildMessagesWithContextState(state)
 		}
 	} else {
-		agentLog.Info("memory: MemoryStore disabled, using DB history")
-		history, histErr := a.convSrv.GetRecentEvents(ctx, conv.UID, a.cfg.MemorySize)
+		agentLog.Info("context: ContextProvider disabled, using DB history")
+		history, histErr := a.convSrv.GetRecentEvents(ctx, conv.UID, a.cfg.ContextSize)
 		if histErr != nil {
 			return nil, fmt.Errorf("load history: %w", histErr)
 		}
@@ -73,7 +73,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 	// Enforce the tool_call/tool_result pairing invariant exactly once, after the raw message
 	// list is assembled and the pending interrupt (if any) is known. This drops unanswered
 	// tool_calls / orphaned tool messages and re-appends the pending interrupt's tool_calls.
-	messages = memory.SanitizeMessages(conv.UID, messages, pendingToolCalls)
+	messages = contextcomp.SanitizeMessages(conv.UID, messages, pendingToolCalls)
 
 	// Log the exact history context handed to the LLM so tool-call/result pairing problems
 	// (which surface as opaque 400 errors from the provider) can be diagnosed from logs alone.
@@ -81,7 +81,7 @@ func (a *agentRuntime) buildLLMMessages(ctx context.Context, conv *agentmodel.Co
 		logger.String("conv.uid", conv.UID),
 		logger.Int("total_messages", len(messages)),
 		logger.Int("pending_tool_calls", len(pendingToolCalls)),
-		logger.String("summary", memory.SummarizeMessages(messages)))
+		logger.String("summary", contextcomp.SummarizeMessages(messages)))
 	return messages, nil
 }
 
@@ -118,10 +118,10 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) []*schema.M
 	return msgs
 }
 
-// buildMessagesWithMemoryState builds messages using MemoryStore conversation state.
+// buildMessagesWithContextState builds messages using ContextProvider conversation state.
 // The state's ContextWindow already contains the current user message (saved before
 // GetConversationState was called).
-func (a *agentRuntime) buildMessagesWithMemoryState(state *memory.ConversationState) []*schema.Message {
+func (a *agentRuntime) buildMessagesWithContextState(state *contextcomp.ConversationState) []*schema.Message {
 	messages := make([]*schema.Message, 0, len(state.ContextWindow)+1)
 
 	sysPrompt := a.buildSystemPrompt()

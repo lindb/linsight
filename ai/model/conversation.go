@@ -39,7 +39,7 @@ func (Conversation) TableName() string { return "conversations" }
 
 // Message stores a single turn in a conversation.
 // RawMessage holds the complete eino schema.Message JSON (snake_case keys), enabling
-// the memory store to unmarshal it directly to schema.Message without any field mapping.
+// the context provider to unmarshal it directly to schema.Message without any field mapping.
 // The AG-UI message ID is stored in the separate MessageUID column because schema.Message
 // has no "id" field; the service layer reconstructs agui.Message.ID from MessageUID.
 type Message struct {
