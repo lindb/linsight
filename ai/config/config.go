@@ -45,7 +45,7 @@ type Config struct {
 	// tool invocation. Must be less than RequestTimeout.
 	ToolTimeout ltoml.Duration `env:"TOOL_TIMEOUT" toml:"tool-timeout"`
 
-	// MaxConcurrentPerOrg caps concurrent in-flight Chat() calls per organisation.
+	// MaxConcurrentPerOrg caps concurrent in-flight Chat() calls per organization.
 	// Requests that exceed this limit are rejected with HTTP 429.
 	MaxConcurrentPerOrg int `env:"MAX_CONCURRENT_PER_ORG" toml:"max-concurrent-per-org"`
 
@@ -83,6 +83,11 @@ type Config struct {
 	// cache from the skills table. A non-positive value disables periodic refresh.
 	// Default: 30s.
 	SkillRefreshInterval ltoml.Duration `env:"SKILL_REFRESH_INTERVAL" toml:"skill-refresh-interval"`
+
+	// MemoryRefreshInterval is how often the DB-backed memory backend reloads its in-memory
+	// cache from the memories table. A non-positive value disables periodic refresh.
+	// Default: 30s.
+	MemoryRefreshInterval ltoml.Duration `env:"MEMORY_REFRESH_INTERVAL" toml:"memory-refresh-interval"`
 }
 
 // NewDefaultConfig returns a Config with conservative, safe defaults.
@@ -105,6 +110,7 @@ func NewDefaultConfig() *Config {
 		MaxContextWindowSize:   50,
 		RuleRefreshInterval:    ltoml.Duration(30 * time.Second),
 		SkillRefreshInterval:   ltoml.Duration(30 * time.Second),
+		MemoryRefreshInterval:  ltoml.Duration(30 * time.Second),
 	}
 }
 
@@ -127,7 +133,7 @@ request-timeout = "%s"
 ## Env: LINSIGHT_AI_TOOL_TIMEOUT
 tool-timeout = "%s"
 
-## Max concurrent chat requests per organisation. Excess requests return 429. Default: %d
+## Max concurrent chat requests per organization. Excess requests return 429. Default: %d
 ## Env: LINSIGHT_AI_MAX_CONCURRENT_PER_ORG
 max-concurrent-per-org = %d
 
@@ -166,22 +172,27 @@ rule-refresh-interval = "%s"
 
 	## How often the DB-backed skill backend reloads its in-memory cache. Default: %s
 	## Env: LINSIGHT_AI_SKILL_REFRESH_INTERVAL
-	skill-refresh-interval = "%s"`,
-	c.Enabled, c.Enabled,
-		c.MaxStep, c.MaxStep,
-		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
-		c.ToolTimeout.Duration().String(), c.ToolTimeout.Duration().String(),
-		c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
-		c.ContextSize, c.ContextSize,
-		c.MaxMessageLength, c.MaxMessageLength,
-		escapeTOMLString(c.ContextProviderType),
-		c.ContextProviderTTL.Duration().String(), c.ContextProviderTTL.Duration().String(),
-		escapeTOMLString(c.PromptRigidityLevel),
-		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
-		c.MaxContextWindowSize, c.MaxContextWindowSize,
-		c.RuleRefreshInterval.Duration().String(), c.RuleRefreshInterval.Duration().String(),
-		c.SkillRefreshInterval.Duration().String(), c.SkillRefreshInterval.Duration().String(),
-	)
+	skill-refresh-interval = "%s"
+
+	## How often the DB-backed memory backend reloads its in-memory cache. Default: %s
+	## Env: LINSIGHT_AI_MEMORY_REFRESH_INTERVAL
+	memory-refresh-interval = "%s"`,
+		c.Enabled, c.Enabled,
+			c.MaxStep, c.MaxStep,
+			c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
+			c.ToolTimeout.Duration().String(), c.ToolTimeout.Duration().String(),
+			c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
+			c.ContextSize, c.ContextSize,
+			c.MaxMessageLength, c.MaxMessageLength,
+			escapeTOMLString(c.ContextProviderType),
+			c.ContextProviderTTL.Duration().String(), c.ContextProviderTTL.Duration().String(),
+			escapeTOMLString(c.PromptRigidityLevel),
+			c.EnableMultiTurnContext, c.EnableMultiTurnContext,
+			c.MaxContextWindowSize, c.MaxContextWindowSize,
+			c.RuleRefreshInterval.Duration().String(), c.RuleRefreshInterval.Duration().String(),
+			c.SkillRefreshInterval.Duration().String(), c.SkillRefreshInterval.Duration().String(),
+			c.MemoryRefreshInterval.Duration().String(), c.MemoryRefreshInterval.Duration().String(),
+		)
 }
 
 // escapeTOMLString escapes special characters in s for safe embedding in a TOML basic string.

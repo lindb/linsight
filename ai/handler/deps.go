@@ -34,4 +34,5 @@ type Deps struct {
 	FeedbackSrv agentservice.FeedbackService
 	RuleSrv     agentservice.RuleService
 	SkillSrv    agentservice.SkillService
+	MemorySrv   agentservice.MemoryService
 }

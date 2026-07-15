@@ -32,6 +32,7 @@ import (
 
 	agentapi "github.com/lindb/linsight/ai/api"
 	contextcomp "github.com/lindb/linsight/ai/components/context"
+	memorycomp "github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
@@ -63,6 +64,7 @@ type agentRuntime struct {
 	contextProvider contextcomp.ContextProvider
 	// ruleEngine injects DB-backed global/per-org rules into the LLM context.
 	ruleEngine rulescomp.RuleEngine
+	memoryBackend memorycomp.Backend
 	// graph is the explicit compose.Graph compiled once at startup.
 	graph compose.Runnable[[]*schema.Message, []*schema.Message]
 	// sems maps orgID (int64) → chan struct{} (buffered semaphore).
@@ -81,6 +83,7 @@ func New(
 	proxy *modelcomp.DynamicModelProxy,
 	contextProvider contextcomp.ContextProvider,
 	ruleEngine rulescomp.RuleEngine,
+	memoryBackend memorycomp.Backend,
 ) (Agent, error) {
 	graph, err := buildGraph(cfg)
 	if err != nil {
@@ -95,6 +98,7 @@ func New(
 		proxy:        proxy,
 		contextProvider: contextProvider,
 		ruleEngine:   ruleEngine,
+		memoryBackend: memoryBackend,
 		graph:        graph,
 	}, nil
 }

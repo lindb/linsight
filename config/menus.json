@@ -109,6 +109,14 @@
         "page": "ai_skills",
         "icon": "ai-skill",
         "role": "Admin"
+      },
+      {
+        "uid": "ai_memories",
+        "label": "Memories",
+        "path": "/ai/settings/memories/*",
+        "page": "ai_memories",
+        "icon": "ai-memory",
+        "role": "Admin"
       }
     ]
   },

@@ -3196,6 +3196,119 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  # ─── Agent Memories ──────────────────────────────────────────────────────────
+  /api/v1/ai/settings/memories:
+    get:
+      tags: [AISettings]
+      summary: List memories for the org
+      responses:
+        '200':
+          description: All memories owned by the caller org
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Memory'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AISettings]
+      summary: Create a memory
+      description: >
+        Creates a new long-term memory entry for the org. Content is required; category is optional.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryRequest'
+      responses:
+        '200':
+          description: UID of the created memory
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/ai/settings/memories/{uid}:
+    get:
+      tags: [AISettings]
+      summary: Get a single memory by UID
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The memory entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Memory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AISettings]
+      summary: Update a memory
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemoryRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [AISettings]
+      summary: Delete a memory
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
 # ─── Components ──────────────────────────────────────────────────────────────
 components:
   securitySchemes:
@@ -5192,3 +5305,39 @@ components:
           description: Create/edit a global skill. Requires super admin (RoleLin).
         isEnabled:
           type: boolean
+
+    Memory:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+              description: Short external identifier used by management APIs and tool calls.
+            orgId:
+              type: integer
+              format: int64
+              description: Scopes the memory to a single organisation.
+            content:
+              type: string
+              description: The memory text rendered into the system prompt.
+            category:
+              type: string
+              description: Optional tag for grouping related memories.
+            isEnabled:
+              type: boolean
+              description: Whether the memory is active and loaded into the prompt cache.
+
+    MemoryRequest:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          description: The memory text.
+        category:
+          type: string
+          description: Optional category tag for grouping related memories.
+        isEnabled:
+          type: boolean
+          description: Whether the memory is active.

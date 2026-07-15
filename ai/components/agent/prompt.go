@@ -38,6 +38,12 @@ const titleGenTimeout = 10 * time.Second
 // model can distinguish operator-defined rules from the base persona prompt.
 const rulesInjectionHeader = "\n\n# Global Rules\nThe following rules are configured by the operator and MUST be strictly followed:\n\n"
 
+// memoryInjectionHeader precedes injected memory text inside the system message so the
+// model can distinguish user long-term memories from the base persona prompt.
+const memoryInjectionHeader = "\n\n# User Long-Term Memory\n" +
+	"The following facts about the user have been persisted across sessions " +
+	"and should be treated as authoritative context:\n\n"
+
 // injectRulesIntoSystem returns a NEW message slice with rulesText appended to the
 // system message (or a new system message prepended if none exists). It performs a
 // copy-on-write so the caller's `messages` slice — which is reused across graph
@@ -62,6 +68,34 @@ func injectRulesIntoSystem(messages []*schema.Message, rulesText string) []*sche
 	out = append(out, &schema.Message{
 		Role:    schema.System,
 		Content: strings.TrimPrefix(rulesInjectionHeader, "\n\n") + rulesText,
+	})
+	return append(out, messages...)
+}
+
+// injectMemoryIntoSystem returns a NEW message slice with memoryText appended to the
+// system message (or a new system message prepended if none exists). It follows the
+// same copy-on-write pattern as injectRulesIntoSystem so multi-iteration loops do not
+// stack memory blocks.
+func injectMemoryIntoSystem(messages []*schema.Message, memoryText string) []*schema.Message {
+	if memoryText == "" {
+		return messages
+	}
+	for i, msg := range messages {
+		if msg.Role != schema.System {
+			continue
+		}
+		updated := *msg
+		updated.Content += memoryInjectionHeader + memoryText
+		out := make([]*schema.Message, len(messages))
+		copy(out, messages)
+		out[i] = &updated
+		return out
+	}
+	// No system message present; prepend one carrying just the memory.
+	out := make([]*schema.Message, 0, len(messages)+1)
+	out = append(out, &schema.Message{
+		Role:    schema.System,
+		Content: strings.TrimPrefix(memoryInjectionHeader, "\n\n") + memoryText,
 	})
 	return append(out, messages...)
 }

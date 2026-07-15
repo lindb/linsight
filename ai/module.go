@@ -29,6 +29,7 @@ import (
 	"github.com/lindb/linsight/accesscontrol"
 	agentcomp "github.com/lindb/linsight/ai/components/agent"
 	contextcomp "github.com/lindb/linsight/ai/components/context"
+	memorycomp "github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
@@ -66,6 +67,7 @@ type aiModule struct {
 	feedback *agenthandler.FeedbackHandler
 	rule     *agenthandler.RuleHandler
 	skill    *agenthandler.SkillHandler
+	memory   *agenthandler.MemoryHandler
 }
 
 // mod is the package-level singleton; nil if AI is disabled.
@@ -96,6 +98,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		&agentmodel.Event{},
 		&agentmodel.InterruptRecord{},
 		&agentmodel.AgentRule{},
+		&agentmodel.Memory{},
 	); err != nil {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
 	}
@@ -118,7 +121,6 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to build builtin tools: %v", err))
 	}
-	composite := toolscomp.NewCompositeToolsFactory(mcpFactory, builtinFactory)
 
 	// Build the DB-backed skill backend with in-memory cache (like rule engine).
 	skillBackend := skillscomp.NewDBBackend(db, cfg.AI.SkillRefreshInterval.Duration())
@@ -127,6 +129,21 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	}
 	skillBackend.StartAutoRefresh(context.Background())
 	skillSrv := agentservice.NewSkillService(db)
+
+	// Build the DB-backed memory backend with in-memory cache.
+	memoryBackend := memorycomp.NewDBMemoryBackend(db, cfg.AI.MemoryRefreshInterval.Duration())
+	if err := memoryBackend.RefreshCache(context.Background()); err != nil {
+		moduleLog.Warn("ai: initial memory cache load failed", logger.Error(err))
+	}
+	memoryBackend.StartAutoRefresh(context.Background())
+	memorySrv := agentservice.NewMemoryService(db, memoryBackend)
+
+	// Build memory tools and add them to the composite factory.
+	memToolsFactory, err := memorycomp.NewMemoryToolsFactory(memorySrv)
+	if err != nil {
+		panic(fmt.Sprintf("ai: failed to build memory tools: %v", err))
+	}
+	composite := toolscomp.NewCompositeToolsFactory(mcpFactory, builtinFactory, memToolsFactory)
 
 	// Create ContextProvider factory and instance.
 	contextProviderFactory := contextcomp.NewContextProviderFactory(db, convSrv, cfg.AI)
@@ -143,7 +160,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	ruleEngine.StartAutoRefresh(context.Background())
 	ruleSrv := agentservice.NewRuleService(db, ruleEngine)
 
-	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillBackend, composite, proxy, contextProvider, ruleEngine)
+	agent, err := agentcomp.New(cfg.AI, convSrv, modelFactory, skillBackend, composite, proxy, contextProvider, ruleEngine, memoryBackend)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to compile agent graph: %v", err))
 	}
@@ -160,6 +177,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		FeedbackSrv: feedbackSrv,
 		RuleSrv:     ruleSrv,
 		SkillSrv:    skillSrv,
+		MemorySrv:   memorySrv,
 	}
 	mod = &aiModule{
 		chat:     agenthandler.NewChatHandler(deps),
@@ -168,6 +186,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		feedback: agenthandler.NewFeedbackHandler(deps),
 		rule:     agenthandler.NewRuleHandler(deps),
 		skill:    agenthandler.NewSkillHandler(deps),
+		memory:   agenthandler.NewMemoryHandler(deps),
 	}
 }
 
@@ -185,6 +204,7 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 	fb := mod.feedback
 	rule := mod.rule
 	skill := mod.skill
+	memory := mod.memory
 
 	// Viewer-level routes: any authenticated user may invoke the agent.
 	router.POST("/ai/chat",
@@ -264,4 +284,16 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, skill.UpdateSkill)...)
 	router.DELETE("/ai/settings/skills/:uid",
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, skill.DeleteSkill)...)
+
+	// Memory CRUD — admin-level. Each org manages only its own memories.
+	router.GET("/ai/settings/memories",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, memory.ListMemories)...)
+	router.POST("/ai/settings/memories",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, memory.CreateMemory)...)
+	router.GET("/ai/settings/memories/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, memory.GetMemory)...)
+	router.PUT("/ai/settings/memories/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, memory.UpdateMemory)...)
+	router.DELETE("/ai/settings/memories/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, memory.DeleteMemory)...)
 }

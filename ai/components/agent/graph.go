@@ -193,6 +193,18 @@ func createExecutionNode() *compose.Lambda {
 			}
 		}
 
+		// Inject org-level long-term memory into the system prompt (copy-on-write).
+		// Follows the same pattern as rule injection so multi-iteration loops do not
+		// stack memory blocks.
+		if rt.agent.memoryBackend != nil {
+			memText, merr := rt.agent.memoryBackend.Render(ctx)
+			if merr != nil {
+				agentLog.Warn("deep: memory render failed, proceeding without memory", logger.Error(merr))
+			} else if memText != "" {
+				msgsForLLM = injectMemoryIntoSystem(msgsForLLM, memText)
+			}
+		}
+
 		reader, err := rt.agent.proxy.Stream(ctx, msgsForLLM, modelOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("deep execution stream: %w", err)

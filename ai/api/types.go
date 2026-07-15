@@ -136,6 +136,17 @@ type SkillRequest struct {
 	IsEnabled bool `json:"isEnabled"`
 }
 
+// MemoryRequest is the unified body for POST /ai/settings/memories and
+// PUT /ai/settings/memories/:uid. Content is required; Category is optional.
+type MemoryRequest struct {
+	// Content is the memory text. Required.
+	Content string `json:"content"`
+	// Category is an optional tag for grouping related memories.
+	Category string `json:"category"`
+	// IsEnabled gates whether the memory is active and loaded into the prompt.
+	IsEnabled bool `json:"isEnabled"`
+}
+
 // CreateMCPServerRequest is the body for POST /agent/settings/mcp.
 type CreateMCPServerRequest struct {
 	Name    string `json:"name" binding:"required"`
