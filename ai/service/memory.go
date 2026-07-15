@@ -21,8 +21,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lindb/common/pkg/logger"
-
 	agentapi "github.com/lindb/linsight/ai/api"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
@@ -30,17 +28,10 @@ import (
 	"github.com/lindb/linsight/pkg/uuid"
 )
 
-var memSrvLog = logger.GetLogger("agent", "memory-service")
-
-// memoryCacheRefresher is the minimal surface MemoryService needs from the memory
-// backend: trigger an immediate cache reload after a write so changes take effect
-// without waiting for the periodic ticker.
-type memoryCacheRefresher interface {
-	RefreshCache(ctx context.Context) error
-}
-
 // MemoryService manages Memory CRUD scoped to the caller's organization.
 // All operations are strictly org-isolated — no cross-org access.
+// The in-memory prompt cache is refreshed by DBMemoryBackend's periodic ticker,
+// not by individual writes.
 type MemoryService interface {
 	// ListMemories returns all memories for the org in ctx.
 	ListMemories(ctx context.Context) ([]*agentmodel.Memory, error)
@@ -63,14 +54,12 @@ type MemoryService interface {
 }
 
 type memoryService struct {
-	db    dbpkg.DB
-	cache memoryCacheRefresher
+	db dbpkg.DB
 }
 
-// NewMemoryService creates a MemoryService backed by db. The cache refresher is called
-// after every write so the in-memory prompt cache stays immediately consistent.
-func NewMemoryService(db dbpkg.DB, cache memoryCacheRefresher) MemoryService {
-	return &memoryService{db: db, cache: cache}
+// NewMemoryService creates a MemoryService backed by db.
+func NewMemoryService(db dbpkg.DB) MemoryService {
+	return &memoryService{db: db}
 }
 
 // ListMemories returns all memories owned by the caller's org.
@@ -126,8 +115,6 @@ func (s *memoryService) CreateMemory(ctx context.Context, req *agentapi.MemoryRe
 	if err := s.db.Create(mem); err != nil {
 		return "", err
 	}
-
-	s.refreshCache(ctx, "create")
 	return mem.UID, nil
 }
 
@@ -157,8 +144,6 @@ func (s *memoryService) UpdateMemory(ctx context.Context, uid string, req *agent
 		Updates(updates).Error; err != nil {
 		return err
 	}
-
-	s.refreshCache(ctx, "update")
 	return nil
 }
 
@@ -175,8 +160,6 @@ func (s *memoryService) DeleteMemory(ctx context.Context, uid string) error {
 	if err := s.db.Delete(&agentmodel.Memory{}, "uid = ? and org_id = ?", uid, existing.OrgID); err != nil {
 		return err
 	}
-
-	s.refreshCache(ctx, "delete")
 	return nil
 }
 
@@ -207,7 +190,6 @@ func (s *memoryService) SaveMemoryFromTool(ctx context.Context, id, content, cat
 		if err := s.db.Create(mem); err != nil {
 			return "", fmt.Errorf("create memory: %w", err)
 		}
-		s.refreshCache(ctx, "save")
 		return fmt.Sprintf("Memory created [%s]: %s", mem.UID, content), nil
 	}
 
@@ -230,8 +212,6 @@ func (s *memoryService) SaveMemoryFromTool(ctx context.Context, id, content, cat
 		Updates(updates).Error; err != nil {
 		return "", fmt.Errorf("update memory: %w", err)
 	}
-
-	s.refreshCache(ctx, "save")
 
 	// Build a human-readable diff.
 	var diff string
@@ -263,18 +243,5 @@ func (s *memoryService) DeleteMemoryFromTool(ctx context.Context, uid string) (s
 		return "", fmt.Errorf("delete memory: %w", err)
 	}
 
-	s.refreshCache(ctx, "delete")
 	return fmt.Sprintf("Memory deleted [%s]: %s", uid, existing.Content), nil
-}
-
-// refreshCache triggers an immediate cache reload after a write. Errors are logged
-// at warn level but not returned — the DB write succeeded; the cache will catch up
-// on the next periodic refresh.
-func (s *memoryService) refreshCache(ctx context.Context, op string) {
-	if s.cache == nil {
-		return
-	}
-	if err := s.cache.RefreshCache(ctx); err != nil {
-		memSrvLog.Warn("memory: cache refresh after "+op+" failed", logger.Error(err))
-	}
 }

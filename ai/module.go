@@ -136,7 +136,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		moduleLog.Warn("ai: initial memory cache load failed", logger.Error(err))
 	}
 	memoryBackend.StartAutoRefresh(context.Background())
-	memorySrv := agentservice.NewMemoryService(db, memoryBackend)
+	memorySrv := agentservice.NewMemoryService(db)
 
 	// Build memory tools and add them to the composite factory.
 	memToolsFactory, err := memorycomp.NewMemoryToolsFactory(memorySrv)
