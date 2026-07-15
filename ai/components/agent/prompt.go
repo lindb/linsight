@@ -49,27 +49,7 @@ const memoryInjectionHeader = "\n\n# User Long-Term Memory\n" +
 // copy-on-write so the caller's `messages` slice — which is reused across graph
 // iterations — is never mutated; otherwise rule blocks would stack up on every loop.
 func injectRulesIntoSystem(messages []*schema.Message, rulesText string) []*schema.Message {
-	if rulesText == "" {
-		return messages
-	}
-	for i, msg := range messages {
-		if msg.Role != schema.System {
-			continue
-		}
-		updated := *msg
-		updated.Content += rulesInjectionHeader + rulesText
-		out := make([]*schema.Message, len(messages))
-		copy(out, messages)
-		out[i] = &updated
-		return out
-	}
-	// No system message present; prepend one carrying just the rules.
-	out := make([]*schema.Message, 0, len(messages)+1)
-	out = append(out, &schema.Message{
-		Role:    schema.System,
-		Content: strings.TrimPrefix(rulesInjectionHeader, "\n\n") + rulesText,
-	})
-	return append(out, messages...)
+	return injectIntoSystem(messages, rulesText, rulesInjectionHeader)
 }
 
 // injectMemoryIntoSystem returns a NEW message slice with memoryText appended to the
@@ -77,7 +57,13 @@ func injectRulesIntoSystem(messages []*schema.Message, rulesText string) []*sche
 // same copy-on-write pattern as injectRulesIntoSystem so multi-iteration loops do not
 // stack memory blocks.
 func injectMemoryIntoSystem(messages []*schema.Message, memoryText string) []*schema.Message {
-	if memoryText == "" {
+	return injectIntoSystem(messages, memoryText, memoryInjectionHeader)
+}
+
+// injectIntoSystem appends header + text to the existing system message (copy-on-write),
+// or prepends a new system message if none exists.
+func injectIntoSystem(messages []*schema.Message, text, header string) []*schema.Message {
+	if text == "" {
 		return messages
 	}
 	for i, msg := range messages {
@@ -85,17 +71,17 @@ func injectMemoryIntoSystem(messages []*schema.Message, memoryText string) []*sc
 			continue
 		}
 		updated := *msg
-		updated.Content += memoryInjectionHeader + memoryText
+		updated.Content += header + text
 		out := make([]*schema.Message, len(messages))
 		copy(out, messages)
 		out[i] = &updated
 		return out
 	}
-	// No system message present; prepend one carrying just the memory.
+	// No system message present; prepend one.
 	out := make([]*schema.Message, 0, len(messages)+1)
 	out = append(out, &schema.Message{
 		Role:    schema.System,
-		Content: strings.TrimPrefix(memoryInjectionHeader, "\n\n") + memoryText,
+		Content: strings.TrimPrefix(header, "\n\n") + text,
 	})
 	return append(out, messages...)
 }
