@@ -111,6 +111,14 @@
         "role": "Admin"
       },
       {
+        "uid": "ai_agent",
+        "label": "Agent",
+        "path": "/ai/settings/agents/*",
+        "page": "ai_agents",
+        "icon": "ai-agent",
+        "role": "Admin"
+      },
+      {
         "uid": "ai_memories",
         "label": "Memories",
         "path": "/ai/settings/memories/*",

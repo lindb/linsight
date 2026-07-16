@@ -49,6 +49,12 @@ type Config struct {
 	// Requests that exceed this limit are rejected with HTTP 429.
 	MaxConcurrentPerOrg int `env:"MAX_CONCURRENT_PER_ORG" toml:"max-concurrent-per-org"`
 
+	// MaxParallelToolCalls bounds how many tool calls within a SINGLE reasoning step are
+	// executed concurrently. Tool calls in one step are independent by construction (the
+	// LLM emits them from the same pre-tool context), so parallelizing is safe; a value
+	// of 1 forces sequential execution. Default: 4.
+	MaxParallelToolCalls int `env:"MAX_PARALLEL_TOOL_CALLS" toml:"max-parallel-tool-calls"`
+
 	// ContextSize is the number of historical messages loaded into the LLM context
 	// for each request (sliding window, newest first).
 	ContextSize int `env:"CONTEXT_SIZE" toml:"context-size"`
@@ -88,29 +94,35 @@ type Config struct {
 	// cache from the memories table. A non-positive value disables periodic refresh.
 	// Default: 30s.
 	MemoryRefreshInterval ltoml.Duration `env:"MEMORY_REFRESH_INTERVAL" toml:"memory-refresh-interval"`
+
+	// SpecialistRefreshInterval is how often the DB-backed specialist (sub-agent) backend
+	// reloads its in-memory cache from the specialists table. A non-positive value disables
+	// periodic refresh. Default: 30s.
+	SpecialistRefreshInterval ltoml.Duration `env:"SPECIALIST_REFRESH_INTERVAL" toml:"specialist-refresh-interval"`
 }
 
 // NewDefaultConfig returns a Config with conservative, safe defaults.
 // All guards are enabled; the feature itself is disabled (Enabled: false).
 func NewDefaultConfig() *Config {
 	return &Config{
-		Enabled:               false,
-		MaxStep:               12,
-		RequestTimeout:        ltoml.Duration(120 * time.Second),
-		ToolTimeout:           ltoml.Duration(30 * time.Second),
-		MaxConcurrentPerOrg:   5,
-		ContextSize:           20,
-		MaxMessageLength:      8192,
-
+		Enabled:              false,
+		MaxStep:              12,
+		RequestTimeout:       ltoml.Duration(120 * time.Second),
+		ToolTimeout:          ltoml.Duration(30 * time.Second),
+		MaxConcurrentPerOrg:  5,
+		ContextSize:          20,
+		MaxMessageLength:     8192,
+		MaxParallelToolCalls: 4,
 		// Context provider configuration defaults
-		ContextProviderType:    "db",
-		ContextProviderTTL:     ltoml.Duration(24 * time.Hour),
-		PromptRigidityLevel:    "strict",
-		EnableMultiTurnContext: true,
-		MaxContextWindowSize:   50,
-		RuleRefreshInterval:    ltoml.Duration(30 * time.Second),
-		SkillRefreshInterval:   ltoml.Duration(30 * time.Second),
-		MemoryRefreshInterval:  ltoml.Duration(30 * time.Second),
+		ContextProviderType:       "db",
+		ContextProviderTTL:        ltoml.Duration(24 * time.Hour),
+		PromptRigidityLevel:       "strict",
+		EnableMultiTurnContext:    true,
+		MaxContextWindowSize:      50,
+		RuleRefreshInterval:       ltoml.Duration(30 * time.Second),
+		SkillRefreshInterval:      ltoml.Duration(30 * time.Second),
+		MemoryRefreshInterval:     ltoml.Duration(30 * time.Second),
+		SpecialistRefreshInterval: ltoml.Duration(30 * time.Second),
 	}
 }
 
@@ -136,6 +148,10 @@ tool-timeout = "%s"
 ## Max concurrent chat requests per organization. Excess requests return 429. Default: %d
 ## Env: LINSIGHT_AI_MAX_CONCURRENT_PER_ORG
 max-concurrent-per-org = %d
+
+## Max tool calls within a single reasoning step executed concurrently (1 = sequential). Default: %d
+## Env: LINSIGHT_AI_MAX_PARALLEL_TOOL_CALLS
+max-parallel-tool-calls = %d
 
 ## Number of historical messages to include in each request context. Default: %d
 ## Env: LINSIGHT_AI_CONTEXT_SIZE
@@ -176,23 +192,29 @@ rule-refresh-interval = "%s"
 
 	## How often the DB-backed memory backend reloads its in-memory cache. Default: %s
 	## Env: LINSIGHT_AI_MEMORY_REFRESH_INTERVAL
-	memory-refresh-interval = "%s"`,
+	memory-refresh-interval = "%s"
+
+	## How often the DB-backed specialist (sub-agent) backend reloads its in-memory cache. Default: %s
+	## Env: LINSIGHT_AI_SPECIALIST_REFRESH_INTERVAL
+	specialist-refresh-interval = "%s"`,
 		c.Enabled, c.Enabled,
-			c.MaxStep, c.MaxStep,
-			c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
-			c.ToolTimeout.Duration().String(), c.ToolTimeout.Duration().String(),
-			c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
-			c.ContextSize, c.ContextSize,
-			c.MaxMessageLength, c.MaxMessageLength,
-			escapeTOMLString(c.ContextProviderType),
-			c.ContextProviderTTL.Duration().String(), c.ContextProviderTTL.Duration().String(),
-			escapeTOMLString(c.PromptRigidityLevel),
-			c.EnableMultiTurnContext, c.EnableMultiTurnContext,
-			c.MaxContextWindowSize, c.MaxContextWindowSize,
-			c.RuleRefreshInterval.Duration().String(), c.RuleRefreshInterval.Duration().String(),
-			c.SkillRefreshInterval.Duration().String(), c.SkillRefreshInterval.Duration().String(),
-			c.MemoryRefreshInterval.Duration().String(), c.MemoryRefreshInterval.Duration().String(),
-		)
+		c.MaxStep, c.MaxStep,
+		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
+		c.ToolTimeout.Duration().String(), c.ToolTimeout.Duration().String(),
+		c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
+		c.MaxParallelToolCalls, c.MaxParallelToolCalls,
+		c.ContextSize, c.ContextSize,
+		c.MaxMessageLength, c.MaxMessageLength,
+		escapeTOMLString(c.ContextProviderType),
+		c.ContextProviderTTL.Duration().String(), c.ContextProviderTTL.Duration().String(),
+		escapeTOMLString(c.PromptRigidityLevel),
+		c.EnableMultiTurnContext, c.EnableMultiTurnContext,
+		c.MaxContextWindowSize, c.MaxContextWindowSize,
+		c.RuleRefreshInterval.Duration().String(), c.RuleRefreshInterval.Duration().String(),
+		c.SkillRefreshInterval.Duration().String(), c.SkillRefreshInterval.Duration().String(),
+		c.MemoryRefreshInterval.Duration().String(), c.MemoryRefreshInterval.Duration().String(),
+		c.SpecialistRefreshInterval.Duration().String(), c.SpecialistRefreshInterval.Duration().String(),
+	)
 }
 
 // escapeTOMLString escapes special characters in s for safe embedding in a TOML basic string.

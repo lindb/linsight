@@ -3196,6 +3196,130 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  # ─── Agent Specialists (sub-agents) ──────────────────────────────────────────
+  /api/v1/ai/settings/agents:
+    get:
+      tags: [AISettings]
+      summary: List specialists visible to the org (global + own-org sub-agents)
+      responses:
+        '200':
+          description: Global specialists plus the caller org's specialists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Specialist'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [AISettings]
+      summary: Create a specialist (sub-agent)
+      description: >
+        Creates a DB-backed specialist. When enabled it is exposed to the Host LLM as a
+        handoff_to_<name> tool; invoking it runs the specialist in an isolated context
+        (its systemPrompt plus the host-supplied goal) and returns structured evidence.
+        Creating a global specialist (isGlobal=true) requires super admin (RoleLin);
+        regular org admins may only create own-org specialists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRequest'
+      responses:
+        '200':
+          description: UID of the created specialist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uid:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/ai/settings/agents/{uid}:
+    get:
+      tags: [AISettings]
+      summary: Get a single specialist by UID
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The specialist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Specialist'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    put:
+      tags: [AISettings]
+      summary: Update a specialist
+      description: >
+        Editing a global specialist requires super admin (RoleLin). Per-org specialists
+        are scoped to the caller's org. Note: isGlobal is ignored on update — a
+        specialist's scope is immutable after creation.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags: [AISettings]
+      summary: Delete a specialist
+      description: >
+        Deleting a global specialist requires super admin (RoleLin). Per-org specialists
+        are scoped to the caller's org.
+      parameters:
+        - name: uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/OK'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   # ─── Agent Memories ──────────────────────────────────────────────────────────
   /api/v1/ai/settings/memories:
     get:
@@ -5303,6 +5427,55 @@ components:
         isGlobal:
           type: boolean
           description: Create/edit a global skill. Requires super admin (RoleLin).
+        isEnabled:
+          type: boolean
+
+    Specialist:
+      allOf:
+        - $ref: '#/components/schemas/BaseModel'
+        - type: object
+          properties:
+            uid:
+              type: string
+            orgId:
+              type: integer
+              format: int64
+              description: 0 for a global specialist; a positive value scopes it to that org.
+            name:
+              type: string
+              description: >
+                Canonical specialist name and the suffix of its handoff tool
+                (handoff_to_<name>). A tool-name-safe slug.
+            content:
+              type: string
+              description: >
+                Full agent.md Markdown document. The optional YAML frontmatter carries
+                description (when to delegate — becomes the handoff tool description),
+                and the reserved model / tools fields; the body is the specialist's
+                isolated system prompt.
+            isGlobal:
+              type: boolean
+              description: True when the specialist applies to all orgs.
+            isEnabled:
+              type: boolean
+
+    AgentRequest:
+      type: object
+      required: [name, content]
+      properties:
+        name:
+          type: string
+          description: >
+            Canonical specialist name (tool-name-safe slug); becomes handoff_to_<name>.
+        content:
+          type: string
+          description: >
+            Full agent.md Markdown document (YAML frontmatter + body). Frontmatter fields:
+            description (routing), model and tools (reserved, not yet enforced); the body
+            is the specialist's system prompt.
+        isGlobal:
+          type: boolean
+          description: Create/edit a global specialist. Requires super admin (RoleLin).
         isEnabled:
           type: boolean
 

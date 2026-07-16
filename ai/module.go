@@ -31,6 +31,7 @@ import (
 	contextcomp "github.com/lindb/linsight/ai/components/context"
 	memorycomp "github.com/lindb/linsight/ai/components/memory"
 	modelcomp "github.com/lindb/linsight/ai/components/model"
+	multiagentcomp "github.com/lindb/linsight/ai/components/multiagent"
 	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
@@ -61,13 +62,14 @@ type ObservabilityDeps struct {
 // aiModule holds the domain handlers wired up during Bootstrap.
 // A nil mod means the agent is disabled or Bootstrap was never called.
 type aiModule struct {
-	chat     *agenthandler.ChatHandler
-	model    *agenthandler.ModelHandler
-	mcp      *agenthandler.MCPHandler
-	feedback *agenthandler.FeedbackHandler
-	rule     *agenthandler.RuleHandler
-	skill    *agenthandler.SkillHandler
-	memory   *agenthandler.MemoryHandler
+	chat       *agenthandler.ChatHandler
+	model      *agenthandler.ModelHandler
+	mcp        *agenthandler.MCPHandler
+	feedback   *agenthandler.FeedbackHandler
+	rule       *agenthandler.RuleHandler
+	skill      *agenthandler.SkillHandler
+	specialist *agenthandler.SpecialistHandler
+	memory     *agenthandler.MemoryHandler
 }
 
 // mod is the package-level singleton; nil if AI is disabled.
@@ -99,6 +101,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		&agentmodel.InterruptRecord{},
 		&agentmodel.AgentRule{},
 		&agentmodel.Memory{},
+		&agentmodel.Specialist{},
 	); err != nil {
 		panic(fmt.Sprintf("ai: failed to migrate database schema: %v", err))
 	}
@@ -143,7 +146,18 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to build memory tools: %v", err))
 	}
-	composite := toolscomp.NewCompositeToolsFactory(mcpFactory, builtinFactory, memToolsFactory)
+
+	// Build the DB-backed specialist (sub-agent) backend with in-memory cache. It doubles
+	// as a ToolsProvider: each enabled specialist becomes a handoff_to_<name> tool bound to
+	// the Host, realizing the Host-Specialist topology with no agent-graph changes.
+	specialistBackend := multiagentcomp.NewDBBackend(db, proxy, cfg.AI.SpecialistRefreshInterval.Duration())
+	if err := specialistBackend.RefreshCache(context.Background()); err != nil {
+		moduleLog.Warn("ai: initial specialist cache load failed", logger.Error(err))
+	}
+	specialistBackend.StartAutoRefresh(context.Background())
+	specialistSrv := agentservice.NewSpecialistService(db)
+
+	composite := toolscomp.NewCompositeToolsFactory(mcpFactory, builtinFactory, memToolsFactory, specialistBackend)
 
 	// Create ContextProvider factory and instance.
 	contextProviderFactory := contextcomp.NewContextProviderFactory(db, convSrv, cfg.AI)
@@ -169,24 +183,26 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 	telemetry.Register()
 
 	deps := &agenthandler.Deps{
-		Cfg:         cfg.AI,
-		Agent:       agent,
-		ModelSrv:    modelSrv,
-		MCPSrv:      mcpSrv,
-		ConvSrv:     convSrv,
-		FeedbackSrv: feedbackSrv,
-		RuleSrv:     ruleSrv,
-		SkillSrv:    skillSrv,
-		MemorySrv:   memorySrv,
+		Cfg:           cfg.AI,
+		Agent:         agent,
+		ModelSrv:      modelSrv,
+		MCPSrv:        mcpSrv,
+		ConvSrv:       convSrv,
+		FeedbackSrv:   feedbackSrv,
+		RuleSrv:       ruleSrv,
+		SkillSrv:      skillSrv,
+		SpecialistSrv: specialistSrv,
+		MemorySrv:     memorySrv,
 	}
 	mod = &aiModule{
-		chat:     agenthandler.NewChatHandler(deps),
-		model:    agenthandler.NewModelHandler(deps),
-		mcp:      agenthandler.NewMCPHandler(deps),
-		feedback: agenthandler.NewFeedbackHandler(deps),
-		rule:     agenthandler.NewRuleHandler(deps),
-		skill:    agenthandler.NewSkillHandler(deps),
-		memory:   agenthandler.NewMemoryHandler(deps),
+		chat:       agenthandler.NewChatHandler(deps),
+		model:      agenthandler.NewModelHandler(deps),
+		mcp:        agenthandler.NewMCPHandler(deps),
+		feedback:   agenthandler.NewFeedbackHandler(deps),
+		rule:       agenthandler.NewRuleHandler(deps),
+		skill:      agenthandler.NewSkillHandler(deps),
+		specialist: agenthandler.NewSpecialistHandler(deps),
+		memory:     agenthandler.NewMemoryHandler(deps),
 	}
 }
 
@@ -204,6 +220,7 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 	fb := mod.feedback
 	rule := mod.rule
 	skill := mod.skill
+	specialist := mod.specialist
 	memory := mod.memory
 
 	// Viewer-level routes: any authenticated user may invoke the agent.
@@ -284,6 +301,20 @@ func RegisterRoutes(router *gin.RouterGroup, deps *depspkg.API) {
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, skill.UpdateSkill)...)
 	router.DELETE("/ai/settings/skills/:uid",
 		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, skill.DeleteSkill)...)
+
+	// Specialist (sub-agent) CRUD — admin-level. Global specialists (is_global=true) are
+	// further gated to super admins (RoleLin) inside SpecialistService; regular org admins
+	// manage only their own org's specialists. User-facing resource path is "agents".
+	router.GET("/ai/settings/agents",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, specialist.ListSpecialists)...)
+	router.POST("/ai/settings/agents",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, specialist.CreateSpecialist)...)
+	router.GET("/ai/settings/agents/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Read, specialist.GetSpecialist)...)
+	router.PUT("/ai/settings/agents/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, specialist.UpdateSpecialist)...)
+	router.DELETE("/ai/settings/agents/:uid",
+		middleware.Authorize(deps, accesscontrol.AdminAccessResource, accesscontrol.Write, specialist.DeleteSpecialist)...)
 
 	// Memory CRUD — admin-level. Each org manages only its own memories.
 	router.GET("/ai/settings/memories",

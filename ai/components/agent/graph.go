@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -566,54 +567,16 @@ func createToolsNode() *compose.Lambda {
 			stepID = rt.pendingInterrupt.StepID
 		}
 
-		for _, tc := range toolCalls {
-			toolEvt := aievent.NewToolCallEvent(
-				tc.ID, tc.Function.Name,
-				parentMsgUID, stepID,
-				rt.writer, rt.agent.convSrv, rt.convCtx,
-			)
-
-			if !isResumeApproved {
-				// Normal execution path: emit TOOL_CALL_START + persist tool_call DB row.
-				staticExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
-				publicExtra := getToolPublicExtra(staticExtra)
-				toolEvt.OnStart(ctx, tc.Function.Arguments, publicExtra)
-			}
-			// Resume+approved: run 1's processInterrupt already called OnStart.
-
-			it, ok := toolMap[tc.Function.Name]
-			if !ok {
-				toolErr := fmt.Errorf("tool %q not found", tc.Function.Name)
-				toolEvt.OnError(ctx, toolErr)
-				messages = append(messages, &schema.Message{
-					Role:       schema.Tool,
-					Content:    toolErr.Error(),
-					ToolCallID: tc.ID,
-					ToolName:   tc.Function.Name,
-				})
-				continue
-			}
-
-			result, runErr := it.InvokableRun(ctx, tc.Function.Arguments)
-			if runErr != nil {
-				toolEvt.OnError(ctx, runErr)
-				messages = append(messages, &schema.Message{
-					Role:       schema.Tool,
-					Content:    runErr.Error(),
-					ToolCallID: tc.ID,
-					ToolName:   tc.Function.Name,
-				})
-			} else {
-				llmContent, extra := parseToolResult(result)
-				toolEvt.OnEnd(ctx, llmContent, extra)
-				messages = append(messages, &schema.Message{
-					Role:       schema.Tool,
-					Content:    llmContent,
-					ToolCallID: tc.ID,
-					ToolName:   tc.Function.Name,
-				})
-			}
-		}
+		// Execute this step's tool calls. By construction they are INDEPENDENT: the LLM
+		// emitted them all from the same pre-tool context, so none can consume another's
+		// output (data dependencies only ever appear ACROSS steps, which the ReAct loop
+		// serializes via tools→thinking→execution). We therefore run them concurrently with
+		// a bounded worker pool and collect results by position, so the tool_call →
+		// tool_result pairing order stays deterministic for history replay.
+		results := dispatchToolCalls(toolCalls, rt.agent.cfg.MaxParallelToolCalls, func(i int) *schema.Message {
+			return rt.runToolCall(ctx, &toolCalls[i], toolMap, parentMsgUID, stepID, isResumeApproved)
+		})
+		messages = append(messages, results...)
 
 		// All tools in this iteration are done; close the step.
 		rt.currentStepEvt.OnFinish(ctx)
@@ -622,6 +585,117 @@ func createToolsNode() *compose.Lambda {
 		rt.pendingToolCallsToExecute = nil
 		return messages, nil
 	})
+}
+
+// dispatchToolCalls runs fn for each tool call, concurrently up to maxParallel workers
+// (a value <= 1, or a single call, runs sequentially), and returns the results in the
+// ORIGINAL order regardless of completion order. Each worker writes a distinct result slot
+// and the final slice is assembled after all workers finish, so replay ordering is
+// deterministic and there is no shared-slice race. Safe because tool calls within one step
+// are independent by construction (see caller).
+func dispatchToolCalls(toolCalls []schema.ToolCall, maxParallel int, fn func(i int) *schema.Message) []*schema.Message {
+	results := make([]*schema.Message, len(toolCalls))
+	if maxParallel < 1 {
+		maxParallel = 1
+	}
+	if maxParallel == 1 || len(toolCalls) <= 1 {
+		for i := range toolCalls {
+			results[i] = fn(i)
+		}
+		return results
+	}
+
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxParallel)
+	for i := range toolCalls {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = fn(idx)
+		}(i)
+	}
+	wg.Wait()
+	return results
+}
+
+// runToolCall executes a single tool call, emitting the TOOL_CALL_* lifecycle events and
+// returning the resulting tool message. It is safe to call concurrently for distinct tool
+// calls within one step: each invocation owns its ToolCallEvent, the SSE writer serializes
+// its own frames, the event sequence counter is atomic, and each goroutine writes a
+// distinct result slot. A tool error is converted into a tool message (never a Go error)
+// so one failing tool never aborts its siblings.
+func (rt *chatRun) runToolCall(
+	ctx context.Context,
+	tc *schema.ToolCall,
+	toolMap map[string]tool.InvokableTool,
+	parentMsgUID, stepID string,
+	isResumeApproved bool,
+) (msg *schema.Message) {
+	toolEvt := aievent.NewToolCallEvent(
+		tc.ID, tc.Function.Name,
+		parentMsgUID, stepID,
+		rt.writer, rt.agent.convSrv, rt.convCtx,
+	)
+
+	// Recover from a panicking tool. This is REQUIRED for the parallel path: a panic in a
+	// worker goroutine cannot be caught by the request goroutine's recover (runtime.go), so
+	// without this it would crash the whole process. We degrade the panic to a tool-error
+	// message + event, exactly like a returned error, so one bad tool never aborts its
+	// siblings (parallel) or the whole turn (sequential).
+	defer func() {
+		if r := recover(); r != nil {
+			panicErr := fmt.Errorf("tool %q panicked: %v", tc.Function.Name, r)
+			agentLog.Error("tool call panicked", logger.String("tool", tc.Function.Name), logger.Error(panicErr))
+			toolEvt.OnError(ctx, panicErr)
+			msg = &schema.Message{
+				Role:       schema.Tool,
+				Content:    panicErr.Error(),
+				ToolCallID: tc.ID,
+				ToolName:   tc.Function.Name,
+			}
+		}
+	}()
+
+	if !isResumeApproved {
+		// Normal execution path: emit TOOL_CALL_START + persist tool_call DB row.
+		staticExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
+		publicExtra := getToolPublicExtra(staticExtra)
+		toolEvt.OnStart(ctx, tc.Function.Arguments, publicExtra)
+	}
+	// Resume+approved: run 1's processInterrupt already called OnStart.
+
+	it, ok := toolMap[tc.Function.Name]
+	if !ok {
+		toolErr := fmt.Errorf("tool %q not found", tc.Function.Name)
+		toolEvt.OnError(ctx, toolErr)
+		return &schema.Message{
+			Role:       schema.Tool,
+			Content:    toolErr.Error(),
+			ToolCallID: tc.ID,
+			ToolName:   tc.Function.Name,
+		}
+	}
+
+	result, runErr := it.InvokableRun(ctx, tc.Function.Arguments)
+	if runErr != nil {
+		toolEvt.OnError(ctx, runErr)
+		return &schema.Message{
+			Role:       schema.Tool,
+			Content:    runErr.Error(),
+			ToolCallID: tc.ID,
+			ToolName:   tc.Function.Name,
+		}
+	}
+	llmContent, extra := parseToolResult(result)
+	toolEvt.OnEnd(ctx, llmContent, extra)
+	return &schema.Message{
+		Role:       schema.Tool,
+		Content:    llmContent,
+		ToolCallID: tc.ID,
+		ToolName:   tc.Function.Name,
+	}
 }
 
 // decideBranch routes after the interruptCheck node:

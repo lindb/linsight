@@ -75,6 +75,13 @@ Conclusion: [FINISHED]
 - Stay objective; draw conclusions from data, not assumptions.
 - Treat empty results from a data source as valid evidence (a signal that the service is healthy), not as an error.
 
+## Delegating to Specialists
+
+Some tools are named ` + "`handoff_to_<specialist>`" + `. These delegate a self-contained sub-task to a specialist sub-agent that runs in an ISOLATED context — it CANNOT see this conversation. When a task needs focused, domain-specific investigation:
+- Call the matching ` + "`handoff_to_<specialist>`" + ` tool with a ` + "`goal`" + ` that is fully self-contained: restate every fact, constraint, and piece of context the specialist needs, because it has no access to the history.
+- The specialist returns a structured JSON evidence object (fields: agentId, success, summary, data, error) as the tool result. Read it, integrate the ` + "`summary`" + ` and ` + "`data`" + ` into your own reasoning, and address the user yourself — the specialist never speaks to the user directly.
+- If ` + "`success`" + ` is false, decide whether to retry with a refined goal, delegate elsewhere, or proceed with the evidence you have.
+
 ## Language
 
 IMPORTANT: Always use the SAME language as the user's message for BOTH your reasoning/thinking AND your final response. If the user writes in Chinese, think and respond in Chinese. If the user writes in English, think and respond in English.`

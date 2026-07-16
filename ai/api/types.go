@@ -80,10 +80,10 @@ const (
 // service layer (not gin binding) so that service calls made outside of
 // HTTP handlers are also validated correctly.
 type ModelRequest struct {
-	Name      string `json:"name"`
-	Provider  string `json:"provider"`
-	Model     string `json:"model"`
-	APIKey    string `json:"apiKey"`
+	Name     string `json:"name"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	APIKey   string `json:"apiKey"`
 	// IsDefault marks this model as the org default. On create it is applied
 	// atomically after insert; on update it is stored directly.
 	IsDefault   bool    `json:"isDefault"`
@@ -133,6 +133,24 @@ type SkillRequest struct {
 	// IsGlobal marks the skill as available to all orgs. Super-admin only.
 	IsGlobal bool `json:"isGlobal"`
 	// IsEnabled gates whether the skill is active.
+	IsEnabled bool `json:"isEnabled"`
+}
+
+// AgentRequest is the unified body for POST /ai/settings/agents and
+// PUT /ai/settings/agents/:uid. It configures a Specialist (sub-agent) as a
+// Claude-Code-style agent.md document. Required-field validation is enforced by the
+// service layer (not gin binding) so that service calls made outside of HTTP handlers
+// are also validated correctly. The description / model / tools metadata is carried in
+// the Content YAML frontmatter; the body is the specialist's system prompt.
+type AgentRequest struct {
+	// Name is the canonical specialist name and the suffix of its handoff tool
+	// (handoff_to_<name>). Required; must be a tool-name-safe slug.
+	Name string `json:"name"`
+	// Content is the full agent.md Markdown document (YAML frontmatter + body). Required.
+	Content string `json:"content"`
+	// IsGlobal marks the specialist as available to all orgs. Super-admin only.
+	IsGlobal bool `json:"isGlobal"`
+	// IsEnabled gates whether the specialist is active (its handoff tool bound).
 	IsEnabled bool `json:"isEnabled"`
 }
 

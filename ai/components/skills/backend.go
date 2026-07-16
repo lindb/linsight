@@ -29,8 +29,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	agentmodel "github.com/lindb/linsight/ai/model"
-	"github.com/lindb/linsight/pkg/util"
+	aiutil "github.com/lindb/linsight/ai/util"
 	dbpkg "github.com/lindb/linsight/pkg/db"
+	"github.com/lindb/linsight/pkg/util"
 )
 
 var log = logger.GetLogger("agent", "skills")
@@ -234,7 +235,7 @@ func getOrgID(ctx context.Context) (int64, error) {
 func parseFrontmatter(name string, content string) (*runtimeSkill, error) {
 	rs := &runtimeSkill{Name: name}
 
-	fm, body := splitFrontmatter(content)
+	fm, body := aiutil.SplitFrontmatter(content)
 	rs.Content = body
 
 	if fm == "" {
@@ -258,31 +259,4 @@ func parseFrontmatter(name string, content string) (*runtimeSkill, error) {
 	}
 
 	return rs, nil
-}
-
-// splitFrontmatter extracts a leading "---\n...\n---" block. Returns (frontmatter, body).
-// When the content does not start with a frontmatter delimiter, or the opening "---"
-// has no matching closing delimiter, frontmatter is empty and body is the whole content.
-func splitFrontmatter(content string) (string, string) {
-	const delimiter = "---"
-
-	trimmed := strings.TrimLeft(content, " \t\r\n")
-	if !strings.HasPrefix(trimmed, delimiter) {
-		return "", content
-	}
-
-	lines := strings.Split(strings.ReplaceAll(trimmed, "\r\n", "\n"), "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != delimiter {
-		return "", content
-	}
-
-	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == delimiter {
-			fm := strings.Join(lines[1:i], "\n")
-			body := strings.Join(lines[i+1:], "\n")
-			return fm, body
-		}
-	}
-	// No closing fence: treat the leading "---" as ordinary Markdown.
-	return "", content
 }

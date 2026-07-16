@@ -51,6 +51,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	agentmodel "github.com/lindb/linsight/ai/model"
+	aiutil "github.com/lindb/linsight/ai/util"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
 )
@@ -298,7 +299,7 @@ func ValidateContent(content string) error {
 // body and builds a RuntimeRule. When no frontmatter is present the whole content is
 // treated as the body (an always-on rule).
 func parseRuleContent(content string) (*RuntimeRule, error) {
-	fm, body := splitFrontmatter(content)
+	fm, body := aiutil.SplitFrontmatter(content)
 	rr := &RuntimeRule{Body: body}
 	if fm != "" {
 		var meta ruleFrontmatter
@@ -318,33 +319,6 @@ func parseRuleContent(content string) (*RuntimeRule, error) {
 		}
 	}
 	return rr, nil
-}
-
-// splitFrontmatter extracts a leading "---\n...\n---" block. Returns (frontmatter, body).
-// When the content does not start with a frontmatter delimiter, OR the opening "---"
-// has no matching closing delimiter (i.e. it is really a Markdown thematic break rather
-// than a frontmatter fence), the frontmatter is empty and body is the whole content.
-func splitFrontmatter(content string) (string, string) {
-	trimmed := strings.TrimLeft(content, "\uFEFF \t\r\n")
-	if !strings.HasPrefix(trimmed, "---") {
-		return "", content
-	}
-	// Normalise newlines then locate the closing delimiter after the opening line.
-	lines := strings.Split(strings.ReplaceAll(trimmed, "\r\n", "\n"), "\n")
-	if len(lines) == 0 || strings.TrimSpace(lines[0]) != "---" {
-		return "", content
-	}
-	for i := 1; i < len(lines); i++ {
-		if strings.TrimSpace(lines[i]) == "---" {
-			fm := strings.Join(lines[1:i], "\n")
-			body := strings.Join(lines[i+1:], "\n")
-			return fm, body
-		}
-	}
-	// No closing fence: treat the leading "---" as ordinary Markdown content, not a
-	// malformed frontmatter block. This avoids rejecting rules whose body legitimately
-	// begins with a thematic break.
-	return "", content
 }
 
 // lowerAll returns a new slice with each element trimmed and lower-cased; empty
