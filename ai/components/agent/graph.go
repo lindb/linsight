@@ -53,9 +53,6 @@ const (
 // agentState is the per-run mutable state threaded through the graph via compose.ProcessState.
 // Using a pointer (*agentState) as the type parameter ensures mutations propagate across nodes.
 type agentState struct {
-	// IsFinished is true when the LLM produced "Conclusion: [FINISHED]" (RCA path) or a
-	// text-only response with no tool calls; decideBranch then terminates the graph.
-	IsFinished bool
 	// GoToThinking is set by the rejection branch (processResumeDecision) so decideBranch
 	// routes back to "thinking" for another LLM call instead of going to END.
 	GoToThinking bool
@@ -116,17 +113,16 @@ func parseToolResult(result string) (llmContent string, extra map[string]any) {
 }
 
 // createThinkingNode builds the first Lambda in the graph.
-// It opens a new StepEvent for the current model-call iteration and resets IsFinished
-// so a completion signal from a prior tool-less pass does not short-circuit the next cycle.
+// It opens a new StepEvent for the current model-call iteration and resets the per-iteration
+// state flags so stale values from a previous loop cannot short-circuit the next cycle.
 func createThinkingNode() *compose.Lambda {
 	return compose.InvokableLambda(func(ctx context.Context, messages []*schema.Message) ([]*schema.Message, error) {
 		rt := ctx.Value(ctxChatRun).(*chatRun)
 
 		// Reset per-iteration flags so stale values from a previous loop cannot
-		// short-circuit or repeat special-case logic (e.g. a prior "FINISHED", or the
-		// GoToThinking set by a rejection branch that already looped back here).
+		// short-circuit or repeat special-case logic (e.g. the GoToThinking set by a
+		// rejection branch that already looped back here).
 		if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
-			s.IsFinished = false
 			s.GoToThinking = false
 			s.InterruptIssued = false
 			return nil
@@ -277,16 +273,6 @@ func createExecutionNode() *compose.Lambda {
 		// Close reasoning and text SSE frames for this model call.
 		reasoningEvt.OnEnd(ctx)
 		rt.assistantEvt.OnEnd(ctx)
-
-		// Detect explicit completion signal; set state so decideBranch can terminate the loop.
-		if strings.Contains(contentSB.String(), "Conclusion: [FINISHED]") {
-			if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
-				s.IsFinished = true
-				return nil
-			}); err != nil {
-				return nil, fmt.Errorf("deep execution: set finished state: %w", err)
-			}
-		}
 
 		// Tool calls present: append the assistant message and let the tools node execute.
 		// Include Content so the LLM can reference its own [DEEP THINKING] preamble text
@@ -479,7 +465,7 @@ func processResumeDecision(ctx context.Context, messages []*schema.Message, rt *
 // createInterruptCheckNode implements the four-case governance gate that sits between
 // the execution (LLM) node and the tools node. Each case maps to an AG-UI timeline moment:
 //
-//   - Case A (text-only / FINISHED): no ToolCalls on last message → pass through → decideBranch ends the run
+//   - Case A (text-only): no ToolCalls on last message → pass through → decideBranch ends the run
 //   - Case B (resume): pending interrupt from a previous run → processResumeDecision (approve/reject)
 //   - Case C (normal, no approval needed): ToolCalls present and none flagged _gov_need_approval → pass to tools
 //   - Case D (interrupt): ToolCalls present, at least one _gov_need_approval=true, AutoApprove=false → processInterrupt
@@ -700,11 +686,10 @@ func (rt *chatRun) runToolCall(
 
 // decideBranch routes after the interruptCheck node:
 //   - compose.END  when InterruptIssued=true (run halted for human approval)
-//   - compose.END  when IsFinished=true (RCA "FINISHED" or text-only response)
 //   - "thinking"   when GoToThinking=true (rejection → loop back to the LLM)
 //   - "tools"      when rt.pendingToolCallsToExecute is non-empty (approved resume)
 //   - "tools"      when the last message carries ToolCalls (normal execution, Case C)
-//   - compose.END  otherwise
+//   - compose.END  otherwise (text-only response — the RCA conclusion or a plain answer)
 func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 	var state agentState
 	if err := compose.ProcessState[*agentState](ctx, func(_ context.Context, s *agentState) error {
@@ -715,9 +700,6 @@ func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 	}
 
 	if state.InterruptIssued {
-		return compose.END, nil
-	}
-	if state.IsFinished {
 		return compose.END, nil
 	}
 	if state.GoToThinking {
@@ -751,7 +733,7 @@ func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 //	          ▲                                                 │
 //	          └──────────────── thinking ◀──────────────────── │ (GoToThinking: rejected resume)
 //	                                                            │
-//	                                                    END ◀───┘ (IsFinished / InterruptIssued)
+//	                                                    END ◀───┘ (text-only / InterruptIssued)
 //
 // Node roles and their AG-UI timeline mapping:
 //
@@ -759,7 +741,7 @@ func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 //	execution      — streams the LLM (REASONING_* / TEXT_MESSAGE_*); on a resume first
 //	                 pass it skips the LLM and reuses the ToolCalls from the interrupt.
 //	interruptCheck — the governance gate, one branch per AG-UI moment:
-//	                   Case A  text-only / "Conclusion: [FINISHED]"  → pass through → END
+//	                   Case A  text-only response (no tool calls)     → pass through → END
 //	                   Case B  resume payload (approve / reject)      → processResumeDecision
 //	                   Case C  tool calls, none need approval         → pass through → tools
 //	                   Case D  tool call needs approval, no auto-ok   → processInterrupt
@@ -768,7 +750,7 @@ func decideBranch(ctx context.Context, msgs []*schema.Message) (string, error) {
 //
 // decideBranch reads agentState after interruptCheck and routes to one of:
 //
-//	END       InterruptIssued=true (Case D) | IsFinished=true (Case A)
+//	END       InterruptIssued=true (Case D) | text-only response (Case A)
 //	thinking  GoToThinking=true (rejected resume → LLM apologises / re-plans)
 //	tools     approved resume (pendingToolCallsToExecute) | Case C (fresh tool calls)
 func buildGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message, []*schema.Message], error) {

@@ -352,9 +352,9 @@ func (rt *chatRun) resolveTools() {
 // RUN_FINISHED or RUN_INTERRUPT. Assistant text is persisted per step by the execution
 // node's OnEnd (the final iteration included), so finalize no longer persists text.
 func (rt *chatRun) finalize() error {
-	// Close any open step — idempotent; handles the edge case where IsFinished=true
-	// is detected alongside tool calls, causing decideBranch to terminate before
-	// createToolsNode ran and closed the step.
+	// Close any open step — idempotent. The execution (text-only), tools, and interrupt
+	// paths each close their own step, so this is a defensive backstop for any path that
+	// terminates with a step still open (e.g. an early error return).
 	if rt.currentStepEvt != nil {
 		rt.currentStepEvt.OnFinish(rt.timeoutCtx)
 	}
