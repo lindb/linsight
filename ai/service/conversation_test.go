@@ -155,6 +155,66 @@ func TestGetConversationEvents_ResumeInterruptOrdering(t *testing.T) {
 	assert.Equal(t, "asst-1", events[idxToolCallStart].ParentMessageID)
 }
 
+// TestGetConversationEvents_DanglingStepClosed verifies the backstop for a run that died
+// (max-step, panic, client disconnect) before persisting step_finished: replay must still
+// close the dangling STEP_STARTED so history never ends on an unclosed step, and the
+// synthesized STEP_FINISHED must carry the same stepId the STEP_STARTED was emitted with.
+func TestGetConversationEvents_DanglingStepClosed(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockDB := db.NewMockDB(ctrl)
+	srv := NewConversationService(mockDB)
+
+	// A turn that hit max-step: step_started + partial text + a run_error, but NO step_finished.
+	rows := []*agentmodel.Event{
+		{RunID: "R1", StepID: "S1", Type: agentmodel.EventTypeStepStarted, ToolName: "Deep Analysis", Sequence: 1},
+		{RunID: "R1", StepID: "S1", MessageUID: "asst-1", Type: agentmodel.EventTypeAssistantText,
+			Content: "thinking", RawMessage: assistantTextRaw("thinking"), Sequence: 2},
+		{RunID: "R1", Type: agentmodel.EventTypeRunError, Status: string(agui.StatusError),
+			Code: "internal", Content: "exceeds max steps", Sequence: 3},
+	}
+
+	mockDB.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(out any, _ string, _ ...any) error {
+			*(out.(*agentmodel.Conversation)) = agentmodel.Conversation{UID: "C1"}
+			return nil
+		})
+	mockDB.EXPECT().FindForPaging(gomock.Any(), 0, gomock.Any(), "id asc", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(out any, _, _ int, _, _ string, _ ...any) error {
+			*(out.(*[]*agentmodel.Event)) = rows
+			return nil
+		})
+	mockDB.EXPECT().Find(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(out any, _ string, _ ...any) error {
+			*(out.(*[]*agentmodel.InterruptRecord)) = nil
+			return nil
+		})
+
+	events, err := srv.GetConversationEvents(convTestCtx, "C1", 100)
+	assert.NoError(t, err)
+
+	// The stack must balance: exactly one STEP_STARTED and one (synthesized) STEP_FINISHED,
+	// carrying the same stepId, and a RUN_ERROR must be present.
+	var startID, finishID string
+	var startCount, finishCount, errCount int
+	for _, e := range events {
+		switch e.Type {
+		case agui.StepStarted:
+			startCount++
+			startID = e.StepID
+		case agui.StepFinished:
+			finishCount++
+			finishID = e.StepID
+		case agui.RunError:
+			errCount++
+		}
+	}
+	assert.Equal(t, 1, startCount, "one STEP_STARTED")
+	assert.Equal(t, 1, finishCount, "dangling step must be closed by the backstop")
+	assert.Equal(t, startID, finishID, "synthesized STEP_FINISHED must reuse the STEP_STARTED id")
+	assert.Equal(t, 1, errCount, "run_error must be replayed")
+}
+
 // TestGetConversationEvents_PendingInterruptTail verifies a still-pending interrupt (no
 // tool_result rows yet) is appended by the tail fallback so the approval card is not dropped.
 func TestGetConversationEvents_PendingInterruptTail(t *testing.T) {

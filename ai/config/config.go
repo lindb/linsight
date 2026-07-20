@@ -55,6 +55,12 @@ type Config struct {
 	// of 1 forces sequential execution. Default: 4.
 	MaxParallelToolCalls int `env:"MAX_PARALLEL_TOOL_CALLS" toml:"max-parallel-tool-calls"`
 
+	// MaxSubAgentDepth caps how deep sub-agent runs (specialist handoff / fork skill) may
+	// nest. The host is depth 0; a specialist it dispatches runs at depth 1, and so on.
+	// A run whose depth would exceed this, or that would re-enter an agent already on the
+	// active stack (cycle), is refused. Default: 3.
+	MaxSubAgentDepth int `env:"MAX_SUB_AGENT_DEPTH" toml:"max-sub-agent-depth"`
+
 	// ContextSize is the number of historical messages loaded into the LLM context
 	// for each request (sliding window, newest first).
 	ContextSize int `env:"CONTEXT_SIZE" toml:"context-size"`
@@ -113,6 +119,7 @@ func NewDefaultConfig() *Config {
 		ContextSize:          20,
 		MaxMessageLength:     8192,
 		MaxParallelToolCalls: 4,
+		MaxSubAgentDepth:     3,
 		// Context provider configuration defaults
 		ContextProviderType:       "db",
 		ContextProviderTTL:        ltoml.Duration(24 * time.Hour),
@@ -152,6 +159,10 @@ max-concurrent-per-org = %d
 ## Max tool calls within a single reasoning step executed concurrently (1 = sequential). Default: %d
 ## Env: LINSIGHT_AI_MAX_PARALLEL_TOOL_CALLS
 max-parallel-tool-calls = %d
+
+## Max nesting depth for sub-agent runs (specialist handoff / fork skill). Default: %d
+## Env: LINSIGHT_AI_MAX_SUB_AGENT_DEPTH
+max-sub-agent-depth = %d
 
 ## Number of historical messages to include in each request context. Default: %d
 ## Env: LINSIGHT_AI_CONTEXT_SIZE
@@ -203,6 +214,7 @@ rule-refresh-interval = "%s"
 		c.ToolTimeout.Duration().String(), c.ToolTimeout.Duration().String(),
 		c.MaxConcurrentPerOrg, c.MaxConcurrentPerOrg,
 		c.MaxParallelToolCalls, c.MaxParallelToolCalls,
+		c.MaxSubAgentDepth, c.MaxSubAgentDepth,
 		c.ContextSize, c.ContextSize,
 		c.MaxMessageLength, c.MaxMessageLength,
 		escapeTOMLString(c.ContextProviderType),

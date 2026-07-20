@@ -66,6 +66,12 @@ type SSEWriter interface {
 	// STEP_STARTED fires before TOOL_CALL_START; STEP_FINISHED fires after TOOL_CALL_RESULT.
 	WriteStepStarted(stepID, stepName string)
 	WriteStepFinished(stepID string, elapsedMs int64)
+
+	// Scoped returns a writer whose emitted frames all carry the given agentID and
+	// parentToolCallID, so a sub-agent run's events can be nested under the host
+	// tool_call that spawned it. The returned writer shares the underlying connection
+	// and mutex, so frames from the host and all sub-agents remain serialized.
+	Scoped(agentID, parentToolCallID string) SSEWriter
 }
 
 // ginSSEWriter is the concrete SSEWriter implementation backed by gin.ResponseWriter.
@@ -73,9 +79,13 @@ type SSEWriter interface {
 // across long-running agent runs whose wall-clock duration exceeds the server's
 // WriteTimeout (default 30s).
 type ginSSEWriter struct {
-	mu sync.Mutex
+	mu *sync.Mutex
 	w  gin.ResponseWriter
 	rc *http.ResponseController
+	// agentID / parentToolCallID stamp every frame emitted by a Scoped() sub-writer so
+	// sub-agent events are attributed and nestable. Empty on the host-level writer.
+	agentID          string
+	parentToolCallID string
 }
 
 // NewSSEWriter prepares c for SSE delivery and returns an SSEWriter bound to it.
@@ -88,8 +98,22 @@ func NewSSEWriter(c *gin.Context) SSEWriter {
 	c.Header("Transfer-Encoding", "chunked")
 	c.Writer.Flush()
 	return &ginSSEWriter{
+		mu: &sync.Mutex{},
 		w:  c.Writer,
 		rc: http.NewResponseController(c.Writer),
+	}
+}
+
+// Scoped returns a shallow copy that stamps agentID/parentToolCallID onto every emitted
+// frame. The mutex and connection are shared (by pointer) so host and sub-agent frames
+// never interleave mid-frame and the write deadline logic stays coherent.
+func (w *ginSSEWriter) Scoped(agentID, parentToolCallID string) SSEWriter {
+	return &ginSSEWriter{
+		mu:               w.mu,
+		w:                w.w,
+		rc:               w.rc,
+		agentID:          agentID,
+		parentToolCallID: parentToolCallID,
 	}
 }
 
@@ -247,6 +271,15 @@ func (w *ginSSEWriter) WriteStepFinished(stepID string, elapsedMs int64) {
 // Before each flush the write deadline is extended by 30s so the connection
 // survives long-running agent runs that exceed the server's WriteTimeout.
 func (w *ginSSEWriter) writeEvent(evt agui.Event) error {
+	// Stamp sub-agent attribution onto every frame emitted by a Scoped() writer.
+	// No-op on the host-level writer where both fields are empty.
+	if w.agentID != "" {
+		evt.AgentID = w.agentID
+	}
+	if w.parentToolCallID != "" {
+		evt.ParentToolCallID = w.parentToolCallID
+	}
+
 	data, err := json.Marshal(evt)
 	if err != nil {
 		return err

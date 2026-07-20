@@ -28,7 +28,6 @@ import (
 
 	"github.com/lindb/linsight/ai/agui"
 	agentapi "github.com/lindb/linsight/ai/api"
-	aiutil "github.com/lindb/linsight/ai/util"
 	"github.com/lindb/linsight/constant"
 )
 
@@ -46,7 +45,8 @@ func NewChatHandler(deps *Deps) *ChatHandler {
 
 // Chat handles POST /agent/chat and POST /agent/conversations/:uid/chat.
 // It upgrades the response to an SSE stream and forwards LLM output chunk-by-chunk.
-// All service errors are translated by aiutil.ClassifyError and delivered as RUN_ERROR events.
+// All errors are terminated by the runtime itself (finalizeError), which streams the
+// terminal RUN_ERROR event; the handler only logs.
 func (h *ChatHandler) Chat(c *gin.Context) {
 	var req agentapi.ChatRequest
 	if err := c.ShouldBind(&req); err != nil {
@@ -64,16 +64,10 @@ func (h *ChatHandler) Chat(c *gin.Context) {
 	// Commit SSE headers before the first write so the client starts receiving events.
 	writer := agentapi.NewSSEWriter(c)
 
-	_, runID, err := h.deps.Agent.Chat(c.Request.Context(), &req, writer, convUID)
-	if err != nil {
-		// HTTP 200 + SSE headers are already committed; deliver the error via the stream.
-		// RUN_ERROR is the terminal event — no additional done event is required.
-		code, msg := aiutil.ClassifyError(err)
-		chatLog.Info("sending SSE error event",
-			logger.String("code", string(code)),
-			logger.String("msg", msg),
-			logger.Error(err))
-		writer.WriteRunError(runID, code, msg)
+	if _, _, err := h.deps.Agent.Chat(c.Request.Context(), &req, writer, convUID); err != nil {
+		// HTTP 200 + SSE headers are already committed. The runtime's finalizeError has
+		// already streamed the terminal RUN_ERROR event, so we only log here.
+		chatLog.Info("chat run ended with error", logger.Error(err))
 	}
 }
 

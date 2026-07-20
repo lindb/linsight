@@ -4945,6 +4945,17 @@ components:
         parentMessageId:
           type: string
           description: Assistant message ID that triggered this tool call (present on TOOL_CALL_START).
+        agentId:
+          type: string
+          description: >
+            Sub-agent (specialist or fork skill) name that produced this event. Empty/absent for
+            host events. Present on every frame of a sub-agent run so the frontend can render the
+            sub-agent timeline nested under its handoff/skill call.
+        parentToolCallId:
+          type: string
+          description: >
+            The host tool_call id (handoff_to_<name> or skill) this sub-agent run is nested under.
+            Empty/absent for host events. Combined with agentId it reconstructs the sub-agent tree.
         content:
           type: string
           description: Full tool result content (present on TOOL_CALL_RESULT).

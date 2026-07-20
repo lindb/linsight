@@ -254,10 +254,10 @@ func (s *conversationService) GetConversationMessages(ctx context.Context, uid s
 
 		var userMsg *agentmodel.Message
 		var errMsg *agentmodel.Message
-		var finalMsg *agentmodel.Message            // last assistant row with non-empty Content
-		var finalMsgContent string                  // Content of finalMsg, cached to avoid re-unmarshal
-		var finalMsgReasoningContent string         // ReasoningContent of finalMsg, cached alongside Content
-		var firstTCMsg *agentmodel.Message          // first assistant row with ToolCalls (for interrupted-turn ID)
+		var finalMsg *agentmodel.Message    // last assistant row with non-empty Content
+		var finalMsgContent string          // Content of finalMsg, cached to avoid re-unmarshal
+		var finalMsgReasoningContent string // ReasoningContent of finalMsg, cached alongside Content
+		var firstTCMsg *agentmodel.Message  // first assistant row with ToolCalls (for interrupted-turn ID)
 		var toolCalls []agui.ToolCall
 		seenCallIDs := make(map[string]bool)
 
@@ -525,6 +525,11 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 			}
 		}
 
+		// Record where this row's events begin so we can stamp sub-agent attribution onto
+		// exactly the events this row produces (not the host-level interrupt frame injected
+		// above, which is always a host event).
+		rowStart := len(result)
+
 		switch r.Type {
 		case agentmodel.EventTypeUserMessage:
 			// User messages are never streamed; use a single flat USER_MESSAGE event
@@ -640,6 +645,29 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 				Sequence: r.Sequence,
 			})
 		}
+
+		// Stamp sub-agent attribution onto every event this row produced, so history replay
+		// can nest a sub-agent's timeline under the host tool_call that spawned it. Host rows
+		// have empty AgentID/ParentToolCallID, so this is a no-op for them.
+		if r.AgentID != "" || r.ParentToolCallID != "" {
+			for i := rowStart; i < len(result); i++ {
+				result[i].AgentID = r.AgentID
+				result[i].ParentToolCallID = r.ParentToolCallID
+			}
+		}
+	}
+
+	// Backstop: close any step whose step_finished row is missing — e.g. a run that died
+	// (max-step, panic, client disconnect) before persisting step_finished, or legacy rows
+	// written before that path was hardened. Without this the frontend renders an unclosed
+	// STEP_STARTED as the last event. Pop LIFO; steps do not nest. ElapsedMs is 0 (the finish
+	// time was never recorded) and Sequence is left 0, matching the synthesized interrupt tail
+	// events below (snapshot replay renders by array order, not sequence).
+	for i := len(stepStack) - 1; i >= 0; i-- {
+		result = append(result, agui.Event{
+			Type:   agui.StepFinished,
+			StepID: stepStack[i],
+		})
 	}
 
 	// Tail fallback: append any interrupt not injected inline. This covers a still-pending
@@ -664,6 +692,8 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 // Reasoning, step_started, and step_finished rows are excluded at the query level
 // (models reject their own reasoning; step events carry no LLM-relevant content).
 // Error-status rows are also excluded to prevent poisoning the context.
+// Sub-agent process events (agent_id != ”) are also excluded: the host only needs the
+// sub-agent's RESULT, which is the handoff/skill tool_result (a host-level event).
 func (s *conversationService) GetRecentEvents(ctx context.Context, convUID string, limit int) ([]*agentmodel.Event, error) {
 	var evts []*agentmodel.Event
 	excludeTypes := []string{
@@ -672,8 +702,8 @@ func (s *conversationService) GetRecentEvents(ctx context.Context, convUID strin
 		agentmodel.EventTypeStepFinished,
 	}
 	if err := s.db.FindForPaging(&evts, 0, limit, "id desc",
-		"conv_uid = ? AND type NOT IN ? AND status != ?",
-		convUID, excludeTypes, string(agui.StatusError)); err != nil {
+		"conv_uid = ? AND type NOT IN ? AND status != ? AND agent_id = ?",
+		convUID, excludeTypes, string(agui.StatusError), ""); err != nil {
 		return nil, err
 	}
 	// Reverse so events are ordered oldest-first for LLM context assembly.

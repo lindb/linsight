@@ -225,6 +225,14 @@ type Event struct {
 	// Used by the frontend for ordering and deduplication in snapshot replay.
 	Sequence int `json:"sequence,omitempty"`
 
+	// AgentID is the sub-agent (specialist or fork skill) name that produced this event.
+	// Empty for host events. Non-empty on every frame of a forked sub-agent run so the
+	// frontend can render the sub-agent timeline nested under its handoff/skill call.
+	AgentID string `json:"agentId,omitempty"`
+	// ParentToolCallID links a sub-agent frame back to the host tool_call (handoff_to_<name>
+	// or skill) that spawned it, enabling arbitrary-depth tree reconstruction.
+	ParentToolCallID string `json:"parentToolCallId,omitempty"`
+
 	// MessagesSnapshot (legacy — deprecated, use Events instead).
 	// Kept for backwards compatibility; will be removed in a future release.
 	// TODO: remove it?

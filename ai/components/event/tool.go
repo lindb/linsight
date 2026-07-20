@@ -26,8 +26,8 @@ import (
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
 
-	agentapi "github.com/lindb/linsight/ai/api"
 	"github.com/lindb/linsight/ai/agui"
+	agentapi "github.com/lindb/linsight/ai/api"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/pkg/uuid"
 )

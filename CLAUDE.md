@@ -46,6 +46,16 @@ go run github.com/lindb/linsight/cmd migrator all
 ```
 Default credentials after migration: `admin` / `admin`
 
+## Code Generation Workflow
+
+Do **not** run lint or code review after routine edits. `make lint` / `go vet` / `gofmt` and the `code-reviewer` subagent run **only at commit time**, so the same checks are not repeated on every edit.
+
+Rules:
+1. After creating or modifying source files (Go or `web/`), just finish — do **not** run `make lint`, `go vet`, `gofmt`, or the `code-reviewer` subagent.
+2. Only when the user asks to commit: run lint (`make lint`, and `gofmt`/`go vet` as needed), fix any errors, run the `code-reviewer` subagent, then commit.
+3. Never commit with unresolved lint errors.
+4. Running tests to verify correctness (`make test-without-lint`, `go test ...`) is a separate concern and is still fine on demand.
+
 ## Architecture
 
 The project follows a layered architecture:

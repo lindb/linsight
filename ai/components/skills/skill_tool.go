@@ -28,6 +28,8 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
+
+	subagentcomp "github.com/lindb/linsight/ai/components/subagent"
 )
 
 // toolName is the tool name registered in the agent's tool set and invoked by the LLM.
@@ -148,8 +150,31 @@ func (t *nativeSkillTool) InvokableRun(ctx context.Context, argumentsInJSON stri
 
 	switch sk.Context {
 	case skill.ContextModeForkWithContext, skill.ContextModeFork:
-		log.Warn("skill tool: fork mode not yet wired; falling back to inline",
-			logger.String("skill", sk.Name), logger.Any("context_mode", sk.Context))
+		// Fork modes run the skill as an isolated sub-agent through the shared runner, so its
+		// full process streams as tagged AG-UI events. fork_with_context additionally inherits
+		// the parent conversation history. On any failure (or when no runner is wired, e.g.
+		// unit tests) we fall through to inline so the skill still executes.
+		if r, ok := subagentcomp.RunnerFrom(ctx); ok {
+			mode := subagentcomp.ModeSkillFork
+			if sk.Context == skill.ContextModeForkWithContext {
+				mode = subagentcomp.ModeSkillForkWithContext
+			}
+			out, runErr := r.Run(ctx, subagentcomp.RunRequest{
+				AgentID:      sk.Name,
+				SystemPrompt: sk.Content,
+				Mode:         mode,
+			})
+			if runErr == nil {
+				log.Info("skill tool: fork execution done",
+					logger.String("skill", sk.Name), logger.Int("result_len", len(out)))
+				return fmt.Sprintf(forkResultFmt, sk.Name, out), nil
+			}
+			log.Warn("skill tool: fork run failed, falling back to inline",
+				logger.String("skill", sk.Name), logger.Error(runErr))
+		} else {
+			log.Warn("skill tool: fork mode requested but no runner wired; falling back to inline",
+				logger.String("skill", sk.Name))
+		}
 		fallthrough
 	default:
 		result := fmt.Sprintf(toolResultFmt, sk.Name, sk.Content)

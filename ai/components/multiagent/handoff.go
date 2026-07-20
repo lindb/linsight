@@ -27,6 +27,8 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
+
+	subagentcomp "github.com/lindb/linsight/ai/components/subagent"
 )
 
 var handoffLog = logger.GetLogger("agent", "multiagent")
@@ -113,16 +115,40 @@ func (t *handoffTool) InvokableRun(ctx context.Context, argumentsInJSON string, 
 		return failureEvidence(t.spec.Name, "no goal supplied to specialist", "handoff goal is required"), nil
 	}
 
-	// Context isolation: the specialist sees ONLY its own persona + the goal.
-	cleanMessages := []*schema.Message{
-		{Role: schema.System, Content: t.spec.SystemPrompt + evidenceContract},
-		{Role: schema.User, Content: args.Goal},
-	}
-
 	handoffLog.Info("multiagent: dispatching specialist",
 		logger.String("specialist", t.spec.Name),
 		logger.Int("goal_len", len(args.Goal)),
 	)
+
+	// Preferred path: run the specialist through the shared sub-agent runner so its full
+	// process (reasoning, tool calls, text) streams as tagged AG-UI events and it can use
+	// tools (including nested handoff, bounded by the depth/cycle guard). The runner returns
+	// the specialist's final text, which we parse into Evidence for the host.
+	if r, ok := subagentcomp.RunnerFrom(ctx); ok {
+		out, err := r.Run(ctx, subagentcomp.RunRequest{
+			AgentID:       t.spec.Name,
+			SystemPrompt:  t.spec.SystemPrompt + evidenceContract,
+			Goal:          args.Goal,
+			ToolWhitelist: parseToolCSV(t.spec.Tools),
+			Mode:          subagentcomp.ModeHandoff,
+		})
+		if err != nil {
+			handoffLog.Warn("multiagent: specialist run failed",
+				logger.String("specialist", t.spec.Name), logger.Error(err))
+			return failureEvidence(t.spec.Name, "specialist execution failed", err.Error()), nil
+		}
+		ev := parseEvidence(t.spec.Name, out)
+		handoffLog.Info("multiagent: specialist handback",
+			logger.String("specialist", t.spec.Name), logger.Any("success", ev.Success))
+		return ev.marshal(), nil
+	}
+
+	// Fallback: no runner in context (e.g. unit tests). Run a single-shot isolated Generate;
+	// the specialist sees ONLY its own persona + the goal.
+	cleanMessages := []*schema.Message{
+		{Role: schema.System, Content: t.spec.SystemPrompt + evidenceContract},
+		{Role: schema.User, Content: args.Goal},
+	}
 
 	// The proxy resolves the per-org model from the signed user in ctx (real routing).
 	out, err := t.proxy.Generate(ctx, cleanMessages)
@@ -138,4 +164,21 @@ func (t *handoffTool) InvokableRun(ctx context.Context, argumentsInJSON string, 
 		logger.Any("success", ev.Success),
 	)
 	return ev.marshal(), nil
+}
+
+// parseToolCSV splits a comma-separated tool whitelist (from a specialist's frontmatter
+// tools:) into trimmed, non-empty names. Returns nil for an empty/blank string, meaning
+// "inherit all tools".
+func parseToolCSV(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

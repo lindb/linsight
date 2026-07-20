@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -33,8 +34,11 @@ import (
 	agentapi "github.com/lindb/linsight/ai/api"
 	aievent "github.com/lindb/linsight/ai/components/event"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	subagentcomp "github.com/lindb/linsight/ai/components/subagent"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/ai/telemetry"
+	aiutil "github.com/lindb/linsight/ai/util"
+	"github.com/lindb/linsight/constant"
 	"github.com/lindb/linsight/pkg/util"
 	"github.com/lindb/linsight/pkg/uuid"
 )
@@ -68,9 +72,14 @@ type chatRun struct {
 
 	// event lifecycle objects; initialized in run() after conversation is resolved
 	convCtx        *aievent.ConvContext
+	runEvt         *aievent.RunEvent  // run-lifecycle SSE frames (RUN_STARTED/FINISHED/ERROR/INTERRUPT)
 	assistantEvt   *aievent.AssistantTextEvent
 	currentStepID  string             // updated at the start of each model-call iteration
 	currentStepEvt *aievent.StepEvent // step lifecycle for the current model-call iteration
+
+	// errFinalized guards finalizeError so the single deferred error path is idempotent
+	// (a max-step return and a later panic must not double-emit RUN_ERROR / run_error).
+	errFinalized atomic.Bool
 
 	// orgTools holds the resolved tool set; used by the graph Lambda nodes via context.
 	orgTools []tool.BaseTool
@@ -123,28 +132,34 @@ func newChatRun(
 // events over rt.writer. The named return allows defers to set retErr directly.
 //
 // Defer registration order (LIFO — last registered executes first):
-//  1. panic recovery  (registered first → executes last)
-//  2. cancel
-//  3. semaphore release
-//  4. fallback title  (if new conversation)
-//  5. persistErrorMessage
-//  6. persistAssistantMessage on error
-//  7. WriteTextMessageEnd on error
-//  8. reader.Close  (registered inside executeGraph)
+//  1. finalizeError    (registered first → executes last, after panic recovery has set retErr)
+//  2. panic recovery
+//  3. cancel
+//  4. semaphore release
+//  5. reader.Close     (registered inside executeGraph)
+//
+// All error-path cleanup (close open step, persist run_error, emit RUN_ERROR, fallback
+// title) is consolidated into finalizeError so a single deterministic, idempotent,
+// disconnect-safe path handles every failure — including early returns and panics.
 func (rt *chatRun) run() (retErr error) {
 	rt.runID = uuid.GenerateShortUUID()
 	rt.start = time.Now()
+	rt.runEvt = aievent.NewRunEvent(rt.writer) // writer is always available
 
-	// Panic recovery — registered first (LIFO) so it runs last, after all cleanup
-	// defers have finished.
+	// Consolidated error finalize — registered FIRST so (LIFO) it runs LAST, after the
+	// panic defer has populated retErr. Covers every error return, including the early
+	// ones below (semaphore full, conversation init) and recovered panics.
+	defer func() {
+		if retErr != nil {
+			rt.finalizeError(retErr)
+		}
+	}()
+
+	// Panic recovery — only logs and sets retErr; finalizeError owns all cleanup.
 	defer func() {
 		if r := recover(); r != nil {
-			panicErr := fmt.Errorf("agent panic: %v", r)
 			agentLog.Error("agent panic recovered", logger.String("panic", fmt.Sprintf("%v", r)))
-			retErr = panicErr
-			if rt.isNew && rt.conv != nil {
-				rt.agent.persistFallbackTitle(rt.reqCtx, rt.conv.ID, rt.req.Content)
-			}
+			retErr = fmt.Errorf("agent panic: %v", r)
 		}
 	}()
 
@@ -192,34 +207,11 @@ func (rt *chatRun) run() (retErr error) {
 		}
 	}
 
-	rt.writer.WriteRunStarted(rt.runID, rt.conv.UID)
-
-	// For new conversations: persist a fallback title when we exit with an error so
-	// the sidebar never shows an empty entry.
-	if rt.isNew {
-		defer func() {
-			if retErr != nil {
-				rt.agent.persistFallbackTitle(rt.reqCtx, rt.conv.ID, rt.req.Content)
-			}
-		}()
-	}
-
-	// Persist an error message on the way out so failures are visible after page
-	// refresh. Guard: only fire once a user message has been persisted (userMsgUID set).
-	defer func() {
-		if retErr != nil && rt.userMsgUID != "" {
-			rt.persistAgentError(rt.reqCtx, retErr)
-		}
-	}()
+	rt.runEvt.OnStart(rt.runID, rt.conv.UID)
 
 	// Initialize event lifecycle objects; must be before persistUserMessage so
 	// the user-message event can use convCtx.NextSeq().
-	rt.convCtx = &aievent.ConvContext{
-		ConvID:  rt.conv.ID,
-		ConvUID: rt.conv.UID,
-		UserID:  rt.userID,
-		RunID:   rt.runID,
-	}
+	rt.convCtx = aievent.NewConvContext(rt.conv.ID, rt.conv.UID, rt.userID, rt.runID)
 	// Resume reuses the interrupted run's RunID; prime the sequence counter with that run's
 	// existing max sequence so resumed events continue its monotonic order instead of
 	// colliding from 1. Non-fatal: on error we fall back to 0 (the pre-existing behaviour).
@@ -249,24 +241,6 @@ func (rt *chatRun) run() (retErr error) {
 
 	// resolveTools is non-fatal: it logs and continues if the registry call fails.
 	rt.resolveTools()
-
-	// Close any open step on error so the frontend never sees an unclosed STEP_STARTED.
-	// Idempotent: no-op if the step was already closed by the normal path.
-	defer func() {
-		if retErr != nil && rt.currentStepEvt != nil {
-			rt.currentStepEvt.OnFinish(rt.reqCtx)
-		}
-	}()
-
-	// Close the text stream before RUN_ERROR so the frontend never sees an unclosed
-	// TEXT_MESSAGE_START when the turn returns an error. OnEnd also persists the open
-	// segment, so a partial assistant text always has a DB row (giving any tool-result
-	// rows a parent and preventing orphaned tool messages in the next LLM call).
-	defer func() {
-		if retErr != nil && rt.assistantEvt.IsStarted() {
-			rt.assistantEvt.OnEnd(rt.reqCtx)
-		}
-	}()
 
 	// The graph runs the explicit four-node Lambda pipeline, which also handles
 	// AG-UI tool-bound interrupts and resume (human-in-the-loop approval).
@@ -370,18 +344,90 @@ func (rt *chatRun) finalize() error {
 	)
 
 	if rt.interruptHandled && rt.interruptPayload != nil {
-		rt.writer.WriteRunInterrupt(rt.runID, rt.conv.UID, rt.interruptPayload)
+		rt.runEvt.OnInterrupt(rt.runID, rt.conv.UID, rt.interruptPayload)
 	} else {
-		rt.writer.WriteRunFinished(rt.runID, rt.conv.UID, title)
+		rt.runEvt.OnEnd(rt.runID, rt.conv.UID, title)
 	}
 	return nil
 }
 
-// enrichRunCtx injects the current *chatRun into the run contextso that the
+// finalizeError is the single error-termination path, mirroring finalize(). It closes any
+// open assistant-text stream and step, persists a run_error event, generates a fallback
+// title for new conversations, and emits exactly one RUN_ERROR frame.
+//
+// It is armed as the first-registered (LIFO last-run) defer in run(), so it fires on every
+// error return — including early ones (semaphore full, conversation init) and recovered
+// panics. Idempotent via errFinalized: a max-step return followed by a defer-time panic
+// cannot double-emit. The DB writes use a disconnect-safe background context (same pattern
+// as persistAgentError) so step_finished / run_error still land after client disconnect or
+// request-timeout cancellation — the fix for the "unclosed STEP_STARTED after reload" bug.
+func (rt *chatRun) finalizeError(retErr error) {
+	if !rt.errFinalized.CompareAndSwap(false, true) {
+		return
+	}
+
+	// Disconnect-safe context for the DB writes below; only buildable once the conversation
+	// (and thus the signed user carried by reqCtx) is resolved. Pre-conversation failures
+	// (e.g. ErrTooManyRequests) skip persistence entirely and only emit RUN_ERROR.
+	var saveCtx context.Context
+	if rt.conv != nil {
+		user := util.GetUser(rt.reqCtx)
+		var cancel context.CancelFunc
+		saveCtx, cancel = context.WithTimeout(
+			context.WithValue(context.Background(), constant.LinSightSignedKey, user),
+			titleGenTimeout)
+		defer cancel()
+	}
+
+	// 1. Close the open assistant-text stream first so its sequence lands inside the step
+	//    (OnEnd also persists the partial text, giving any tool-result rows a parent).
+	if saveCtx != nil && rt.assistantEvt != nil && rt.assistantEvt.IsStarted() {
+		rt.assistantEvt.OnEnd(saveCtx)
+	}
+
+	// 2. Close the open step so the frontend never sees an unclosed STEP_STARTED. Idempotent:
+	//    a no-op if the normal path already closed it. Uses saveCtx (fixes the lost
+	//    step_finished on client disconnect).
+	if saveCtx != nil && rt.currentStepEvt != nil {
+		rt.currentStepEvt.OnFinish(saveCtx)
+	}
+
+	// 3. Persist the run_error event. Gated only on convCtx (needed for NextSeq + a valid
+	//    ConvUID); no userMsgUID guard, so resume errors persist too. Its NextSeq() runs
+	//    after step_finished above, so it sorts last on replay. persistAgentError derives
+	//    its own background context internally.
+	if rt.convCtx != nil {
+		rt.persistAgentError(rt.reqCtx, retErr)
+	}
+
+	// 4. Fallback title for new conversations so the sidebar never shows an empty entry.
+	if rt.isNew && rt.conv != nil {
+		rt.agent.persistFallbackTitle(rt.reqCtx, rt.conv.ID, rt.req.Content)
+	}
+
+	// 5. Emit exactly one RUN_ERROR frame (terminal event) via the run event object.
+	code, msg := aiutil.ClassifyError(retErr)
+	rt.runEvt.OnError(rt.runID, code, msg)
+}
+
+// enrichRunCtx injects the current *chatRun into the run context so that the
 // graph Lambda nodes can access all per-request state (tools, events, writer)
-// via a single context key without additional coupling.
+// via a single context key without additional coupling. It also injects the shared
+// sub-agent Runner and a per-request Scope so handoff/skill tools can spawn sub-agent
+// runs that stream + persist events on the same connection.
 func (rt *chatRun) enrichRunCtx() context.Context {
-	return context.WithValue(rt.runCtx, ctxChatRun, rt)
+	ctx := context.WithValue(rt.runCtx, ctxChatRun, rt)
+	ctx = subagentcomp.WithRunner(ctx, rt.agent.runner)
+	ctx = subagentcomp.WithScope(ctx, &subagentcomp.Scope{
+		Writer:    rt.writer,
+		Saver:     rt.agent.convSrv,
+		ConvCtx:   rt.convCtx,
+		BaseTools: rt.orgTools,
+		History: func(c context.Context) ([]*schema.Message, error) {
+			return rt.agent.historyMessages(c, rt.conv.UID)
+		},
+	})
+	return ctx
 }
 
 // executeGraph runs the explicit four-node Lambda graph and drains the output

@@ -22,9 +22,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"strings"
-	"sync"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -34,7 +31,7 @@ import (
 
 	"github.com/lindb/linsight/ai/agui"
 	aievent "github.com/lindb/linsight/ai/components/event"
-	toolscomp "github.com/lindb/linsight/ai/components/tools"
+	subagent "github.com/lindb/linsight/ai/components/subagent"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentmodel "github.com/lindb/linsight/ai/model"
 	"github.com/lindb/linsight/pkg/uuid"
@@ -59,57 +56,6 @@ type agentState struct {
 	// InterruptIssued is set when processInterrupt fires so decideBranch routes to END
 	// (the run terminates immediately; the client must send a resume request).
 	InterruptIssued bool
-}
-
-// toolNeedsApproval checks ToolInfo.Extra for _gov_need_approval=true.
-// Returns false if extra is nil, the key is absent, or the value is not a bool.
-func toolNeedsApproval(extra map[string]any) bool {
-	if extra == nil {
-		return false
-	}
-	v, ok := extra["_gov_need_approval"]
-	if !ok {
-		return false
-	}
-	b, ok := v.(bool)
-	return ok && b
-}
-
-// getToolPublicExtra returns a shallow copy of extra with all _gov_* keys stripped.
-// This prevents governance metadata from leaking to SSE frames or DB rows visible
-// to the frontend. Returns nil if the result would be empty.
-func getToolPublicExtra(extra map[string]any) map[string]any {
-	if len(extra) == 0 {
-		return extra
-	}
-	result := make(map[string]any, len(extra))
-	for k, v := range extra {
-		if !strings.HasPrefix(k, "_gov_") {
-			result[k] = v
-		}
-	}
-	if len(result) == 0 {
-		return nil
-	}
-	return result
-}
-
-// parseToolResult unwraps a ToolCallResult envelope (if present) and injects
-// raw_data into extra for rich frontend rendering (e.g. DataQueryView table).
-func parseToolResult(result string) (llmContent string, extra map[string]any) {
-	if tcr, ok := toolscomp.ParseToolCallResult(result); ok {
-		llmContent = string(tcr.Data)
-		extra = tcr.Extra
-		if extra == nil {
-			extra = make(map[string]any)
-		}
-		var rawData json.RawMessage
-		if json.Unmarshal(tcr.Data, &rawData) == nil {
-			extra["raw_data"] = rawData
-		}
-		return llmContent, extra
-	}
-	return result, nil
 }
 
 // createThinkingNode builds the first Lambda in the graph.
@@ -217,74 +163,21 @@ func createExecutionNode() *compose.Lambda {
 
 		reasoningEvt := rt.assistantEvt.NewReasoningEvent(rt.currentStepID)
 
-		// toolCallsByIndex accumulates partial ToolCall fragments using the OpenAI streaming
-		// index as key; toolCallsIndexOrder preserves insertion order for deterministic merging.
-		toolCallsByIndex := make(map[int]*schema.ToolCall)
-		var toolCallsIndexOrder []int
-		var contentSB strings.Builder
-
-		for {
-			chunk, recvErr := reader.Recv()
-			if errors.Is(recvErr, io.EOF) {
-				break
-			}
-			if recvErr != nil {
-				return nil, fmt.Errorf("deep execution recv: %w", recvErr)
-			}
-			if chunk == nil {
-				continue
-			}
-
-			if chunk.ReasoningContent != "" {
-				reasoningEvt.OnContent(chunk.ReasoningContent)
-			}
-			if chunk.Content != "" {
-				rt.assistantEvt.OnContent(chunk.Content)
-				contentSB.WriteString(chunk.Content)
-			}
-
-			// Merge streaming tool_call fragments: each chunk carries a partial Arguments
-			// string that must be concatenated in Index order.
-			for i := range chunk.ToolCalls {
-				tc := &chunk.ToolCalls[i]
-				idx := i
-				if tc.Index != nil {
-					idx = *tc.Index
-				}
-				if existing, ok := toolCallsByIndex[idx]; ok {
-					existing.Function.Arguments += tc.Function.Arguments
-					if tc.ID != "" {
-						existing.ID = tc.ID
-					}
-					if tc.Function.Name != "" {
-						existing.Function.Name = tc.Function.Name
-					}
-					if tc.Type != "" {
-						existing.Type = tc.Type
-					}
-				} else {
-					copied := *tc
-					toolCallsByIndex[idx] = &copied
-					toolCallsIndexOrder = append(toolCallsIndexOrder, idx)
-				}
-			}
+		// Drain the stream via the shared primitive (also used by sub-agent runs): it forwards
+		// reasoning/text deltas, merges streaming tool_call fragments in index order, and closes
+		// the reasoning + text SSE segments on EOF.
+		content, toolCalls, drainErr := subagent.DrainModelStream(ctx, reader, rt.assistantEvt, reasoningEvt)
+		if drainErr != nil {
+			return nil, fmt.Errorf("deep execution: %w", drainErr)
 		}
-
-		// Close reasoning and text SSE frames for this model call.
-		reasoningEvt.OnEnd(ctx)
-		rt.assistantEvt.OnEnd(ctx)
 
 		// Tool calls present: append the assistant message and let the tools node execute.
 		// Include Content so the LLM can reference its own [DEEP THINKING] preamble text
 		// in subsequent iterations (relevant for non-native-reasoning models).
-		if len(toolCallsByIndex) > 0 {
-			toolCalls := make([]schema.ToolCall, 0, len(toolCallsByIndex))
-			for _, idx := range toolCallsIndexOrder {
-				toolCalls = append(toolCalls, *toolCallsByIndex[idx])
-			}
+		if len(toolCalls) > 0 {
 			return append(messages, &schema.Message{
 				Role:      schema.Assistant,
-				Content:   contentSB.String(),
+				Content:   content,
 				ToolCalls: toolCalls,
 			}), nil
 		}
@@ -307,7 +200,7 @@ func processInterrupt(ctx context.Context, messages []*schema.Message, rt *chatR
 
 	for _, tc := range lastMsg.ToolCalls {
 		rawExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
-		publicExtra := getToolPublicExtra(rawExtra)
+		publicExtra := subagent.PublicExtra(rawExtra)
 
 		// Emit TOOL_CALL_START SSE + persist tool_call DB row so the frontend can
 		// render the approval card with the correct tool name and arguments.
@@ -492,7 +385,7 @@ func createInterruptCheckNode() *compose.Lambda {
 		if !rt.req.AutoApprove {
 			for _, tc := range lastMsg.ToolCalls {
 				rawExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
-				if toolNeedsApproval(rawExtra) {
+				if subagent.ToolNeedsApproval(rawExtra) {
 					return processInterrupt(ctx, messages, rt)
 				}
 			}
@@ -573,115 +466,26 @@ func createToolsNode() *compose.Lambda {
 	})
 }
 
-// dispatchToolCalls runs fn for each tool call, concurrently up to maxParallel workers
-// (a value <= 1, or a single call, runs sequentially), and returns the results in the
-// ORIGINAL order regardless of completion order. Each worker writes a distinct result slot
-// and the final slice is assembled after all workers finish, so replay ordering is
-// deterministic and there is no shared-slice race. Safe because tool calls within one step
-// are independent by construction (see caller).
+// dispatchToolCalls delegates to subagent.DispatchToolCalls (kept as a local alias so the
+// tools node and existing tests share the one bounded-parallel dispatcher).
 func dispatchToolCalls(toolCalls []schema.ToolCall, maxParallel int, fn func(i int) *schema.Message) []*schema.Message {
-	results := make([]*schema.Message, len(toolCalls))
-	if maxParallel < 1 {
-		maxParallel = 1
-	}
-	if maxParallel == 1 || len(toolCalls) <= 1 {
-		for i := range toolCalls {
-			results[i] = fn(i)
-		}
-		return results
-	}
-
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, maxParallel)
-	for i := range toolCalls {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			results[idx] = fn(idx)
-		}(i)
-	}
-	wg.Wait()
-	return results
+	return subagent.DispatchToolCalls(toolCalls, maxParallel, fn)
 }
 
-// runToolCall executes a single tool call, emitting the TOOL_CALL_* lifecycle events and
-// returning the resulting tool message. It is safe to call concurrently for distinct tool
-// calls within one step: each invocation owns its ToolCallEvent, the SSE writer serializes
-// its own frames, the event sequence counter is atomic, and each goroutine writes a
-// distinct result slot. A tool error is converted into a tool message (never a Go error)
-// so one failing tool never aborts its siblings.
+// runToolCall executes a single tool call, delegating to the shared subagent.RunToolCall
+// so the host and sub-agent runs use identical tool-execution + event mechanics. It emits
+// the TOOL_CALL_* lifecycle events and returns the resulting tool message; a tool error or
+// panic is degraded to a tool-error message so one bad tool never aborts its siblings.
 func (rt *chatRun) runToolCall(
 	ctx context.Context,
 	tc *schema.ToolCall,
 	toolMap map[string]tool.InvokableTool,
 	parentMsgUID, stepID string,
 	isResumeApproved bool,
-) (msg *schema.Message) {
-	toolEvt := aievent.NewToolCallEvent(
-		tc.ID, tc.Function.Name,
-		parentMsgUID, stepID,
+) *schema.Message {
+	return subagent.RunToolCall(ctx, tc, toolMap, rt.orgTools,
 		rt.writer, rt.agent.convSrv, rt.convCtx,
-	)
-
-	// Recover from a panicking tool. This is REQUIRED for the parallel path: a panic in a
-	// worker goroutine cannot be caught by the request goroutine's recover (runtime.go), so
-	// without this it would crash the whole process. We degrade the panic to a tool-error
-	// message + event, exactly like a returned error, so one bad tool never aborts its
-	// siblings (parallel) or the whole turn (sequential).
-	defer func() {
-		if r := recover(); r != nil {
-			panicErr := fmt.Errorf("tool %q panicked: %v", tc.Function.Name, r)
-			agentLog.Error("tool call panicked", logger.String("tool", tc.Function.Name), logger.Error(panicErr))
-			toolEvt.OnError(ctx, panicErr)
-			msg = &schema.Message{
-				Role:       schema.Tool,
-				Content:    panicErr.Error(),
-				ToolCallID: tc.ID,
-				ToolName:   tc.Function.Name,
-			}
-		}
-	}()
-
-	if !isResumeApproved {
-		// Normal execution path: emit TOOL_CALL_START + persist tool_call DB row.
-		staticExtra := cloneToolExtra(rt.orgTools, tc.Function.Name)
-		publicExtra := getToolPublicExtra(staticExtra)
-		toolEvt.OnStart(ctx, tc.Function.Arguments, publicExtra)
-	}
-	// Resume+approved: run 1's processInterrupt already called OnStart.
-
-	it, ok := toolMap[tc.Function.Name]
-	if !ok {
-		toolErr := fmt.Errorf("tool %q not found", tc.Function.Name)
-		toolEvt.OnError(ctx, toolErr)
-		return &schema.Message{
-			Role:       schema.Tool,
-			Content:    toolErr.Error(),
-			ToolCallID: tc.ID,
-			ToolName:   tc.Function.Name,
-		}
-	}
-
-	result, runErr := it.InvokableRun(ctx, tc.Function.Arguments)
-	if runErr != nil {
-		toolEvt.OnError(ctx, runErr)
-		return &schema.Message{
-			Role:       schema.Tool,
-			Content:    runErr.Error(),
-			ToolCallID: tc.ID,
-			ToolName:   tc.Function.Name,
-		}
-	}
-	llmContent, extra := parseToolResult(result)
-	toolEvt.OnEnd(ctx, llmContent, extra)
-	return &schema.Message{
-		Role:       schema.Tool,
-		Content:    llmContent,
-		ToolCallID: tc.ID,
-		ToolName:   tc.Function.Name,
-	}
+		parentMsgUID, stepID, isResumeApproved)
 }
 
 // decideBranch routes after the interruptCheck node:
@@ -808,19 +612,5 @@ func buildGraph(cfg *agentconfig.Config) (compose.Runnable[[]*schema.Message, []
 // (icon, render_type) to tool events without coupling the graph nodes to specific
 // tool implementations.
 func cloneToolExtra(tools []tool.BaseTool, name string) map[string]any {
-	for _, t := range tools {
-		info, err := t.Info(context.Background())
-		if err != nil || info == nil || info.Name != name {
-			continue
-		}
-		if len(info.Extra) == 0 {
-			return nil
-		}
-		m := make(map[string]any, len(info.Extra))
-		for k, v := range info.Extra {
-			m[k] = v
-		}
-		return m
-	}
-	return nil
+	return subagent.CloneToolExtra(context.Background(), tools, name)
 }

@@ -37,12 +37,48 @@ import (
 // atomic sequence counter so all events in the run are globally ordered.
 // It is created once per chatRun and shared (by pointer) across all event objects
 // so the sequence is monotonically increasing across concurrent tool callbacks.
+//
+// seq is a *shared* pointer: Fork() derives a scoped ConvContext (for a sub-agent
+// run) that carries a different AgentID/ParentToolCallID but SHARES the same seq
+// counter, so host and all nested sub-agent events keep one run-global monotonic
+// order for deterministic replay.
 type ConvContext struct {
 	ConvID  int64
 	ConvUID string
 	UserID  int64
 	RunID   string
-	seq     atomic.Int32
+	// AgentID is the sub-agent (specialist/fork skill) name for events produced by a
+	// forked sub-agent run; empty for host events.
+	AgentID string
+	// ParentToolCallID is the host tool_call id that spawned this sub-agent run; empty for host.
+	ParentToolCallID string
+	seq              *atomic.Int32
+}
+
+// NewConvContext creates a ConvContext with an initialised (host-scoped) sequence counter.
+func NewConvContext(convID int64, convUID string, userID int64, runID string) *ConvContext {
+	return &ConvContext{
+		ConvID:  convID,
+		ConvUID: convUID,
+		UserID:  userID,
+		RunID:   runID,
+		seq:     new(atomic.Int32),
+	}
+}
+
+// Fork derives a sub-agent-scoped ConvContext that tags every event it produces with
+// agentID/parentToolCallID while SHARING the parent's seq counter (by pointer) so the
+// whole run keeps a single monotonic sequence across host and nested sub-agents.
+func (c *ConvContext) Fork(agentID, parentToolCallID string) *ConvContext {
+	return &ConvContext{
+		ConvID:           c.ConvID,
+		ConvUID:          c.ConvUID,
+		UserID:           c.UserID,
+		RunID:            c.RunID,
+		AgentID:          agentID,
+		ParentToolCallID: parentToolCallID,
+		seq:              c.seq,
+	}
 }
 
 // NextSeq atomically increments and returns the next sequence number for this run.
@@ -139,16 +175,18 @@ func newDBEvent(
 	opts ...evtOption,
 ) *agentmodel.Event {
 	e := &agentmodel.Event{
-		RunID:      convCtx.RunID,
-		ConvUID:    convCtx.ConvUID,
-		MessageUID: uuid.GenerateShortUUID(),
-		StepID:     stepID,
-		Role:       role,
-		Type:       evtType,
-		Status:     string(agui.StatusComplete),
-		Content:    content,
-		Sequence:   convCtx.NextSeq(),
-		ElapsedMs:  elapsedMs,
+		RunID:            convCtx.RunID,
+		ConvUID:          convCtx.ConvUID,
+		MessageUID:       uuid.GenerateShortUUID(),
+		StepID:           stepID,
+		Role:             role,
+		Type:             evtType,
+		Status:           string(agui.StatusComplete),
+		Content:          content,
+		Sequence:         convCtx.NextSeq(),
+		ElapsedMs:        elapsedMs,
+		AgentID:          convCtx.AgentID,
+		ParentToolCallID: convCtx.ParentToolCallID,
 	}
 	e.CreatedBy = convCtx.UserID
 	e.UpdatedBy = convCtx.UserID

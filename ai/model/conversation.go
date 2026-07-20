@@ -93,24 +93,24 @@ func (Message) TableName() string { return "messages" }
 // user_message and run_error events are not part of any model-call iteration; step_id is empty.
 type Event struct {
 	basemodel.BaseModel
-	RunID      string          `gorm:"column:run_id;index"`
-	ConvUID    string          `gorm:"column:conv_uid;index"`
-	MessageUID string          `gorm:"column:message_uid;uniqueIndex"`
+	RunID      string `gorm:"column:run_id;index"`
+	ConvUID    string `gorm:"column:conv_uid;index"`
+	MessageUID string `gorm:"column:message_uid;uniqueIndex"`
 	// StepID groups all events produced in one model-call iteration (reasoning → tool → text).
 	// Empty for user_message and run_error events.
-	StepID     string          `gorm:"column:step_id;index"`
-	Role       schema.RoleType `gorm:"column:role;index"`
+	StepID string          `gorm:"column:step_id;index"`
+	Role   schema.RoleType `gorm:"column:role;index"`
 	// Type is the event category; see EventType* constants.
-	Type       string          `gorm:"column:type;index"`
+	Type string `gorm:"column:type;index"`
 	// Status mirrors agui.MessageStatus; "error" rows are excluded from LLM context.
-	Status     string          `gorm:"column:status;index"`
+	Status string `gorm:"column:status;index"`
 	// Content holds the full text for text/reasoning events, tool result for tool_result,
 	// tool name for step_started, and human-readable error message for run_error.
-	Content    string          `gorm:"column:content;type:text"`
+	Content string `gorm:"column:content;type:text"`
 	// Code holds the machine-readable error code for run_error events (maps to agui.ErrorCode).
-	Code       string          `gorm:"column:code"`
-	ToolCallID string          `gorm:"column:tool_call_id;index"`
-	ToolName   string          `gorm:"column:tool_name"`
+	Code       string `gorm:"column:code"`
+	ToolCallID string `gorm:"column:tool_call_id;index"`
+	ToolName   string `gorm:"column:tool_name"`
 	// RawMessage is the schema.Message JSON for LLM context reconstruction (user/assistant/tool roles).
 	// Populated for event types that contribute to LLM context; empty for step and reasoning events.
 	RawMessage json.RawMessage `gorm:"column:raw_message;type:json"`
@@ -118,12 +118,19 @@ type Event struct {
 	// tool_call events. tool_result: render hints + raw_data from tool execution.
 	// tool_call: static ToolInfo.Extra (icon/render_type) for frontend pre-rendering.
 	// DB column name kept as "guidance" to avoid schema migration.
-	Extra   json.RawMessage `gorm:"column:extra;type:json"`
+	Extra json.RawMessage `gorm:"column:extra;type:json"`
 	// Sequence is the run-scoped insertion order for deterministic replay.
-	Sequence   int             `gorm:"column:sequence;default:0"`
+	Sequence int `gorm:"column:sequence;default:0"`
 	// ElapsedMs is the time from first content to persist (text/reasoning) or from
 	// OnStart to OnEnd (tool events). Zero for step_started and user_message rows.
-	ElapsedMs  int64           `gorm:"column:elapsed_ms;default:0"`
+	ElapsedMs int64 `gorm:"column:elapsed_ms;default:0"`
+	// AgentID is the sub-agent (specialist or fork skill) name that produced this event.
+	// Empty for host-produced events. Sub-agent process events carry a non-empty AgentID
+	// so they can be nested in history replay and excluded from LLM context building.
+	AgentID string `gorm:"column:agent_id;index"`
+	// ParentToolCallID links a sub-agent event back to the host tool_call (handoff_to_<name>
+	// or skill) that spawned the sub-agent run, enabling arbitrary-depth tree reconstruction.
+	ParentToolCallID string `gorm:"column:parent_tool_call_id;index"`
 }
 
 // TableName specifies the GORM table name.

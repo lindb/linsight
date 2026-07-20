@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/lindb/linsight/ai/agui"
+	agentapi "github.com/lindb/linsight/ai/api"
 	agentmodel "github.com/lindb/linsight/ai/model"
 )
 
@@ -37,10 +38,13 @@ type textFrame struct {
 	elapsedMs int64
 }
 
-// fakeSSEWriter captures only the TEXT_MESSAGE_* frames; every other SSEWriter method is a
-// no-op so the fake satisfies the full interface without pulling in a gin response writer.
+// fakeSSEWriter captures only the TEXT_MESSAGE_* frames (and STEP_* frame counts); every
+// other SSEWriter method is a no-op so the fake satisfies the full interface without pulling
+// in a gin response writer.
 type fakeSSEWriter struct {
-	text []textFrame
+	text         []textFrame
+	stepStarted  int
+	stepFinished int
 }
 
 func (w *fakeSSEWriter) WriteTextMessageStart(messageID string, _ schema.RoleType) {
@@ -66,8 +70,9 @@ func (w *fakeSSEWriter) WriteToolCallEnd(_ string)                              
 func (w *fakeSSEWriter) WriteToolCallResult(_, _, _ string, _ agui.MessageStatus, _ string, _ map[string]any, _ int64) {
 }
 func (w *fakeSSEWriter) WriteMessagesSnapshot(_ []agui.Message) {}
-func (w *fakeSSEWriter) WriteStepStarted(_, _ string)           {}
-func (w *fakeSSEWriter) WriteStepFinished(_ string, _ int64)    {}
+func (w *fakeSSEWriter) WriteStepStarted(_, _ string)           { w.stepStarted++ }
+func (w *fakeSSEWriter) WriteStepFinished(_ string, _ int64)    { w.stepFinished++ }
+func (w *fakeSSEWriter) Scoped(_, _ string) agentapi.SSEWriter  { return w }
 
 // fakeSaver captures persisted DB events.
 type fakeSaver struct {
@@ -82,7 +87,7 @@ func (s *fakeSaver) SaveEvent(_ context.Context, evt *agentmodel.Event) error {
 func newTestAssistantEvent() (*AssistantTextEvent, *fakeSSEWriter, *fakeSaver) {
 	w := &fakeSSEWriter{}
 	s := &fakeSaver{}
-	e := NewAssistantTextEvent(w, s, &ConvContext{RunID: "run-1", ConvUID: "conv-1", UserID: 7})
+	e := NewAssistantTextEvent(w, s, NewConvContext(1, "conv-1", 7, "run-1"))
 	return e, w, s
 }
 

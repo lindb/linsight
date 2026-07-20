@@ -118,6 +118,34 @@ func (a *agentRuntime) assembleMessages(history []*agentmodel.Event) []*schema.M
 	return msgs
 }
 
+// historyMessages returns the persisted conversation history as LLM messages, WITHOUT a
+// system prompt. Used to seed a fork_with_context sub-agent run that inherits the parent
+// conversation. GetRecentEvents already excludes reasoning/step/error rows and (after the
+// sub-agent tagging change) sub-agent process events, so only host-level turns are inherited.
+func (a *agentRuntime) historyMessages(ctx context.Context, convUID string) ([]*schema.Message, error) {
+	history, err := a.convSrv.GetRecentEvents(ctx, convUID, a.cfg.ContextSize)
+	if err != nil {
+		return nil, err
+	}
+	msgs := make([]*schema.Message, 0, len(history))
+	for _, m := range history {
+		if len(m.RawMessage) == 0 {
+			continue
+		}
+		var sm schema.Message
+		if err := json.Unmarshal(m.RawMessage, &sm); err != nil {
+			continue
+		}
+		sm.ReasoningContent = ""
+		msgs = append(msgs, &sm)
+	}
+	// Enforce the tool_call/tool_result pairing invariant: drop the in-flight tool_call that
+	// spawned this fork (persisted before its result exists) and any other orphans, so the
+	// forked sub-agent receives a provider-valid message list.
+	msgs = contextcomp.SanitizeMessages(convUID, msgs, nil)
+	return msgs, nil
+}
+
 // buildMessagesWithContextState builds messages using ContextProvider conversation state.
 // The state's ContextWindow already contains the current user message (saved before
 // GetConversationState was called).

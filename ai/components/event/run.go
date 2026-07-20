@@ -18,8 +18,8 @@
 package event
 
 import (
-	agentapi "github.com/lindb/linsight/ai/api"
 	"github.com/lindb/linsight/ai/agui"
+	agentapi "github.com/lindb/linsight/ai/api"
 )
 
 // RunEvent emits the run-lifecycle SSE frames (RUN_STARTED, RUN_FINISHED, RUN_ERROR).
@@ -46,4 +46,10 @@ func (e *RunEvent) OnEnd(runID, convUID, title string) {
 // OnError emits RUN_ERROR.
 func (e *RunEvent) OnError(runID string, code agui.ErrorCode, message string) {
 	e.writer.WriteRunError(runID, code, message)
+}
+
+// OnInterrupt emits a RUN_FINISHED frame with Outcome=interrupt so the frontend can
+// render the human-approval card(s) and echo back the interruptId to resume.
+func (e *RunEvent) OnInterrupt(runID, convUID string, payload *agui.InterruptPayload) {
+	e.writer.WriteRunInterrupt(runID, convUID, payload)
 }

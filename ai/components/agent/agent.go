@@ -36,6 +36,7 @@ import (
 	modelcomp "github.com/lindb/linsight/ai/components/model"
 	rulescomp "github.com/lindb/linsight/ai/components/rules"
 	skillscomp "github.com/lindb/linsight/ai/components/skills"
+	subagentcomp "github.com/lindb/linsight/ai/components/subagent"
 	toolscomp "github.com/lindb/linsight/ai/components/tools"
 	agentconfig "github.com/lindb/linsight/ai/config"
 	agentservice "github.com/lindb/linsight/ai/service"
@@ -55,16 +56,19 @@ type Agent interface {
 // four-node Lambda graph, which handles AG-UI tool-bound interrupts with human-in-the-loop
 // approval (see buildGraph in graph.go).
 type agentRuntime struct {
-	cfg          *agentconfig.Config
-	convSrv      agentservice.ConversationService
-	modelFactory *modelcomp.ModelFactory
-	skillBackend skillscomp.Backend
-	toolsFactory toolscomp.ToolsProvider
-	proxy        *modelcomp.DynamicModelProxy
+	cfg             *agentconfig.Config
+	convSrv         agentservice.ConversationService
+	modelFactory    *modelcomp.ModelFactory
+	skillBackend    skillscomp.Backend
+	toolsFactory    toolscomp.ToolsProvider
+	proxy           *modelcomp.DynamicModelProxy
 	contextProvider contextcomp.ContextProvider
 	// ruleEngine injects DB-backed global/per-org rules into the LLM context.
-	ruleEngine rulescomp.RuleEngine
+	ruleEngine    rulescomp.RuleEngine
 	memoryBackend memorycomp.Backend
+	// runner executes sub-agent runs (specialist handoff / fork skill) with full event
+	// streaming; injected into the request context so handoff/skill tools can delegate to it.
+	runner subagentcomp.Runner
 	// graph is the explicit compose.Graph compiled once at startup.
 	graph compose.Runnable[[]*schema.Message, []*schema.Message]
 	// sems maps orgID (int64) → chan struct{} (buffered semaphore).
@@ -90,16 +94,17 @@ func New(
 		return nil, fmt.Errorf("compile agent graph: %w", err)
 	}
 	return &agentRuntime{
-		cfg:          cfg,
-		convSrv:      convSrv,
-		modelFactory: modelFactory,
-		skillBackend: skillBackend,
-		toolsFactory: toolsFactory,
-		proxy:        proxy,
+		cfg:             cfg,
+		convSrv:         convSrv,
+		modelFactory:    modelFactory,
+		skillBackend:    skillBackend,
+		toolsFactory:    toolsFactory,
+		proxy:           proxy,
 		contextProvider: contextProvider,
-		ruleEngine:   ruleEngine,
-		memoryBackend: memoryBackend,
-		graph:        graph,
+		ruleEngine:      ruleEngine,
+		memoryBackend:   memoryBackend,
+		runner:          subagentcomp.NewRunner(proxy, cfg),
+		graph:           graph,
 	}, nil
 }
 
