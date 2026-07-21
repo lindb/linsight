@@ -60,21 +60,24 @@ func TestStepEvent_OnFinishIdempotent(t *testing.T) {
 	s := &fakeSaver{}
 	e := NewStepEvent(w, s, NewConvContext(1, "conv-1", 7, "run-1"))
 
-	e.OnStart(context.Background(), "step-1", "Deep Analysis")
+	e.OnStart(context.Background(), "step-1", "Step 1")
+	e.SetName("Inspect memory metrics") // model-generated title overrides the placeholder
 	e.OnFinish(context.Background())
 	e.OnFinish(context.Background()) // second close must be a no-op
 
 	assert.Equal(t, 1, w.stepStarted)
 	assert.Equal(t, 1, w.stepFinished, "double OnFinish must emit exactly one STEP_FINISHED")
 
-	// Exactly two rows: one step_started, one step_finished (no duplicate).
+	// Exactly two rows: one step_started ("Step 1"), one step_finished (the overridden title).
 	var started, finished int
 	for _, row := range s.saved {
 		switch row.Type {
 		case agentmodel.EventTypeStepStarted:
 			started++
+			assert.Equal(t, "Step 1", row.ToolName)
 		case agentmodel.EventTypeStepFinished:
 			finished++
+			assert.Equal(t, "Inspect memory metrics", row.ToolName)
 		}
 	}
 	assert.Equal(t, 1, started)

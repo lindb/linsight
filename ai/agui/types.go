@@ -211,8 +211,9 @@ type Event struct {
 
 	// Step lifecycle: STEP_STARTED and STEP_FINISHED.
 	// StepID is a short UUID distinct from ToolCallID; one per model-call iteration.
-	// StepName carries a caller-supplied label (e.g. "Reasoning", "Deep Analysis").
-	// Empty string is valid for unnamed steps.
+	// StepName carries the step label. Under the "llm" naming strategy it opens as
+	// "Step N" on STEP_STARTED and is replaced by the model-generated title on
+	// STEP_FINISHED; under "sequential" it stays "Step N". Empty string is valid.
 	StepID   string `json:"stepId,omitempty"`
 	StepName string `json:"stepName,omitempty"`
 

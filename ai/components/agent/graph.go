@@ -76,10 +76,13 @@ func createThinkingNode() *compose.Lambda {
 			return nil, fmt.Errorf("thinking: reset state: %w", err)
 		}
 
-		// Open a new step to group the upcoming model call and tool executions.
+		// Open a new step to group the upcoming model call and tool executions. The step
+		// opens as "Step N"; under the "llm" naming strategy the execution node later
+		// overrides it with the model-generated title (see createExecutionNode).
+		rt.stepSeq++
 		stepID := uuid.GenerateShortUUID()
 		stepEvt := aievent.NewStepEvent(rt.writer, rt.agent.convSrv, rt.convCtx)
-		stepEvt.OnStart(ctx, stepID, "Deep Analysis")
+		stepEvt.OnStart(ctx, stepID, fmt.Sprintf("Step %d", rt.stepSeq))
 		rt.currentStepID = stepID
 		rt.currentStepEvt = stepEvt
 
@@ -169,6 +172,14 @@ func createExecutionNode() *compose.Lambda {
 		content, toolCalls, drainErr := subagent.DrainModelStream(ctx, reader, rt.assistantEvt, reasoningEvt)
 		if drainErr != nil {
 			return nil, fmt.Errorf("deep execution: %w", drainErr)
+		}
+
+		// Under the "llm" strategy, generate the step title concurrently with tool execution
+		// (below). The StepEvent joins the result at OnFinish, so the naming latency is hidden
+		// behind tool runtime for tool-calling steps and bounded by a timeout otherwise.
+		if rt.agent.cfg.LLMStepName() {
+			rt.currentStepEvt.SetNameSource(
+				subagent.StartStepTitle(rt.reqCtx, rt.agent.proxy, content, toolCalls))
 		}
 
 		// Tool calls present: append the assistant message and let the tools node execute.

@@ -71,7 +71,7 @@ func (w *fakeSSEWriter) WriteToolCallResult(_, _, _ string, _ agui.MessageStatus
 }
 func (w *fakeSSEWriter) WriteMessagesSnapshot(_ []agui.Message) {}
 func (w *fakeSSEWriter) WriteStepStarted(_, _ string)           { w.stepStarted++ }
-func (w *fakeSSEWriter) WriteStepFinished(_ string, _ int64)    { w.stepFinished++ }
+func (w *fakeSSEWriter) WriteStepFinished(_, _ string, _ int64) { w.stepFinished++ }
 func (w *fakeSSEWriter) Scoped(_, _ string) agentapi.SSEWriter  { return w }
 
 // fakeSaver captures persisted DB events.

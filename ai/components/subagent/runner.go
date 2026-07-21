@@ -33,10 +33,12 @@ import (
 	"github.com/lindb/linsight/pkg/uuid"
 )
 
-// Streamer is the minimal model surface the runner needs. *modelcomp.DynamicModelProxy
-// satisfies it, so production wiring uses the real per-org model; tests inject a stub.
+// Streamer is the minimal model surface the runner needs: streaming for the ReAct loop and
+// non-streaming Generate for step-title naming. *modelcomp.DynamicModelProxy satisfies it
+// (it exposes both), so production wiring uses the real per-org model; tests inject a stub.
 type Streamer interface {
 	Stream(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.StreamReader[*schema.Message], error)
+	Generate(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.Message, error)
 }
 
 // runner is the default Runner implementation: a linear (no-interrupt) ReAct loop that
@@ -91,7 +93,7 @@ func (r *runner) Run(ctx context.Context, req RunRequest) (string, error) {
 	for i := 0; i < maxIters; i++ {
 		stepID := uuid.GenerateShortUUID()
 		stepEvt := aievent.NewStepEvent(w, saver, cc)
-		stepEvt.OnStart(ctx, stepID, req.AgentID)
+		stepEvt.OnStart(ctx, stepID, fmt.Sprintf("Step %d", i+1))
 
 		var modelOpts []einomodel.Option
 		if infos := toolInfos(ctx, tools); len(infos) > 0 {
@@ -115,6 +117,12 @@ func (r *runner) Run(ctx context.Context, req RunRequest) (string, error) {
 			return "", derr
 		}
 		lastText = content
+
+		// Under the "llm" strategy, name the step via a concurrent Generate call that overlaps
+		// the tool execution below; OnFinish joins it. Same rule as the host agent.
+		if r.cfg.LLMStepName() {
+			stepEvt.SetNameSource(StartStepTitle(ctx, r.proxy, content, toolCalls))
+		}
 
 		// No tool calls: terminal text-only iteration — the final answer.
 		if len(toolCalls) == 0 {

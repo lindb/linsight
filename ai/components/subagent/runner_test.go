@@ -49,6 +49,12 @@ func (s *scriptedStreamer) Stream(_ context.Context, _ []*schema.Message, _ ...e
 	return schema.StreamReaderFromArray(s.turns[i]), nil
 }
 
+// Generate satisfies the Streamer interface for step-title naming. Tests do not assert on
+// titles, so a canned short title is sufficient.
+func (s *scriptedStreamer) Generate(_ context.Context, _ []*schema.Message, _ ...einomodel.Option) (*schema.Message, error) {
+	return &schema.Message{Role: schema.Assistant, Content: "Test Step"}, nil
+}
+
 // recordingWriter records the (agentID) of every frame so we can assert tagging.
 // It implements agentapi.SSEWriter; Scoped returns a child sharing the same sink.
 type recordingWriter struct {
@@ -84,7 +90,7 @@ func (w *recordingWriter) WriteToolCallResult(_, _, _ string, _ agui.MessageStat
 }
 func (w *recordingWriter) WriteMessagesSnapshot(_ []agui.Message) {}
 func (w *recordingWriter) WriteStepStarted(_, _ string)           { w.rec() }
-func (w *recordingWriter) WriteStepFinished(_ string, _ int64)    { w.rec() }
+func (w *recordingWriter) WriteStepFinished(_, _ string, _ int64) { w.rec() }
 func (w *recordingWriter) Scoped(agentID, parentToolCallID string) agentapi.SSEWriter {
 	return &recordingWriter{mu: w.mu, sink: w.sink, agent: agentID, parent: parentToolCallID}
 }

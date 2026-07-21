@@ -78,7 +78,7 @@ func TestGetConversationEvents_ResumeInterruptOrdering(t *testing.T) {
 
 	// DB rows for one interrupted-then-resumed turn, in global insert order (id asc).
 	rows := []*agentmodel.Event{
-		{RunID: runID, StepID: stepID, Type: agentmodel.EventTypeStepStarted, ToolName: "Deep Analysis", Sequence: 1},
+		{RunID: runID, StepID: stepID, Type: agentmodel.EventTypeStepStarted, ToolName: "Step 1", Sequence: 1},
 		{RunID: runID, StepID: stepID, MessageUID: "tc-msg", Type: agentmodel.EventTypeToolCall,
 			ToolCallID: "call_1", RawMessage: toolCallRaw("call_1", "query"), Sequence: 2},
 		{RunID: runID, StepID: stepID, MessageUID: "asst-1", Type: agentmodel.EventTypeAssistantText,
@@ -88,7 +88,7 @@ func TestGetConversationEvents_ResumeInterruptOrdering(t *testing.T) {
 		{RunID: runID, StepID: stepID, MessageUID: "tr-msg", Type: agentmodel.EventTypeToolResult,
 			ToolCallID: "call_1", Content: "result body", RawMessage: toolResultRaw("call_1", "query", "result body"), Sequence: 5},
 		// continuation loops back to a new step under the SAME run
-		{RunID: runID, StepID: contStepID, Type: agentmodel.EventTypeStepStarted, ToolName: "Deep Analysis", Sequence: 6},
+		{RunID: runID, StepID: contStepID, Type: agentmodel.EventTypeStepStarted, ToolName: "Step 2", Sequence: 6},
 		{RunID: runID, StepID: contStepID, MessageUID: "asst-2", Type: agentmodel.EventTypeAssistantText,
 			Content: "final answer", RawMessage: assistantTextRaw("final answer"), Sequence: 7},
 		{RunID: runID, StepID: contStepID, Type: agentmodel.EventTypeStepFinished, Sequence: 8},
@@ -167,7 +167,7 @@ func TestGetConversationEvents_DanglingStepClosed(t *testing.T) {
 
 	// A turn that hit max-step: step_started + partial text + a run_error, but NO step_finished.
 	rows := []*agentmodel.Event{
-		{RunID: "R1", StepID: "S1", Type: agentmodel.EventTypeStepStarted, ToolName: "Deep Analysis", Sequence: 1},
+		{RunID: "R1", StepID: "S1", Type: agentmodel.EventTypeStepStarted, ToolName: "Step 1", Sequence: 1},
 		{RunID: "R1", StepID: "S1", MessageUID: "asst-1", Type: agentmodel.EventTypeAssistantText,
 			Content: "thinking", RawMessage: assistantTextRaw("thinking"), Sequence: 2},
 		{RunID: "R1", Type: agentmodel.EventTypeRunError, Status: string(agui.StatusError),

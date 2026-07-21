@@ -65,7 +65,7 @@ type SSEWriter interface {
 	// Step lifecycle: wraps a named execution step (typically one tool invocation).
 	// STEP_STARTED fires before TOOL_CALL_START; STEP_FINISHED fires after TOOL_CALL_RESULT.
 	WriteStepStarted(stepID, stepName string)
-	WriteStepFinished(stepID string, elapsedMs int64)
+	WriteStepFinished(stepID, stepName string, elapsedMs int64)
 
 	// Scoped returns a writer whose emitted frames all carry the given agentID and
 	// parentToolCallID, so a sub-agent run's events can be nested under the host
@@ -258,10 +258,11 @@ func (w *ginSSEWriter) WriteStepStarted(stepID, stepName string) {
 	})
 }
 
-func (w *ginSSEWriter) WriteStepFinished(stepID string, elapsedMs int64) {
+func (w *ginSSEWriter) WriteStepFinished(stepID, stepName string, elapsedMs int64) {
 	_ = w.writeEvent(agui.Event{
 		Type:      agui.StepFinished,
 		StepID:    stepID,
+		StepName:  stepName,
 		ElapsedMs: elapsedMs,
 	})
 }

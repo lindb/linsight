@@ -76,6 +76,10 @@ type chatRun struct {
 	assistantEvt   *aievent.AssistantTextEvent
 	currentStepID  string             // updated at the start of each model-call iteration
 	currentStepEvt *aievent.StepEvent // step lifecycle for the current model-call iteration
+	// stepSeq counts model-call iterations in this run; incremented in the thinking node
+	// and rendered as the "Step N" placeholder step name (overridden by the model-generated
+	// title under the "llm" strategy).
+	stepSeq int
 
 	// errFinalized guards finalizeError so the single deferred error path is idempotent
 	// (a max-step return and a later panic must not double-emit RUN_ERROR / run_error).

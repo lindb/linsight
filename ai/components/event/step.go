@@ -47,8 +47,14 @@ var stepLog = logger.GetLogger("ai", "StepEvent")
 type StepEvent struct {
 	sseStepID   string      // per-iteration UUID for SSE STEP_STARTED/STEP_FINISHED pairing
 	modelStepID string      // stored at OnStart; used by OnFinish to write step_finished DB row
+	name        string      // display name: set to "Step N" at OnStart, may be overridden by SetName
 	startTime   time.Time   // set in OnStart; used to compute elapsed in OnFinish
 	finished    atomic.Bool // idempotent guard: OnFinish is a no-op after the first call
+
+	// nameCh, when set via SetNameSource, delivers an asynchronously generated step title.
+	// OnFinish reads it (once) before writing the final name, so title generation can run
+	// concurrently with tool execution and be joined at step close.
+	nameCh <-chan string
 
 	writer  agentapi.SSEWriter
 	saver   EventSaver
@@ -73,6 +79,7 @@ func NewStepEvent(writer agentapi.SSEWriter, saver EventSaver, convCtx *ConvCont
 func (e *StepEvent) OnStart(ctx context.Context, modelStepID string, name string) {
 	e.startTime = time.Now()
 	e.modelStepID = modelStepID
+	e.name = name
 
 	// SSE: open the step before reasoning begins so the frontend groups the full iteration.
 	e.writer.WriteStepStarted(e.sseStepID, name)
@@ -91,6 +98,25 @@ func (e *StepEvent) OnStart(ctx context.Context, modelStepID string, name string
 	}
 }
 
+// SetName overrides the step's display name after OnStart (e.g. with a model-generated
+// title known only once streaming has begun). It is a no-op for the SSE STEP_STARTED
+// frame already emitted; the new name takes effect on the STEP_FINISHED frame and the
+// step_finished DB row. Passing an empty name leaves the existing name unchanged.
+func (e *StepEvent) SetName(name string) {
+	if name != "" {
+		e.name = name
+	}
+}
+
+// SetNameSource registers a channel that will deliver an asynchronously generated step
+// title (e.g. produced concurrently with tool execution). OnFinish reads a single value
+// from it before writing the final name; a non-empty value overrides the placeholder.
+// The channel MUST be buffered (size >= 1) and receive exactly one value so OnFinish never
+// blocks indefinitely and the producing goroutine never leaks if OnFinish is skipped.
+func (e *StepEvent) SetNameSource(ch <-chan string) {
+	e.nameCh = ch
+}
+
 // OnFinish fires when all tool calls in the iteration complete, or immediately after
 // model streaming ends for text-only iterations (no tool calls). Idempotent: subsequent
 // calls after the first are silently ignored, allowing both the normal path and the
@@ -100,21 +126,32 @@ func (e *StepEvent) OnFinish(ctx context.Context) {
 		return
 	}
 
+	// Join any asynchronously generated title (may block until the producer sends, bounded
+	// by the producer's own timeout). Empty leaves the "Step N" placeholder in place.
+	if e.nameCh != nil {
+		if n := <-e.nameCh; n != "" {
+			e.name = n
+		}
+	}
+
 	var elapsed int64
 	if !e.startTime.IsZero() {
 		elapsed = time.Since(e.startTime).Milliseconds()
 	}
 
-	// SSE: close the step with total iteration elapsed duration.
-	e.writer.WriteStepFinished(e.sseStepID, elapsed)
+	// SSE: close the step with total iteration elapsed duration and the (possibly
+	// overridden) step name.
+	e.writer.WriteStepFinished(e.sseStepID, e.name, elapsed)
 
-	// DB: persist step_finished for all iterations.
+	// DB: persist step_finished for all iterations, carrying the final step name so
+	// history replay can render the model-generated title.
 	evt := newDBEvent(e.convCtx,
 		agentmodel.EventTypeStepFinished,
 		e.modelStepID,
 		schema.Assistant,
 		"",
 		elapsed,
+		withToolName(e.name),
 	)
 	if err := e.saver.SaveEvent(ctx, evt); err != nil {
 		stepLog.Warn("failed to persist step_finished event", logger.Error(err))

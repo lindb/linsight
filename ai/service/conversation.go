@@ -616,7 +616,7 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 			result = append(result, agui.Event{
 				Type:     agui.StepStarted,
 				StepID:   stepUID,
-				StepName: r.ToolName, // empty for iteration-level steps; non-empty legacy tool steps
+				StepName: r.ToolName, // "Step N" placeholder (or empty for legacy rows)
 				RunID:    r.RunID,
 				Sequence: r.Sequence,
 			})
@@ -632,6 +632,7 @@ func (s *conversationService) GetConversationEvents(ctx context.Context, uid str
 			result = append(result, agui.Event{
 				Type:      agui.StepFinished,
 				StepID:    stepUID,
+				StepName:  r.ToolName, // final step name (model-generated title, or "Step N")
 				ElapsedMs: r.ElapsedMs,
 				Sequence:  r.Sequence,
 			})

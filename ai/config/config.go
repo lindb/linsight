@@ -105,6 +105,25 @@ type Config struct {
 	// reloads its in-memory cache from the specialists table. A non-positive value disables
 	// periodic refresh. Default: 30s.
 	SpecialistRefreshInterval ltoml.Duration `env:"SPECIALIST_REFRESH_INTERVAL" toml:"specialist-refresh-interval"`
+
+	// StepNameStrategy controls how each reasoning step is named in the SSE/DB event stream.
+	// Options:
+	//   - "llm" (default): the step opens as "Step N" and is renamed on finish to a short
+	//     title produced by a lightweight LLM call summarizing the step's output and tool
+	//     calls (generated concurrently with tool execution; falls back to "Step N" on error).
+	//   - "sequential": the step is always named "Step N"; no title call is made.
+	StepNameStrategy string `env:"STEP_NAME_STRATEGY" toml:"step-name-strategy"`
+}
+
+// StepNameStrategySequential is the config value that forces plain "Step N" naming
+// (no model-generated title).
+const StepNameStrategySequential = "sequential"
+
+// LLMStepName reports whether the LLM-generated step-title strategy is active. Any value
+// other than "sequential" (including the empty string, for backward compatibility) selects
+// the "llm" strategy.
+func (c *Config) LLMStepName() bool {
+	return c.StepNameStrategy != StepNameStrategySequential
 }
 
 // NewDefaultConfig returns a Config with conservative, safe defaults.
@@ -130,6 +149,7 @@ func NewDefaultConfig() *Config {
 		SkillRefreshInterval:      ltoml.Duration(30 * time.Second),
 		MemoryRefreshInterval:     ltoml.Duration(30 * time.Second),
 		SpecialistRefreshInterval: ltoml.Duration(30 * time.Second),
+		StepNameStrategy:          "llm",
 	}
 }
 
@@ -207,7 +227,11 @@ rule-refresh-interval = "%s"
 
 	## How often the DB-backed specialist (sub-agent) backend reloads its in-memory cache. Default: %s
 	## Env: LINSIGHT_AI_SPECIALIST_REFRESH_INTERVAL
-	specialist-refresh-interval = "%s"`,
+	specialist-refresh-interval = "%s"
+
+## Step naming strategy in the event stream. Options: "llm" (default, model-generated title) / "sequential" ("Step N")
+## Env: LINSIGHT_AI_STEP_NAME_STRATEGY
+step-name-strategy = "%s"`,
 		c.Enabled, c.Enabled,
 		c.MaxStep, c.MaxStep,
 		c.RequestTimeout.Duration().String(), c.RequestTimeout.Duration().String(),
@@ -226,6 +250,7 @@ rule-refresh-interval = "%s"
 		c.SkillRefreshInterval.Duration().String(), c.SkillRefreshInterval.Duration().String(),
 		c.MemoryRefreshInterval.Duration().String(), c.MemoryRefreshInterval.Duration().String(),
 		c.SpecialistRefreshInterval.Duration().String(), c.SpecialistRefreshInterval.Duration().String(),
+		escapeTOMLString(c.StepNameStrategy),
 	)
 }
 
