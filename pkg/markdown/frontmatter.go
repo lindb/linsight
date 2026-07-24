@@ -15,9 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package util
+package markdown
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
 
 // SplitFrontmatter extracts a leading "---\n...\n---" YAML frontmatter block from a
 // Markdown document, returning (frontmatter, body). It is shared by the skill, rule, and
@@ -48,4 +53,17 @@ func SplitFrontmatter(content string) (frontmatter, body string) {
 	}
 	// No closing fence: treat the leading "---" as ordinary Markdown.
 	return "", content
+}
+
+// ParseFrontmatter splits frontmatter from content, unmarshals it into T, and returns
+// (meta, body, err). When no frontmatter is present, meta is zero-valued and err is nil.
+func ParseFrontmatter[T any](content string) (meta T, body string, err error) {
+	fm, body := SplitFrontmatter(content)
+	if fm == "" {
+		return meta, body, nil
+	}
+	if err := yaml.Unmarshal([]byte(fm), &meta); err != nil {
+		return meta, body, fmt.Errorf("parse frontmatter: %w", err)
+	}
+	return meta, body, nil
 }

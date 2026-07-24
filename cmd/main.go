@@ -40,6 +40,7 @@ import (
 	"github.com/lindb/linsight/config"
 	"github.com/lindb/linsight/http"
 	"github.com/lindb/linsight/http/deps"
+	"github.com/lindb/linsight/integrations"
 	"github.com/lindb/linsight/model"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/plugin/datasource"
@@ -271,6 +272,11 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DatasourceMgr: datasourceMgr,
 		AlertRuleSrv:  service.NewAlertRuleService(db, alertRuleGroupSrv),
 	})
+
+	// Bootstrap integrations module (no-op when integrations-dir is not configured).
+	if err := integrations.Bootstrap(&integrations.Config{Dir: cfg.IntegrationsDir}); err != nil {
+		panic(err)
+	}
 
 	return &deps.API{
 		Config:              cfg,

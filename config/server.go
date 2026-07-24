@@ -80,8 +80,9 @@ type Server struct {
 	Cookie       *Cookie           `envPrefix:"LINSIGHT_COOKIE_" toml:"cookie"`
 	Provisioning string            `env:"LINSIGHT_PROVISIONING" toml:"provisioning"`
 	Logger       *logger.Setting   `envPrefix:"LINSIGHT_LOGGING_" toml:"logging"`
-	AI           *aiconfig.Config `envPrefix:"LINSIGHT_AI_" toml:"ai"`
-	Alerting     *Alerting        `envPrefix:"LINSIGHT_ALERTING_" toml:"alerting"`
+	AI           *aiconfig.Config  `envPrefix:"LINSIGHT_AI_" toml:"ai"`
+	Alerting     *Alerting         `envPrefix:"LINSIGHT_ALERTING_" toml:"alerting"`
+	IntegrationsDir string         `env:"LINSIGHT_INTEGRATIONS_DIR" toml:"integrations-dir"`
 }
 
 // TOML returns the server configuration as a commented TOML string.
@@ -93,6 +94,10 @@ func (s *Server) TOML() string {
 	alertingSection := ""
 	if s.Alerting != nil {
 		alertingSection = fmt.Sprintf("\n\n## Alerting background services configuration.\n[alerting]%s", s.Alerting.TOML())
+	}
+	integrationsSection := ""
+	if s.IntegrationsDir != "" {
+		integrationsSection = fmt.Sprintf("\n\n## Integration knowledge base directory.\n## Default: %s\n## Env: LINSIGHT_INTEGRATIONS_DIR\nintegrations-dir = \"%s\"", s.IntegrationsDir, s.IntegrationsDir)
 	}
 	return fmt.Sprintf(`## Run database migrations automatically on every startup.
 ## Default: %v
@@ -112,7 +117,7 @@ provisioning = "%s"
 
 ## Session cookie configuration.
 [cookie]%s
-%s%s%s`,
+%s%s%s%s`,
 		s.Migration, s.Migration,
 		s.Provisioning, s.Provisioning,
 		s.Database.TOML(),
@@ -121,6 +126,7 @@ provisioning = "%s"
 		s.Logger.TOML("LINSIGHT"),
 		aiSection,
 		alertingSection,
+		integrationsSection,
 	)
 }
 

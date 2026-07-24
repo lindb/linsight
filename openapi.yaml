@@ -3433,7 +3433,91 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-# ─── Components ──────────────────────────────────────────────────────────────
+  # ─── Integrations Knowledge Base ──────────────────────────────────────────────
+  /api/v1/integrations/categories:
+    get:
+      tags: [Integrations]
+      summary: List all integration categories and their counts
+      description: Returns available integration categories and the count of integrations in each.
+      responses:
+        '200':
+          description: List of categories with counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CategoryCount'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/integrations:
+    get:
+      tags: [Integrations]
+      summary: Search integrations
+      description: Search for integrations by category and/or query string.
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by category (optional)
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query string, matches name, description, tags, and symptoms (optional)
+      responses:
+        '200':
+          description: List of matching integrations with summary info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  integrations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IntegrationSummary'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/integrations/{id}:
+    get:
+      tags: [Integrations]
+      summary: Get integration details
+      description: Retrieve full details of a specific integration, including raw Markdown content for README and monitors.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Integration ID
+      responses:
+        '200':
+          description: Full integration details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Integration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+
 components:
   securitySchemes:
     cookieAuth:
@@ -5440,6 +5524,87 @@ components:
           description: Create/edit a global skill. Requires super admin (RoleLin).
         isEnabled:
           type: boolean
+
+    # ── Integrations Knowledge Base ─────────────────────────────────────────────
+    CategoryCount:
+      type: object
+      properties:
+        category:
+          type: string
+          description: Integration category name
+        count:
+          type: integer
+          description: Number of integrations in this category
+
+    Manifest:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the integration
+        name:
+          type: string
+          description: Human-readable name of the integration
+        version:
+          type: string
+          description: Semantic version (MAJOR.MINOR.PATCH)
+        category:
+          type: string
+          description: Integration category (database, observability, etc.)
+        description:
+          type: string
+          description: Brief description of the integration
+        tags:
+          type: array
+          items:
+            type: string
+          description: Searchable tags for this integration
+        symptoms:
+          type: array
+          items:
+            type: string
+          description: Observable failure patterns or symptoms
+        maintainers:
+          type: array
+          items:
+            type: string
+          description: GitHub handles of maintainers (optional)
+        homepage:
+          type: string
+          description: Official project URL (optional)
+
+    IntegrationSummary:
+      type: object
+      properties:
+        manifest:
+          $ref: '#/components/schemas/Manifest'
+        overview:
+          type: string
+          description: Overview text extracted from README.md
+
+    Integration:
+      allOf:
+        - $ref: '#/components/schemas/IntegrationSummary'
+        - type: object
+          properties:
+            sections:
+              type: array
+              items:
+                $ref: '#/components/schemas/ContentSection'
+              description: Markdown content sections sorted by order
+
+    ContentSection:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Section title from markdown frontmatter or filename
+        content:
+          type: string
+          description: Section content (markdown body after frontmatter)
+        order:
+          type: integer
+          description: Sort order (from frontmatter; defaults to 0 if not specified)
 
     Specialist:
       allOf:

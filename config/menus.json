@@ -193,6 +193,14 @@
     ]
   },
   {
+    "uid": "integrations",
+    "label": "Integrations",
+    "path": "/integrations/*",
+    "icon": "integration",
+    "page": "integrations",
+    "role": "Viewer"
+  },
+  {
     "uid": "setting",
     "label": "Setting",
     "icon": "setting",

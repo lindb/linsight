@@ -48,10 +48,9 @@ import (
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/lindb/common/pkg/logger"
-	"gopkg.in/yaml.v3"
 
 	agentmodel "github.com/lindb/linsight/ai/model"
-	aiutil "github.com/lindb/linsight/ai/util"
+	"github.com/lindb/linsight/pkg/markdown"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
 )
@@ -299,23 +298,21 @@ func ValidateContent(content string) error {
 // body and builds a RuntimeRule. When no frontmatter is present the whole content is
 // treated as the body (an always-on rule).
 func parseRuleContent(content string) (*RuntimeRule, error) {
-	fm, body := aiutil.SplitFrontmatter(content)
+	meta, body, err := markdown.ParseFrontmatter[ruleFrontmatter](content)
+	if err != nil {
+		return nil, err
+	}
+
 	rr := &RuntimeRule{Body: body}
-	if fm != "" {
-		var meta ruleFrontmatter
-		if uerr := yaml.Unmarshal([]byte(fm), &meta); uerr != nil {
-			return nil, fmt.Errorf("parse frontmatter: %w", uerr)
-		}
-		rr.TriggerTools = lowerAll(meta.TriggerTools)
-		rr.TriggerKeywords = lowerAll(meta.TriggerKeywords)
-		if meta.Variables != nil {
-			// Re-emit variables as compact JSON so the LLM receives a stable,
-			// language-neutral representation regardless of YAML vs. inline-JSON input.
-			if raw, jerr := json.Marshal(normalizeYAML(meta.Variables)); jerr == nil {
-				rr.VariablesJSON = string(raw)
-			} else {
-				ruleLog.Warn("rules: failed to serialise variables, dropping", logger.Error(jerr))
-			}
+	rr.TriggerTools = lowerAll(meta.TriggerTools)
+	rr.TriggerKeywords = lowerAll(meta.TriggerKeywords)
+	if meta.Variables != nil {
+		// Re-emit variables as compact JSON so the LLM receives a stable,
+		// language-neutral representation regardless of YAML vs. inline-JSON input.
+		if raw, jerr := json.Marshal(normalizeYAML(meta.Variables)); jerr == nil {
+			rr.VariablesJSON = string(raw)
+		} else {
+			ruleLog.Warn("rules: failed to serialise variables, dropping", logger.Error(jerr))
 		}
 	}
 	return rr, nil

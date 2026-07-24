@@ -26,6 +26,7 @@ import (
 	"github.com/lindb/linsight/http/api"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/http/middleware"
+	"github.com/lindb/linsight/integrations"
 )
 
 // Router represents http api router.
@@ -36,7 +37,6 @@ type Router struct {
 	loginAPI           *api.LoginAPI
 	bootAPI            *api.BootAPI
 	menuAPI            *api.MenuAPI
-	integrationAPI     *api.IntegerationAPI
 	orgAPI             *api.OrgAPI
 	teamAPI            *api.TeamAPI
 	userAPI            *api.UserAPI
@@ -67,7 +67,6 @@ func NewRouter(engine *gin.Engine, deps *depspkg.API) *Router {
 		loginAPI:           api.NewLoginAPI(deps),
 		bootAPI:            api.NewBootAPI(deps),
 		menuAPI:            api.NewMenuAPI(deps),
-		integrationAPI:     api.NewIntegrationAPI(deps),
 		orgAPI:             api.NewOrgAPI(deps),
 		userAPI:            api.NewUserAPI(deps),
 		teamAPI:            api.NewTeamAPI(deps),
@@ -101,7 +100,6 @@ func (r *Router) RegisterRouters() {
 	router.GET("/logout", middleware.Authenticate(r.deps), r.loginAPI.Logout)
 	router.GET("/boot", middleware.Authenticate(r.deps), r.bootAPI.Boot)
 
-	router.GET("/integrations", middleware.Authenticate(r.deps), r.integrationAPI.GetIntegrations)
 	router.GET("/tags", middleware.Authenticate(r.deps), r.tagAPI.FindTags)
 
 	router.GET("/menus",
@@ -251,6 +249,9 @@ func (r *Router) RegisterRouters() {
 
 	// ai agent (no-op when agent module is disabled)
 	aimodule.RegisterRoutes(router, r.deps)
+
+	// integrations knowledge base (no-op when integrations dir is not configured)
+	integrations.RegisterRoutes(router, r.deps)
 }
 
 func (r *Router) registerAlertingRouters(router *gin.RouterGroup) {

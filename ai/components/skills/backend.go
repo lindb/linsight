@@ -26,10 +26,9 @@ import (
 
 	"github.com/cloudwego/eino/adk/middlewares/skill"
 	"github.com/lindb/common/pkg/logger"
-	"gopkg.in/yaml.v3"
 
 	agentmodel "github.com/lindb/linsight/ai/model"
-	aiutil "github.com/lindb/linsight/ai/util"
+	"github.com/lindb/linsight/pkg/markdown"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	"github.com/lindb/linsight/pkg/util"
 )
@@ -235,17 +234,12 @@ func getOrgID(ctx context.Context) (int64, error) {
 func parseFrontmatter(name string, content string) (*runtimeSkill, error) {
 	rs := &runtimeSkill{Name: name}
 
-	fm, body := aiutil.SplitFrontmatter(content)
+	meta, body, err := markdown.ParseFrontmatter[skillFrontmatter](content)
+	if err != nil {
+		return nil, err
+	}
+
 	rs.Content = body
-
-	if fm == "" {
-		return rs, nil
-	}
-
-	var meta skillFrontmatter
-	if err := yaml.Unmarshal([]byte(fm), &meta); err != nil {
-		return nil, fmt.Errorf("parse frontmatter: %w", err)
-	}
 	rs.Description = strings.TrimSpace(meta.Description)
 	rs.Agent = strings.TrimSpace(meta.Agent)
 

@@ -26,10 +26,9 @@ import (
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/lindb/common/pkg/logger"
-	"gopkg.in/yaml.v3"
 
 	agentmodel "github.com/lindb/linsight/ai/model"
-	aiutil "github.com/lindb/linsight/ai/util"
+	"github.com/lindb/linsight/pkg/markdown"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 )
 
@@ -181,17 +180,12 @@ func (b *DBBackend) GetToolsForOrg(_ context.Context, orgID int64) ([]tool.BaseT
 func parseSpecialist(name, content string) (*runtimeSpecialist, error) {
 	rs := &runtimeSpecialist{Name: name}
 
-	fm, body := aiutil.SplitFrontmatter(content)
+	meta, body, err := markdown.ParseFrontmatter[specialistFrontmatter](content)
+	if err != nil {
+		return nil, err
+	}
+
 	rs.SystemPrompt = strings.TrimSpace(body)
-
-	if fm == "" {
-		return rs, nil
-	}
-
-	var meta specialistFrontmatter
-	if err := yaml.Unmarshal([]byte(fm), &meta); err != nil {
-		return nil, fmt.Errorf("parse frontmatter: %w", err)
-	}
 	rs.Description = strings.TrimSpace(meta.Description)
 	rs.Model = strings.TrimSpace(meta.Model)
 	rs.Tools = strings.TrimSpace(meta.Tools)

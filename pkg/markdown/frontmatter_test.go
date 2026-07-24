@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package util
+package markdown
 
 import (
 	"testing"
@@ -58,5 +58,41 @@ func TestSplitFrontmatter(t *testing.T) {
 		fm, body := SplitFrontmatter("---\r\nk: v\r\n---\r\nbody")
 		assert.Equal(t, "k: v", fm)
 		assert.Equal(t, "body", body)
+	})
+}
+
+func TestParseFrontmatter(t *testing.T) {
+	type TestMeta struct {
+		Title string `yaml:"title"`
+		Order int    `yaml:"order"`
+	}
+
+	t.Run("with frontmatter", func(t *testing.T) {
+		meta, body, err := ParseFrontmatter[TestMeta]("---\ntitle: Test\norder: 1\n---\nContent here")
+		assert.NoError(t, err)
+		assert.Equal(t, "Test", meta.Title)
+		assert.Equal(t, 1, meta.Order)
+		assert.Equal(t, "Content here", body)
+	})
+
+	t.Run("no frontmatter", func(t *testing.T) {
+		meta, body, err := ParseFrontmatter[TestMeta]("Just content, no frontmatter")
+		assert.NoError(t, err)
+		assert.Equal(t, TestMeta{}, meta)
+		assert.Equal(t, "Just content, no frontmatter", body)
+	})
+
+	t.Run("invalid yaml", func(t *testing.T) {
+		_, _, err := ParseFrontmatter[TestMeta]("---\ntitle: Test\ninvalid: [unclosed\n---\nContent")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "parse frontmatter")
+	})
+
+	t.Run("partial fields", func(t *testing.T) {
+		meta, body, err := ParseFrontmatter[TestMeta]("---\ntitle: Only Title\n---\nBody")
+		assert.NoError(t, err)
+		assert.Equal(t, "Only Title", meta.Title)
+		assert.Equal(t, 0, meta.Order)
+		assert.Equal(t, "Body", body)
 	})
 }
