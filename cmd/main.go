@@ -271,6 +271,7 @@ func buildDeps(db dbpkg.DB, cfg *config.Server) *deps.API {
 		DashboardSrv:  dashboardSrv,
 		DatasourceMgr: datasourceMgr,
 		AlertRuleSrv:  service.NewAlertRuleService(db, alertRuleGroupSrv),
+		CatalogSrv:    integrations.GetCatalogService(),
 	})
 
 	// Bootstrap integrations module (no-op when integrations-dir is not configured).

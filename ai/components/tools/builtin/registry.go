@@ -26,6 +26,7 @@ type BuiltinDeps struct {
 	DashboardSrv  dashboardSearcher
 	DatasourceMgr pluginManager
 	AlertRuleSrv  alertRuleCreator
+	CatalogSrv    catalogReader
 }
 
 // toolConstructor is a factory function that builds a single builtin tool from deps.

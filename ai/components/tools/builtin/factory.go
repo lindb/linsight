@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/lindb/common/pkg/logger"
 
+	"github.com/lindb/linsight/integrations"
 	"github.com/lindb/linsight/model"
 	"github.com/lindb/linsight/plugin"
 )
@@ -64,6 +65,12 @@ type alertRuleCreator interface {
 	CreateAlertRule(ctx context.Context, req *model.CreateAlertRuleRequest) (string, error)
 }
 
+// catalogReader is the minimal integrations.CatalogService surface that builtin tools require.
+type catalogReader interface {
+	SearchIntegrations(ctx context.Context, category, q string) ([]*integrations.IntegrationSummary, error)
+	GetIntegration(ctx context.Context, id string) (*integrations.Integration, error)
+}
+
 // BuiltinToolsFactory provides the built-in observability tools.
 // Unlike MCPToolsFactory the tool set is the same for all orgs, so the
 // tools slice is built once at construction time.
@@ -80,12 +87,14 @@ func NewBuiltinToolsFactory(
 	dashboardSrv dashboardSearcher,
 	datasourceMgr pluginManager,
 	alertRuleSrv alertRuleCreator,
+	catalogSrv catalogReader,
 ) (*BuiltinToolsFactory, error) {
 	deps := BuiltinDeps{
 		DatasourceSrv: datasourceSrv,
 		DashboardSrv:  dashboardSrv,
 		DatasourceMgr: datasourceMgr,
 		AlertRuleSrv:  alertRuleSrv,
+		CatalogSrv:    catalogSrv,
 	}
 	tools := make([]tool.BaseTool, 0, len(builtinRegistry))
 	for _, ctor := range builtinRegistry {

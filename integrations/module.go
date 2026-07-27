@@ -32,8 +32,9 @@ type module struct {
 }
 
 var (
-	mod     *module
-	modInit sync.Once
+	mod        *module
+	modInit    sync.Once
+	catalogSvc CatalogService = noopCatalogService{}
 )
 
 // Bootstrap initializes the integrations module.
@@ -53,11 +54,18 @@ func Bootstrap(cfg *Config) error {
 			svc = noopCatalogService{}
 		}
 
+		catalogSvc = svc
 		mod = &module{
 			handler: NewHandler(svc),
 		}
 	})
 	return initErr
+}
+
+// GetCatalogService returns the global CatalogService singleton.
+// It may return noopCatalogService if Bootstrap was not called or no integrations directory was configured.
+func GetCatalogService() CatalogService {
+	return catalogSvc
 }
 
 // RegisterRoutes registers all integrations routes.

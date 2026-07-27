@@ -43,6 +43,7 @@ import (
 	"github.com/lindb/linsight/config"
 	depspkg "github.com/lindb/linsight/http/deps"
 	"github.com/lindb/linsight/http/middleware"
+	"github.com/lindb/linsight/integrations"
 	dbpkg "github.com/lindb/linsight/pkg/db"
 	datasourcepkg "github.com/lindb/linsight/plugin/datasource"
 	servicepkg "github.com/lindb/linsight/service"
@@ -57,6 +58,8 @@ type ObservabilityDeps struct {
 	DatasourceMgr datasourcepkg.Manager
 	// AlertRuleSrv backs the linsight_create_alert_rule tool (approval-gated).
 	AlertRuleSrv servicepkg.AlertRuleService
+	// CatalogSrv backs the integration_discover and integration_load tools.
+	CatalogSrv integrations.CatalogService
 }
 
 // aiModule holds the domain handlers wired up during Bootstrap.
@@ -120,6 +123,7 @@ func Bootstrap(cfg *config.Server, db dbpkg.DB, obsDeps ObservabilityDeps) {
 		obsDeps.DashboardSrv,
 		obsDeps.DatasourceMgr,
 		obsDeps.AlertRuleSrv,
+		obsDeps.CatalogSrv,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("ai: failed to build builtin tools: %v", err))
